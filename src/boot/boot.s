@@ -22,22 +22,79 @@ init_raw_stack:
     mov sp, 0x7C00
 
 main:
+    mov ax, 0xCDE4
+    mov di, msg
+    call store_hex_str
+    call store_hex_str
+    
     mov si, msg
-    call puts
+    call print_str
 
     hlt
 
 .halt:
     jmp .halt
 
-msg:
-    db "Hello", ENDL, 0
 
+
+msg: db 0, 0, 0, 0, ENDL, 0
+
+;; Stores the given registers value as a hex string
+;; at the given location. (Null terminator is NOT
+;; included)
+;;
+;; Params:
+;;  di: the desination to store at.
+;;  ax: the register to translate.
+store_hex_str:
+    push cx
+    push bx
+    push di
+
+    ;; ax contains 16 bits (4 groups of 4)    
+    ;; each group of 4 must be translated.
+    
+    ;; we are going to do 4 iterations.
+    mov cl, 0
+
+.loop:
+    mov bx, ax
+
+    sar bx, 12  ;; Will copy high bits.
+    and bx, 0x000F
+
+    cmp bx, 10
+    jge .hex_digit
+
+.decimal_digit: 
+    add bl, "0"
+    jmp .continue
+
+.hex_digit:
+    add bl, "A" - 10
+
+.continue:
+    mov [di], bl
+    inc di
+
+    rol ax, 4
+
+    inc cl
+    cmp cl, 4
+    je .exit
+    jmp .loop
+
+.exit:
+    pop di
+    pop bx
+    pop cx
+     
+    ret
 
 ;; Print a string.
 ;; Params:
 ;;  si: pointer to the start of the string.
-puts:
+print_str:
     push si
     push ax
 
@@ -57,6 +114,7 @@ puts:
 .exit:
     pop ax
     pop si
+
     ret
 
 
