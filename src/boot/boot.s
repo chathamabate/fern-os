@@ -6,6 +6,8 @@ bits 16
 
 
 ;; Here is the boot sector.
+;; We could consider printing out the disk geometry?
+;; Could be a cool move for sure.
 
 main:
     ;; Should just print H.

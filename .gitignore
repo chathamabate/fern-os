@@ -1,4 +1,4 @@
 build
-
+*.img
 *.swp
 *.o
