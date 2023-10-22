@@ -22,12 +22,14 @@ init_raw_stack:
     mov sp, 0x7C00
 
 main:
-    mov ax, 0xCDE4
+    mov ax, 0xFFFF
     mov di, msg
-    call store_hex_str
-    call store_hex_str
+    call store_dec_str
     
     mov si, msg
+    call print_str
+
+    mov si, done_msg
     call print_str
 
     hlt
@@ -37,11 +39,53 @@ main:
 
 
 
-msg: db 0, 0, 0, 0, ENDL, 0
+done_msg: db "DONE", ENDL, 0
+msg: db 0, 0, 0, 0, 0, ENDL, 0
 
-;; Stores the given registers value as a hex string
-;; at the given location. (Null terminator is NOT
+;; Stores the given register's value as a decimal string.
+;; (NULL terminator is NOT included)
+;; Writes 5 characters always.
+;;
+;; Params:
+;;  di: the desination to store at.
+;;  ax: the register to translate.
+store_dec_str:
+    push ax
+    push bx
+    push cx
+    push dx
+
+    mov cl, 5
+    add di, 4
+
+    mov bx, 10 ;; Denominator
+
+.loop:
+    mov dx, 0   ;; Remember dx:ax is used as the numerator.
+    div bx
+
+    add dl, "0"
+    mov [di], dl
+
+    dec cl
+    jz .exit
+    
+    dec di
+    jmp .loop
+
+.exit:
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    ret
+    
+
+;; Stores the given register's value as a hex string
+;; at the given location. (NULL terminator is NOT
 ;; included)
+;; Writes 4 characters always.
 ;;
 ;; Params:
 ;;  di: the desination to store at.
@@ -55,12 +99,12 @@ store_hex_str:
     ;; each group of 4 must be translated.
     
     ;; we are going to do 4 iterations.
-    mov cl, 0
+    mov cl, 4
 
 .loop:
     mov bx, ax
 
-    sar bx, 12  ;; Will copy high bits.
+    sar bx, 12  ;; Will copy high bit.
     and bx, 0x000F
 
     cmp bx, 10
@@ -79,9 +123,8 @@ store_hex_str:
 
     rol ax, 4
 
-    inc cl
-    cmp cl, 4
-    je .exit
+    dec cl
+    jz .exit
     jmp .loop
 
 .exit:
@@ -117,6 +160,7 @@ print_str:
 
     ret
 
+bytes_used: dw $-$$
 
 times 510-($-$$) db 0
 
