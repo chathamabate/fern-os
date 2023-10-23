@@ -32,6 +32,7 @@ $(BOOT_BUILD_DIR)/boot.bin: $(BOOT_SRC_DIR)/boot.s
 # We will see how this goes.
 # We will need to use the BIOS to get our drive geometry.
 SECTORS	:= 32768
+# SECTORS	:= 5000
 
 # For now, let's say there are only 4 heads.
 # 4 * 1024 * 63 = 

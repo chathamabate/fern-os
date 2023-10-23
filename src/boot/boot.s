@@ -10,37 +10,105 @@ bits 16
 
 ;; Here we use the memory before the boot sector as
 ;; its temporary stack. After booting, we will changed this.
-init_raw_stack:
+init_segs:
     mov ax, 0
 
     ;; NOTE: remember when using bp, the default segment used is ss.
     ;; when using si and di, the default segment used is ds.
     mov ss, ax
     mov ds, ax
+    mov es, ax
 
+init_stack:
     mov bp, 0x7C00
     mov sp, 0x7C00
 
-main:
-    mov ax, 0xFFFF
-    mov di, msg
-    call store_dec_str
+;; Here we will find and store traits about the drive 
+;; we are booting from.
+discover_drive:
+    ;; prepare for interrupt.
+
+    ;; set es:di = 0000:0000
+    mov di, 0
     
-    mov si, msg
+    mov ah, 0x08
+    mov dl, 0x80    ;; First drive index
+
+    int 0x13
+
+    ;; On error, the carry flag is set.
+    jnc .continue
+
+    mov si, drive_error
     call print_str
+
+.halt:
+    hlt
+    jmp .halt
+
+.continue:
+    ;; Store number of heads.
+    inc dh
+    mov [heads], dh
+
+    mov ax, cx
+    call print_hex_str
+    call print_newline
+
+    mov byte [cylinders], ch
+    mov ch, cl
+
+    sar ch, 6
+    and ch, 0b00000011
+    mov byte [cylinders + 1], ch
+    inc word [cylinders]
+    
+    and cl, 0b00111111
+    mov byte [sectors_per_track], cl
+
+    jmp main 
+
+drive_error: db "Drive Error", ENDL, 0
+
+heads: db 0
+cylinders: dw 0         ;; = tracks per head.
+sectors_per_track: db 0           ;; (per track)
+
+main:
+    mov si, geometry_prefix
+    call print_str
+    
+    mov ax, 0
+    mov al, [heads]
+    call print_dec_str
+    call print_newline
+
+    mov ax, [cylinders]
+    call print_dec_str
+    call print_newline
+
+    mov ax, 0
+    mov al, [sectors_per_track]
+    call print_dec_str
+    call print_newline
 
     mov si, done_msg
     call print_str
-
-    hlt
+    call print_newline
+    
+    mov ax, 0
+    mov ax, [bytes_used]
+    call print_dec_str
+    call print_newline
 
 .halt:
+    hlt
     jmp .halt
 
+geometry_prefix: db "H/C/S:", ENDL, 0
 
+done_msg: db "DONE ", 0
 
-done_msg: db "DONE", ENDL, 0
-msg: db 0, 0, 0, 0, 0, ENDL, 0
 
 ;; Stores the given register's value as a decimal string.
 ;; (NULL terminator is NOT included)
@@ -134,6 +202,44 @@ store_hex_str:
      
     ret
 
+;; Print decimal value stored in ax.
+;; Params:
+;;  ax: value to print.
+print_dec_str:
+    push di
+    push si
+
+    mov di, .buf
+    call store_dec_str
+    mov si, .buf
+    call print_str
+
+    pop si
+    pop di
+    
+    ret
+
+.buf: db 0, 0, 0, 0, 0, 0
+
+;; Print hex value stored in ax.
+;; Params:
+;;  ax: value to print.
+print_hex_str:
+    push di
+    push si
+
+    mov di, .buf
+    call store_hex_str
+    mov si, .buf
+    call print_str
+
+    pop si
+    pop di
+    
+    ret
+
+.buf: db 0, 0, 0, 0, 0
+
 ;; Print a string.
 ;; Params:
 ;;  si: pointer to the start of the string.
@@ -159,6 +265,17 @@ print_str:
     pop si
 
     ret
+
+print_newline:
+    push si
+
+    mov si, newline
+    call print_str
+
+    pop si
+    ret
+
+newline: db ENDL, 0
 
 bytes_used: dw $-$$
 
