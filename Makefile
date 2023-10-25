@@ -20,6 +20,20 @@ $(BOOT_BUILD_DIR)/boot.bin: $(BOOT_SRC_DIR)/boot.s
 	mkdir -p $(BOOT_BUILD_DIR)
 	$(ASM) $(BOOT_SRC_DIR)/boot.s -f bin -o $(BOOT_BUILD_DIR)/boot.bin
 
+KERNEL_DIR			:= kernel
+KERNEL_SRC_DIR		:= $(SRC_DIR)/$(KERNEL_DIR)
+KERNEL_BUILD_DIR	:= $(BUILD_DIR)/$(KERNEL_DIR)
+
+$(KERNEL_BUILD_DIR)/kernel.bin: $(KERNEL_SRC_DIR)/kernel.s
+	mkdir -p $(KERNEL_BUILD_DIR)
+	$(ASM) $(KERNEL_SRC_DIR)/kernel.s -f bin -o $(KERNEL_BUILD_DIR)/kernel.bin
+
+$(BUILD_DIR)/image.bin: $(BOOT_BUILD_DIR)/boot.bin $(KERNEL_BUILD_DIR)/kernel.bin
+	mkdir -p $(BUILD_DIR)
+	cat $(BOOT_BUILD_DIR)/boot.bin > $(BUILD_DIR)/image.bin
+	cat $(KERNEL_BUILD_DIR)/kernel.bin >> $(BUILD_DIR)/image.bin
+
+
 # 512 * 2880 = 1.47 MB
 #
 # Cylinder = 0 to 1023 (1024 possible cylinders) (10 bits)
@@ -34,13 +48,13 @@ $(BOOT_BUILD_DIR)/boot.bin: $(BOOT_SRC_DIR)/boot.s
 #
 # NOTE: the bios will tell us how many sectors we actually
 # have available to us. (This is kinda just an estimate)
-SECTORS := 200000
+SECTORS := 32768
 
 # For now, let's say there are only 4 heads.
 # 4 * 1024 * 63 = 
-$(BUILD_DIR)/disk.img: $(BOOT_BUILD_DIR)/boot.bin
+$(BUILD_DIR)/disk.img: $(BUILD_DIR)/image.bin
 	dd if=/dev/zero of=$(BUILD_DIR)/disk.img bs=512 count=$(SECTORS)
-	dd if=$(BOOT_BUILD_DIR)/boot.bin of=$(BUILD_DIR)/disk.img conv=notrunc
+	dd if=$(BUILD_DIR)/image.bin of=$(BUILD_DIR)/disk.img conv=notrunc
 
 clean:
 	rm -r build

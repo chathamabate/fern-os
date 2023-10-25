@@ -101,73 +101,43 @@ sectors_per_cylinder:   db 0, 0
 sectors:    db 0, 0, 0, 0
 
 main:
+    mov bx, kernel          
 
-;;  bx: cylinder.
-;;  dh: track (head)
-;;  cl: sector.
-
-    mov dx, 1
-    mov ax, 0
+    ;; Starting at LBA 1
+    mov dx, 0
+    mov ax, 1
+    
     call lba_to_chs
+    mov dl, 0x80    ;; First Drive.
+    
+    mov ah, 0x02
 
-    call expand_cs
+    ;; Cannot move out of the current segment?
+    ;; Maybe we can do this better...
+    mov al, 62     ;; Read first Track from first sector.
 
-    mov ax, bx              ;; Cylinder.
-    call print_dec_str
-    call print_newline
+    int 0x13
+    
+    jc boot_error
 
+    jmp kernel
+
+boot_error:
+    mov al, ah
     mov ah, 0
-    mov al, dh              ;; Track.
-    call print_dec_str
-    call print_newline
-
-    mov al, cl              ;; Sector.
-    call print_dec_str
-    call print_newline
-
-    call print_newline
-
-    ;; Done.
-
-    mov si, geometry_prefix
-    call print_str
-
-    mov ax, [cylinders]
-    call print_dec_str
-    call print_newline
     
-    mov ax, 0
-    mov al, [tracks_per_cylinder]
     call print_dec_str
     call print_newline
 
-    mov ax, 0
-    mov al, [sectors_per_track]
-    call print_dec_str
-    call print_newline
-
-    call print_newline
-    mov ax, [sectors_per_cylinder]
-    call print_dec_str
-    call print_newline
-
-    call print_newline
-
-    mov si, done_msg
+    mov si, kernel_load_error
     call print_str
-    call print_newline
-    
-    mov ax, 0
-    mov ax, [bytes_left]
-    call print_dec_str
-    call print_newline
 
 .halt:
     hlt
     jmp .halt
 
+kernel_load_error: db "Error Reading Kernel", ENDL, 0
 geometry_prefix: db "Cyls / TpC / SpT", ENDL, 0
-
 done_msg: db "DONE ", 0
 
 ;; Sector = (lba % spt) + 1
@@ -421,20 +391,6 @@ print_dec_str:
     ret
 
 .buf: db 0, 0, 0, 0, 0, 0
-
-;; Print a 32-bit decimal value.
-;; Params:
-;;  dx:ax: the 32 bit value.
-print_dec32_str:
-    push ax
-
-    mov ax, dx
-    call print_dec_str
-
-    pop ax
-    call print_dec_str
-
-    ret
     
 
 ;; Print hex value stored in ax.
@@ -499,3 +455,5 @@ times 510-($-$$) db 0
 
 ;; Boot signature.
 dw 0xAA55
+
+kernel:
