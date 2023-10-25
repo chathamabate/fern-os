@@ -65,6 +65,14 @@ discover_drive:
     ;; dh - tracks / cyl
     ;; cl - sectors / track
     
+    ;; Calc sectors per cylinder.
+    mov ah, 0
+    mov al, cl
+    mul dh
+    mov [sectors_per_cylinder], ax
+
+    ;; Calc total sectors.
+    
     ;; We just need to multiply the all together.
     mov ah, 0
     mov al, dh   
@@ -83,15 +91,14 @@ discover_drive:
 
 drive_error: db "Drive Err", ENDL, 0
 
-tracks_per_cylinder:    resb 1   ;; = heads.
-cylinders:              resb 2
-sectors_per_track:      resb 1
+tracks_per_cylinder:    db 0   ;; = heads.
+cylinders:              db 0, 0
+sectors_per_track:      db 0
+sectors_per_cylinder:   db 0, 0
 
 ;; Sectors is stored as a 32 bit value.
 ;; (Should never take more than 24 bits though) 
 sectors:    db 0, 0, 0, 0
-sectors2:   db 222, 0, 111, 0
-
 
 main:
     mov si, geometry_prefix
@@ -108,6 +115,10 @@ main:
 
     mov ax, 0
     mov al, [sectors_per_track]
+    call print_dec_str
+    call print_newline
+
+    mov ax, [sectors_per_cylinder]
     call print_dec_str
     call print_newline
 
@@ -183,11 +194,29 @@ compress_cs:
 
 ;; Given CHS, convert to LBA.
 ;; Params:
-;;  dh: head
+;;  dh: track (head)
 ;;  cx: cylinder/sector        
 ;;      NOTE: The 2 high bits of cl are actually
 ;;      the 9th and 10th high bits of the cylinder.
+;; 
+;; Returns:
+;;  dx:ax: LBA form!
 chs_to_lba:
+    call expand_cs
+
+;; At this point:
+;;  bx: cylinder.
+;;  dh: track.
+;;  cl: sector.
+;; We need to calc (s/c)*bx + (s/t)*dh + (cl-1)
+
+    mov ax, [sectors_per_track] 
+    mul bx  // This is gonna write over da...
+
+    mov bx, ax
+    
+    
+
     ret
 
 ;; Given LBA
