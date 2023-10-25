@@ -106,18 +106,28 @@ main:
 ;;  dh: track (head)
 ;;  cl: sector.
 
-    mov bx, 65
-    mov dh, 0
-    mov cl, 1
+    mov dx, 1
+    mov ax, 0
+    call lba_to_chs
 
-    call compress_cs
-    call chs_to_lba
+    call expand_cs
 
-    ;; NEED TO FIX THIS!!
-    ;; But ultimately things are looking good.
-    call print_dec32_str
+    mov ax, bx              ;; Cylinder.
+    call print_dec_str
     call print_newline
+
+    mov ah, 0
+    mov al, dh              ;; Track.
+    call print_dec_str
     call print_newline
+
+    mov al, cl              ;; Sector.
+    call print_dec_str
+    call print_newline
+
+    call print_newline
+
+    ;; Done.
 
     mov si, geometry_prefix
     call print_str
@@ -252,9 +262,53 @@ chs_to_lba:
 
     ret
 
-;; Given LBA
-;; I think this is a 2 register value...
+;; Given LBA, convert to chs.
+;; Params: 
+;;  dx:ax: lba form.
+;;
+;; Returns:
+;;  cx: cylinder/sector
+;;  dh: track 
 lba_to_chs:
+    ;; Save ax, dl, and bx
+    push ax
+    push bx
+    mov bl, dl
+    push bx
+    
+    ;; (dx:ax) / bx
+    ;; dx = s - 1
+    ;; ax = (t/c)c + t
+    mov bh, 0
+    mov bl, [sectors_per_track]
+    div bx
+
+    inc dx
+    push dx ;; Save sector.
+    
+    ;; ax = (t/c)c + t
+    mov dx, 0
+    mov bl, [tracks_per_cylinder]
+    div bx
+
+    ;; ax = c
+    ;; dx = t
+    
+    mov dh, dl
+    mov dl, 0   ;; dh = track.
+
+    mov bx, ax  ;; bx = cylinder
+    
+    pop cx
+    mov ch, 0   ;; cl = sector
+
+    call compress_cs
+
+    pop bx
+    mov dl, bl
+    pop bx
+    pop ax
+    
     ret
 
 ;; Stores the given register's value as a decimal string.
