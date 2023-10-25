@@ -17,8 +17,10 @@ init_segs:
     ;; when using si and di, the default segment used is ds.
     mov ss, ax
     mov ds, ax
-    mov cs, ax
     mov es, ax
+
+    ;; NOTE: I need to figure out exactly how 
+    ;; the cs and pc work in tandom.
 
 init_stack:
     mov bp, 0x7C00
@@ -53,29 +55,43 @@ discover_drive:
     mov [tracks_per_cylinder], dh
 
     call expand_cs
-    mov word [cylinders], bx
-    mov byte [sectors_per_track], cl
+    inc bx
+    mov [cylinders], bx
 
+    mov [sectors_per_track], cl
 
-;;    mov byte [cylinders], ch
-;;    mov ch, cl
-;;
-;;    sar ch, 6
-;;    and ch, 0b00000011
-;;    mov byte [cylinders + 1], ch
-;;    inc word [cylinders]
-;;    
-;;    and cl, 0b00111111
-;;    mov byte [sectors_per_track], cl
+    ;; At this point 
+    ;; bx - cylinders
+    ;; dh - tracks / cyl
+    ;; cl - sectors / track
+    
+    ;; We just need to multiply the all together.
+    mov ah, 0
+    mov al, dh   
+    mov dx, 0   ;; dx:ax = tracks / cyl
+    
+    mul bx      ;; dx:ax = tracks
+
+    mov ch, 0
+    mul cx      ;; dx:ax = sectors
+
+    ;; Remember little endian.
+    mov [sectors], ax
+    mov [sectors+2], dx
 
     jmp main 
 
-msg: db "Here", ENDL, 0
 drive_error: db "Drive Err", ENDL, 0
 
-tracks_per_cylinder: db 0   ;; = heads.
-cylinders: dw 0         
-sectors_per_track: db 0       
+tracks_per_cylinder:    resb 1   ;; = heads.
+cylinders:              resb 2
+sectors_per_track:      resb 1
+
+;; Sectors is stored as a 32 bit value.
+;; (Should never take more than 24 bits though) 
+sectors:    db 0, 0, 0, 0
+sectors2:   db 222, 0, 111, 0
+
 
 main:
     mov si, geometry_prefix
@@ -93,6 +109,14 @@ main:
     mov ax, 0
     mov al, [sectors_per_track]
     call print_dec_str
+    call print_newline
+
+    call print_newline
+
+    mov si, sectors
+    call i_print_dec32_str
+
+    call print_newline
     call print_newline
 
     mov si, done_msg
@@ -164,8 +188,6 @@ compress_cs:
 ;;      NOTE: The 2 high bits of cl are actually
 ;;      the 9th and 10th high bits of the cylinder.
 chs_to_lba:
-    
-
     ret
 
 ;; Given LBA
@@ -265,9 +287,9 @@ store_dec_str:
 ;;     
 ;;    ret
 
-;; Print decimal value stored in ax.
+;; Print decimal value to print.
 ;; Params:
-;;  ax: value to print.
+;;  ax: the value to print.
 print_dec_str:
     push di
     push si
@@ -283,6 +305,22 @@ print_dec_str:
     ret
 
 .buf: db 0, 0, 0, 0, 0, 0
+
+;; Print a 32-bit decimal value.
+;; Params:
+;;  si: a reference to the 32 bit integer.
+i_print_dec32_str:
+    push ax
+
+    mov ax, [si+2]
+    call print_dec_str
+    mov ax, [si]
+    call print_dec_str
+
+    pop ax
+
+    ret
+    
 
 ;; Print hex value stored in ax.
 ;; Params:
