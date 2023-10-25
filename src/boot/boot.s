@@ -101,15 +101,33 @@ sectors_per_cylinder:   db 0, 0
 sectors:    db 0, 0, 0, 0
 
 main:
+
+;;  bx: cylinder.
+;;  dh: track (head)
+;;  cl: sector.
+
+    mov bx, 65
+    mov dh, 0
+    mov cl, 1
+
+    call compress_cs
+    call chs_to_lba
+
+    ;; NEED TO FIX THIS!!
+    ;; But ultimately things are looking good.
+    call print_dec32_str
+    call print_newline
+    call print_newline
+
     mov si, geometry_prefix
     call print_str
+
+    mov ax, [cylinders]
+    call print_dec_str
+    call print_newline
     
     mov ax, 0
     mov al, [tracks_per_cylinder]
-    call print_dec_str
-    call print_newline
-
-    mov ax, [cylinders]
     call print_dec_str
     call print_newline
 
@@ -118,16 +136,11 @@ main:
     call print_dec_str
     call print_newline
 
+    call print_newline
     mov ax, [sectors_per_cylinder]
     call print_dec_str
     call print_newline
 
-    call print_newline
-
-    mov si, sectors
-    call i_print_dec32_str
-
-    call print_newline
     call print_newline
 
     mov si, done_msg
@@ -143,7 +156,7 @@ main:
     hlt
     jmp .halt
 
-geometry_prefix: db "H/C/S:", ENDL, 0
+geometry_prefix: db "Cyls / TpC / SpT", ENDL, 0
 
 done_msg: db "DONE ", 0
 
@@ -202,6 +215,10 @@ compress_cs:
 ;; Returns:
 ;;  dx:ax: LBA form!
 chs_to_lba:
+
+    push bx
+    push cx
+
     call expand_cs
 
 ;; At this point:
@@ -210,12 +227,28 @@ chs_to_lba:
 ;;  cl: sector.
 ;; We need to calc (s/c)*bx + (s/t)*dh + (cl-1)
 
-    mov ax, [sectors_per_track] 
-    mul bx  // This is gonna write over da...
+;; Could we do multiplications than pushes??
 
-    mov bx, ax
-    
-    
+    mov ah, 0
+    mov al, dh ;; (Use Track)
+    mul byte [sectors_per_track]
+    push ax ;; Save (s/t)*dh 
+
+    mov ax, bx ;; (Use Cylinder)
+    mov dx, 0 
+    mul word [sectors_per_cylinder]
+
+    pop bx
+    ADD ax, bx
+    ADC dx, 0
+
+    mov ch, 0
+    dec cl
+    ADD ax, cx
+    ADC dx, 0
+
+    pop cx
+    pop bx
 
     ret
 
@@ -337,16 +370,15 @@ print_dec_str:
 
 ;; Print a 32-bit decimal value.
 ;; Params:
-;;  si: a reference to the 32 bit integer.
-i_print_dec32_str:
+;;  dx:ax: the 32 bit value.
+print_dec32_str:
     push ax
 
-    mov ax, [si+2]
-    call print_dec_str
-    mov ax, [si]
+    mov ax, dx
     call print_dec_str
 
     pop ax
+    call print_dec_str
 
     ret
     

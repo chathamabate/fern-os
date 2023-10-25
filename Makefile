@@ -34,7 +34,7 @@ $(BOOT_BUILD_DIR)/boot.bin: $(BOOT_SRC_DIR)/boot.s
 #
 # NOTE: the bios will tell us how many sectors we actually
 # have available to us. (This is kinda just an estimate)
-SECTORS := 32768
+SECTORS := 200000
 
 # For now, let's say there are only 4 heads.
 # 4 * 1024 * 63 = 
