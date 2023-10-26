@@ -1,7 +1,4 @@
-
-;; IO functions!
-
-%define ENDL 0x0D, 0x0A
+;; Terminal functions!
 
 %define BLACK       0x0
 %define BLUE        0x1
@@ -52,30 +49,72 @@ tui_init:
 
 ;; Clear the linear buffer.
 tui_clear:
-    push ds
-
     mov ax, TUI_BUFFER_SEG
     mov ds, ax
 
     mov bx, 0
 .loop:
-    mov byte [bx],     " "
-    mov byte [bx + 1], COLOR(WHITE, BLACK)
+    cmp bx, (2*TUI_BUFFER_LEN)
+    jnl .end
+
+    mov byte [bx],     "_"
+    mov byte [bx + 1], COLOR(WHITE, BLUE)
 
     add bx, 2
-    cmp bx, (2*TUI_BUFFER_LEN)
-    jne .loop
+    jmp .loop
 
-    pop ds
-
+.end:
     ret
-
-
 
 ;; Place a string in the BIOS video memory.
 ;; Params:
-;;  si: Address of the beginning of the string.
-;;   
+;;  [bp-1]: u8 row
+;;  [bp-2]: u8 col
+;;  [bp-3]: u8 color
+;;  [bp-5]: u16 source segment
+;;  [bp-7]: u16 source offset
 tui_puts:
+    ;; Reading source string from ds:si.
+    mov ds, [bp-5]
+    mov si, [bp-7]
 
+    ;; We exit if we hit the end of the string,
+    ;; or we hit the end of the buffer.
 
+    mov ah, 0
+    mov al, [bp-1] 
+
+    mov bl, TUI_COLS
+    mul bl 
+
+    add al, [bp-2]
+    adc ah, 0
+    
+    mov di, ax
+
+    ;; Copying to es:di.
+    mov ax, TUI_BUFFER_SEG
+    mov es, ax
+
+    ;; Retrieve our color.
+    mov ch, [bp-3]
+.loop:
+    cmp di, (2*TUI_BUFFER_LEN)
+    jnl .end
+
+    mov cl, [ds:si]
+    
+    ;; Check for end of string.
+    cmp cl, 0
+    je .end
+
+    ;; Finally perform write.
+    mov [es:di], cx
+    
+    inc si      ;; move in source.
+    add di, 2   ;; move in dest.
+    
+    jmp .loop
+
+.end:
+    ret
