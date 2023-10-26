@@ -18,7 +18,9 @@ bits 16
     jmp start_kernel
 
 ;; From this point on, functions are only
-;; expected to preserve the cs and ss segment registers.
+;; expected to preserve the cs, ss, sp, and bp registers.
+;; Additionally, passed parameter values should be left
+;; unmodified.
 ;; Parameters should be passed through the stack.
 
 ;; System Functions!
@@ -31,20 +33,34 @@ start_kernel:
     ;; Let's place a string on the stack bois.
     mov bp, sp
     mov byte [bp-1], 0
-    mov byte [bp-2], "b"
-    mov byte [bp-3], "a"
-    mov byte [bp-4], "c"
-    sub sp, 4 
+    mov byte [bp-2], "A"
+    mov byte [bp-3], "B"
+    sub sp, 3
 
-    ;; ax point to the beginning of the string.
+    ;; ax point to the beginning of the string buffer.
+    mov ax, sp
+
+    ;; Set up u8 to hex stack frame. 
+    mov bp, sp
+    sub sp, 5
+    mov byte [bp-1], 0x00
+    mov [bp-3], ss
+    mov [bp-5], ax
+
+    call str_u8_to_hex
+    
+    ;; dispose of stack frame.
+    mov sp, bp
+
+    ;; Reload our string buffer reference.
     mov ax, sp
 
     ;; Set up puts stack frame.
     mov bp, sp
     sub sp, 7
 
-    mov byte [bp-1], 3
-    mov byte [bp-2], 15
+    mov byte [bp-1], 0
+    mov byte [bp-2], 0
     mov byte [bp-3], COLOR(GREEN, BLACK)
     mov word [bp-5], ss
     mov word [bp-7], ax
