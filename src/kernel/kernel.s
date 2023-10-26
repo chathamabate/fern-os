@@ -43,9 +43,9 @@ start_kernel:
     mov bp, sp
     sub sp, 7
 
-    mov byte [bp-1], 1
-    mov byte [bp-2], 0
-    mov byte [bp-3], COLOR(WHITE, BLACK)
+    mov byte [bp-1], 3
+    mov byte [bp-2], 15
+    mov byte [bp-3], COLOR(GREEN, BLACK)
     mov word [bp-5], ss
     mov word [bp-7], ax
     

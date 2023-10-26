@@ -34,6 +34,7 @@
 ;; tui works with the BIOS vga3 text mode display!
 
 tui_init:
+
     ;; Code for disabling cursor.
     mov dx, 0x3D4
 	mov al, 0xA
@@ -57,8 +58,8 @@ tui_clear:
     cmp bx, (2*TUI_BUFFER_LEN)
     jnl .end
 
-    mov byte [bx],     "_"
-    mov byte [bx + 1], COLOR(WHITE, BLUE)
+    mov byte [bx],     " "
+    mov byte [bx + 1], COLOR(WHITE, BLACK)
 
     add bx, 2
     jmp .loop
@@ -91,6 +92,7 @@ tui_puts:
     adc ah, 0
     
     mov di, ax
+    sal di, 1
 
     ;; Copying to es:di.
     mov ax, TUI_BUFFER_SEG
