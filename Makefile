@@ -24,8 +24,13 @@ KERNEL_DIR			:= kernel
 KERNEL_SRC_DIR		:= $(SRC_DIR)/$(KERNEL_DIR)
 KERNEL_BUILD_DIR	:= $(BUILD_DIR)/$(KERNEL_DIR)
 
-$(KERNEL_BUILD_DIR)/kernel.bin: $(KERNEL_SRC_DIR)/kernel.s
+KERNEL_SRCS			:= $(wildcard $(KERNEL_SRC_DIR)/*.s)
+
+$(KERNEL_BUILD_DIR)/kernel.bin: $(KERNEL_SRCS)
 	mkdir -p $(KERNEL_BUILD_DIR)
+	
+	# NOTE that kernel.s should include all the code from
+	# all other kernel srcs.
 	$(ASM) $(KERNEL_SRC_DIR)/kernel.s -f bin -o $(KERNEL_BUILD_DIR)/kernel.bin
 
 $(BUILD_DIR)/image.bin: $(BOOT_BUILD_DIR)/boot.bin $(KERNEL_BUILD_DIR)/kernel.bin

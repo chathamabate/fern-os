@@ -1,5 +1,9 @@
 org 0x7C00
 
+;; NOTE This is the old boot sector.
+;; It contains many extra functionss which will be moved
+;; to the kernel.
+
 bits 16
 
 %define ENDL 0x0D, 0x0A
@@ -101,7 +105,14 @@ sectors_per_cylinder:   db 0, 0
 sectors:    db 0, 0, 0, 0
 
 main:
-    mov bx, kernel          
+    
+    ;; This is where the kernel will start.
+    mov ax, 0x1000
+    mov es, ax
+    mov bx, 0
+    
+    ;; Right now, the kernel will be sectors
+    ;; 1 - 128 inclusive in LBA.
 
     ;; Starting at LBA 1
     mov dx, 0
@@ -112,15 +123,14 @@ main:
     
     mov ah, 0x02
 
-    ;; Cannot move out of the current segment?
-    ;; Maybe we can do this better...
-    mov al, 62     ;; Read first Track from first sector.
+    ;; This should fill all of 
+    ;; the kernel segment.
+    mov al, 128     
 
     int 0x13
-    
     jc boot_error
 
-    jmp kernel
+    jmp 0x1000:0x0
 
 boot_error:
     mov al, ah
@@ -194,43 +204,43 @@ compress_cs:
 ;; 
 ;; Returns:
 ;;  dx:ax: LBA form!
-chs_to_lba:
-
-    push bx
-    push cx
-
-    call expand_cs
-
-;; At this point:
-;;  bx: cylinder.
-;;  dh: track.
-;;  cl: sector.
-;; We need to calc (s/c)*bx + (s/t)*dh + (cl-1)
-
-;; Could we do multiplications than pushes??
-
-    mov ah, 0
-    mov al, dh ;; (Use Track)
-    mul byte [sectors_per_track]
-    push ax ;; Save (s/t)*dh 
-
-    mov ax, bx ;; (Use Cylinder)
-    mov dx, 0 
-    mul word [sectors_per_cylinder]
-
-    pop bx
-    ADD ax, bx
-    ADC dx, 0
-
-    mov ch, 0
-    dec cl
-    ADD ax, cx
-    ADC dx, 0
-
-    pop cx
-    pop bx
-
-    ret
+;;chs_to_lba:
+;;
+;;    push bx
+;;    push cx
+;;
+;;    call expand_cs
+;;
+;;;; At this point:
+;;;;  bx: cylinder.
+;;;;  dh: track.
+;;;;  cl: sector.
+;;;; We need to calc (s/c)*bx + (s/t)*dh + (cl-1)
+;;
+;;;; Could we do multiplications than pushes??
+;;
+;;    mov ah, 0
+;;    mov al, dh ;; (Use Track)
+;;    mul byte [sectors_per_track]
+;;    push ax ;; Save (s/t)*dh 
+;;
+;;    mov ax, bx ;; (Use Cylinder)
+;;    mov dx, 0 
+;;    mul word [sectors_per_cylinder]
+;;
+;;    pop bx
+;;    ADD ax, bx
+;;    ADC dx, 0
+;;
+;;    mov ch, 0
+;;    dec cl
+;;    ADD ax, cx
+;;    ADC dx, 0
+;;
+;;    pop cx
+;;    pop bx
+;;
+;;    ret
 
 ;; Given LBA, convert to chs.
 ;; Params: 
@@ -456,4 +466,3 @@ times 510-($-$$) db 0
 ;; Boot signature.
 dw 0xAA55
 
-kernel:

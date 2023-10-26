@@ -1,42 +1,40 @@
-
-org 0x7E00
+;; The Kernel Segment.
+;; Will go from 0x10000 - 0x1FFFF
+;;
+;; This is 128 sectors in total!
+;; LBA 1 - 128
+;;
+;; Other areas will be decided upon later!
+org 0x10000
 
 bits 16
-
-%define ENDL 0x0D, 0x0A
 
 ;; NOTE: from this point on, the boot sector will
 ;; be deprecated. DON'T USE IT'S FUNCTIONS!
 
-start_kernel:
-    mov si, kernel_msg
-    call print_str
+init_segments:
+    ;; Set up kernel segments.
+    mov ax, 0x1000
+    mov ds, ax
+    mov es, ax
+    
+    jmp start_kernel
 
-.halt
+;; From this point on, functions are only
+;; expected to preserve segment register values.
+;; Parameters should be passed through the stack.
+
+;; System Functions!
+%include "src/kernel/io.s"
+
+start_kernel:
+    call tui_init
+    ;; Kernel Start Up Code!
+.halt:
     hlt
     jmp .halt
 
-kernel_msg: db "Hello From Kernel!", ENDL, 0
 
-print_str:
-    push si
-    push ax
-
-    mov ah, 0x0E
-
-.loop:
-    mov al, [si]
-
-    cmp al, 0
-    je .exit
-
-    int 0x10
-    
-    inc si
-    jmp .loop
-
-.exit:
-    pop ax
-    pop si
-
-    ret
+;; This tells us how many bytes we have left
+;; in the kernel segment.
+%define BYTES_LEFT 65536-($-$$)
