@@ -33,21 +33,23 @@ start_kernel:
     ;; Let's place a string on the stack bois.
     mov bp, sp
     mov byte [bp-1], 0
-    mov byte [bp-2], "A"
-    mov byte [bp-3], "B"
-    sub sp, 3
+    mov byte [bp-2], "-"
+    mov byte [bp-3], "-"
+    mov byte [bp-4], "-"
+    mov byte [bp-5], "-"
+    sub sp, 5
 
     ;; ax point to the beginning of the string buffer.
     mov ax, sp
 
     ;; Set up u8 to hex stack frame. 
     mov bp, sp
-    sub sp, 5
-    mov byte [bp-1], 0x00
-    mov [bp-3], ss
-    mov [bp-5], ax
+    sub sp, 6
+    mov word [bp-2], 0xA0B1
+    mov [bp-4], ss
+    mov [bp-6], ax
 
-    call str_u8_to_hex
+    call str_u16_to_hex
     
     ;; dispose of stack frame.
     mov sp, bp

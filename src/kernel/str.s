@@ -63,25 +63,51 @@ str_u8_to_hex:
 str_u16_to_hex:
     ;; We are going to use our above
     ;; call as a helper.
+
+    ;; NOTE:
+    ;; in a function we know the exact size of
+    ;; the entire stack frame, and the parameter
+    ;; stack frame of all called functions.
     ;;
-    ;; Harder than we thought huh?
-    ;;
-    ;; How do we call one function from another
-    ;; while not losing any information about bp??
-    ;; This is a lil tricky my friend... a lil tricky...
-    
-    ;; Store are old bp in ax.
-    ;; Gotta figure this out boys...
-    ;; How will locals be accessed...
-    ;; This is a good questione.
-    mov ax, bp
+    ;; When writing this by hand, I will store the old
+    ;; bp. However, a compiler wouldn't need to do this!
+
+    ;; We have no stack locals, so let's
+    ;; push our stack pointer.
     push bp
 
-    mov bp, sp 
+    ;; NOTE: that with this strategy.
+    ;; [bp] will be our old stack pointer!
+    mov bp, sp  
+
     sub sp, 5
+
+    ;; get our old base pointer.
+    mov si, [bp]
+
+    ;; load params.
+    mov bl, [ss:si-1]
+    mov [bp-1], bl
     
+    mov bx, [ss:si-4]
+    mov [bp-3], bx
     
-    
+    mov bx, [ss:si-6]
+    mov [bp-5], bx
+
+    call str_u8_to_hex
+
+    ;; This relies on the fact that parameters
+    ;; should never be modified!
+    mov bl, [ss:si-2]
+    mov [bp-1], bl
+
+    add word [bp-5], 2
+
+    call str_u8_to_hex
+
+    add sp, 5
+
     pop bp
 
     ret
