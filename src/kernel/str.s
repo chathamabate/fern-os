@@ -110,33 +110,18 @@ str_s8_to_dec:
     mov ax, [bp-2]
     mov ds, ax
     mov si, [bp-4]
-
-    ;; Write to the last character first.
-    add si, 2
-
-    ;; Load up the byte.
-    mov al, [bp-5]
-
     
-    mov bl, 10
-    mov cl, 0
+    ;; This is a bit harder now...
+    ;; I feel like this isn't too hard..
+    ;; like, just make it positive...
+    ;; unless its OxA
+    ;; we can use 2 complement negation...
+    mov al, [bp-5]
+    
+    ;; if the final bit is set, we
+    ;; write a negative sign. 
+    ;; otherwise a positive sign.
 
-.loop:
-    cmp cl, 3
-    jge .end
-
-    ;; Perform division.
-    mov ah, 0
-    div bl 
-
-    ;; Write Character.
-    add ah, "0"
-    mov [si], ah
-    dec si
-
-    inc cl
-    jmp .loop
-.end:
 
     ret
     
