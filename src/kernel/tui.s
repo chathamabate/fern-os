@@ -33,9 +33,11 @@
 
 ;; tui works with the BIOS vga3 text mode display!
 
-tui_init:
 
-    ;; Code for disabling cursor.
+;; Initialize the tui.
+;; Params:
+;;  None
+tui_init:
     mov dx, 0x3D4
 	mov al, 0xA
 	out dx, al

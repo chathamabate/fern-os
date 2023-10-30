@@ -19,16 +19,18 @@ bits 16
 
 ;; From this point on, functions are only
 ;; expected to preserve the cs, ss, sp, and bp registers.
-;; Additionally, passed parameter values should be left
-;; unmodified.
 ;; Parameters should be passed through the stack.
+;; Parameters should not be modified by the called function.
+;; (Only Read)
 
 ;; System Functions!
 %include "src/kernel/str.s"
 %include "src/kernel/tui.s"
 
 start_kernel:
+    ;; prepare for call.
     call tui_init
+
     
     ;; Let's place a string on the stack bois.
     mov bp, sp
@@ -45,7 +47,7 @@ start_kernel:
     ;; Set up u8 to hex stack frame. 
     mov bp, sp
     sub sp, 6
-    mov word [bp-2], 0xA0B1
+    mov word [bp-2], 0xA012
     mov [bp-4], ss
     mov [bp-6], ax
 
