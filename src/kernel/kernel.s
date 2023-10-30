@@ -22,6 +22,9 @@ bits 16
 ;; Parameters should be passed through the stack.
 ;; Parameters should not be modified by the called function.
 ;; (Only Read)
+;;
+;; "return values" are simulated by providing 
+;; a pointer to the desired return location.
 
 ;; System Functions!
 %include "src/kernel/str.s"
@@ -34,12 +37,14 @@ start_kernel:
     
     ;; Let's place a string on the stack bois.
     mov bp, sp
+    sub sp, 6
+
     mov byte [bp-1], 0
     mov byte [bp-2], "-"
     mov byte [bp-3], "-"
     mov byte [bp-4], "-"
     mov byte [bp-5], "-"
-    sub sp, 5
+    mov byte [bp-6], "-"
 
     ;; ax point to the beginning of the string buffer.
     mov ax, sp
@@ -47,11 +52,11 @@ start_kernel:
     ;; Set up u8 to hex stack frame. 
     mov bp, sp
     sub sp, 6
-    mov word [bp-2], 0xA012
-    mov [bp-4], ss
-    mov [bp-6], ax
+    mov [bp-2], ss
+    mov [bp-4], ax
+    mov word [bp-6], 0xF000
 
-    call str_u16_to_hex
+    call str_u16_to_dec
     
     ;; dispose of stack frame.
     mov sp, bp

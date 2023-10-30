@@ -7,16 +7,16 @@
 ;; NOTE: this ALWAYS writes 2 characters.
 ;;
 ;; Params:
-;;  [bp-1]: u8 the byte.
-;;  [bp-3]: u16 segment of buffer.
-;;  [bp-5]: u16 offset of buffer.
+;;  [bp-2]: u16 segment of buffer.
+;;  [bp-4]: u16 offset of buffer.
+;;  [bp-5]: u8 the byte.
 str_u8_to_hex:
-    mov ax, [bp-3]
+    mov ax, [bp-2]
     mov es, ax
-    mov di, [bp-5]
+    mov di, [bp-4]
     
     ;; Extract the byte.
-    mov al, [bp-1]
+    mov al, [bp-5]
 
     ;; Just gonna count to 2.
     mov cl, 0
@@ -53,13 +53,101 @@ str_u8_to_hex:
 .end:
     ret
 
-;; Calc the hex string of a word.
-;; NOTE: this ALWAYS writes 4 characters.
+;; This converts a unsigned byte into its
+;; 3 digit decimal form.
+;; NOTE: this always writes 3 characters (No NT)
 ;;
 ;; Params:
-;;  [bp-2]: u16 the word.
-;;  [bp-4]: u16 segment of buffer.
-;;  [bp-6]: u16 offset of buffer.
+;;  [bp-2]: u16 segment of buffer.
+;;  [bp-4]: u16 offset of buffer.
+;;  [bp-5]: u8 the byte.
+str_u8_to_dec:
+    ;; Load up ds:si to point to the buffer.
+    mov ax, [bp-2]
+    mov ds, ax
+    mov si, [bp-4]
+
+    ;; Write to the last character first.
+    add si, 2
+
+    ;; Load up the byte.
+    mov al, [bp-5]
+
+    
+    mov bl, 10
+    mov cl, 0
+
+.loop:
+    cmp cl, 3
+    jge .end
+
+    ;; Perform division.
+    mov ah, 0
+    div bl 
+
+    ;; Write Character.
+    add ah, "0"
+    mov [si], ah
+    dec si
+
+    inc cl
+    jmp .loop
+.end:
+
+    ret
+
+;; This converts a signed byte into its
+;; 3 digit decimal form.
+;; NOTE: this always writes 4 characters (No NT)
+;; (First character is the sign +/-)
+;;
+;; Params:
+;;  [bp-2]: u16 segment of buffer.
+;;  [bp-4]: u16 offset of buffer.
+;;  [bp-5]: u8 the byte.
+str_s8_to_dec:
+    ;; Load up ds:si to point to the buffer.
+    mov ax, [bp-2]
+    mov ds, ax
+    mov si, [bp-4]
+
+    ;; Write to the last character first.
+    add si, 2
+
+    ;; Load up the byte.
+    mov al, [bp-5]
+
+    
+    mov bl, 10
+    mov cl, 0
+
+.loop:
+    cmp cl, 3
+    jge .end
+
+    ;; Perform division.
+    mov ah, 0
+    div bl 
+
+    ;; Write Character.
+    add ah, "0"
+    mov [si], ah
+    dec si
+
+    inc cl
+    jmp .loop
+.end:
+
+    ret
+    
+
+;; Calc the hex string of a word.
+;; NOTE: this ALWAYS writes 4 characters (No NT)
+;;
+;; Params:
+;;  [bp-2]: u16 segment of buffer.
+;;  [bp-4]: u16 offset of buffer.
+;;  [bp-6]: u16 the word.
 str_u16_to_hex:
     ;; We are going to use our above
     ;; call as a helper.
@@ -73,15 +161,15 @@ str_u16_to_hex:
     ;; get our old base pointer.
     mov si, [bp]
 
-    ;; load params.
-    mov bl, [ss:si-1]
-    mov [bp-1], bl
+    mov bx, [ss:si-2]
+    mov [bp-2], bx
     
     mov bx, [ss:si-4]
-    mov [bp-3], bx
-    
-    mov bx, [ss:si-6]
-    mov [bp-5], bx
+    mov [bp-4], bx
+
+    ;; load params.
+    mov bl, [ss:si-5]
+    mov [bp-5], bl
 
     call str_u8_to_hex
 
@@ -89,9 +177,9 @@ str_u16_to_hex:
     mov si, [bp]
 
     ;; load params.
-    mov bl, [ss:si-2]
-    mov [bp-1], bl
-    add word [bp-5], 2
+    mov bl, [ss:si-6]
+    mov [bp-5], bl
+    add word [bp-4], 2
 
     call str_u8_to_hex
 
@@ -100,7 +188,48 @@ str_u16_to_hex:
     pop bp
 
     ret
-    
+
+;; Calc the hex string of a word.
+;; NOTE: this ALWAYS writes 5 characters (No NT)
+;;
+;; Params:
+;;  [bp-2]: u16 segment of buffer.
+;;  [bp-4]: u16 offset of buffer.
+;;  [bp-6]: u16 the word.
+str_u16_to_dec:
+    ;; Load up ds:si to point to the buffer.
+    mov ax, [bp-2]
+    mov ds, ax
+    mov si, [bp-4]
+
+    ;; Write to the last character first.
+    add si, 4
+
+    ;; Load up the byte.
+    mov ax, [bp-6]
+
+    mov bx, 10
+
+    mov cl, 0
+
+.loop:
+    cmp cl, 5
+    jge .end
+
+    ;; Perform division.
+    mov dx, 0
+    div bx
+
+    ;; Write Character.
+    add dl, "0"
+    mov [si], dl
+    dec si
+
+    inc cl
+    jmp .loop
+.end:
+
+    ret
     
 
 
