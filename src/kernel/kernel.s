@@ -25,6 +25,9 @@ bits 16
 ;;
 ;; "return values" are simulated by providing 
 ;; a pointer to the desired return location.
+;;
+;; Lastly, even in the function has no paramters,
+;; bp should be set to sp before calling the function.
 
 ;; System Functions!
 %include "src/kernel/str.s"
@@ -32,19 +35,20 @@ bits 16
 
 start_kernel:
     ;; prepare for call.
+    mov bp, sp
     call tui_init
-
     
     ;; Let's place a string on the stack bois.
     mov bp, sp
-    sub sp, 6
+    sub sp, 7
 
     mov byte [bp-1], 0
-    mov byte [bp-2], "-"
-    mov byte [bp-3], "-"
-    mov byte [bp-4], "-"
-    mov byte [bp-5], "-"
-    mov byte [bp-6], "-"
+    mov byte [bp-2], "_"
+    mov byte [bp-3], "_"
+    mov byte [bp-4], "_"
+    mov byte [bp-5], "_"
+    mov byte [bp-6], "_"
+    mov byte [bp-7], "_"
 
     ;; ax point to the beginning of the string buffer.
     mov ax, sp
@@ -54,9 +58,9 @@ start_kernel:
     sub sp, 6
     mov [bp-2], ss
     mov [bp-4], ax
-    mov word [bp-6], 0xF000
+    mov word [bp-6], (1<<15)
 
-    call str_u16_to_dec
+    call str_s16_to_dec
     
     ;; dispose of stack frame.
     mov sp, bp
@@ -79,9 +83,6 @@ start_kernel:
 .halt:
     hlt
     jmp .halt
-
-msg: db "Hello", 0
-
 
 ;; This tells us how many bytes we have left
 ;; in the kernel segment.

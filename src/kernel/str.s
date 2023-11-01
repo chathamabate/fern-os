@@ -64,11 +64,11 @@ str_u8_to_hex:
 str_u8_to_dec:
     ;; Load up ds:si to point to the buffer.
     mov ax, [bp-2]
-    mov ds, ax
-    mov si, [bp-4]
+    mov es, ax
+    mov di, [bp-4]
 
     ;; Write to the last character first.
-    add si, 2
+    add di, 2
 
     ;; Load up the byte.
     mov al, [bp-5]
@@ -87,8 +87,8 @@ str_u8_to_dec:
 
     ;; Write Character.
     add ah, "0"
-    mov [si], ah
-    dec si
+    mov [es:di], ah
+    dec di
 
     inc cl
     jmp .loop
@@ -108,20 +108,40 @@ str_u8_to_dec:
 str_s8_to_dec:
     ;; Load up ds:si to point to the buffer.
     mov ax, [bp-2]
-    mov ds, ax
-    mov si, [bp-4]
-    
-    ;; This is a bit harder now...
-    ;; I feel like this isn't too hard..
-    ;; like, just make it positive...
-    ;; unless its OxA
-    ;; we can use 2 complement negation...
-    mov al, [bp-5]
-    
-    ;; if the final bit is set, we
-    ;; write a negative sign. 
-    ;; otherwise a positive sign.
+    mov es, ax
+    mov di, [bp-4]
 
+    ;; We can call str_u8_to_dec
+    mov al, [bp-5]
+    test al, (1<<7)
+
+    jnz .neg
+
+    ;; Write sign.
+.pos:
+    mov byte [es:di], "+"
+    jmp .digits
+.neg:
+    mov byte [es:di], "-"
+    neg al
+
+.digits:
+    inc di  ;; move past sign character.
+
+    ;; Here we are going to set up a call to 
+    ;; str_u8_to_dec
+    push bp
+    mov bp, sp
+    sub sp, 5
+
+    mov [bp-2], es 
+    mov [bp-4], di
+    mov [bp-5], al
+
+    call str_u8_to_dec
+    
+    add sp, 5
+    pop bp
 
     ret
     
@@ -184,11 +204,11 @@ str_u16_to_hex:
 str_u16_to_dec:
     ;; Load up ds:si to point to the buffer.
     mov ax, [bp-2]
-    mov ds, ax
-    mov si, [bp-4]
+    mov es, ax
+    mov di, [bp-4]
 
     ;; Write to the last character first.
-    add si, 4
+    add di, 4
 
     ;; Load up the byte.
     mov ax, [bp-6]
@@ -207,14 +227,59 @@ str_u16_to_dec:
 
     ;; Write Character.
     add dl, "0"
-    mov [si], dl
-    dec si
+    mov [es:di], dl
+    dec di
 
     inc cl
     jmp .loop
 .end:
-
     ret
     
+;; Calc the decimal string value of a signed 16-bit
+;; number.
+;; NOTE: this ALWAYS writes 6 characters (No NT)
+;;
+;; Params:
+;;  [bp-2]: u16 segment of buffer.
+;;  [bp-4]: u16 offset of buffer.
+;;  [bp-6]: u16 the word.
+str_s16_to_dec:
+    ;; Load up ds:si to point to the buffer.
+    mov ax, [bp-2]
+    mov es, ax
+    mov di, [bp-4]
+
+    mov ax, [bp-6]
+
+    test ax, (1<<15)
+
+    jnz .neg
+
+.pos:
+    mov byte [es:di], "+"
+    jmp .digits
+
+.neg:
+    mov byte [es:di], "-"
+    neg ax
+
+.digits:
+    inc di  ;; move past sign character
+
+    ;; prepare for str_u16_to_dec call.
+    push bp
+    mov bp, sp
+    sub sp, 6
+
+    mov [bp-2], es
+    mov [bp-4], di
+    mov [bp-6], ax
+    
+    call str_u16_to_dec
+
+    mov sp, bp
+    pop bp
+
+    ret
 
 
