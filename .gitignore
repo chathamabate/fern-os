@@ -1,4 +1,6 @@
 build
+attempt1/build
+attempt2/build
 *.img
 *.swp
 *.o
