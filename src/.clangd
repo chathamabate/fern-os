@@ -1,0 +1,3 @@
+CompileFlags:
+  Add:
+  - -I/Users/chathamabate/Desktop/Git-Workspaces/fern-os/src/mods/terminal/include
