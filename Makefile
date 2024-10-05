@@ -1,5 +1,7 @@
 
--include globals.mk
+CC := i386-elf-gcc
+AS := i386-elf-as
+TOP_DIR := $(shell git rev-parse --show-toplevel)
 
 OS_NAME := myos
 
@@ -35,14 +37,14 @@ $(FULL_ASM_OBJS): $(BUILD_DIR)/%.o: $(SRC_DIR)/%.s | $(BUILD_DIR)
 	$(AS) $< -o $@
 
 $(FULL_SRC_OBJS): $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
-	$(CC) -c $< -o $@ -std=gnu99 -ffreestanding -O2 -Wall -Wextra -Wpedantic
+	$(CC) -c $< -o $@ -std=gnu99 -ffreestanding -O2 -Wall -Wextra -Wpedantic $(foreach m,$(MODS),-I$(MODS_DIR)/$(m)/include)
 
 # We'll assume if the folder exists, the build artifacts were created.
 $(MOD_BUILD_FOLDERS): $(MODS_DIR)/%/build:
 	make -C $(MODS_DIR)/$* lib
 
 $(BIN_FILE): $(FULL_ASM_OBJS) $(FULL_SRC_OBJS) $(LDSCRIPT) | $(MOD_BUILD_FOLDERS)
-	$(CC) -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib $(FULL_ASM_OBJS) $(FULL_SRC_OBJS) -lgcc $(MOD_LIBS)
+	$(CC) -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib $(FULL_ASM_OBJS) $(FULL_SRC_OBJS) $(MOD_LIBS) -lgcc
 
 bin: $(BIN_FILE)
 

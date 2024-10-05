@@ -39,7 +39,7 @@ $(FULL_SRC_OBJS): $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(HEADERS) | $(BUILD_DIR)
 	$(CC) -c $< -o $@ -std=gnu99 -ffreestanding -O2 -Wall -Wextra -Wpedantic $(INCLUDE_FLAGS)
 
 $(MOD_LIB): $(FULL_ASM_OBJS) $(FULL_SRC_OBJS)
-	ar rcs $@ $^
+	i386-elf-ar rcs $@ $^
 
 lib: $(MOD_LIB)
 
