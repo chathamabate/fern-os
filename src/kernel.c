@@ -10,12 +10,10 @@
 #endif
 
 #include "terminal/out.h"
+#include "msys/io.h"
 
 void kernel_main(void) 
 {
-	/* Initialize terminal interface */
-	terminal_clear();
- 
-	/* Newline support is left as an exercise. */
-	//terminal_writestring("Hello, kernel World!\n");
+    outb(0x3D4, 0x0A);
+    outb(0x3D5, 0x20);
 }

@@ -5,7 +5,8 @@ TOP_DIR := $(shell git rev-parse --show-toplevel)
 
 OS_NAME := myos
 
-MODS := terminal
+MODS := msys \
+		terminal
 
 SRCS := kernel.c
 ASMS := boot.s
@@ -69,12 +70,12 @@ qemu.cd: $(ISO_FILE)
 
 clean:
 	rm -rf $(BUILD_DIR)
-	true && $(foreach m,$(MODS),make -C $(MODS_DIR)/$(m) clean)
+	true $(foreach m,$(MODS),&& make -C $(MODS_DIR)/$(m) clean)
 
 $(SRC_DIR)/.clangd:
 	echo "CompileFlags:" > $@
 	echo "  Add:" >> $@
-	$(foreach m,$(MODS),echo "  - -I$(MODS_DIR)/$(m)/include" >> $@)
+	$(foreach m,$(MODS),echo "  - -I$(MODS_DIR)/$(m)/include" >> $@;)
 
 clangd: $(SRC_DIR)/.clangd
 

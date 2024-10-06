@@ -31,6 +31,7 @@ System V ABI standard and de-facto extensions. The compiler will assume the
 stack is properly aligned and failure to align the stack will result in
 undefined behavior.
 */
+// Should I just put this in the linker script?
 .section .bss
 .align 16
 stack_bottom:
@@ -76,6 +77,18 @@ _start:
 	C++ features such as global constructors and exceptions will require
 	runtime support to work as well.
 	*/
+
+    /*
+    // Calling a C function example, we are in protected mode!
+    push   %ebp
+    mov    %esp,%ebp
+    sub    $0x14,%esp
+    push   %eax
+    call   print_hex
+    add    $0x10,%esp
+    leave
+    */
+
 
 	/*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte
