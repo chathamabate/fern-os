@@ -14,7 +14,8 @@
 
 void kernel_main(void) {
     disable_bios_cursor();
-    terminal_clear();
+    term_set_cursor(true);
+    term_clear();
 
     // This is BIG!!!
     // WOOOOOO
