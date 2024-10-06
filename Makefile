@@ -5,8 +5,8 @@ TOP_DIR := $(shell git rev-parse --show-toplevel)
 
 OS_NAME := myos
 
-MODS := msys \
-		terminal
+MODS := terminal \
+		msys
 
 SRCS := kernel.c
 ASMS := boot.s

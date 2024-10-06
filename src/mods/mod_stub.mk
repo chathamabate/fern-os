@@ -43,17 +43,6 @@ $(MOD_LIB): $(FULL_ASM_OBJS) $(FULL_SRC_OBJS)
 
 lib: $(MOD_LIB)
 
-$(INCLUDE_DIR)/.clangd:
-	echo "CompileFlags:" > $@
-	echo "  Add:" >> $@
-	$(foreach f,$(INCLUDE_FLAGS), echo "  - $(f)" >> $@;)
-
-SRC_DIR_INCLUDE_FLAGS := -I$(SRC_DIR) -I$(INCLUDE_DIR) $(INCLUDE_FLAGS)
-$(SRC_DIR)/.clangd:
-	echo "CompileFlags:" > $@
-	echo "  Add:" >> $@
-	$(foreach f,$(SRC_DIR_INCLUDE_FLAGS), echo "  - $(f)" >> $@;)
-
 clean:
 	rm -rf $(BUILD_DIR)
 

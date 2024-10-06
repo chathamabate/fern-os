@@ -12,8 +12,10 @@
 #include "terminal/out.h"
 #include "msys/io.h"
 
-void kernel_main(void) 
-{
-    outb(0x3D4, 0x0A);
-    outb(0x3D5, 0x20);
+void kernel_main(void) {
+    disable_bios_cursor();
+    terminal_clear();
+
+    // This is BIG!!!
+    // WOOOOOO
 }

@@ -40,6 +40,8 @@ static const size_t VGA_WIDTH = 80;
 static const size_t VGA_HEIGHT = 25;
 static uint16_t *const TERMINAL_BUFFER = (uint16_t *)0xB8000;
 
+void disable_bios_cursor(void);
+
 void terminal_clear(void);
 
 #endif

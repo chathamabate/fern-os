@@ -1,22 +1,10 @@
 
 #include "terminal/out.h"
+#include "msys/io.h"
 
-static char to_hex(unsigned int x) {
-    if (x > 9) {
-        return 'A' + (x - 10);
-    }
-
-    return '0' + x;
-}
-
-void print_hex(unsigned int x) {
-    for (int i = 7; i >= 0; i--) {
-        char hex = to_hex((x >> (4 * i)) & 0xF);
-        TERMINAL_BUFFER[7 - i] = vga_entry(
-                hex, 
-                vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK)
-        );
-    }
+void disable_bios_cursor(void) {
+    outb(0x3D4, 0x0A);
+    outb(0x3D5, 0x20);
 }
 
 void terminal_clear(void) {
