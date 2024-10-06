@@ -16,7 +16,12 @@ void kernel_main(void) {
     term_init();
     term_clear();
 
+    term_set_output_style(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
+    term_puts("Hello");
 
+    term_set_cursor(0, 0);
+    term_set_output_style(vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+    term_puts("He");
 
     // This is BIG!!!
     // WOOOOOO

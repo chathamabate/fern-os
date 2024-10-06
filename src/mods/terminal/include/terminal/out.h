@@ -8,11 +8,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Should I use UTF 8??
-// You can always come back to UTF 8 if you'd LIKE?
-// Or maybe something else??
-// I am thinking something else??
-
 /* Hardware text mode color constants. */
 typedef enum _vga_color_t {
 	VGA_COLOR_BLACK = 0,
@@ -102,6 +97,10 @@ void term_clear(void);
 size_t term_get_cursor_row(void);
 size_t term_get_cursor_col(void);
 void term_set_cursor(size_t row, size_t col);
+
+uint8_t term_get_output_style(void);
+void term_set_output_style(uint8_t color);
+
 
 // Scroll up a single line.
 // Cursor position remains unchanged.

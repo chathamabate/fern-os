@@ -69,9 +69,29 @@ size_t term_get_cursor_col(void) {
     return term_state.cursor_col;
 }
 
+// Quick helper for removing and restoring the visible cursor
+// from the screen.
+static inline void _term_cursor_guard(void) {
+    if (term_state.show_cursor) {
+        term_flip_cursor_color(); 
+    }
+}
+
 void term_set_cursor(size_t row, size_t col) {
+    _term_cursor_guard();
+
     term_state.cursor_row = row;
     term_state.cursor_col = col;
+
+    _term_cursor_guard();
+}
+
+uint8_t term_get_output_style(void) {
+    return term_state.output_style;
+}
+
+void term_set_output_style(uint8_t color) {
+    term_state.output_style = color;
 }
 
 // Just do the copying. (NO CURSOR TOGGLING)
@@ -89,22 +109,16 @@ static void _term_scroll_down(void) {
 
 void term_scroll_down(void) {
     // First let's forget about the cursor all together.
-    if (term_state.show_cursor) {
-        term_flip_cursor_color(); 
-    }
+    _term_cursor_guard();
     
     _term_scroll_down();
 
     // Put cursor back if needed.
-    if (term_state.show_cursor) {
-        term_flip_cursor_color(); 
-    }
+    _term_cursor_guard();
 }
 
 void term_cursor_next_line(void) {
-    if (term_state.show_cursor) {
-        term_flip_cursor_color();
-    }
+    _term_cursor_guard();
 
     if (term_state.cursor_row == VGA_HEIGHT - 1) {
         // When on the last line, let's scroll down.
@@ -117,9 +131,7 @@ void term_cursor_next_line(void) {
     // Always set cursor column to the beginning of the line.
     term_state.cursor_col = 0;
 
-    if (term_state.show_cursor) {
-        term_flip_cursor_color();
-    }
+    _term_cursor_guard();
 }
 
 void term_outc(char c) {

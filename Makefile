@@ -41,6 +41,7 @@ $(FULL_SRC_OBJS): $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	$(CC) -c $< -o $@ -std=gnu99 -ffreestanding -O2 -Wall -Wextra -Wpedantic $(foreach m,$(MODS),-I$(MODS_DIR)/$(m)/include)
 
 # We'll assume if the folder exists, the build artifacts were created.
+# And up-to-date. You'll need to run a clean first if you'd like to rebuild modules too.
 $(MOD_BUILD_FOLDERS): $(MODS_DIR)/%/build:
 	make -C $(MODS_DIR)/$* lib
 
