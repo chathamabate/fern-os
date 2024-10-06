@@ -13,7 +13,6 @@
 // Or maybe something else??
 // I am thinking something else??
 
-
 /* Hardware text mode color constants. */
 typedef enum _vga_color_t {
 	VGA_COLOR_BLACK = 0,
@@ -41,6 +40,10 @@ static volatile uint16_t * const TERMINAL_BUFFER = (uint16_t *)0xB8000;
 static inline uint8_t vga_entry_color(vga_color_t fg, vga_color_t bg) {
 	return fg | bg << 4;
 }
+
+static inline uint8_t vga_color_flip(uint8_t color) {
+    return (color << 4) | (color >> 4);
+}
  
 static inline uint16_t vga_entry(unsigned char uc, uint8_t color) {
 	return (uint16_t) uc | (uint16_t) color << 8;
@@ -62,39 +65,62 @@ static inline unsigned char vga_extract_char(uint16_t entry) {
     return (unsigned char)(entry & 0xFF);
 }
 
-static inline volatile uint16_t *get_vga_entry_p(size_t row, size_t col) {
+static inline volatile uint16_t *vga_get_entry_p(size_t row, size_t col) {
     return &(TERMINAL_BUFFER[(row * VGA_WIDTH) + col]);
 }
 
-static inline void set_vga_entry(size_t row, size_t col, uint16_t entry) {
-    *get_vga_entry_p(row, col) = entry;
+static inline void vga_set_entry(size_t row, size_t col, uint16_t entry) {
+    *vga_get_entry_p(row, col) = entry;
 }
 
-static inline uint16_t get_vga_entry(size_t row, size_t col) {
-    return *get_vga_entry_p(row, col);
+static inline uint16_t vga_get_entry(size_t row, size_t col) {
+    return *vga_get_entry_p(row, col);
 }
 
-static inline void set_vga_entry_color_p(volatile uint16_t *entry, uint8_t color) {
+static inline void vga_set_entry_color_p(volatile uint16_t *entry, uint8_t color) {
     *entry = (*entry & 0x00FF) | ((uint16_t)color << 8);
 }
 
-static inline void set_vga_entry_color(size_t row, size_t col, uint8_t color) {
-    set_vga_entry_color_p(get_vga_entry_p(row, col), color);
+static inline void vga_set_entry_color(size_t row, size_t col, uint8_t color) {
+    vga_set_entry_color_p(vga_get_entry_p(row, col), color);
 }
 
-static inline void set_vga_entry_char_p(volatile uint16_t *entry, unsigned char c) {
+static inline void vga_set_entry_char_p(volatile uint16_t *entry, unsigned char c) {
     *entry = (*entry & 0xFF00) | (uint16_t)c;
 }
 
-static inline void set_vga_entry_char(size_t row, size_t col, unsigned char c) {
-    set_vga_entry_char_p(get_vga_entry_p(row, col), c);
+static inline void vga_set_entry_char(size_t row, size_t col, unsigned char c) {
+    vga_set_entry_char_p(vga_get_entry_p(row, col), c);
 }
 
-void disable_bios_cursor(void);
+// Must be called before all below calls.
+void term_init(void);
 
-void term_set_cursor(bool p);
+void term_show_cursor(bool p);
 void term_clear(void);
 
-void term_putc(char c);
+size_t term_get_cursor_row(void);
+size_t term_get_cursor_col(void);
+void term_set_cursor(size_t row, size_t col);
+
+// Scroll up a single line.
+// Cursor position remains unchanged.
+void term_scroll_down(void);
+
+// Move the cursor down a line, if we are already
+// at the bottom of the screen, scroll up!
+void term_cursor_next_line(void);
+
+// This call outputs a single character to the terminal at the cursors position.
+// The cursor then is advanced.
+// If ther cursor is at the end of a line, the screen will be scrolled one line up.
+// NOTE: c is NOT interpreted as a control character in anyway. The character
+// given is always placed on the screen whether its legible or not.
+void term_outc(char c);
+
+// Just a helper to call outc in a loop.
+//
+// Again, no control characters recognized.
+void term_puts(const char *s);
 
 #endif

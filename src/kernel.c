@@ -13,9 +13,10 @@
 #include "msys/io.h"
 
 void kernel_main(void) {
-    disable_bios_cursor();
-    term_set_cursor(true);
+    term_init();
     term_clear();
+
+
 
     // This is BIG!!!
     // WOOOOOO
