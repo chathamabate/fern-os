@@ -6,6 +6,7 @@ TOP_DIR := $(shell git rev-parse --show-toplevel)
 OS_NAME := myos
 
 MODS := terminal \
+		util \
 		msys
 
 SRCS := kernel.c
@@ -29,7 +30,9 @@ BIN_FILE := $(BUILD_DIR)/$(OS_NAME).bin
 ISO_FILE := $(BUILD_DIR)/$(OS_NAME).iso
 GRUB_CFG_FILE := $(ISO_DIR)/boot/grub/grub.cfg
 
-.PHONY: bin qemu.bin iso qemu.cd clean clangd clangd.clean
+.PHONY: all bin qemu.bin iso qemu.cd clean clangd clangd.clean
+
+all: bin
 
 $(BUILD_DIR) $(ISO_DIR)/boot/grub:
 	mkdir -p $@
