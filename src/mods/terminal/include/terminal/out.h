@@ -115,11 +115,12 @@ void term_cursor_next_line(void);
 // If ther cursor is at the end of a line, the screen will be scrolled one line up.
 // NOTE: c is NOT interpreted as a control character in anyway. The character
 // given is always placed on the screen whether its legible or not.
-void term_outc(char c);
+void term_putc(char c);
 
 // Just a helper to call outc in a loop.
 //
 // Again, no control characters recognized.
-void term_puts(const char *s);
+// return number of character output.
+size_t term_puts(const char *s);
 
 #endif
