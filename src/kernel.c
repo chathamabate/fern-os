@@ -17,9 +17,5 @@ void kernel_main(void) {
     term_init();
     term_clear();
 
-    if (test_str()) {
-        term_puts("SUCCESS");
-    } else {
-        term_puts("FAILURE");
-    }
+
 }
