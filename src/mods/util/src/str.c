@@ -18,6 +18,30 @@ bool str_eq(const char *s1, const char *s2) {
     }
 }
 
+size_t str_cpy(char *dest, const char *src) {
+    size_t i = 0;
+    while (true) {
+        char c = src[i];
+        dest[i] = c;
+
+        if (c == '\0') {
+            return i; // We don't count \0 in the length returned.
+        }
+
+        i++;
+    }
+}
+
+size_t str_len(const char *src) {
+    size_t i = 0;
+    while (true) {
+        if (src[i] == '\0') {
+            return i;
+        }
+        i++;
+    }
+}
+
 size_t str_of_u(char *buf, uint32_t u) {
     if (u == 0) {
         buf[0] = '0';
@@ -84,6 +108,64 @@ size_t str_of_hex(char *buf, uint32_t u, uint8_t hex_digs) {
     buf[hex_digs] = '\0';
 
     return hex_digs;
+}
+
+void str_la(char *buf, size_t n, char pad, const char *s) {
+    buf[n] = '\0';
+
+    size_t i = 0;
+
+    while (i < n && s[i]) {
+        buf[i] = s[i];
+        i++;
+    }
+
+    while (i < n) {
+        buf[i] = pad;
+        i++;
+    }
+}
+
+void str_ra(char *buf, size_t n, char pad, const char *s) {
+    size_t len = str_len(s);
+
+    // We are really reading from right to left here.
+    for (size_t i = 0; i < n; i++) {
+        if (i < len) {
+            buf[n - 1 - i] = i < len ? s[len - 1 - i] : pad;
+        } 
+    }
+
+    buf[n] = '\0';
+}
+
+void str_center(char *buf, size_t n, char pad, const char *s) {
+    size_t len = str_len(s);
+
+    if (len <= n) {
+        size_t pads = n - len;
+        size_t prefix_pads = pads / 2;
+
+        for (size_t i = 0; i < prefix_pads; i++) {
+            buf[i] = pad;
+        }
+        
+        for (size_t i = 0; i < len; i++) {
+            buf[prefix_pads + i] = s[i];
+        }
+
+        for (size_t i = prefix_pads + len; i < n; i++) {
+            buf[i] = pad;
+        }
+    } else {
+        // n < len (There will be cutoff)
+        size_t cutoff_prefix = (len - n) / 2;
+        for (size_t i = 0; i < n; i++) {
+            buf[i] = s[cutoff_prefix + i];
+        }
+    }
+
+    buf[n] = '\0';
 }
 
 
