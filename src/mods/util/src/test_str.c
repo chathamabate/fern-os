@@ -12,6 +12,29 @@ static bool test_str_eq(void) {
     TEST_SUCCEED();
 }
 
+static bool test_str_cpy(void) {
+    char buf[100];
+
+    TEST_TRUE(str_cpy(buf, "heel") == 4);
+    TEST_TRUE(str_eq(buf, "heel"));
+
+    TEST_TRUE(str_cpy(buf, "h") == 1);
+    TEST_TRUE(str_eq(buf, "h"));
+
+    TEST_TRUE(str_cpy(buf, "") == 0);
+    TEST_TRUE(str_eq(buf, ""));
+    
+    TEST_SUCCEED();
+}
+
+static bool test_str_len(void) {
+    TEST_TRUE(str_len("HEllo") == 5);
+    TEST_TRUE(str_len("H") == 1);
+    TEST_TRUE(str_len("") == 0);
+
+    TEST_SUCCEED();
+}
+
 typedef struct _test_str_of_u_case_t {
     uint32_t in_num;
     const char *exp_str;
@@ -163,11 +186,70 @@ static bool test_str_of_hex(void) {
     TEST_SUCCEED();
 }
 
+static bool test_str_la(void) {
+    char buf[100];
+
+    str_la(buf, 10, '-', "Hello");
+    TEST_TRUE(str_eq(buf, "Hello-----"));
+
+    str_la(buf, 5, '-', "Hello");
+    TEST_TRUE(str_eq(buf, "Hello"));
+
+    str_la(buf, 3, '-', "Hello");
+    TEST_TRUE(str_eq(buf, "Hel"));
+
+    str_la(buf, 3, '-', "");
+    TEST_TRUE(str_eq(buf, "---"));
+
+    TEST_SUCCEED();
+}
+
+static bool test_str_ra(void) {
+    char buf[100];
+
+    str_ra(buf, 10, '-', "Hello");
+    TEST_TRUE(str_eq(buf, "-----Hello"));
+
+    str_ra(buf, 5, '-', "Hello");
+    TEST_TRUE(str_eq(buf, "Hello"));
+
+    str_ra(buf, 3, '-', "Hello");
+    TEST_TRUE(str_eq(buf, "llo"));
+
+    str_ra(buf, 3, '-', "");
+    TEST_TRUE(str_eq(buf, "---"));
+
+    TEST_SUCCEED();
+}
+
+static bool test_str_center(void) {
+    char buf[100];
+
+    str_center(buf, 3, '-', "a");
+    TEST_TRUE(str_eq(buf, "-a-"));
+
+    str_center(buf, 3, '-', "ab");
+    TEST_TRUE(str_eq(buf, "ab-"));
+
+    str_center(buf, 3, '-', "ababa");
+    TEST_TRUE(str_eq(buf, "bab"));
+
+    str_center(buf, 5, '-', "ba");
+    TEST_TRUE(str_eq(buf, "-ba--"));
+
+    TEST_SUCCEED();
+}
+
 bool test_str(void) {
     TEST_TRUE(test_str_eq());
+    TEST_TRUE(test_str_cpy());
+    TEST_TRUE(test_str_len());
     TEST_TRUE(test_str_of_u());
     TEST_TRUE(test_str_of_i());
     TEST_TRUE(test_str_of_hex());
+    TEST_TRUE(test_str_la());
+    TEST_TRUE(test_str_ra());
+    TEST_TRUE(test_str_center());
 
     TEST_SUCCEED();
 }

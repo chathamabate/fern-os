@@ -131,9 +131,7 @@ void str_ra(char *buf, size_t n, char pad, const char *s) {
 
     // We are really reading from right to left here.
     for (size_t i = 0; i < n; i++) {
-        if (i < len) {
-            buf[n - 1 - i] = i < len ? s[len - 1 - i] : pad;
-        } 
+        buf[n - 1 - i] = i < len ? s[len - 1 - i] : pad;
     }
 
     buf[n] = '\0';
