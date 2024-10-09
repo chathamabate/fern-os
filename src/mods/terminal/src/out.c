@@ -134,7 +134,7 @@ void term_cursor_next_line(void) {
     _term_cursor_guard();
 }
 
-void term_putc(char c) {
+void term_outc(char c) {
     // Let's overwrite the cursor.
     vga_set_entry(
             term_state.cursor_row, term_state.cursor_col,
@@ -158,12 +158,12 @@ void term_putc(char c) {
     }
 }
 
-size_t term_puts(const char *s) {
-    size_t i = 0;
-    while (s[i]) {
-        term_putc(s[i]);
-        i++;
+void term_puts(const char *s) {
+    const char *i = s;
+    char c;
+
+    while ((c = *(i++))) {
+       term_outc(c); 
     }
-    return i;
 }
 
