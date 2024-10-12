@@ -243,8 +243,17 @@ static bool test_str_center(void) {
 static bool test_str_fmt(void) {
     char buf[100];
 
-    str_fmt(buf, "Aye");
+    TEST_TRUE(str_fmt(buf, "Aye") == 3);
     TEST_TRUE(str_eq(buf, "Aye"));
+
+    TEST_TRUE(str_fmt(buf, "Aye %s", "Oh") == 6);
+    TEST_TRUE(str_eq(buf, "Aye Oh"));
+
+    TEST_TRUE(str_fmt(buf, "%u %d", 12, -34) == 6);
+    TEST_TRUE(str_eq(buf, "12 -34"));
+
+    TEST_TRUE(str_fmt(buf, "Hello %X\n", 1) == 15);
+    TEST_TRUE(str_eq(buf, "Hello 00000001\n"));
 
     TEST_SUCCEED();
 }
