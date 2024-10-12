@@ -10,6 +10,7 @@
 #endif
 
 #include "terminal/out.h"
+#include "util/ansii.h"
 #include "util/str.h"
 #include "msys/io.h"
 
@@ -17,10 +18,6 @@ void kernel_main(void) {
     term_init();
     term_clear();
 
-    if (test_str()) {
-        term_puts("Success");
-    } else {
-        term_puts("Failure");
-    }
-
+    term_puts(ANSII_BLACK_FG ANSII_GREEN_BG "HELLO" ANSII_RESET 
+            ANSII_BRIGHT_CYAN_FG " Aye Yo" ANSII_RESET);
 }

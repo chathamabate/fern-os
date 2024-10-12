@@ -117,9 +117,7 @@ void term_scroll_down(void) {
     _term_cursor_guard();
 }
 
-void term_cursor_next_line(void) {
-    _term_cursor_guard();
-
+static void _term_cursor_next_line(void) {
     if (term_state.cursor_row == VGA_HEIGHT - 1) {
         // When on the last line, let's scroll down.
         _term_scroll_down();
@@ -130,40 +128,107 @@ void term_cursor_next_line(void) {
 
     // Always set cursor column to the beginning of the line.
     term_state.cursor_col = 0;
+}
 
+void term_cursor_next_line(void) {
+    _term_cursor_guard();
+    _term_cursor_next_line();
     _term_cursor_guard();
 }
 
-void term_outc(char c) {
-    // Let's overwrite the cursor.
-    vga_set_entry(
-            term_state.cursor_row, term_state.cursor_col,
-            vga_entry(c, term_state.output_style)
-    );
-
+// NO CURSOR TOGGLING
+static void _term_advance_cursor(void) {
     term_state.cursor_col++;
 
     if (term_state.cursor_col == VGA_WIDTH) {
         term_state.cursor_col = 0;
-        term_state.cursor_row++;
-
-        if (term_state.cursor_row == VGA_HEIGHT) {
-            _term_scroll_down();
-            term_state.cursor_row = VGA_HEIGHT - 1;
-        }
-    }
-    
-    if (term_state.show_cursor) {
-        term_flip_cursor_color();
+        _term_cursor_next_line();
     }
 }
 
+static void _term_putc(char c) {
+    switch (c) {
+    case '\n':
+        _term_cursor_next_line();
+        break;
+    case '\r':
+        term_state.cursor_col = 0;
+        break;
+    default:
+        vga_set_entry(term_state.cursor_row, term_state.cursor_col, 
+                vga_entry(c, term_state.output_style));
+        _term_advance_cursor();
+        break;
+    }
+}
+
+void term_putc(char c) {
+    _term_cursor_guard();
+    _term_putc(c);
+    _term_cursor_guard();
+}
+
+// Returns number of characters consumed.
+static size_t term_interp_esc_seq(const char *s) {
+    const char *i = s;
+    char c;
+
+    if (*i != '[') {
+        return 0;   
+    }
+
+    uint8_t num = 0;
+
+    while ((c = *(++i)) && ('0' <= c && c <= '9')) {
+        num *= 10;
+        num += c - '0';
+    }
+
+    if (c == 'm') {
+        i++; // Consume m.
+             
+        uint8_t curr_style = term_state.output_style;
+        vga_color_t curr_fg_color = vga_extract_fg_color(curr_style);
+        vga_color_t curr_bg_color = vga_extract_bg_color(curr_style);
+             
+        if (num == 0) {
+            term_state.output_style = term_state.default_style;
+        } else if (30 <= num && num <= 37) {
+            num -= 30;
+            term_state.output_style =
+                vga_entry_color(num, curr_bg_color);
+        } else if (40 <= num && num <= 47) {
+            num -= 40;
+            term_state.output_style =
+                vga_entry_color(curr_fg_color, num);
+        } else if (90 <= num && num <= 97) {
+            num -= 82;
+            term_state.output_style =
+                vga_entry_color(num, curr_bg_color);
+        } else if (100 <= num && num <= 107) {
+            num -= 92;
+            term_state.output_style =
+                vga_entry_color(curr_fg_color, num);
+        }
+    }
+    
+    return i - s; 
+}
+
 void term_puts(const char *s) {
+    _term_cursor_guard();
+
     const char *i = s;
     char c;
 
     while ((c = *(i++))) {
-       term_outc(c); 
+        if (c == 0x1B) {
+            i += term_interp_esc_seq(i);
+        } else {
+            _term_putc(c); 
+        }
     }
+
+    _term_cursor_guard();
 }
 

@@ -35,6 +35,7 @@ void str_center(char *buf, size_t n, char pad, const char *s);
 
 // Supported Specifiers:
 // Returns number of characters written excluding \0
+// %%   - The % sign
 // %x   - 32-bit Hex Value
 // %u   - 32-bit Unsigned Integer
 // %d   - 32-bit Signed Integer

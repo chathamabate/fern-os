@@ -113,13 +113,18 @@ void term_cursor_next_line(void);
 // This call outputs a single character to the terminal at the cursors position.
 // The cursor then is advanced.
 // If ther cursor is at the end of a line, the screen will be scrolled one line up.
-// NOTE: c is NOT interpreted as a control character in anyway. The character
-// given is always placed on the screen whether its legible or not.
-void term_outc(char c);
-
-// Just a helper to call outc in a loop.
 //
-// Again, no control characters recognized.
+// Special Characters Supported:
+// 
+// \n   - Skip to start of next line.
+// \r   - Go to beginning of this line.
+//
+void term_putc(char c);
+
+// Print a string onto the terminal.
+//
+// This supports control characters supported by putc.
+// This supports ANSII colors found in util/ansii.h
 void term_puts(const char *s);
 
 #endif

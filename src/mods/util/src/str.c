@@ -195,32 +195,36 @@ size_t str_vfmt(char *buf, const char *fmt, va_list va) {
     while ((c = *(fmt_ptr++)) != '\0') {
         if (c != '%') {
             *(buf_ptr++) = c;
-        } else {
-            char f = *(fmt_ptr++);
-            if (f == '\0') {
-                break;
-            }
+            continue;
+        } 
 
-            switch (f) {
-            case 'X':
-                uval = va_arg(va, uint32_t);
-                buf_ptr += str_of_hex(buf_ptr, uval, 8);
-                break;
-            case 'u':
-                uval = va_arg(va, uint32_t);
-                buf_ptr += str_of_u(buf_ptr, uval);
-                break;
-            case 'd':
-                ival = va_arg(va, int32_t);
-                buf_ptr += str_of_i(buf_ptr, ival);
-                break;
-            case 's':
-                sval = va_arg(va, const char *);
-                buf_ptr += str_cpy(buf_ptr, sval);
-                break;
-            default:
-                break;
-            }
+        char f = *(fmt_ptr++);
+        if (f == '\0') {
+            break;
+        }
+
+        switch (f) {
+        case '%':
+            *(buf_ptr++) = '%';
+            break;
+        case 'X':
+            uval = va_arg(va, uint32_t);
+            buf_ptr += str_of_hex(buf_ptr, uval, 8);
+            break;
+        case 'u':
+            uval = va_arg(va, uint32_t);
+            buf_ptr += str_of_u(buf_ptr, uval);
+            break;
+        case 'd':
+            ival = va_arg(va, int32_t);
+            buf_ptr += str_of_i(buf_ptr, ival);
+            break;
+        case 's':
+            sval = va_arg(va, const char *);
+            buf_ptr += str_cpy(buf_ptr, sval);
+            break;
+        default:
+            break;
         }
     }
 

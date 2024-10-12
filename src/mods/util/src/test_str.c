@@ -246,6 +246,12 @@ static bool test_str_fmt(void) {
     TEST_TRUE(str_fmt(buf, "Aye") == 3);
     TEST_TRUE(str_eq(buf, "Aye"));
 
+    TEST_TRUE(str_fmt(buf, "A%ye") == 2);
+    TEST_TRUE(str_eq(buf, "Ae"));
+
+    TEST_TRUE(str_fmt(buf, "A%%ye") == 4);
+    TEST_TRUE(str_eq(buf, "A%ye"));
+
     TEST_TRUE(str_fmt(buf, "Aye %s", "Oh") == 6);
     TEST_TRUE(str_eq(buf, "Aye Oh"));
 
