@@ -1,7 +1,8 @@
 
 #include "util/str.h"
-
 #include "msys/test.h"
+#include <stdarg.h>
+
 
 bool str_eq(const char *s1, const char *s2) {
     size_t i = 0;
@@ -129,9 +130,16 @@ void str_la(char *buf, size_t n, char pad, const char *s) {
 void str_ra(char *buf, size_t n, char pad, const char *s) {
     size_t len = str_len(s);
 
-    // We are really reading from right to left here.
-    for (size_t i = 0; i < n; i++) {
-        buf[n - 1 - i] = i < len ? s[len - 1 - i] : pad;
+    size_t i = 0;
+
+    while (i < n && i < len) {
+        buf[n - 1 - i] = s[len - 1 - i];
+        i++;
+    }
+
+    while (i < n) {
+        buf[n - 1 - i] = pad;
+        i++;
     }
 
     buf[n] = '\0';
@@ -164,6 +172,61 @@ void str_center(char *buf, size_t n, char pad, const char *s) {
     }
 
     buf[n] = '\0';
+}
+
+size_t str_fmt(char *buf, const char *fmt,...) {
+    va_list va; 
+    va_start(va, fmt);
+    size_t chars = str_vfmt(buf, fmt, va);
+    va_end(va);
+
+    return chars;
+}
+
+size_t str_vfmt(char *buf, const char *fmt, va_list va) {
+    char *buf_ptr = buf;
+    const char *fmt_ptr = fmt;
+
+    uint32_t uval;
+    int32_t ival;
+    const char *sval;
+
+    char c;
+    while ((c = *(fmt_ptr++)) != '\0') {
+        if (c != '%') {
+            *(buf_ptr++) = c;
+        } else {
+            char f = *(fmt_ptr++);
+            if (f == '\0') {
+                break;
+            }
+
+            switch (f) {
+            case 'X':
+                uval = va_arg(va, uint32_t);
+                buf_ptr += str_of_hex(buf_ptr, uval, 8);
+                break;
+            case 'u':
+                uval = va_arg(va, uint32_t);
+                buf_ptr += str_of_u(buf_ptr, uval);
+                break;
+            case 'd':
+                ival = va_arg(va, int32_t);
+                buf_ptr += str_of_i(buf_ptr, ival);
+                break;
+            case 's':
+                sval = va_arg(va, const char *);
+                buf_ptr += str_cpy(buf_ptr, sval);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    *buf_ptr = '\0';
+
+    return (buf_ptr - buf);
 }
 
 

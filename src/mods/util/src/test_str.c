@@ -240,6 +240,15 @@ static bool test_str_center(void) {
     TEST_SUCCEED();
 }
 
+static bool test_str_fmt(void) {
+    char buf[100];
+
+    str_fmt(buf, "Aye");
+    TEST_TRUE(str_eq(buf, "Aye"));
+
+    TEST_SUCCEED();
+}
+
 bool test_str(void) {
     TEST_TRUE(test_str_eq());
     TEST_TRUE(test_str_cpy());
@@ -250,6 +259,7 @@ bool test_str(void) {
     TEST_TRUE(test_str_la());
     TEST_TRUE(test_str_ra());
     TEST_TRUE(test_str_center());
+    TEST_TRUE(test_str_fmt());
 
     TEST_SUCCEED();
 }
