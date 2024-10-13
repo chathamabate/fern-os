@@ -27,7 +27,7 @@ void kernel_main(void) {
     read_gdtr(&v);
 
     size_t len = (v.size_m_1 + 1) / 8;
-    seg_descriptor_t *tbl = (seg_descriptor_t *)(v.offset);
+    seg_descriptor_t *tbl = (v.offset);
 
     //char buf[100];
     str_fmt(buf, "Num Entries: %u\n", len);
@@ -62,6 +62,15 @@ void kernel_main(void) {
         str_fmt(buf, "  AB    = %X\n", access_byte);
         term_puts(buf);
     }
+
+    // To force some sort of behavoir, I believe some sort
+    // of handler must be implemented!
+    // Otherwise, UB?
+
+    uint32_t *addr = (uint32_t *)0xFFFFF000;
+    *addr = 55;
+    str_fmt(buf, "%u\n", *addr);
+    term_puts(buf);
 
     return;
 }

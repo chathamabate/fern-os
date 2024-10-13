@@ -5,14 +5,15 @@
 
 #include <stdint.h>
 
+typedef uint64_t seg_descriptor_t;
+
 struct _gdtr_val_t {
     uint16_t size_m_1; // size of the table (in bytes) - 1.
-    uint32_t offset;
+    seg_descriptor_t *offset;
 } __attribute__ ((packed));
 
 typedef struct _gdtr_val_t gdtr_val_t;
 
-typedef uint64_t seg_descriptor_t;
 
 static inline uint32_t sd_get_limit(seg_descriptor_t sd) {
     return (sd & 0xFFFF) | ((sd >> 32) & 0x000F0000);

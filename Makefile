@@ -79,6 +79,7 @@ clean:
 $(SRC_DIR)/.clangd:
 	echo "CompileFlags:" > $@
 	echo "  Add:" >> $@
+	echo "  - --gcc-toolchain=$(shell which $(CC))" >> $@
 	$(foreach m,$(MODS),echo "  - -I$(MODS_DIR)/$(m)/include" >> $@;)
 
 clangd: $(SRC_DIR)/.clangd

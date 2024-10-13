@@ -45,11 +45,6 @@ stack_top:
 gdt_start:
 .skip 1028 // (1KB, much larger than ever needed)
 
-.align 16
-gdtr_val_buf:
-.byte 0x00, 0x00               // GDT Size - 1
-.byte 0x00, 0x00, 0x00, 0x00   // GDT Offset
-
 /*
 The linker script specifies _start as the entry point to the kernel and the
 bootloader will jump to this position once the kernel has been loaded. It
@@ -90,21 +85,24 @@ _start:
 	runtime support to work as well.
 	*/
 
+    // This will place the values we want in our new gdt area.
+    // Returns size - 1 into %ax.
     call init_flat_gdt    
 
-    leal (gdtr_val_buf), %edi
-
-    // eax should contain size of the table - 1 at this point.
-    movw %ax, (%edi)
-    movl $gdt_start, 2(%edi)
-
-    // Now let's actually load our new GDTR value.
     cli
+    // Now, we need to tell the cpu where to find our new gdt.
 
-    lgdt (gdtr_val_buf)
+    sub $8, %esp
 
-    // Reload segment regsiters: Assumes flat model
-    // with kernel code coming first, and kernel data coming second.
+    movl $0, (%esp)
+    movl $0, 4(%esp)
+
+    movw %ax, (%esp)
+    movl $gdt_start, 2(%esp)
+
+    lgdt (%esp)
+
+    add $8, %esp
 
     // Reload cs.
     jmp $0x08, $._reload_cs
