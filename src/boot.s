@@ -34,12 +34,21 @@ System V ABI standard and de-facto extensions. The compiler will assume the
 stack is properly aligned and failure to align the stack will result in
 undefined behavior.
 */
-// Should I just put this in the linker script?
 .section .bss
 .align 16
 stack_bottom:
 .skip 16384 # 16 KiB
 stack_top:
+
+.section .gdt
+// Section should already be aligned via the linker script!
+gdt_start:
+.skip 1028 // (1KB, much larger than ever needed)
+
+.align 16
+gdtr_val_buf:
+.byte 0x00, 0x00               // GDT Size - 1
+.byte 0x00, 0x00, 0x00, 0x00   // GDT Offset
 
 /*
 The linker script specifies _start as the entry point to the kernel and the
@@ -81,17 +90,35 @@ _start:
 	runtime support to work as well.
 	*/
 
-    /*
-    // Calling a C function example, we are in protected mode!
-    push   %ebp
-    mov    %esp,%ebp
-    sub    $0x14,%esp
-    push   %eax
-    call   print_hex
-    add    $0x10,%esp
-    leave
-    */
+    call init_flat_gdt    
 
+    leal (gdtr_val_buf), %edi
+
+    // eax should contain size of the table - 1 at this point.
+    movw %ax, (%edi)
+    movl $gdt_start, 2(%edi)
+
+    // Now let's actually load our new GDTR value.
+    cli
+
+    lgdt (gdtr_val_buf)
+
+    // Reload segment regsiters: Assumes flat model
+    // with kernel code coming first, and kernel data coming second.
+
+    // Reload cs.
+    jmp $0x08, $._reload_cs
+._reload_cs:
+
+    // Reload data segment registers.
+    movw $0x10, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+    movw %ax, %ss
+    
+    sti
 
 	/*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte

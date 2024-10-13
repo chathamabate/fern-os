@@ -10,15 +10,18 @@
 #error "Please compile with a ix86-elf compiler"
 #endif
 
-#include "msys/gdt.h"
+#include "msys/dt.h"
 #include "terminal/out.h"
 
 extern void write(void *addr);
+extern char _gdt_start;
+extern char _gdt_end;
 
 void kernel_main(void) {
     term_init();
     term_clear();
 
+    char buf[100];
     gdtr_val_t v;
 
     read_gdtr(&v);
@@ -26,7 +29,7 @@ void kernel_main(void) {
     size_t len = (v.size_m_1 + 1) / 8;
     seg_descriptor_t *tbl = (seg_descriptor_t *)(v.offset);
 
-    char buf[100];
+    //char buf[100];
     str_fmt(buf, "Num Entries: %u\n", len);
     term_puts(buf);
 
@@ -34,6 +37,7 @@ void kernel_main(void) {
     // Looks like this is for paging setup at somepoint??
     // Maybe I could change this at some point?
     // Attempt changing this to some different value??
+    // Could keep this how it is and move on to interrupts/file systems?
 
     for (uint32_t i = 0; i < len; i++) {
         seg_descriptor_t sd = tbl[i];

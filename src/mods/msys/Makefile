@@ -2,7 +2,7 @@
 
 MOD_NAME := msys
 
-ASMS := io.s gdt.s
+ASMS := io.s dt.s
 SRCS := 
 DEPS :=
 
