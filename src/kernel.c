@@ -1,23 +1,32 @@
  
 /* Check if the compiler thinks you are targeting the wrong operating system. */
+#include "util/str.h"
 #if defined(__linux__)
 #error "You are not using a cross-compiler, you will most certainly run into trouble"
 #endif
  
 /* This tutorial will only work for the 32-bit ix86 targets. */
 #if !defined(__i386__)
-#error "This tutorial needs to be compiled with a ix86-elf compiler"
+#error "Please compile with a ix86-elf compiler"
 #endif
 
+#include "msys/gdt.h"
 #include "terminal/out.h"
-#include "util/ansii.h"
-#include "util/str.h"
-#include "msys/io.h"
+
+extern void write(void *addr);
 
 void kernel_main(void) {
     term_init();
     term_clear();
 
-    term_puts(ANSII_BLACK_FG ANSII_GREEN_BG "HELLO" ANSII_RESET 
-            ANSII_BRIGHT_CYAN_FG " Aye Yo" ANSII_RESET);
+    gdtr_val_t v;
+
+    read_gdtr(&v);
+
+    char buf[20];
+    str_fmt(buf, "Offset = 0x%X\n", (v.offset));
+    term_puts(buf);
+
+    str_fmt(buf, "Size   = 0x%X\n", (uint32_t)(v.size));
+    term_puts(buf);
 }

@@ -10,4 +10,7 @@
 // on the stack in 4-bytes chunks.
 void outb(uint32_t port, uint32_t value);
 
+void enable_intrs(void);
+void disable_intrs(void);
+
 #endif

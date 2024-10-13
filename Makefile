@@ -9,7 +9,7 @@ MODS := terminal \
 		util \
 		msys
 
-SRCS := kernel.c
+SRCS := kernel.c test.c
 ASMS := boot.s
 
 SRC_DIR := $(TOP_DIR)/src
