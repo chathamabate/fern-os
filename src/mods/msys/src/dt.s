@@ -1,11 +1,5 @@
 
 
-// We are going to load the user given arg into here.
-.section .bss
-gdtr_store_addr: 
-    // 48 bits needed!
-    .byte 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-
 .section .text
 
 .global read_gdtr
@@ -16,21 +10,20 @@ read_gdtr:
 
     // Get our User given pointer and store it in %edi.
     movl 8(%ebp), %edi   
+    sgdt (%edi)
 
-    // Store the address we will be copying gdtr value info
-    // from.
-    leal (gdtr_store_addr), %esi
-    
-    // Store the value of the gdtr into our .bss section.
-    sgdt (gdtr_store_addr)
+    pop %ebp
+    ret
 
-    // Move size.
-    movw (%esi), %ax
-    movw %ax, (%edi)
-    
-    // Move Offset.
-    movl 2(%esi), %eax
-    movl %eax, 2(%edi)
+.global read_idtr
+.type read_idtr, @function
+read_idtr:
+    push %ebp
+    movl %esp, %ebp
+
+    // Get our User given pointer and store it in %edi.
+    movl 8(%ebp), %edi   
+    sidt (%edi)
 
     pop %ebp
     ret

@@ -6,8 +6,8 @@
 
 .global my_handler
 my_handler:
-    pushad
+    //pushad
     cld
     call _my_handler
-    popad
+    //popad
     iret

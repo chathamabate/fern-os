@@ -40,11 +40,6 @@ stack_bottom:
 .skip 16384 # 16 KiB
 stack_top:
 
-.section .gdt
-// Section should already be aligned via the linker script!
-gdt_start:
-.skip 1028 // (1KB, much larger than ever needed)
-
 /*
 The linker script specifies _start as the entry point to the kernel and the
 bootloader will jump to this position once the kernel has been loaded. It
@@ -74,6 +69,8 @@ _start:
 	*/
 	mov $stack_top, %esp
 
+    call term_init
+
 	/*
 	This is a good place to initialize crucial processor state before the
 	high-level kernel is entered. It's best to minimize the early
@@ -98,7 +95,7 @@ _start:
     movl $0, 4(%esp)
 
     movw %ax, (%esp)
-    movl $gdt_start, 2(%esp)
+    movl $_gdt_start, 2(%esp)
 
     lgdt (%esp)
 
@@ -140,6 +137,7 @@ _start:
 	3) Jump to the hlt instruction if it ever wakes up due to a
 	   non-maskable interrupt occurring or due to system management mode.
 	*/
+.end:
 	cli
 1:	hlt
 	jmp 1b

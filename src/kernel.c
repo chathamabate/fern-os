@@ -13,14 +13,7 @@
 #include "msys/dt.h"
 #include "terminal/out.h"
 
-extern void write(void *addr);
-extern char _gdt_start;
-extern char _gdt_end;
-
-void kernel_main(void) {
-    term_init();
-    term_clear();
-
+static void print_gdt(void) {
     char buf[100];
     gdtr_val_t v;
 
@@ -29,15 +22,8 @@ void kernel_main(void) {
     size_t len = (v.size_m_1 + 1) / 8;
     seg_descriptor_t *tbl = (v.offset);
 
-    //char buf[100];
     str_fmt(buf, "Num Entries: %u\n", len);
     term_puts(buf);
-
-    // Looks like in this configuration, the entire memory space is read/write/executable!
-    // Looks like this is for paging setup at somepoint??
-    // Maybe I could change this at some point?
-    // Attempt changing this to some different value??
-    // Could keep this how it is and move on to interrupts/file systems?
 
     for (uint32_t i = 0; i < len; i++) {
         seg_descriptor_t sd = tbl[i];
@@ -50,27 +36,50 @@ void kernel_main(void) {
         str_fmt(buf, "\nEntry %u:\n", i);
         term_puts(buf);
 
-        str_fmt(buf, "  Base  = %X\n", base);
+        str_fmt(buf, "  Range = (%X, %X)\n", base, lim);
         term_puts(buf);
 
-        str_fmt(buf, "  Limit = %X\n", lim);
-        term_puts(buf);
-
-        str_fmt(buf, "  Flags = %X\n", flags);
-        term_puts(buf);
-
-        str_fmt(buf, "  AB    = %X\n", access_byte);
+        str_fmt(buf, "  Flags = %X AB = %X\n", flags, access_byte);
         term_puts(buf);
     }
+}
 
-    // To force some sort of behavoir, I believe some sort
-    // of handler must be implemented!
-    // Otherwise, UB?
+static void print_idt(void) {
+    char buf[100];
+    idtr_val_t v;
+    read_idtr(&v);
 
-    uint32_t *addr = (uint32_t *)0xFFFFF000;
-    *addr = 55;
-    str_fmt(buf, "%u\n", *addr);
+    size_t len = (v.size_m_1 + 1) / 8;
+    gate_descriptor_t *tbl = (v.offset);
+
+    str_fmt(buf, "Num Entries: %u\n", len);
     term_puts(buf);
+
+    for (size_t i = 0; i < 4; i++) {
+        gate_descriptor_t gd = tbl[i];
+        uint32_t selector = gd_get_selector(gd);
+        uint32_t offset = gd_get_offset(gd);
+        uint32_t attrs = gd_get_attrs(gd);
+
+        str_fmt(buf, "\nEntry %u:\n", i);
+        term_puts(buf);
+
+        str_fmt(buf, "  Sel: %X, Off: %X, Attrs: %X\n",
+                selector, offset, attrs);
+        term_puts(buf);
+
+        str_fmt(buf, "  Orig: %X, New: %X\n", (uint32_t)(gd >> 32), 
+                (uint32_t)(gd_from_parts(selector, offset, attrs) >> 32));
+        term_puts(buf);
+    }
+}
+
+
+void kernel_main(void) {
+    term_init();
+    term_clear();
+
+    print_idt();
 
     return;
 }

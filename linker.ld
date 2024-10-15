@@ -1,7 +1,10 @@
+
+GDT_AREA_SIZE = 1024;
+
 /* The bootloader will look at this image and start execution at the symbol
    designated as the entry point. */
 ENTRY(_start)
- 
+
 /* Tell where the various sections of the object files will be put in the final
    kernel image. */
 SECTIONS
@@ -18,6 +21,13 @@ SECTIONS
 	   work around this issue. This does not use that feature, so 2M was
 	   chosen as a safer option than the traditional 1M. */
 	. = 2M;
+
+    .tables BLOCK(4K) : ALIGN(4K)
+    {
+        _gdt_start = .;
+        . += GDT_AREA_SIZE;
+        _gdt_end = .;
+    } 
  
 	/* First put the multiboot header, as it is required to be put very early
 	   in the image or the bootloader won't recognize the file format.
@@ -47,10 +57,4 @@ SECTIONS
 		*(.bss)
 	}
 
-    .gdt BLOCK(4K) : ALIGN(4K)
-    {
-        _gdt_start = .;
-        KEEP(*(.gdt))
-        _gdt_end = .;
-    } 
 }
