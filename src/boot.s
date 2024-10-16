@@ -69,8 +69,6 @@ _start:
 	*/
 	mov $stack_top, %esp
 
-    call term_init
-
 	/*
 	This is a good place to initialize crucial processor state before the
 	high-level kernel is entered. It's best to minimize the early
@@ -90,15 +88,11 @@ _start:
     // Now, we need to tell the cpu where to find our new gdt.
 
     sub $8, %esp
-
     movl $0, (%esp)
     movl $0, 4(%esp)
-
     movw %ax, (%esp)
     movl $_gdt_start, 2(%esp)
-
     lgdt (%esp)
-
     add $8, %esp
 
     // Reload cs.
@@ -115,6 +109,19 @@ _start:
     
     sti
 
+    // Now let's initialize our IDT.
+    call init_idt
+
+    cli
+    sub $8, %esp
+    movl $0, (%esp)
+    movl $0, 4(%esp)
+    movw %ax, (%esp)
+    movl $_idt_start, 2(%esp)
+    lidt (%esp)
+    add $8, %esp
+    sti
+
 	/*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte
 	aligned at the time of the call instruction (which afterwards pushes
@@ -123,7 +130,9 @@ _start:
 	stack since (pushed 0 bytes so far), so the alignment has thus been
 	preserved and the call is well defined.
 	*/
+
 	call kernel_main
+    int $0x5
 
 	/*
 	If the system has nothing more to do, put the computer into an

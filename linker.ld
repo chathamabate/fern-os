@@ -1,5 +1,6 @@
 
-GDT_AREA_SIZE = 1024;
+GDT_AREA_SIZE = 0x1000;
+IDT_AREA_SIZE = 0x10000;
 
 /* The bootloader will look at this image and start execution at the symbol
    designated as the entry point. */
@@ -27,6 +28,10 @@ SECTIONS
         _gdt_start = .;
         . += GDT_AREA_SIZE;
         _gdt_end = .;
+        . = ALIGN(16);
+        _idt_start = .;
+        . += IDT_AREA_SIZE;
+        _idt_end = .;
     } 
  
 	/* First put the multiboot header, as it is required to be put very early

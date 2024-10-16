@@ -1,5 +1,6 @@
  
 /* Check if the compiler thinks you are targeting the wrong operating system. */
+#include "msys/intr.h"
 #include "util/str.h"
 #if defined(__linux__)
 #error "You are not using a cross-compiler, you will most certainly run into trouble"
@@ -52,10 +53,10 @@ static void print_idt(void) {
     size_t len = (v.size_m_1 + 1) / 8;
     gate_descriptor_t *tbl = (v.offset);
 
-    str_fmt(buf, "Num Entries: %u\n", len);
+    str_fmt(buf, "Num Entries: %u @ %X\n", len, tbl);
     term_puts(buf);
 
-    for (size_t i = 0; i < 4; i++) {
+    for (size_t i = 0; i < 6; i++) {
         gate_descriptor_t gd = tbl[i];
         uint32_t selector = gd_get_selector(gd);
         uint32_t offset = gd_get_offset(gd);
@@ -67,10 +68,6 @@ static void print_idt(void) {
         str_fmt(buf, "  Sel: %X, Off: %X, Attrs: %X\n",
                 selector, offset, attrs);
         term_puts(buf);
-
-        str_fmt(buf, "  Orig: %X, New: %X\n", (uint32_t)(gd >> 32), 
-                (uint32_t)(gd_from_parts(selector, offset, attrs) >> 32));
-        term_puts(buf);
     }
 }
 
@@ -78,6 +75,14 @@ static void print_idt(void) {
 void kernel_main(void) {
     term_init();
     term_clear();
+
+    // Maybe try some stuff here.
+    //idtr_val_t idt_val;
+    //read_idtr(&idt_val);
+
+    //size_t len = (idt_val.size_m_1 + 1) / 8;
+    //gate_descriptor_t *tbl = (idt_val.offset);
+
 
     print_idt();
 
