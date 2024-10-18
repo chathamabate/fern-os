@@ -80,5 +80,6 @@ static inline gate_descriptor_t gd_from_parts(uint16_t selector, uint32_t offset
 }
 
 void read_idtr(idtr_val_t *dest);
+void load_idtr(gate_descriptor_t *offset, uint32_t size_m_1);
 
 #endif

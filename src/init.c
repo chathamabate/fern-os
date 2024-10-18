@@ -4,6 +4,8 @@
 
 #include "msys/dt.h"
 #include "msys/intr.h"
+#include "terminal/out.h"
+#include "util/str.h"
 #include <stdint.h>
 
 extern seg_descriptor_t _gdt_start[];
@@ -23,7 +25,10 @@ uint32_t init_flat_gdt(void) {
 extern gate_descriptor_t _idt_start[];
 extern char _idt_end;
 
-uint32_t init_idt(void) {
+void init_idt(void) {
+    // Gotta make sure the segment selectors are RIGHT!
+    // Just use kernel code/data mode for now!
+
     gate_descriptor_t NOP_GD = 
         gd_from_parts(0x8, (uint32_t)nop_handler, 0x8E);
 
@@ -33,10 +38,7 @@ uint32_t init_idt(void) {
         _idt_start[i] = NOP_GD;
     }
 
-    _idt_start[0x5]  =
-        gd_from_parts(0x8, (uint32_t)my_handler, 0x8E);
-    
-    return (len * sizeof(gate_descriptor_t)) - 1;
+    load_idtr(_idt_start, (len * sizeof(gate_descriptor_t)) - 1);
 }
 
 

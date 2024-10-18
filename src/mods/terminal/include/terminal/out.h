@@ -119,12 +119,16 @@ void term_cursor_next_line(void);
 // \n   - Skip to start of next line.
 // \r   - Go to beginning of this line.
 //
-void term_putc(char c);
+void term_put_c(char c);
 
 // Print a string onto the terminal.
 //
 // This supports control characters supported by putc.
 // This supports ANSII colors found in util/ansii.h
-void term_puts(const char *s);
+void term_put_s(const char *s);
+
+// Print out the values in the stack before this function is called.
+// slots is the number of 32-bit values to trace up the stack.
+void term_put_trace(uint32_t slots, uint32_t *esp);
 
 #endif

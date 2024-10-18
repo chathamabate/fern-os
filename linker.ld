@@ -1,6 +1,7 @@
 
 GDT_AREA_SIZE = 0x1000;
 IDT_AREA_SIZE = 0x10000;
+STACK_SIZE =    0x10000;
 
 /* The bootloader will look at this image and start execution at the symbol
    designated as the entry point. */
@@ -23,8 +24,7 @@ SECTIONS
 	   chosen as a safer option than the traditional 1M. */
 	. = 2M;
 
-    .tables BLOCK(4K) : ALIGN(4K)
-    {
+    .tables BLOCK(4K) : ALIGN(4K) {
         _gdt_start = .;
         . += GDT_AREA_SIZE;
         _gdt_end = .;
@@ -33,6 +33,12 @@ SECTIONS
         . += IDT_AREA_SIZE;
         _idt_end = .;
     } 
+
+    .stack BLOCK(4K) : ALIGN(4K) {
+        _stack_bottom = .;
+        . += STACK_SIZE;
+        _stack_top = .;
+    }
  
 	/* First put the multiboot header, as it is required to be put very early
 	   in the image or the bootloader won't recognize the file format.

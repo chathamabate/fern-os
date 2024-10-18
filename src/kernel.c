@@ -24,7 +24,7 @@ static void print_gdt(void) {
     seg_descriptor_t *tbl = (v.offset);
 
     str_fmt(buf, "Num Entries: %u\n", len);
-    term_puts(buf);
+    term_put_s(buf);
 
     for (uint32_t i = 0; i < len; i++) {
         seg_descriptor_t sd = tbl[i];
@@ -35,13 +35,13 @@ static void print_gdt(void) {
         uint32_t access_byte = sd_get_access_byte(sd);
 
         str_fmt(buf, "\nEntry %u:\n", i);
-        term_puts(buf);
+        term_put_s(buf);
 
         str_fmt(buf, "  Range = (%X, %X)\n", base, lim);
-        term_puts(buf);
+        term_put_s(buf);
 
         str_fmt(buf, "  Flags = %X AB = %X\n", flags, access_byte);
-        term_puts(buf);
+        term_put_s(buf);
     }
 }
 
@@ -54,7 +54,7 @@ static void print_idt(void) {
     gate_descriptor_t *tbl = (v.offset);
 
     str_fmt(buf, "Num Entries: %u @ %X\n", len, tbl);
-    term_puts(buf);
+    term_put_s(buf);
 
     for (size_t i = 0; i < 6; i++) {
         gate_descriptor_t gd = tbl[i];
@@ -63,18 +63,18 @@ static void print_idt(void) {
         uint32_t attrs = gd_get_attrs(gd);
 
         str_fmt(buf, "\nEntry %u:\n", i);
-        term_puts(buf);
+        term_put_s(buf);
 
         str_fmt(buf, "  Sel: %X, Off: %X, Attrs: %X\n",
                 selector, offset, attrs);
-        term_puts(buf);
+        term_put_s(buf);
     }
 }
 
 
 void kernel_main(void) {
-    term_init();
-    term_clear();
+    //term_init();
+    //term_clear();
 
     // Maybe try some stuff here.
     //idtr_val_t idt_val;
@@ -83,8 +83,7 @@ void kernel_main(void) {
     //size_t len = (idt_val.size_m_1 + 1) / 8;
     //gate_descriptor_t *tbl = (idt_val.offset);
 
-
-    print_idt();
-
+    term_init();
+    term_clear();
     return;
 }

@@ -24,7 +24,7 @@ HEADERS := $(wildcard $(INCLUDE_DIR)/$(MOD_NAME)/*.h)
 
 MOD_LIB := $(BUILD_DIR)/lib$(MOD_NAME).a
 
-INCLUDE_DIRS := $(INCLUDE_DIR) $(foreach dep,$(DEPS),$(TOP_DIR)/src/mods/$(DEPS)/include)
+INCLUDE_DIRS := $(INCLUDE_DIR) $(foreach dep,$(DEPS),$(TOP_DIR)/src/mods/$(dep)/include)
 INCLUDE_FLAGS := $(addprefix -I,$(INCLUDE_DIRS))
 
 .PHONY: lib clean

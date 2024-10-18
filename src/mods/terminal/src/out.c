@@ -1,6 +1,9 @@
 
 #include "terminal/out.h"
 #include "msys/io.h"
+#include "util/ansii.h"
+#include "util/str.h"
+#include "msys/debug.h"
 
 static void disable_bios_cursor(void) {
     outb(0x3D4, 0x0A);
@@ -146,7 +149,7 @@ static void _term_advance_cursor(void) {
     }
 }
 
-static void _term_putc(char c) {
+static void _term_put_c(char c) {
     switch (c) {
     case '\n':
         _term_cursor_next_line();
@@ -162,9 +165,9 @@ static void _term_putc(char c) {
     }
 }
 
-void term_putc(char c) {
+void term_put_c(char c) {
     _term_cursor_guard();
-    _term_putc(c);
+    _term_put_c(c);
     _term_cursor_guard();
 }
 
@@ -215,7 +218,7 @@ static size_t term_interp_esc_seq(const char *s) {
     return i - s; 
 }
 
-void term_puts(const char *s) {
+void term_put_s(const char *s) {
     _term_cursor_guard();
 
     const char *i = s;
@@ -225,10 +228,38 @@ void term_puts(const char *s) {
         if (c == 0x1B) {
             i += term_interp_esc_seq(i);
         } else {
-            _term_putc(c); 
+            _term_put_c(c); 
         }
     }
 
     _term_cursor_guard();
+}
+
+#define _ESP_ID_FMT ANSII_GREEN_FG "%%esp" ANSII_RESET
+#define _ESP_INDEX_FMT ANSII_CYAN_FG "%u" ANSII_RESET "(" _ESP_ID_FMT ")"
+
+#define _EVEN_ROW_FMT _ESP_INDEX_FMT " = " ANSII_LIGHT_GREY_FG "0x%X" ANSII_RESET "\n"
+#define _ODD_ROW_FMT _ESP_INDEX_FMT " = " ANSII_BRIGHT_LIGHT_GREY_FG "0x%X" ANSII_RESET "\n"
+
+#define _ESP_VAL_ROW_FMT _ESP_ID_FMT " = " ANSII_BRIGHT_LIGHT_GREY_FG "0x%X" ANSII_RESET "\n"
+
+void term_put_trace(uint32_t slots, uint32_t *esp) {
+    char buf[100];
+
+
+    for (size_t i = 0; i < slots; i++) {
+        size_t j = slots - 1 - i; 
+
+        if (j % 2 == 0) {
+            str_fmt(buf, _EVEN_ROW_FMT, j * sizeof(uint32_t), esp[j]);
+        } else {
+            str_fmt(buf, _ODD_ROW_FMT, j * sizeof(uint32_t), esp[j]);
+        }
+
+        term_put_s(buf);
+    }
+
+    str_fmt(buf, _ESP_VAL_ROW_FMT, esp);
+    term_put_s(buf);
 }
 

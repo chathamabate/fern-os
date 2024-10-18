@@ -28,5 +28,30 @@ read_idtr:
     pop %ebp
     ret
 
+.global load_idtr
+.type load_idtr, @function
+load_idtr:
+    push %ebp
+    movl %esp, %ebp
+    
+    sub $8, %esp
 
+    // Clear the 8 bytes we just reserved.
+    movl $0, (%esp)
+    movl $0, 4(%esp)
+
+    movw 32(%esp), %ax
+    movw %ax, (%esp)
+
+    movl 24(%esp), %eax
+    movl %eax, 2(%esp)
+
+    cli
+    lidt (%esp)
+    sti
+
+    add $8, %esp
+
+    pop %ebp
+    ret
 
