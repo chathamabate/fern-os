@@ -42,37 +42,6 @@ doesn't make sense to return from this function as the bootloader is gone.
 */
 .section .text
 
-// This function calls the C implemented init_flat_gdt function.
-// Then it loads the appropriate gdt regsiter value and segment register values.
-.type _init_gdt, @function
-_init_gdt:
-    call init_flat_gdt    
-
-    cli
-    // Now, we need to tell the cpu where to find our new gdt.
-
-    sub $8, %esp
-    movl $0, (%esp)
-    movl $0, 4(%esp)
-    movw %ax, (%esp)
-    movl $_gdt_start, 2(%esp)
-    lgdt (%esp)
-    add $8, %esp
-
-    // Reload cs.
-    jmp $0x08, $._reload_cs
-._reload_cs:
-
-    // Reload data segment registers.
-    movw $0x10, %ax
-    movw %ax, %ds
-    movw %ax, %es
-    movw %ax, %fs
-    movw %ax, %gs
-    movw %ax, %ss
-    
-    sti
-    ret
 
 .global _start
 .type _start, @function
@@ -95,7 +64,11 @@ _start:
 	stack (as it grows downwards on x86 systems). This is necessarily done
 	in assembly as languages such as C cannot function without a stack.
 	*/
-	mov $_stack_top, %esp
+	movl $_stack_top, %esp
+    movl %esp, %ebp
+
+    call term_init
+    call term_clear
 
 	/*
 	This is a good place to initialize crucial processor state before the
@@ -108,9 +81,8 @@ _start:
 	runtime support to work as well.
 	*/
 
-    call _init_gdt
-
-    call init_idt
+    call init_gdt
+    //call init_idt
 
     // This will place the values we want in our new gdt area.
     // Returns size - 1 into %ax.
@@ -128,18 +100,6 @@ _start:
 
 	call kernel_main
 
-    //sub $12, %esp
-
-    //movl $0xF4, %esp
-    //movl $0x111, 4(%esp) 
-
-    pushl $0xFF
-    pushl $0xEE
-    pushl $0xDD
-
-    pushl %esp
-    pushl $3
-    call term_put_trace
 
 	/*
 	If the system has nothing more to do, put the computer into an

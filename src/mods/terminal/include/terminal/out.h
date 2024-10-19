@@ -127,6 +127,12 @@ void term_put_c(char c);
 // This supports ANSII colors found in util/ansii.h
 void term_put_s(const char *s);
 
+// Prints a string to the terminal using str_fmt.
+// NOTE: Make sure your resulting string does overflow
+// the static Buffer size noted here.
+#define TERM_FMT_BUF_SIZE 1024
+void term_put_fmt_s(const char *fmt, ...);
+
 // Print out the values in the stack before this function is called.
 // slots is the number of 32-bit values to trace up the stack.
 void term_put_trace(uint32_t slots, uint32_t *esp);

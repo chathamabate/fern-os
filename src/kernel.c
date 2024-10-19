@@ -12,6 +12,7 @@
 #endif
 
 #include "msys/dt.h"
+#include "msys/debug.h"
 #include "terminal/out.h"
 
 static void print_gdt(void) {
@@ -73,17 +74,6 @@ static void print_idt(void) {
 
 
 void kernel_main(void) {
-    //term_init();
-    //term_clear();
-
-    // Maybe try some stuff here.
-    //idtr_val_t idt_val;
-    //read_idtr(&idt_val);
-
-    //size_t len = (idt_val.size_m_1 + 1) / 8;
-    //gate_descriptor_t *tbl = (idt_val.offset);
-
-    term_init();
-    term_clear();
+    term_put_fmt_s("Hello %X\n", 0xFF);
     return;
 }

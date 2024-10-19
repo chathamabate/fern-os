@@ -235,6 +235,17 @@ void term_put_s(const char *s) {
     _term_cursor_guard();
 }
 
+static char term_fmt_buf[TERM_FMT_BUF_SIZE];
+void term_put_fmt_s(const char *fmt, ...) {
+    va_list va;
+    va_start(va, fmt);
+    str_vfmt(term_fmt_buf, fmt, va);
+    va_end(va);
+
+    term_put_s(term_fmt_buf);
+}
+
+
 #define _ESP_ID_FMT ANSII_GREEN_FG "%%esp" ANSII_RESET
 #define _ESP_INDEX_FMT ANSII_CYAN_FG "%u" ANSII_RESET "(" _ESP_ID_FMT ")"
 

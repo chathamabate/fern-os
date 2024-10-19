@@ -47,6 +47,12 @@ static inline seg_descriptor_t sd_from_parts(uint32_t base, uint32_t limit,
 // Stores contents of the gdtr into where dest points.
 void read_gdtr(gdtr_val_t *dest);
 
+
+// Load a new GDT into the GDT register.
+// NOTE: Make sure the current value of CS is valid in the new GDT.
+// NOTE: After loading the GDT, 0x8 will be loaded into CS.
+void load_gdtr(seg_descriptor_t *offset, uint32_t size_m_1, uint32_t new_data_seg);
+
 // Interrupt Descriptor Table Stuff
 
 typedef uint64_t gate_descriptor_t;
