@@ -7,7 +7,16 @@
 
 // Global Descriptor Table Stuff
 
-typedef uint64_t seg_descriptor_t;
+struct _seg_descriptor_t {
+    uint64_t limit_lo : 16;
+    uint64_t base_lo : 24;
+    uint64_t access_byte : 8;
+    uint64_t limit_hi : 4;
+    uint64_t flags : 4;
+    uint64_t base_hi : 8;
+} __attribute__ ((packed));
+
+typedef struct _seg_descriptor_t seg_descriptor_t;
 
 struct _gdtr_val_t {
     uint16_t size_m_1; // size of the table (in bytes) - 1.
@@ -16,32 +25,94 @@ struct _gdtr_val_t {
 
 typedef struct _gdtr_val_t gdtr_val_t;
 
+// Access Byte Definition.
+
+#define GDT_AB_P_MASK (1 << 7)
+#define GDT_AB_DPL_MASK (3 << 5)
+#define GDT_AB_S_MASK (1 << 4)
+#define GDT_AB_E_MASK (1 << 3)
+#define GDT_AB_DC_MASK (1 << 2)
+#define GDT_AB_RW_MASK (1 << 1)
+#define GDT_AB_A_MASK (1 << 0)
+
+// Present Bit
+#define GDT_AB_PRESENT GDT_AB_P_MASK
+#define GDT_AB_NOT_PRESENT 0x0
+
+// DPL Bits
+#define GDT_AB_USER_PRVLG GDT_AB_DPL_MASK
+#define GDT_AB_ROOT_PRVLG 0x0
+
+// Descriptor Type Bit
+#define GDT_AB_TSS 0x0
+#define GDT_AB_CODE_OR_DATA_SEG GDT_AB_S_MASK
+
+// Executable Bit
+#define GDT_AB_EXECUTABLE GDT_AB_E_MASK
+#define GDT_AB_NOT_EXECUTABLE 0x0
+
+// Direction Bit/Conforming Bit
+#define GDT_AB_DIRECTION_UP 0x0             // For Data Segments
+#define GDT_AB_DIRECTION_DOWN GDT_AB_DC_MASK
+#define GDT_AB_NON_CONFORMING 0x0           // For Code Segments
+#define GDT_AB_CONFOMRING GDT_AB_DC_MASK
+
+// RW Bit
+#define GDT_AB_WRITE GDT_AB_RW_MASK // For Data Segments
+#define GDT_AB_NO_WRITE 0x0
+#define GDT_AB_READ GDT_AB_RW_MASK  // For Code Segments
+#define GDT_AB_NO_READ 0x0
+
+// Accessed Bit
+#define GDT_AB_ACCESSED GDT_AB_A_MASK
+#define GDT_AB_NOT_ACCESSED 0x0
+
+//  Flag Byte definitions.
+
+#define GDT_F_G_MASK (1 << 3)
+#define GDT_F_DB_MASK (1 << 2)
+#define GDT_F_L_MASK (1 << 1)
+
+// Granularity Bit.
+#define GDT_F_1B_GRANULARITY 0x0
+#define GDT_F_4K_GRANULARITY GDT_F_G_MASK
+
+// Size Bit.
+#define GDT_F_16b_PROTECTED_MODE 0x0
+#define GDT_F_32b_PROTECTED_MODE GDT_F_DB_MASK
+
+// Long Mode Bit.
+#define GDT_F_LONG_MODE GDT_F_L_MASK
+#define GDT_F_NON_LONG_MODE 0x0
+
 static inline uint32_t sd_get_limit(seg_descriptor_t sd) {
-    return ((sd & 0xFFFF) | ((sd >> 32) & 0x000F0000));
+    return sd.limit_lo | (sd.limit_hi << 16);
 }
 
 static inline uint32_t sd_get_base(seg_descriptor_t sd) {
-    return (((sd >> 16) & 0xFFFFFF) | 
-        ((sd >> 32) & 0xFF000000));
+    return sd.base_lo | (sd.base_hi << 24);
 }
 
 static inline uint8_t sd_get_flags(seg_descriptor_t sd) {
-    return (sd >> 52) & 0xF;
+    return sd.flags;
 }
 
 static inline uint8_t sd_get_access_byte(seg_descriptor_t sd) {
-    return (sd >> 40) & 0xFF;
+    return sd.access_byte;
 }
 
 static inline seg_descriptor_t sd_from_parts(uint32_t base, uint32_t limit, 
         uint8_t access_byte, uint8_t flags) {
-    return 
-        (((uint64_t)limit) & 0xFFFF) |
-        ((((uint64_t)base) & 0xFFFFFF) << 16) |
-        (((uint64_t)access_byte) << 40) |
-        ((((uint64_t)limit) & 0x000F0000) << 32) |
-        ((((uint64_t)flags) & 0xF) << 52) |
-        ((((uint64_t)base) & 0xFF000000) << 32);
+    seg_descriptor_t sd = {
+        .limit_lo = limit & 0xFFFF,
+        .base_lo = base & 0xFFFFFF,
+        .access_byte = access_byte,
+        .limit_hi = (limit & 0xF0000) >> 16,
+        .flags = flags,
+        .base_hi = (base & 0xFF000000) >> 24
+    };
+
+    return sd;
 }
 
 // Stores contents of the gdtr into where dest points.

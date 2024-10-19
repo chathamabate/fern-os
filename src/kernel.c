@@ -74,6 +74,7 @@ static void print_idt(void) {
 
 
 void kernel_main(void) {
-    term_put_fmt_s("Hello %X\n", 0xFF);
+    term_init();
+    print_gdt();
     return;
 }

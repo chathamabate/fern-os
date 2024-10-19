@@ -67,9 +67,6 @@ _start:
 	movl $_stack_top, %esp
     movl %esp, %ebp
 
-    call term_init
-    call term_clear
-
 	/*
 	This is a good place to initialize crucial processor state before the
 	high-level kernel is entered. It's best to minimize the early
@@ -81,8 +78,8 @@ _start:
 	runtime support to work as well.
 	*/
 
-    call init_gdt
-    //call init_idt
+    call gdt_init
+    call idt_init
 
     // This will place the values we want in our new gdt area.
     // Returns size - 1 into %ax.
