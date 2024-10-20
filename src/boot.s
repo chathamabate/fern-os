@@ -97,7 +97,6 @@ _start:
 
 	call kernel_main
 
-
 	/*
 	If the system has nothing more to do, put the computer into an
 	infinite loop. To do that:
@@ -120,3 +119,9 @@ Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.
 */
 .size _start, . - _start
+
+
+.global my_handler
+.type my_handler, @function
+my_handler:
+    iret

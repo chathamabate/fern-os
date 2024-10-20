@@ -4,6 +4,7 @@
 #define MSYS_DT_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 // Global Descriptor Table Stuff
 
@@ -126,7 +127,15 @@ void load_gdtr(seg_descriptor_t *offset, uint32_t size_m_1, uint32_t new_data_se
 
 // Interrupt Descriptor Table Stuff
 
-typedef uint64_t gate_descriptor_t;
+struct _gate_descriptor_t {
+    uint64_t offset_lo : 16;
+    uint64_t seg_selector : 16;
+    uint64_t reserved : 8;
+    uint64_t attrs : 8;
+    uint64_t offset_hi : 16; 
+} __attribute__ ((packed));
+
+typedef struct _gate_descriptor_t gate_descriptor_t;
 
 struct _idtr_val_t {
     uint16_t size_m_1;  // Size of table bytes - 1.
@@ -135,28 +144,53 @@ struct _idtr_val_t {
 
 typedef struct _idtr_val_t idtr_val_t;
 
+#define IDT_ATTR_GT_MASK 0xF
+#define IDT_ATTR_DPL_MASK (3 << 5)
+#define IDT_ATTR_P_MASK (1 << 7)
+
+// Gate Type
+#define IDT_ATTR_TASK_GATE 0x5
+#define IDT_ATTR_16b_INTR_GATE 0x6
+#define IDT_ATTR_16b_TRAP_GATE 0x7
+#define IDT_ATTR_32b_INTR_GATE 0xE
+#define IDT_ATTR_32b_TRAP_GATE 0xF
+
+// Privlege Level
+#define IDT_ATTR_ROOT_PRVLG 0x0
+#define IDT_ATTR_USER_PRVLG IDT_ATTR_DPL_MASK
+
+// Present Bit
+#define IDT_ATTR_PRESENT IDT_ATTR_P_MASK
+#define IDT_ATTR_NOT_PRESENT 0x0
+
 static inline uint16_t gd_get_selector(gate_descriptor_t gd) {
-    return (gd >> 16) & 0xFFFF;
+    return gd.seg_selector >> 16;
 }
 
 static inline uint32_t gd_get_offset(gate_descriptor_t gd) {
-    return ((gd & 0xFFFF) | ((gd >> 32) & 0xFFFF0000));
+    return gd.offset_lo | (gd.offset_hi << 16);
 }
 
 static inline uint8_t gd_get_attrs(gate_descriptor_t gd) {
-    return (gd >> 40) & 0xFF;
+    return gd.attrs;
 }
 
 static inline gate_descriptor_t gd_from_parts(uint16_t selector, uint32_t offset, 
         uint8_t attrs) {
-    return 
-        (((uint64_t)offset) & 0xFFFF) |
-        (((uint64_t)selector) << 16) |
-        (((uint64_t)attrs) << 40) |
-        ((((uint64_t)offset) & 0xFFFF0000) << 32);
+    gate_descriptor_t gd = {
+        .offset_lo = offset & 0xFFFF,
+        .seg_selector = selector,
+        .reserved = 0,
+        .attrs = attrs,
+        .offset_hi = (offset >> 16)
+    };
+
+    return gd;
 }
 
 void read_idtr(idtr_val_t *dest);
 void load_idtr(gate_descriptor_t *offset, uint32_t size_m_1);
+
+void load_gate_descriptor(size_t i, gate_descriptor_t gd);
 
 #endif

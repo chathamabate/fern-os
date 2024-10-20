@@ -72,9 +72,24 @@ static void print_idt(void) {
     }
 }
 
+extern void my_handler(void);
+
 
 void kernel_main(void) {
     term_init();
-    print_gdt();
+
+    load_gate_descriptor(
+        1,
+        gd_from_parts(
+            0x8, 
+            (uint32_t)my_handler,
+            IDT_ATTR_32b_INTR_GATE |
+            IDT_ATTR_ROOT_PRVLG |
+            IDT_ATTR_PRESENT
+        )
+    );
+
+    print_idt();
+
     return;
 }

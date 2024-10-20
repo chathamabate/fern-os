@@ -15,15 +15,3 @@ enable_intrs:
 disable_intrs:
     cli
     ret
-
-.global nop_handler
-nop_handler:
-    iret
-
-.global my_handler
-my_handler:
-    pushal
-    cld
-    call _my_handler
-    popal
-    iret

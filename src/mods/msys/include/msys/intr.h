@@ -5,9 +5,4 @@
 void enable_intrs(void);
 void disable_intrs(void);
 
-// Handler which does nothing.
-void nop_handler(void);
-
-void my_handler(void);
-
 #endif
