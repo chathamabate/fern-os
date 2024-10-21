@@ -104,7 +104,26 @@ This is useful when debugging or when you implement call tracing.
 .size _start, . - _start
 
 
+/*
+    EFLAGS
+    0000 CS
+    EIP         <- What iret expects.
+    Error Code  <- What will also be added on during exception.
+
+    8 general purpose registers!
+*/
+
+.global default_handler
+default_handler:
+    push %esp
+    push $15
+    call term_put_trace
+    call lock_up
+
 .global my_handler
-.type my_handler, @function
 my_handler:
-    iret
+    pushal
+    push %esp 
+    push $20
+    call term_put_trace
+    call lock_up

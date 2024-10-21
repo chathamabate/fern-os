@@ -74,23 +74,16 @@ static void print_idt(void) {
 
 extern void my_handler(void);
 
+void _my_handler(uint32_t error_code) {
+}
+
 void kernel_main(void) {
     term_init();
-    term_put_s("HELLO\n");
-    term_put_s("GOOD BYE\n");
 
-    load_gate_descriptor(
-        1,
-        gd_from_parts(
-            0x8, 
-            (uint32_t)my_handler,
-            IDT_ATTR_32b_INTR_GATE |
-            IDT_ATTR_ROOT_PRVLG |
-            IDT_ATTR_PRESENT
-        )
-    );
+    uint32_t *addr = (uint32_t *)0xFFFF0000;
+    *addr = 10;
+    term_put_fmt_s("%u\n", *addr);
 
-    print_idt();
 
     return;
 }
