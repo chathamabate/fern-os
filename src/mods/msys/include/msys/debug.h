@@ -9,4 +9,8 @@ uint32_t *read_esp(void);
 uint32_t read_cs(void);
 uint32_t read_ds(void);
 
+// This function just stops the computer basically.
+// YOU CANNOT RECOVER FROM THIS.
+void lock_up(void);
+
 #endif

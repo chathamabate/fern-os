@@ -74,9 +74,10 @@ static void print_idt(void) {
 
 extern void my_handler(void);
 
-
 void kernel_main(void) {
     term_init();
+    term_put_s("HELLO\n");
+    term_put_s("GOOD BYE\n");
 
     load_gate_descriptor(
         1,
