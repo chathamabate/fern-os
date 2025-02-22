@@ -3,7 +3,7 @@
 MOD_NAME := msys
 
 ASMS := io.s dt.s intr.s debug.s
-SRCS := _dt.c
+SRCS := _dt.c _intr.c
 DEPS :=
 
 -include ../mod_stub.mk

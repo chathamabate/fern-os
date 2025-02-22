@@ -4,6 +4,38 @@
 
 .section .text
 
+.macro pushad
+    .byte 0x60
+.endm
+
+.macro popad
+    .byte 0x61
+.endm
+
+.global default_exception_handler
+.type default_exception_handler, @function
+default_exception_handler:
+    pushad
+    cld
+    call _default_exception_handler
+    call lock_up
+
+.global default_exception_with_err_code_handler
+.type default_exception_with_err_code_handler, @function
+default_exception_with_err_code_handler:
+    pushad
+    cld
+    call lock_up
+
+.global default_handler
+.type default_handler, @function
+default_handler:
+    pushad
+    cld
+    call _default_handler
+    popad
+    iret
+
 .global enable_intrs
 .type enable_intrs, @function
 enable_intrs:

@@ -113,17 +113,3 @@ This is useful when debugging or when you implement call tracing.
     8 general purpose registers!
 */
 
-.global default_handler
-default_handler:
-    push %esp
-    push $15
-    call term_put_trace
-    call lock_up
-
-.global my_handler
-my_handler:
-    pushal
-    push %esp 
-    push $20
-    call term_put_trace
-    call lock_up

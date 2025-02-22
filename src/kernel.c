@@ -72,18 +72,11 @@ static void print_idt(void) {
     }
 }
 
-extern void my_handler(void);
-
-void _my_handler(uint32_t error_code) {
-}
 
 void kernel_main(void) {
     term_init();
 
-    uint32_t *addr = (uint32_t *)0xFFFF0000;
-    *addr = 10;
-    term_put_fmt_s("%u\n", *addr);
-
-
     return;
 }
+
+
