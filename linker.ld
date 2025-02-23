@@ -19,9 +19,11 @@ ENTRY(_start)
  * 0x1_0000_0000 =   4 GB
  */
 
-GDT_AREA_SIZE = 0x1000;  /* 4KB */
+GDT_AREA_SIZE = 0x1000; /* 4 KB */
 IDT_AREA_SIZE = 0x1000; /* 4 KB (Need this really be so big?) */
-STACK_SIZE =    0x1000; /* 4 KB (Should this maybe be larger?) */
+
+
+STACK_SIZE =    0x10000; /* 64 KB (Should this maybe be larger?) */
 
 MEMORY 
 {
@@ -60,6 +62,8 @@ SECTIONS
         . += IDT_AREA_SIZE;
         _idt_end = .;
     } > static_area
+
+    /* Should we have one page directory?? */
 
     .stack BLOCK(4K) : ALIGN(4K) {
         _stack_bottom = .;

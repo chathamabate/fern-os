@@ -18,4 +18,11 @@ struct _page_table_entry_t {
 
 typedef struct _page_table_entry_t page_table_entry_t;
 
+// Table MUST be a 4K aligned array of 1024 entries.
+void init_page_table(page_table_entry_t *table);
+
+void load_page_directory(void *pd_phys_addr);
+void enable_paging(void);
+
+
 #endif
