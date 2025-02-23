@@ -81,11 +81,6 @@ _start:
     call gdt_init
     call idt_init
 
-    // This will place the values we want in our new gdt area.
-    // Returns size - 1 into %ax.
-
-    // Now let's initialize our IDT.
-
 	/*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte
 	aligned at the time of the call instruction (which afterwards pushes

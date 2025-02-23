@@ -1,11 +1,37 @@
 
-GDT_AREA_SIZE = 0x1000;
-IDT_AREA_SIZE = 0x10000;
-STACK_SIZE =    0x10000;
 
 /* The bootloader will look at this image and start execution at the symbol
    designated as the entry point. */
 ENTRY(_start)
+
+/*
+ * I'm sick of always doing these calcs.
+ *
+ * 0x          0 =   0  B
+ * 0x          1 =   1  B
+ * 0x         10 =  16  B
+ * 0x        100 = 256  B
+ * 0x       1000 =   4 KB
+ * 0x     1_0000 =  64 KB
+ * 0x    10_0000 =   1 MB
+ * 0x   100_0000 =  16 MB
+ * 0x  1000_0000 = 256 MB
+ * 0x1_0000_0000 =   4 GB
+ */
+
+GDT_AREA_SIZE = 0x1000;  /* 4KB */
+IDT_AREA_SIZE = 0x1000; /* 4 KB (Need this really be so big?) */
+STACK_SIZE =    0x1000; /* 4 KB (Should this maybe be larger?) */
+
+MEMORY 
+{
+    /* 
+     * This will be mapped 1:1 from virtual memory.
+     * A virtual address in this range will map to an identical physical address.
+     */
+    static_area : ORIGIN = 0x400000, LENGTH = 0xC00000 /* 4 MB - 16 MB */
+
+}
 
 /* Tell where the various sections of the object files will be put in the final
    kernel image. */
@@ -22,7 +48,8 @@ SECTIONS
 	   memory which is verified to be available by the firmware, in order to
 	   work around this issue. This does not use that feature, so 2M was
 	   chosen as a safer option than the traditional 1M. */
-	. = 2M;
+
+	. = 0x400000; /* Actually starting at 4 MB here to make initial paging easy */
 
     .tables BLOCK(4K) : ALIGN(4K) {
         _gdt_start = .;
@@ -32,13 +59,13 @@ SECTIONS
         _idt_start = .;
         . += IDT_AREA_SIZE;
         _idt_end = .;
-    } 
+    } > static_area
 
     .stack BLOCK(4K) : ALIGN(4K) {
         _stack_bottom = .;
         . += STACK_SIZE;
         _stack_top = .;
-    }
+    } > static_area
 
 	/* First put the multiboot header, as it is required to be put very early
 	   in the image or the bootloader won't recognize the file format.
@@ -47,25 +74,24 @@ SECTIONS
 	{
 		*(.multiboot)
 		*(.text)
-	}
+	} > static_area
  
 	/* Read-only data. */
 	.rodata BLOCK(4K) : ALIGN(4K)
 	{
 		*(.rodata)
-	}
+	} > static_area
  
 	/* Read-write data (initialized) */
 	.data BLOCK(4K) : ALIGN(4K)
 	{
 		*(.data)
-	}
+	} > static_area
  
 	/* Read-write data (uninitialized) and stack */
 	.bss BLOCK(4K) : ALIGN(4K)
 	{
 		*(COMMON)
 		*(.bss)
-	}
-
+	} > static_area
 }

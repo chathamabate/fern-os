@@ -76,6 +76,12 @@ static void print_idt(void) {
 void kernel_main(void) {
     term_init();
 
+    // We could try to setup paging??
+    // Might be worthwhile...
+    // Then, go from there to keyboard stuff??
+
+    term_put_s("HERE\n");
+
     return;
 }
 

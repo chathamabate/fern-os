@@ -62,7 +62,9 @@ void gdt_init(void) {
             GDT_F_NON_LONG_MODE
     );    // User Code.   0x18
           
-    gdt[4] = sd_from_parts(0x0, 0xFFFFF, 
+    gdt[4] = sd_from_parts(
+            0x0, 0xFFFFF, 
+
             GDT_AB_PRESENT |
             GDT_AB_USER_PRVLG |
             GDT_AB_CODE_OR_DATA_SEG |
@@ -81,10 +83,6 @@ void gdt_init(void) {
 
 extern gate_descriptor_t _idt_start[];
 extern char _idt_end;
-
-extern void default_exception_handler(void);
-extern void default_exception_with_err_code_handler(void);
-extern void default_handler(void);
 
 void idt_init(void) {
     uint8_t len = 64; 
@@ -113,6 +111,10 @@ void idt_init(void) {
     }
 
     load_idtr(_idt_start, (len * sizeof(gate_descriptor_t)) - 1);
+}
+
+void paging_init(void) {
+
 }
 
 

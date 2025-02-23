@@ -24,6 +24,4 @@ void default_handler(void);
 void enable_intrs(void);
 void disable_intrs(void);
 
-void call_intr(uint32_t intr);
-
 #endif

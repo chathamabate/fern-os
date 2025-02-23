@@ -25,6 +25,16 @@ default_exception_handler:
 default_exception_with_err_code_handler:
     pushad
     cld
+
+    // Ok before doing any locking up... can we get the 
+    // Error code actually pushed?
+
+    mov %esp, %ebp
+    pushl %esp
+    pushl $12
+    call term_put_trace
+    mov %ebp, %esp
+
     call lock_up
 
 .global default_handler
@@ -32,6 +42,7 @@ default_exception_with_err_code_handler:
 default_handler:
     pushad
     cld
+
     call _default_handler
     popad
     iret
