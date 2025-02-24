@@ -17,6 +17,9 @@ static inline bool exception_has_err_code(uint8_t intr) {
         intr == 0x1E;
 }
 
+
+void nop_exception_handler(void);
+
 void default_exception_handler(void);
 void default_exception_with_err_code_handler(void);
 void default_handler(void);

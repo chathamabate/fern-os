@@ -57,7 +57,7 @@ static void print_idt(void) {
     str_fmt(buf, "Num Entries: %u @ %X\n", len, tbl);
     term_put_s(buf);
 
-    for (size_t i = 0; i < 6; i++) {
+    for (size_t i = 0; i < 16; i++) {
         gate_descriptor_t gd = tbl[i];
         uint32_t selector = gd_get_selector(gd);
         uint32_t offset = gd_get_offset(gd);
@@ -72,15 +72,17 @@ static void print_idt(void) {
     }
 }
 
+static void print_alot(void) {
+    for (size_t i = 0; i < 10000; i++) {
+        term_put_s("Hello\r");
+    }
+}
+
 
 void kernel_main(void) {
     term_init();
 
-    // We could try to setup paging??
-    // Might be worthwhile...
-    // Then, go from there to keyboard stuff??
-
-    term_put_s("HERE\n");
+    print_alot();
 
     return;
 }

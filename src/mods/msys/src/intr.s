@@ -12,19 +12,26 @@
     .byte 0x61
 .endm
 
+.global nop_exception_handler
+.type nop_exception_handler, @function
+nop_exception_handler:
+    iret 
+
+// It'd be cool if I had a handler for every exception type tbh...
+
 .global default_exception_handler
-.type default_exception_handler, @function
 default_exception_handler:
-    pushad
+    // pushad // Not needed, we don't return.
     cld
     call _default_exception_handler
     call lock_up
 
 .global default_exception_with_err_code_handler
-.type default_exception_with_err_code_handler, @function
 default_exception_with_err_code_handler:
-    pushad
+    // pushad // Not needed, we don't return.
     cld
+
+    // damn, this is actually being called now??
 
     // Ok before doing any locking up... can we get the 
     // Error code actually pushed?
@@ -38,7 +45,6 @@ default_exception_with_err_code_handler:
     call lock_up
 
 .global default_handler
-.type default_handler, @function
 default_handler:
     pushad
     cld
@@ -47,14 +53,14 @@ default_handler:
     popad
     iret
 
+// Some other exception handlers to help i
+
 .global enable_intrs
-.type enable_intrs, @function
 enable_intrs:
     sti
     ret
 
 .global disable_intrs
-.type disable_intrs, @function
 disable_intrs:
     cli
     ret

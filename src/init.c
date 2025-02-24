@@ -8,11 +8,10 @@
 #include "util/str.h"
 #include <stdint.h>
 
-extern seg_descriptor_t _gdt_start[];
-extern char _gdt_end;
+#define NUM_GDT_ENTRIES 0x10
+static seg_descriptor_t gdt[NUM_GDT_ENTRIES] __attribute__ ((aligned(8)));
 
 void gdt_init(void) {
-    seg_descriptor_t *gdt =_gdt_start;  
     gdt[0] = sd_from_parts(0x0, 0x0, 0x0, 0x0);
     gdt[1] = sd_from_parts(
             0x0, 0xFFFFF, 
@@ -77,19 +76,23 @@ void gdt_init(void) {
             GDT_F_32b_PROTECTED_MODE | 
             GDT_F_NON_LONG_MODE
     );    // User Data.   0x20
-          
-    load_gdtr(_gdt_start, (5 * sizeof(seg_descriptor_t)) - 1, 0x10);
+    
+    for (uint32_t i = 5; i < NUM_GDT_ENTRIES; i++) {
+        gdt[i] = sd_from_parts(0x0, 0x0, 0x0, 0x0);
+    }
+
+    load_gdtr(gdt, sizeof(gdt) - 1, 0x10);
 }
 
-extern gate_descriptor_t _idt_start[];
-extern char _idt_end;
+#define NUM_IDT_ENTRIES 0x100
+static gate_descriptor_t idt[NUM_IDT_ENTRIES] __attribute__ ((aligned(8)));
 
 void idt_init(void) {
     uint8_t len = 64; 
 
     // Program all exceptions.
-    for (uint8_t i = 0; i < 32; i++) {
-        _idt_start[i] = gd_from_parts(
+    for (uint32_t i = 0; i < 32; i++) {
+        idt[i] = gd_from_parts(
             0x8, 
             (uint32_t)(exception_has_err_code(i) 
                 ? default_exception_with_err_code_handler 
@@ -100,8 +103,8 @@ void idt_init(void) {
         );
     }
 
-    for (uint8_t i = 32; i < len; i++) {
-        _idt_start[i] = gd_from_parts(
+    for (uint32_t i = 32; i < NUM_IDT_ENTRIES; i++) {
+        idt[i] = gd_from_parts(
             0x8, 
             (uint32_t)default_handler, 
             IDT_ATTR_32b_INTR_GATE |
@@ -110,7 +113,16 @@ void idt_init(void) {
         );
     }
 
-    load_idtr(_idt_start, (len * sizeof(gate_descriptor_t)) - 1);
+    idt[0x8] =  gd_from_parts(
+        0x8, 
+        (uint32_t)nop_exception_handler, 
+        IDT_ATTR_32b_INTR_GATE |
+        IDT_ATTR_ROOT_PRVLG |
+        IDT_ATTR_PRESENT
+    );
+
+
+    load_idtr(idt, sizeof(idt) - 1);
 }
 
 void paging_init(void) {

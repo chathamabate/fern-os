@@ -28,8 +28,11 @@ typedef enum _vga_color_t {
 	VGA_COLOR_WHITE = 15,
 } vga_color_t;
 
-static const size_t VGA_WIDTH = 80;
-static const size_t VGA_HEIGHT = 25;
+//static const size_t VGA_WIDTH = 80;
+//static const size_t VGA_HEIGHT = 25;
+
+#define VGA_WIDTH 80
+#define VGA_HEIGHT 25
 static volatile uint16_t * const TERMINAL_BUFFER = (uint16_t *)0xB8000;
 
 static inline uint8_t vga_entry_color(vga_color_t fg, vga_color_t bg) {

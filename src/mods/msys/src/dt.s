@@ -38,6 +38,8 @@ load_gdtr:
 
     movw 24(%esp), %ax
 
+    cli
+
     lgdt (%esp)
     jmp $0x08, $._reload_cs
 
