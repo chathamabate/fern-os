@@ -80,6 +80,7 @@ _start:
 
     call gdt_init
     call idt_init
+    call paging_init
 
 	/*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte

@@ -80,6 +80,7 @@ $(SRC_DIR)/.clangd:
 	echo "CompileFlags:" > $@
 	echo "  Add:" >> $@
 	echo "  - --gcc-toolchain=$(shell which $(CC))" >> $@
+	echo "  - -m32" >> $@
 	$(foreach m,$(MODS),echo "  - -I$(MODS_DIR)/$(m)/include" >> $@;)
 
 clangd: $(SRC_DIR)/.clangd

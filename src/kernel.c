@@ -2,6 +2,8 @@
 /* Check if the compiler thinks you are targeting the wrong operating system. */
 #include "msys/intr.h"
 #include "util/str.h"
+#include "msys/page.h"
+
 #if defined(__linux__)
 #error "You are not using a cross-compiler, you will most certainly run into trouble"
 #endif
@@ -72,17 +74,12 @@ static void print_idt(void) {
     }
 }
 
-static void print_alot(void) {
-    for (size_t i = 0; i < 10000; i++) {
-        term_put_s("Hello\r");
-    }
-}
-
 
 void kernel_main(void) {
     term_init();
 
-    print_alot();
+
+    term_put_s("HEllo\n");
 
     return;
 }

@@ -4,6 +4,7 @@
 
 #include "msys/dt.h"
 #include "msys/intr.h"
+#include "msys/page.h"
 #include "terminal/out.h"
 #include "util/str.h"
 #include <stdint.h>
@@ -113,6 +114,7 @@ void idt_init(void) {
         );
     }
 
+    // Using this initally to deal with IRQ0 timer interrupt.
     idt[0x8] =  gd_from_parts(
         0x8, 
         (uint32_t)nop_exception_handler, 
@@ -125,8 +127,37 @@ void idt_init(void) {
     load_idtr(idt, sizeof(idt) - 1);
 }
 
-void paging_init(void) {
+// OK, time to init paging.
 
+static page_table_entry_t pde[1024] __attribute__ ((aligned(4096)));
+static page_table_entry_t ptes[4][1024] __attribute__ ((aligned(4096)));
+
+void paging_init(void) {
+    for (size_t i = 0; i < 4; i++) {
+        pde[i] = (page_table_entry_t) {
+            .present = 1,
+            .read_or_write = 1,
+            .super_or_user = 1,
+            .addr = (uint32_t)(ptes[0]) >> 12
+        };
+
+        for (size_t j = 0; j < 1024; j++) {
+            ptes[i][j] = (page_table_entry_t) {
+                .present = 1,
+                .read_or_write = 1,
+                .super_or_user = 1,
+                .addr = (i << 10) + j
+            };
+        }
+    }
+
+    // Other page directory entries can be non-present.
+    for (size_t i = 4; i < 1024; i++) {
+        pde[i] = (page_table_entry_t){ 0 };
+    }
+
+    load_page_directory(pde);
+    enable_paging();
 }
 
 
