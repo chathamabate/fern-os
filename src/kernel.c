@@ -81,6 +81,9 @@ void kernel_main(void) {
 
     term_put_s("HEllo\n");
 
+    // AYE YO THIS WORKS!!!!
+    *(uint8_t *)(0x1000000) = 10;
+
     return;
 }
 

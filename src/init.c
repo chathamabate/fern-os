@@ -138,7 +138,7 @@ void paging_init(void) {
             .present = 1,
             .read_or_write = 1,
             .super_or_user = 1,
-            .addr = (uint32_t)(ptes[0]) >> 12
+            .addr = (uint32_t)(ptes[i]) >> 12
         };
 
         for (size_t j = 0; j < 1024; j++) {
