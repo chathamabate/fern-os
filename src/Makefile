@@ -6,7 +6,7 @@ BUILD_DIR   := $(GIT_TOP)/build
 MODS_DIR    := $(GIT_TOP)/src
 
 EXTRA_CFLAGS := 
-MODS := thingy
+MODS := thingy kernel
 
 # Install Headers
 
@@ -16,46 +16,40 @@ HDRS_INSTALL_TARS := $(addprefix hdrs.install.,$(MODS))
 hdrs.install: $(HDRS_INSTALL_TARS)
 
 $(HDRS_INSTALL_TARS): hdrs.install.%:
+	make -C $(MODS_DIR)/$* test_hdrs.install
 	make -C $(MODS_DIR)/$* hdrs.install
 
-# Install Libs
+# Install Libs (For now we'll just always build the test and normal libs)
 
 LIB_INSTALL_TARS := $(addprefix lib.install.,$(MODS))
 .PHONY: lib.unsafe_install lib.install $(LIB_INSTALL_TARS)
 
+# This is "unsafe" since there is no gaurantee that the headers have been installed.
 lib.unsafe_install: $(LIB_INSTALL_TARS)
 $(LIB_INSTALL_TARS): lib.install.%:
+	make -C $(MODS_DIR)/$* test_lib.install
 	make -C $(MODS_DIR)/$* lib.install
 
 lib.install: hdrs.install
 	make -C $(MODS_DIR) lib.unsafe_install
 
-# Install Test Headers
+# Clangd Helpers
 
-TEST_HDRS_INSTALL_TARS := $(addprefix test_hdrs.install.,$(MODS))
+CLANGD_TARS := $(addprefix clangd.,$(MODS))
+.PHONY: clangd $(CLANGD_TARS)
 
-.PHONY: test_hdrs.install $(TEST_HDRS_INSTALL_TARS)
-test_hdrs.install: $(TEST_HDRS_INSTALL_TARS)
+$(CLANGD_TARS): clangd.%:
+	make -C $(MODS_DIR)/$* clangd
 
-$(TEST_HDRS_INSTALL_TARS): test_hdrs.install.%:
-	make -C $(MODS_DIR)/$* test_hdrs.install
+clangd: $(CLANGD_TARS)
 
-# Install Test Libs
+CLANGD_CLEAN_TARS := $(addprefix clean.clangd.,$(MODS))
+.PHONY: clean.clangd $(CLANGD_CLEAN_TARS)
 
-TEST_LIB_INSTALL_TARS := $(addprefix test_lib.install.,$(MODS))
-.PHONY: test_lib.unsafe_install test_lib.install $(TEST_LIB_INSTALL_TARS)
+$(CLANGD_CLEAN_TARS): clean.clangd.%:
+	make -C $(MODS_DIR)/$* clean.clangd
 
-test_lib.unsafe_install: $(TEST_LIB_INSTALL_TARS)
-$(TEST_LIB_INSTALL_TARS): test_lib.install.%:
-	make -C $(MODS_DIR)/$* test_lib.install
+clean.clangd: $(CLANGD_CLEAN_TARS)
 
-test_lib.install: hdrs.install
-	make -C $(MODS_DIR) test_lib.unsafe_install
-
-
-
-
-
-
-
+# Finally now for actual kernel packaging!
 

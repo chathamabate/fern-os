@@ -14,10 +14,10 @@ _ASMS		?=
 _TEST_SRCS 	?=
 
 # OPTIONAL: Where to place build artifacts
-BUILD_DIR   ?= $(GIT_TOP)/build/$(MOD_NAME)
+BUILD_DIR   ?= $(GIT_TOP)/build/mods/$(MOD_NAME)
 
 # OPTIONAL: Where to place .a files and headers
-INSTALL_DIR ?= $(GIT_TOP)/install
+INSTALL_DIR ?= $(GIT_TOP)/build/install
 
 # OPTIONAL: Extra C flags to use
 EXTRA_CFLAGS ?=
@@ -73,6 +73,12 @@ _TEST_LIB		 := libtest_$(MOD_NAME).a
 BUILD_TEST_LIB 	 := $(BUILD_TEST_DIR)/$(_TEST_LIB)
 INSTALL_TEST_LIB := $(INSTALL_DIR)/$(_TEST_LIB)
 
+INSTALL_HDRS_DIR      := $(INSTALL_INC_DIR)/$(MOD_NAME)
+INSTALL_HDRS := $(addprefix $(INSTALL_HDRS_DIR)/,$(notdir $(HDRS)))
+
+INSTALL_TEST_HDRS_DIR := $(INSTALL_HDRS_DIR)/test
+INSTALL_TEST_HDRS := $(addprefix $(INSTALL_TEST_HDRS_DIR)/,$(notdir $(TEST_HDRS)))
+
 # Normal Build Targets
 
 $(BUILD_DIR) $(BUILD_TEST_DIR) $(INSTALL_DIR):
@@ -103,23 +109,23 @@ $(BUILD_TEST_LIB): $(TEST_OBJS) | $(BUILD_DIR)
 
 # Install Targets
 
-INSTALL_HDRS_DIR      := $(INSTALL_INC_DIR)/$(MOD_NAME)
-INSTALL_TEST_HDRS_DIR := $(INSTALL_HDRS_DIR)/test
 
 $(INSTALL_HDRS_DIR) $(INSTALL_TEST_HDRS_DIR):
 	mkdir -p $@
 
 .PHONY: hdrs.install lib.install test_hdrs.install test_lib.install
 
-hdrs.install: | $(INSTALL_HDRS_DIR)
-	$(foreach hdr,$(HDRS),cp $(hdr) $(INSTALL_HDRS_DIR);)
+hdrs.install: $(INSTALL_HDRS)
+$(INSTALL_HDRS): $(INSTALL_HDRS_DIR)/%.h: $(INC_DIR)/$(MOD_NAME)/%.h | $(INSTALL_HDRS_DIR)
+	cp $< $@
 
 lib.install: $(INSTALL_LIB) 
 $(INSTALL_LIB): $(BUILD_LIB) | $(INSTALL_DIR)
 	cp $< $@
 
-test_hdrs.install: | $(INSTALL_TEST_HDRS_DIR)
-	$(foreach test_hdr,$(TEST_HDRS),cp $(test_hdr) $(INSTALL_TEST_HDRS_DIR))
+test_hdrs.install: $(INSTALL_TEST_HDRS)
+$(INSTALL_TEST_HDRS): $(INSTALL_TEST_HDRS_DIR)/%.h: $(INC_DIR)/$(MOD_NAME)/test/%.h | $(INSTALL_TEST_HDRS_DIR)
+	cp $< $@
 
 test_lib.install: $(INSTALL_TEST_LIB)
 $(INSTALL_TEST_LIB): $(BUILD_TEST_LIB) | $(INSTALL_DIR)
@@ -155,16 +161,18 @@ clangd: $(CLANGDS)
 
 # clean targets
 
-.PHONY: clean uninstall clean.deep
+.PHONY: clean clean.clangd uninstall clean.deep
 
 clean: 
 	rm -rf $(BUILD_DIR)
+
+clean.clangd:
+	rm -f $(CLANGDS)
 
 uninstall:
 	rm -f $(INSTALL_LIB)
 	rm -f $(INSTALL_TEST_LIB)
 	rm -rf $(INSTALL_HDRS_DIR)
 
-clean.deep: uninstall
-	rm -f $(CLANGDS)
+clean.deep: clean clean.clangd uninstall
 
