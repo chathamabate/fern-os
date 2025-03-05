@@ -1,4 +1,5 @@
 # NOTE: This stub is meant to be included
+GIT_TOP ?= $(shell git rev-parse --show-toplevel)
 
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
 MOD_NAME 	?=
@@ -12,11 +13,11 @@ _ASMS		?=
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?=
 
-# REQUIRED: Where to place build artifacts
-BUILD_DIR   ?=
+# OPTIONAL: Where to place build artifacts
+BUILD_DIR   ?= $(GIT_TOP)/build/$(MOD_NAME)
 
-# REQUIRED: Where to place .a files and headers
-INSTALL_DIR ?=
+# OPTIONAL: Where to place .a files and headers
+INSTALL_DIR ?= $(GIT_TOP)/install
 
 # OPTIONAL: Extra C flags to use
 EXTRA_CFLAGS ?=
@@ -29,12 +30,10 @@ C_COMPILER := i386-elf-gcc
 ASSEMBLER  := i386-elf-as
 AR 		   := i386-elf-ar
 
-CFLAGS := -Wall -Wextra -Wpedantic $(EXTRA_CFLAGS)
-
-GIT_TOP ?= $(shell git rev-parse --show-toplevel)
+CFLAGS := -std=gnu99 -ffreestanding -Wall -Wextra -Wpedantic $(EXTRA_CFLAGS)
 
 # Where all module directories live
-MODS_DIR := $(GIT_TOP)/retry/src
+MODS_DIR := $(GIT_TOP)/src
 
 # Uncompiled files
 
