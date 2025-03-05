@@ -10,7 +10,7 @@ _SRCS 		?= str.c
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= test.c
+_TEST_SRCS 	?= test.c str.c
 
 -include ../mod_stub.mk
 
