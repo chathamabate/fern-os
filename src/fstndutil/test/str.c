@@ -1,6 +1,7 @@
 
-#include "util/str.h"
-#include "msys/test.h"
+#include "fstndutil/str.h"
+#include "fstndutil/test/str.h"
+#include "fstndutil/test.h"
 
 static bool test_str_eq(void) {
     TEST_TRUE(str_eq("Hello", "Hello")); 

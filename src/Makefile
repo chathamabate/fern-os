@@ -5,8 +5,18 @@ BUILD_DIR   := $(GIT_TOP)/build
 INSTALL_DIR := $(BUILD_DIR)/install
 MODS_DIR    := $(GIT_TOP)/src
 
-EXTRA_CFLAGS := 
-MODS := kernel term util msys
+
+# While the order they exist here doesn't matter, I like to list
+# the modules in order of independence.
+#
+# kernel depends on everything
+# fstndutil depends on nothing
+MODS := \
+		kernel \
+		term \
+		msys \
+		fstndutil 
+
 
 # Install Headers
 

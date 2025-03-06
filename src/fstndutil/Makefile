@@ -1,7 +1,10 @@
 
 
+# NOTE: This module is freestanding utility code.
+# IT DEPENDS ON NOTHING!!!
+
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
-MOD_NAME 	?= util
+MOD_NAME 	?= fstndutil
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
 _SRCS 		?= str.c

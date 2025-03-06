@@ -92,7 +92,11 @@ _start:
 	*/
 	call kernel_main
 
-    //call lock_up
+    push %esp 
+    push $5
+    call term_put_trace
+
+    call lock_up
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.
