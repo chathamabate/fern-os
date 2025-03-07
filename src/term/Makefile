@@ -4,7 +4,8 @@
 MOD_NAME 	?= term
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= term.c
+_SRCS 		?= term.c \
+			   term_sys_helpers.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= 

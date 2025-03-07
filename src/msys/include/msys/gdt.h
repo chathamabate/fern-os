@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define _TO_MASK(wid) ((1L << wid) - 1)
+#define _TO_MASK(wid) ((1LL << wid) - 1)
 
 typedef uint64_t seg_desc_t;
 

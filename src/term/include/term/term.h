@@ -103,7 +103,6 @@ void term_set_cursor(size_t row, size_t col);
 uint8_t term_get_output_style(void);
 void term_set_output_style(uint8_t color);
 
-
 // Scroll up a single line.
 // Cursor position remains unchanged.
 void term_scroll_down(void);
