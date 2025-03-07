@@ -93,6 +93,9 @@ _start:
 	call kernel_main
 
     call lock_up
+
+my_str: .ascii "Hello\n\0"
+
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.

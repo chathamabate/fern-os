@@ -2,6 +2,12 @@
 
 .section .text
 
+.global read_eflags
+read_eflags:
+    pushf
+    popl %eax
+    ret
+
 .global read_esp
 read_esp:
     leal 4(%esp), %eax

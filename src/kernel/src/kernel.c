@@ -2,6 +2,8 @@
 
 #include "fstndutil/str.h"
 #include "msys/gdt.h"
+#include "msys/debug.h"
+#include "msys/intr.h"
 #include "term/term.h"
 #include "fstndutil/ansii.h"
 #include "term/term_sys_helpers.h"
@@ -10,6 +12,7 @@
 int kernel_main(void) {
     term_init();
 
+    /*
     exec_seg_desc_t esd = exec_seg_desc();
     sd_set_base(&esd, 0x10);
     sd_set_limit(&esd, 0x1F);
@@ -31,6 +34,24 @@ int kernel_main(void) {
     dsd_set_writable(&dsd, 1);
 
     term_put_seg_desc(dsd);
+    */
+
+    /*
+    uint32_t ef = read_eflags();
+    term_put_fmt_s("0x%X\n", ef);
+
+    enable_intrs();
+    */
+    enable_intrs();
+    term_put_s(intrs_enabled() ? "Initially enabled\n" : "Initially disabled\n");
+
+    uint32_t en = intr_section_enter();
+
+    term_put_s(intrs_enabled() ? "Internally enabled\n" : "Internally Disabled\n");
+
+    intr_section_exit(en);
+
+    term_put_s(intrs_enabled() ? "Finally enabled\n" : "Finally disabled\n");
 
     return 0;
 }

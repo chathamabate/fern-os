@@ -246,12 +246,12 @@ void term_put_fmt_s(const char *fmt, ...) {
 
 
 #define _ESP_ID_FMT ANSII_GREEN_FG "%%esp" ANSII_RESET
-#define _ESP_INDEX_FMT ANSII_CYAN_FG "%u" ANSII_RESET "(" _ESP_ID_FMT ")"
+#define _ESP_INDEX_FMT ANSII_CYAN_FG "%2X" ANSII_RESET "(" _ESP_ID_FMT ")"
 
-#define _EVEN_ROW_FMT _ESP_INDEX_FMT " = " ANSII_LIGHT_GREY_FG "0x%X" ANSII_RESET "\n"
-#define _ODD_ROW_FMT _ESP_INDEX_FMT " = " ANSII_BRIGHT_LIGHT_GREY_FG "0x%X" ANSII_RESET "\n"
+#define _EVEN_ROW_FMT _ESP_INDEX_FMT " = " ANSII_LIGHT_GREY_FG "%08X" ANSII_RESET "\n"
+#define _ODD_ROW_FMT _ESP_INDEX_FMT " = " ANSII_BRIGHT_LIGHT_GREY_FG "%08X" ANSII_RESET "\n"
 
-#define _ESP_VAL_ROW_FMT _ESP_ID_FMT " = " ANSII_BRIGHT_LIGHT_GREY_FG "0x%X" ANSII_RESET "\n"
+#define _ESP_VAL_ROW_FMT "   " _ESP_ID_FMT "  = " ANSII_BRIGHT_LIGHT_GREY_FG "%08X" ANSII_RESET "\n"
 
 void term_put_trace(uint32_t slots, uint32_t *esp) {
     char buf[100];

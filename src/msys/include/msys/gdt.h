@@ -390,3 +390,74 @@ static inline uint8_t esd_get_def(data_seg_desc_t esd) {
 /*
  * TODO: Add system segment descriptors.
  */
+
+// GDTR Work.
+
+// The GDTR Register has the following format:
+// size   [0  : 15] (size of the table - 1 in bytes)
+// offset [16 : 47] (physical address of where the table begins)
+//
+// NOTE: The register only holds 48 bits, we'll abstract it as 64 bits here in C.
+typedef uint64_t gdtr_val_t;
+
+#define GDTV_SIZE_OFF (0)      
+#define GDTV_SIZE_WID (16)  
+#define GDTV_SIZE_WID_MASK _TO_MASK(GDTV_SIZE_WID)
+#define GDTV_SIZE_MASK (GDTV_SIZE_WID_MASK << GDTV_SIZE_OFF)       
+
+#define GDTV_BASE_OFF (16)      
+#define GDTV_BASE_WID (32)  
+#define GDTV_BASE_WID_MASK _TO_MASK(GDTV_BASE_WID)
+#define GDTV_BASE_MASK (GDTV_BASE_WID_MASK << GDTV_BASE_OFF)       
+
+static inline gdtr_val_t gdtr_val(void) {
+    return 0;
+}
+
+static inline uint32_t gdtv_get_size(gdtr_val_t gdtv) {
+    return ((gdtv & GDTV_SIZE_MASK) >> GDTV_SIZE_OFF) + 1;
+}
+
+static inline void gdtv_set_size(gdtr_val_t *gdtv, uint32_t size) {
+    gdtr_val_t g = *gdtv;
+
+    g &= ~(GDTV_SIZE_MASK);
+    g |= ((size - 1) & GDTV_SIZE_WID_MASK) << GDTV_SIZE_OFF;
+
+    *gdtv = g;
+}
+
+static inline uint32_t gdtv_get_num_entries(gdtr_val_t gdtv) {
+    return gdtv_get_size(gdtv) / sizeof(seg_desc_t);
+}
+
+static inline void gdtv_set_num_entries(gdtr_val_t *gdtv, uint32_t num_entries) {
+    gdtv_set_size(gdtv, num_entries * sizeof(seg_desc_t));
+}
+
+static inline uint32_t gdtv_get_base(gdtr_val_t gdtv) {
+    return ((gdtv & GDTV_BASE_MASK) >> GDTV_BASE_OFF);
+}
+
+static inline void gdtv_set_base(gdtr_val_t *gdtv, uint32_t base) {
+    gdtr_val_t g = *gdtv;
+
+    g &= ~(GDTV_BASE_MASK);
+    g |= (base & GDTV_BASE_WID_MASK) << GDTV_BASE_OFF;
+
+    *gdtv = g;
+}
+
+gdtr_val_t read_gdtr(void);
+void load_gdtr(gdtr_val_t v);
+
+/*
+// Stores contents of the gdtr into where dest points.
+void read_gdtr(gdtr_val_t *dest);
+
+
+// Load a new GDT into the GDT register.
+// NOTE: Make sure the current value of CS is valid in the new GDT.
+// NOTE: After loading the GDT, 0x8 will be loaded into CS.
+void load_gdtr(seg_descriptor_t *offset, uint32_t size_m_1, uint32_t new_data_seg);
+*/
