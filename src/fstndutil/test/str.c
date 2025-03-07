@@ -296,6 +296,18 @@ static bool test_str_fmt(void) {
     TEST_TRUE(str_fmt(buf, "Hello %X\n", 0x0AB) == 9);
     TEST_TRUE(str_eq(buf, "Hello AB\n"));
 
+    TEST_TRUE(str_fmt(buf, "%2X", 0xF) == 2);
+    TEST_TRUE(str_eq(buf, " F"));
+
+    TEST_TRUE(str_fmt(buf, "N: %4X", 0xFFFFFF) == 7);
+    TEST_TRUE(str_eq(buf, "N: FFFF"));
+
+    TEST_TRUE(str_fmt(buf, "N: %04X", 0xF) == 7);
+    TEST_TRUE(str_eq(buf, "N: 000F"));
+
+    TEST_TRUE(str_fmt(buf, "N: %04X", 0x12345) == 7);
+    TEST_TRUE(str_eq(buf, "N: 2345"));
+
     TEST_SUCCEED();
 }
 

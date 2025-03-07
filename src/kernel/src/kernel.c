@@ -10,7 +10,7 @@
 int kernel_main(void) {
     term_init();
 
-    term_put_fmt_s("Hello %X\n", 1);
+    term_put_fmt_s("Hello %04X\n", 1);
 
     if (test_str()) {
         term_put_s("SUCCESS\n");

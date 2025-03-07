@@ -252,16 +252,35 @@ size_t str_vfmt(char *buf, const char *fmt, va_list va) {
     int32_t ival;
     const char *sval;
 
+    // We'll parse padding for every formatter, but it will only 
+    // do anything for hex as of now.
+    bool zero_pad = false;
+    uint8_t width = 0;
+
     char c;
+    char f;
     while ((c = *(fmt_ptr++)) != '\0') {
         if (c != '%') {
             *(buf_ptr++) = c;
             continue;
         } 
 
-        char f = *(fmt_ptr++);
-        if (f == '\0') {
+        if ((f = *(fmt_ptr++)) == '\0') {
             break;
+        }
+
+        if (f == '0') {
+            zero_pad = true;
+            if ((f = *(fmt_ptr++)) == '\0') {
+                break;
+            }
+        }
+
+        if ('1' <= f && f <= '9') {
+            width = f - '0';
+            if ((f = *(fmt_ptr++)) == '\0') {
+                break;
+            }
         }
 
         switch (f) {
@@ -270,7 +289,11 @@ size_t str_vfmt(char *buf, const char *fmt, va_list va) {
             break;
         case 'X':
             uval = va_arg(va, uint32_t);
-            buf_ptr += str_of_hex_no_pad(buf_ptr, uval);
+            if (width > 0) {
+                buf_ptr += str_of_hex_pad(buf_ptr, uval, width, zero_pad ? '0' : ' ');
+            } else {
+                buf_ptr += str_of_hex_no_pad(buf_ptr, uval);
+            }
             break;
         case 'u':
             uval = va_arg(va, uint32_t);
