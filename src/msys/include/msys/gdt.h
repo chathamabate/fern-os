@@ -221,6 +221,12 @@ typedef seg_desc_t data_seg_desc_t;
 #define DSD_EX_DOWN_WID_MASK _TO_MASK(DSD_EX_DOWN_WID)
 #define DSD_EX_DOWN_MASK (DSD_EX_DOWN_WID_MASK << DSD_EX_DOWN_OFF)       
 
+// big [54 : 54]
+#define DSD_BIG_OFF (54)
+#define DSD_BIG_WID (1)  
+#define DSD_BIG_WID_MASK _TO_MASK(DSD_BIG_WID)
+#define DSD_BIG_MASK (DSD_BIG_WID_MASK << DSD_BIG_OFF)       
+
 static inline data_seg_desc_t data_seg_desc(void) {
     data_seg_desc_t dsd = not_present_desc();
 
@@ -269,133 +275,118 @@ static inline uint8_t dsd_get_ex_down(data_seg_desc_t dsd) {
     return (DSD_EX_DOWN_MASK & dsd) >> DSD_EX_DOWN_OFF;
 }
 
+static inline void dsd_set_big(data_seg_desc_t *dsd, uint8_t big) {
+    data_seg_desc_t d = *dsd;
+
+    d &= ~(DSD_BIG_MASK);
+    d |= (DSD_BIG_WID_MASK & big) << DSD_BIG_OFF;
+
+    *dsd = d;
+}
+
+static inline uint8_t dsd_get_big(data_seg_desc_t dsd) {
+    return (DSD_BIG_MASK & dsd) >> DSD_BIG_OFF;
+}
+
 typedef seg_desc_t exec_seg_desc_t;
 
+// Code Descriptor Format :
+// ...
+// type        [40 : 44] 
+//    accessed    [40 : 40]
+//    readable    [41 : 41]
+//    conforming  [42 : 42]
+//    one         [43 : 43]
+//    one         [44 : 44]
+// ...
+// default     [54 : 54] 
+// ...
+
+// accessed    [40 : 40]
+#define ESD_ACCESSED_OFF (40)
+#define ESD_ACCESSED_WID (1)  
+#define ESD_ACCESSED_WID_MASK _TO_MASK(ESD_ACCESSED_WID)
+#define ESD_ACCESSED_MASK (ESD_ACCESSED_WID_MASK << ESD_ACCESSED_OFF)       
+
+// readable    [41 : 41]
+#define ESD_READABLE_OFF (41)
+#define ESD_READABLE_WID (1)  
+#define ESD_READABLE_WID_MASK _TO_MASK(ESD_READABLE_WID)
+#define ESD_READABLE_MASK (ESD_READABLE_WID_MASK << ESD_READABLE_OFF)       
+
+// conforming [42 : 42]
+#define ESD_CONFORMING_OFF (42)
+#define ESD_CONFORMING_WID (1)  
+#define ESD_CONFORMING_WID_MASK _TO_MASK(ESD_CONFORMING_WID)
+#define ESD_CONFORMING_MASK (ESD_CONFORMING_WID_MASK << ESD_CONFORMING_OFF)       
+
+// default [54 : 54]
+#define ESD_DEFAULT_OFF (54)
+#define ESD_DEFAULT_WID (1)  
+#define ESD_DEFAULT_WID_MASK _TO_MASK(ESD_DEFAULT_WID)
+#define ESD_DEFAULT_MASK (ESD_DEFAULT_WID_MASK << ESD_DEFAULT_OFF)       
+
+static inline exec_seg_desc_t exec_seg_desc(void) {
+    exec_seg_desc_t esd = not_present_desc();
+
+    sd_set_type(&esd, 0x18); // 0b11000 for exec seg.
+    sd_set_present(&esd, 1); // Set as present.
+
+    return esd;
+}
+
+static inline void esd_set_accessed(data_seg_desc_t *esd, uint8_t accessed) {
+    data_seg_desc_t d = *esd;
+
+    d &= ~(ESD_ACCESSED_MASK);
+    d |= (ESD_ACCESSED_WID_MASK & accessed) << ESD_ACCESSED_OFF;
+
+    *esd = d;
+}
+
+static inline uint8_t esd_get_accessed(data_seg_desc_t esd) {
+    return (ESD_ACCESSED_MASK & esd) >> ESD_ACCESSED_OFF;
+}
+
+static inline void esd_set_readable(data_seg_desc_t *esd, uint8_t readable) {
+    data_seg_desc_t d = *esd;
+
+    d &= ~(ESD_READABLE_MASK);
+    d |= (ESD_READABLE_WID_MASK & readable) << ESD_READABLE_OFF;
+
+    *esd = d;
+}
+
+static inline uint8_t esd_get_readable(data_seg_desc_t esd) {
+    return (ESD_READABLE_MASK & esd) >> ESD_READABLE_OFF;
+}
+
+static inline void esd_set_conforming(data_seg_desc_t *esd, uint8_t conforming) {
+    data_seg_desc_t d = *esd;
+
+    d &= ~(ESD_CONFORMING_MASK);
+    d |= (ESD_CONFORMING_WID_MASK & conforming) << ESD_CONFORMING_OFF;
+
+    *esd = d;
+}
+
+static inline uint8_t esd_get_conforming(data_seg_desc_t esd) {
+    return (ESD_CONFORMING_MASK & esd) >> ESD_CONFORMING_OFF;
+}
+
+static inline void esd_set_def(data_seg_desc_t *esd, uint8_t def) {
+    data_seg_desc_t d = *esd;
+
+    d &= ~(ESD_DEFAULT_MASK);
+    d |= (ESD_DEFAULT_WID_MASK & def) << ESD_DEFAULT_OFF;
+
+    *esd = d;
+}
+
+static inline uint8_t esd_get_def(data_seg_desc_t esd) {
+    return (ESD_DEFAULT_MASK & esd) >> ESD_DEFAULT_OFF;
+}
+
 /*
-struct _seg_desc_t {
-    uint64_t limit_lower : 16;
-    uint64_t base_lower : 24;
-
-    uint64_t type : 5;
-
-    uint64_t privilege : 2;
-    uint64_t present : 1;
-
-    uint64_t limit_upper : 4;
-    
-    uint64_t flags : 4;
-
-    uint64_t base_upper : 8;
-};
-
-typedef struct _seg_desc_t seg_desc_t;
-
-static inline seg_desc_t seg_desc(uint32_t base, uint32_t limit, uint32_t priv) {
-    return (seg_desc_t) {
-        .limit_lower = limit & 0xFFFF,
-        .base_lower = base & 0xFFFFFF,
-
-        .type = 0, // Fill this out yourself
-        
-        .privilege = priv & 0x3,
-        .present = 0x1,
-
-        .limit_upper = (limit & 0xF0000) >> 16,
-
-        .flags = 0, // fill this out yourself
-
-        .base_upper = (base & 0xFF000000) >> 24
-    };
-}
-
-struct _data_seg_desc_t {
-    uint64_t limit_lower : 16;
-    uint64_t base_lower : 24;
-
-    // -- Type --
-    uint64_t accessed : 1;
-    uint64_t writable : 1;
-    uint64_t expand_down  : 1;
-
-    uint64_t zero0 : 1; // Must be set as 0.
-    uint64_t one0 : 1;  // Must be set as 1.
-    // ----------
-
-    uint64_t privilege : 2;
-    uint64_t present : 1;
-
-    uint64_t limit_upper : 4;
-
-    // -- flags --
-    uint64_t avail : 1;
-    uint64_t zero1 : 1; // Must be set as 0.
-    uint64_t big : 1;
-    uint64_t granularity : 1;
-    // ----------
-    
-    uint64_t base_upper : 8;
-} __attribute__ ((packed));
-
-typedef struct _data_seg_desc_t data_seg_desc_t;
-
-static inline data_seg_desc_t data_seg_desc(uint32_t base, uint32_t limit, uint32_t priv) {
-    data_seg_desc_t dsd = (data_seg_desc_t)seg_desc(base, limit, priv);
-}
-
-struct _exec_seg_desc_t {
-    uint64_t limit_lower : 16;
-    uint64_t base_lower : 24;
-
-    // -- Type --
-    uint64_t accessed : 1;
-    uint64_t readable : 1;
-    uint64_t conforming  : 1;
-
-    uint64_t zero0 : 1; // Must be set as 0.
-    uint64_t one0 : 1;  // Must be set as 1.
-    // ----------
-
-    uint64_t privilege : 2;
-    uint64_t present : 1;
-
-    uint64_t limit_upper : 4;
-
-    // -- flags --
-    uint64_t avail : 1;
-    uint64_t zero1 : 1; // Must be set as 0.
-    uint64_t def : 1;
-    uint64_t granularity : 1;
-    // ----------
-    
-    uint64_t base_upper : 8;
-} __attribute__ ((packed));
-
-typedef struct _exec_seg_desc_t exec_seg_desc_t;
-
-struct _sys_seg_desc_t {
-    uint64_t limit_lower : 16;
-    uint64_t base_lower : 24;
-
-    // -- Type --
-    uint64_t type : 4;
-    uint64_t zero0 : 1;  // Must be set as 1.
-    // ----------
-
-    uint64_t privilege : 2;
-    uint64_t present : 1;
-
-    uint64_t limit_upper : 4;
-
-    // -- flags --
-    uint64_t avail : 1;
-    uint64_t zero1 : 1; // Must be set as 0.
-    uint64_t _res0 : 1; // Reserved
-    uint64_t granularity : 1;
-    // ----------
-    
-    uint64_t base_upper : 8;
-} __attribute__ ((packed));
-
-typedef struct _sys_seg_desc_t sys_seg_desc_t;
-*/
-
+ * TODO: Add system segment descriptors.
+ */
