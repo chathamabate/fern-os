@@ -42,16 +42,12 @@ int kernel_main(void) {
 
     enable_intrs();
     */
-    enable_intrs();
-    term_put_s(intrs_enabled() ? "Initially enabled\n" : "Initially disabled\n");
 
-    uint32_t en = intr_section_enter();
+    gdtr_val_t gdtv = gdtr_val();
+    gdtv_set_size(&gdtv, 0x100);
+    gdtv_set_base(&gdtv, 0x0);
 
-    term_put_s(intrs_enabled() ? "Internally enabled\n" : "Internally Disabled\n");
-
-    intr_section_exit(en);
-
-    term_put_s(intrs_enabled() ? "Finally enabled\n" : "Finally disabled\n");
+    term_put_gdtv(gdtv);
 
     return 0;
 }

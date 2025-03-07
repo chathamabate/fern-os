@@ -92,3 +92,16 @@ void term_put_seg_desc(seg_desc_t sd) {
         // I guess leave this empty?
     }
 }
+
+void term_put_gdtv(gdtr_val_t gdtv) {
+    char buf[128];
+
+    str_fmt(buf, "%8X", gdtv_get_base(gdtv));
+    term_put_pair("Base", buf);
+
+    str_fmt(buf, "%8X", gdtv_get_size(gdtv));
+    term_put_pair("Size", buf);
+
+    str_fmt(buf, "%u " ANSII_LIGHT_GREY_FG "(Decimal)" ANSII_RESET, gdtv_get_num_entries(gdtv));
+    term_put_pair("Entrs", buf);
+}
