@@ -92,10 +92,6 @@ _start:
 	*/
 	call kernel_main
 
-    push %esp 
-    push $5
-    call term_put_trace
-
     call lock_up
 /*
 Set the size of the _start symbol to the current location '.' minus its start.

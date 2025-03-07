@@ -3,7 +3,39 @@
 #include "fstndutil/test/str.h"
 #include "fstndutil/test.h"
 
+// Pretty simple tests ngl.
+
+static bool test_mem_cmp(void) {
+    uint8_t buf1[16] = { 1, 2, 4 };
+    uint8_t buf2[16] = { 3, 2, 4 };
+
+    TEST_TRUE(mem_cmp(buf1, buf2, 0));
+    TEST_FALSE(mem_cmp(buf1, buf2, 3));
+
+    buf2[0] = 1;
+    TEST_TRUE(mem_cmp(buf1, buf2, 2));
+
+    TEST_TRUE(mem_cmp(buf1, buf2, 0));
+
+    TEST_SUCCEED();
+}
+
+static bool test_mem_cpy(void) {
+    uint8_t dest[16];
+    uint8_t src[16] = {1, 2, 3};
+
+    mem_cpy(dest, src, 3);
+    TEST_TRUE(mem_cmp(dest, src, 3));
+
+    dest[0] = 4;
+    mem_cpy(dest, src, 1);
+    TEST_TRUE(mem_cmp(dest, src, 3));
+
+    TEST_SUCCEED();
+}
+
 static bool test_str_eq(void) {
+    TEST_TRUE(str_eq("", "")); 
     TEST_TRUE(str_eq("Hello", "Hello")); 
     TEST_TRUE(str_eq("H", "H")); 
     TEST_TRUE(str_eq("4294967295","4294967295"));
@@ -150,40 +182,42 @@ static bool test_str_of_i(void) {
     TEST_SUCCEED();
 }
 
-typedef struct _test_str_of_hex_case_t {
-    uint32_t in_val;
-    uint8_t digits;
-    const char *exp_str;
-} test_str_of_hex_case_t;
+static bool test_str_of_hex_pad(void) {
+    char buf[128];
 
-static const test_str_of_hex_case_t TEST_STR_OF_HEX_CASES[] = {
-    {
-        .in_val = 0xF,
-        .digits = 1,
-        .exp_str = "F"
-    },
-    {
-        .in_val = 0xF,
-        .digits = 3,
-        .exp_str = "00F"
-    },
-    {
-        .in_val = 0xAA1100,
-        .digits = 8,
-        .exp_str = "00AA1100"
-    },
-};
-static const size_t TEST_STR_OF_HEX_CASES_LEN = 
-    sizeof(TEST_STR_OF_HEX_CASES) / sizeof(test_str_of_hex_case_t);
+    str_of_hex_pad(buf, 0, 0, ' ');
+    TEST_TRUE(str_eq(buf, ""));
 
-static bool test_str_of_hex(void) {
-    char buf[20];
-    for (size_t i = 0; i < TEST_STR_OF_HEX_CASES_LEN; i++) {
-        const test_str_of_hex_case_t *c = &(TEST_STR_OF_HEX_CASES[i]);
-        size_t chars = str_of_hex(buf, c->in_val, c->digits);
-        TEST_TRUE(str_eq(buf, c->exp_str));
-        TEST_TRUE(chars == c->digits);
-    }
+    str_of_hex_pad(buf, 0, 1, ' ');
+    TEST_TRUE(str_eq(buf, "0"));
+
+    str_of_hex_pad(buf, 0, 2, ' ');
+    TEST_TRUE(str_eq(buf, " 0"));
+
+    str_of_hex_pad(buf, 0x12, 3, '-');
+    TEST_TRUE(str_eq(buf, "-12"));
+
+    str_of_hex_pad(buf, 0x4455, 3, '-');
+    TEST_TRUE(str_eq(buf, "455"));
+
+    str_of_hex_pad(buf, 0x4455, 8, 'Z');
+    TEST_TRUE(str_eq(buf, "ZZZZ4455"));
+
+    TEST_SUCCEED();
+}
+
+static bool test_str_of_hex_no_pad(void) {
+    char buf[128];
+
+    str_of_hex_no_pad(buf, 0x0);
+    TEST_TRUE(str_eq(buf, "0"));
+
+    str_of_hex_no_pad(buf, 0x123);
+    TEST_TRUE(str_eq(buf, "123"));
+
+    str_of_hex_no_pad(buf, 0x12345678);
+    TEST_TRUE(str_eq(buf, "12345678"));
+
     TEST_SUCCEED();
 }
 
@@ -259,19 +293,22 @@ static bool test_str_fmt(void) {
     TEST_TRUE(str_fmt(buf, "%u %d", 12, -34) == 6);
     TEST_TRUE(str_eq(buf, "12 -34"));
 
-    TEST_TRUE(str_fmt(buf, "Hello %X\n", 1) == 15);
-    TEST_TRUE(str_eq(buf, "Hello 00000001\n"));
+    TEST_TRUE(str_fmt(buf, "Hello %X\n", 0x0AB) == 9);
+    TEST_TRUE(str_eq(buf, "Hello AB\n"));
 
     TEST_SUCCEED();
 }
 
 bool test_str(void) {
+    TEST_TRUE(test_mem_cmp());
+    TEST_TRUE(test_mem_cpy());
     TEST_TRUE(test_str_eq());
     TEST_TRUE(test_str_cpy());
     TEST_TRUE(test_str_len());
     TEST_TRUE(test_str_of_u());
     TEST_TRUE(test_str_of_i());
-    TEST_TRUE(test_str_of_hex());
+    TEST_TRUE(test_str_of_hex_pad());
+    TEST_TRUE(test_str_of_hex_no_pad());
     TEST_TRUE(test_str_la());
     TEST_TRUE(test_str_ra());
     TEST_TRUE(test_str_center());

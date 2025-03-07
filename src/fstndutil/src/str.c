@@ -2,6 +2,31 @@
 #include "fstndutil/str.h"
 #include <stdarg.h>
 
+// Consider rewriting these in assembly!
+
+bool mem_cmp(const void *d0, const void *d1, size_t n) {
+    const uint8_t *u0 = (const uint8_t *)d0;
+    const uint8_t *u0_e = u0 + n;
+    const uint8_t *u1 = (const uint8_t *)d1;
+
+    while (u0 < u0_e) {
+        if (*(u0++) != *(u1++)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void mem_cpy(void *dest, const void *src, size_t n) {
+    uint8_t *d = (uint8_t *)dest;
+    uint8_t *e = d + n;
+    const uint8_t *s = (const uint8_t *)src;
+
+    while (d < e) {
+        *(d++) = *(s++);
+    }
+}
 
 bool str_eq(const char *s1, const char *s2) {
     size_t i = 0;
@@ -94,20 +119,57 @@ size_t str_of_i(char *buf, int32_t i) {
     return written + str_of_u(b, uv);
 }
 
-size_t str_of_hex(char *buf, uint32_t u, uint8_t hex_digs) {
-    uint32_t uv = u;
-    for (uint8_t i = 0; i < hex_digs; i++) {
-        uint8_t hex_dig_val = (uint8_t)uv & 0xF;
-        buf[hex_digs - 1 - i] = hex_dig_val < 10 
-            ? '0' + hex_dig_val 
-            : 'A' + (hex_dig_val - 10);
-
-        uv >>= 4;
+// Gets number of leading zeros in a 32-bit hex value.
+static size_t hex_leading_zeros(uint32_t u) {
+    uint32_t mask = 0xF0000000;
+    size_t lzs = 0;
+    while (lzs < 7 && !(u & mask)) {
+        mask >>= 4;
+        lzs++;
     }
 
-    buf[hex_digs] = '\0';
+    return lzs;
+}
 
-    return hex_digs;
+size_t str_of_hex_pad(char *buf, uint32_t u, uint8_t digs, char pad) {
+    size_t lzs = hex_leading_zeros(u);
+    size_t sigs = 8 - lzs;
+
+    if (sigs < digs) {
+        lzs = digs - sigs;
+    } else {
+        sigs = digs;
+        lzs = 0;
+    }
+
+    size_t i;
+
+    for (i = 0; i < lzs; i++) {
+        buf[i] = pad;
+    }
+
+    // Trim out all digits we don't care about.
+    uint32_t uv = u << ((8 - sigs) * 4);
+
+    for (; i < digs; i++) {
+        uint32_t d = uv >> 28;
+        buf[i] = d < 10 
+            ? '0' + d
+            : 'A' + (d - 10);
+
+        uv <<= 4; 
+    }
+
+    buf[digs] = '\0';
+
+    return digs;
+}
+
+size_t str_of_hex_no_pad(char *buf, uint32_t u) {
+    size_t lzs = hex_leading_zeros(u);
+
+    // The padding character should be ignored.
+    return str_of_hex_pad(buf, u, 8 - lzs, ' ');
 }
 
 void str_la(char *buf, size_t n, char pad, const char *s) {
@@ -208,7 +270,7 @@ size_t str_vfmt(char *buf, const char *fmt, va_list va) {
             break;
         case 'X':
             uval = va_arg(va, uint32_t);
-            buf_ptr += str_of_hex(buf_ptr, uval, 8);
+            buf_ptr += str_of_hex_no_pad(buf_ptr, uval);
             break;
         case 'u':
             uval = va_arg(va, uint32_t);
