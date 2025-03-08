@@ -103,5 +103,5 @@ void term_put_gdtv(gdtr_val_t gdtv) {
     term_put_pair("Size", buf);
 
     str_fmt(buf, "%u " ANSII_LIGHT_GREY_FG "(Decimal)" ANSII_RESET, gdtv_get_num_entries(gdtv));
-    term_put_pair("Entrs", buf);
+    term_put_pair("Entries", buf);
 }

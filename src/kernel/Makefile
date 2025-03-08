@@ -4,7 +4,7 @@
 MOD_NAME 	?= kernel
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= kernel.c
+_SRCS 		?= kernel.c init.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= boot.s

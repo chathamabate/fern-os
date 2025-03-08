@@ -21,7 +21,7 @@ read_gdtr:
     ret
 
 .global _load_gdtr
-load_gdtr:
+_load_gdtr:
     pushl %ebp
     movl %esp, %ebp
 

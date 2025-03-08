@@ -1,6 +1,6 @@
 
-#ifndef MSYS_TEST_H
-#define MSYS_TEST_H
+
+#pragma once
 
 #include <stdbool.h>
 
@@ -17,5 +17,3 @@
 #define TEST_SUCCEED() return true
 #define TEST_FAIL() return false
 
-
-#endif

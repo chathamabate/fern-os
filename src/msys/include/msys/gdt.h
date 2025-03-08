@@ -2,8 +2,8 @@
 #pragma once
 
 #include <stdint.h>
+#include "fstndutil/misc.h"
 
-#define _TO_MASK(wid) ((1LL << wid) - 1)
 
 typedef uint64_t seg_desc_t;
 
@@ -24,43 +24,43 @@ typedef uint64_t seg_desc_t;
 // limit_lower [0 : 15]
 #define SD_LIMIT_LOWER_OFF (0)      
 #define SD_LIMIT_LOWER_WID (16)  
-#define SD_LIMIT_LOWER_WID_MASK _TO_MASK(SD_LIMIT_LOWER_WID)
+#define SD_LIMIT_LOWER_WID_MASK TO_MASK64(SD_LIMIT_LOWER_WID)
 #define SD_LIMIT_LOWER_MASK (SD_LIMIT_LOWER_WID_MASK << SD_LIMIT_LOWER_OFF)       
 
 // base_lower [16 : 39]
 #define SD_BASE_LOWER_OFF (16)
 #define SD_BASE_LOWER_WID (24)
-#define SD_BASE_LOWER_WID_MASK _TO_MASK(SD_BASE_LOWER_WID)
+#define SD_BASE_LOWER_WID_MASK TO_MASK64(SD_BASE_LOWER_WID)
 #define SD_BASE_LOWER_MASK (SD_BASE_LOWER_WID_MASK << SD_BASE_LOWER_OFF)
 
 // type [40 : 44]
 #define SD_TYPE_OFF (40)
 #define SD_TYPE_WID (5)
-#define SD_TYPE_WID_MASK _TO_MASK(SD_TYPE_WID)
+#define SD_TYPE_WID_MASK TO_MASK64(SD_TYPE_WID)
 #define SD_TYPE_MASK (SD_TYPE_WID_MASK << SD_TYPE_OFF)
 
 // privelege [45 : 46]
 #define SD_PRIVILEGE_OFF (45)
 #define SD_PRIVILEGE_WID (2)
-#define SD_PRIVILEGE_WID_MASK _TO_MASK(SD_PRIVILEGE_WID)
+#define SD_PRIVILEGE_WID_MASK TO_MASK64(SD_PRIVILEGE_WID)
 #define SD_PRIVILEGE_MASK (SD_PRIVILEGE_WID_MASK << SD_PRIVILEGE_OFF)
 
 // present [47]
 #define SD_PRESENT_OFF (47)
 #define SD_PRESENT_WID (1)
-#define SD_PRESENT_WID_MASK _TO_MASK(SD_PRESENT_WID)
+#define SD_PRESENT_WID_MASK TO_MASK64(SD_PRESENT_WID)
 #define SD_PRESENT_MASK (SD_PRESENT_WID_MASK << SD_PRESENT_OFF)
                                             
 // limit_upper [48 : 51]
 #define SD_LIMIT_UPPER_OFF (48)
 #define SD_LIMIT_UPPER_WID (4)
-#define SD_LIMIT_UPPER_WID_MASK _TO_MASK(SD_LIMIT_UPPER_WID)
+#define SD_LIMIT_UPPER_WID_MASK TO_MASK64(SD_LIMIT_UPPER_WID)
 #define SD_LIMIT_UPPER_MASK (SD_LIMIT_UPPER_WID_MASK << SD_LIMIT_UPPER_OFF)   
 
 // Available bit [52 : 52]
 #define SD_AVAIL_OFF (52)
 #define SD_AVAIL_WID (1)
-#define SD_AVAIL_WID_MASK _TO_MASK(SD_AVAIL_WID)
+#define SD_AVAIL_WID_MASK TO_MASK64(SD_AVAIL_WID)
 #define SD_AVAIL_MASK (SD_AVAIL_WID_MASK << SD_AVAIL_OFF)
 
 // zero        [53 : 53]
@@ -69,13 +69,13 @@ typedef uint64_t seg_desc_t;
 // granularity [55 : 55]
 #define SD_GRAN_OFF (55)
 #define SD_GRAN_WID (1)
-#define SD_GRAN_WID_MASK _TO_MASK(SD_GRAN_WID)
+#define SD_GRAN_WID_MASK TO_MASK64(SD_GRAN_WID)
 #define SD_GRAN_MASK (SD_GRAN_WID_MASK << SD_GRAN_OFF)
 
 // base_upper [56 : 63]
 #define SD_BASE_UPPER_OFF (56)
 #define SD_BASE_UPPER_WID (8)
-#define SD_BASE_UPPER_WID_MASK _TO_MASK(SD_BASE_UPPER_WID)
+#define SD_BASE_UPPER_WID_MASK TO_MASK64(SD_BASE_UPPER_WID)
 #define SD_BASE_UPPER_MASK (SD_BASE_UPPER_WID_MASK << SD_BASE_UPPER_OFF)   
 
 static inline seg_desc_t not_present_desc(void) {
@@ -206,25 +206,25 @@ typedef seg_desc_t data_seg_desc_t;
 // accessed    [40 : 40]
 #define DSD_ACCESSED_OFF (40)
 #define DSD_ACCESSED_WID (1)  
-#define DSD_ACCESSED_WID_MASK _TO_MASK(DSD_ACCESSED_WID)
+#define DSD_ACCESSED_WID_MASK TO_MASK64(DSD_ACCESSED_WID)
 #define DSD_ACCESSED_MASK (DSD_ACCESSED_WID_MASK << DSD_ACCESSED_OFF)       
 
 // writable    [41 : 41]
 #define DSD_WRITABLE_OFF (41)
 #define DSD_WRITABLE_WID (1)  
-#define DSD_WRITABLE_WID_MASK _TO_MASK(DSD_WRITABLE_WID)
+#define DSD_WRITABLE_WID_MASK TO_MASK64(DSD_WRITABLE_WID)
 #define DSD_WRITABLE_MASK (DSD_WRITABLE_WID_MASK << DSD_WRITABLE_OFF)       
 
 // expand down [42 : 42]
 #define DSD_EX_DOWN_OFF (42)
 #define DSD_EX_DOWN_WID (1)  
-#define DSD_EX_DOWN_WID_MASK _TO_MASK(DSD_EX_DOWN_WID)
+#define DSD_EX_DOWN_WID_MASK TO_MASK64(DSD_EX_DOWN_WID)
 #define DSD_EX_DOWN_MASK (DSD_EX_DOWN_WID_MASK << DSD_EX_DOWN_OFF)       
 
 // big [54 : 54]
 #define DSD_BIG_OFF (54)
 #define DSD_BIG_WID (1)  
-#define DSD_BIG_WID_MASK _TO_MASK(DSD_BIG_WID)
+#define DSD_BIG_WID_MASK TO_MASK64(DSD_BIG_WID)
 #define DSD_BIG_MASK (DSD_BIG_WID_MASK << DSD_BIG_OFF)       
 
 static inline data_seg_desc_t data_seg_desc(void) {
@@ -305,25 +305,25 @@ typedef seg_desc_t exec_seg_desc_t;
 // accessed    [40 : 40]
 #define ESD_ACCESSED_OFF (40)
 #define ESD_ACCESSED_WID (1)  
-#define ESD_ACCESSED_WID_MASK _TO_MASK(ESD_ACCESSED_WID)
+#define ESD_ACCESSED_WID_MASK TO_MASK64(ESD_ACCESSED_WID)
 #define ESD_ACCESSED_MASK (ESD_ACCESSED_WID_MASK << ESD_ACCESSED_OFF)       
 
 // readable    [41 : 41]
 #define ESD_READABLE_OFF (41)
 #define ESD_READABLE_WID (1)  
-#define ESD_READABLE_WID_MASK _TO_MASK(ESD_READABLE_WID)
+#define ESD_READABLE_WID_MASK TO_MASK64(ESD_READABLE_WID)
 #define ESD_READABLE_MASK (ESD_READABLE_WID_MASK << ESD_READABLE_OFF)       
 
 // conforming [42 : 42]
 #define ESD_CONFORMING_OFF (42)
 #define ESD_CONFORMING_WID (1)  
-#define ESD_CONFORMING_WID_MASK _TO_MASK(ESD_CONFORMING_WID)
+#define ESD_CONFORMING_WID_MASK TO_MASK64(ESD_CONFORMING_WID)
 #define ESD_CONFORMING_MASK (ESD_CONFORMING_WID_MASK << ESD_CONFORMING_OFF)       
 
 // default [54 : 54]
 #define ESD_DEFAULT_OFF (54)
 #define ESD_DEFAULT_WID (1)  
-#define ESD_DEFAULT_WID_MASK _TO_MASK(ESD_DEFAULT_WID)
+#define ESD_DEFAULT_WID_MASK TO_MASK64(ESD_DEFAULT_WID)
 #define ESD_DEFAULT_MASK (ESD_DEFAULT_WID_MASK << ESD_DEFAULT_OFF)       
 
 static inline exec_seg_desc_t exec_seg_desc(void) {
@@ -402,12 +402,12 @@ typedef uint64_t gdtr_val_t;
 
 #define GDTV_SIZE_OFF (0)      
 #define GDTV_SIZE_WID (16)  
-#define GDTV_SIZE_WID_MASK _TO_MASK(GDTV_SIZE_WID)
+#define GDTV_SIZE_WID_MASK TO_MASK64(GDTV_SIZE_WID)
 #define GDTV_SIZE_MASK (GDTV_SIZE_WID_MASK << GDTV_SIZE_OFF)       
 
 #define GDTV_BASE_OFF (16)      
 #define GDTV_BASE_WID (32)  
-#define GDTV_BASE_WID_MASK _TO_MASK(GDTV_BASE_WID)
+#define GDTV_BASE_WID_MASK TO_MASK64(GDTV_BASE_WID)
 #define GDTV_BASE_MASK (GDTV_BASE_WID_MASK << GDTV_BASE_OFF)       
 
 static inline gdtr_val_t gdtr_val(void) {
