@@ -3,6 +3,7 @@
 .section .text
 
 .global outb
+.type outb, @function
 outb:
     push %ebp
     mov %esp, %ebp

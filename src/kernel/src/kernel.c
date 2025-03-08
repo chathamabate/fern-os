@@ -10,7 +10,6 @@
 #include "fstndutil/test/str.h"
 
 int kernel_main(void) {
-    term_init();
 
     /*
     exec_seg_desc_t esd = exec_seg_desc();
@@ -43,11 +42,23 @@ int kernel_main(void) {
     enable_intrs();
     */
 
-    gdtr_val_t gdtv = gdtr_val();
+    gdtr_val_t v = read_gdtr();
+    seg_desc_t *d = gdtv_get_base(v);
+    term_put_seg_desc(d[1]);
+
+    //term_put_gdtv(v);
+
+
+
+    //load_gdtr(0xFFFFFFFFAAAAAAAAULL);
+
+    /*
+    gdtr_val_t gdtv = read_gdtr();
     gdtv_set_size(&gdtv, 0x100);
     gdtv_set_base(&gdtv, 0x0);
 
     term_put_gdtv(gdtv);
+    */
 
     return 0;
 }

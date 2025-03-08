@@ -435,29 +435,23 @@ static inline void gdtv_set_num_entries(gdtr_val_t *gdtv, uint32_t num_entries) 
     gdtv_set_size(gdtv, num_entries * sizeof(seg_desc_t));
 }
 
-static inline uint32_t gdtv_get_base(gdtr_val_t gdtv) {
-    return ((gdtv & GDTV_BASE_MASK) >> GDTV_BASE_OFF);
+// NOTE: These two function freak out clangd for some reason, they are correct though.
+
+static inline seg_desc_t *gdtv_get_base(gdtr_val_t gdtv) {
+    return (seg_desc_t *)(uint32_t)((gdtv & GDTV_BASE_MASK) >> GDTV_BASE_OFF);
 }
 
-static inline void gdtv_set_base(gdtr_val_t *gdtv, uint32_t base) {
+static inline void gdtv_set_base(gdtr_val_t *gdtv, seg_desc_t *base) {
     gdtr_val_t g = *gdtv;
 
     g &= ~(GDTV_BASE_MASK);
-    g |= (base & GDTV_BASE_WID_MASK) << GDTV_BASE_OFF;
+    g |= ((uint32_t)base & GDTV_BASE_WID_MASK) << GDTV_BASE_OFF;
 
     *gdtv = g;
 }
 
 gdtr_val_t read_gdtr(void);
+
+// NOTE: After doing the register load, cs will be loaded with 0x08, and all other
+// segment registers will be set with 0x10.
 void load_gdtr(gdtr_val_t v);
-
-/*
-// Stores contents of the gdtr into where dest points.
-void read_gdtr(gdtr_val_t *dest);
-
-
-// Load a new GDT into the GDT register.
-// NOTE: Make sure the current value of CS is valid in the new GDT.
-// NOTE: After loading the GDT, 0x8 will be loaded into CS.
-void load_gdtr(seg_descriptor_t *offset, uint32_t size_m_1, uint32_t new_data_seg);
-*/

@@ -30,7 +30,7 @@ C_COMPILER := i386-elf-gcc
 ASSEMBLER  := i386-elf-as
 AR 		   := i386-elf-ar
 
-CFLAGS := -std=gnu99 -ffreestanding -Wall -Wextra -Wpedantic $(EXTRA_CFLAGS)
+CFLAGS := -m32 -std=gnu99 -ffreestanding -Wall -Wextra -Wpedantic $(EXTRA_CFLAGS)
 
 # Where all module directories live
 MODS_DIR := $(GIT_TOP)/src

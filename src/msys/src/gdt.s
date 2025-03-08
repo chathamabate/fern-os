@@ -1,58 +1,52 @@
 
 .section .text
 
-    /*
 .global read_gdtr
 read_gdtr:
-    push %ebp
+    pushl %ebp
     movl %esp, %ebp
 
-    // Get our User given pointer and store it in %edi.
-    movl 8(%ebp), %edi   
-    sgdt (%edi)
+    // Reseve 8 0 bytes on the stack for the gdtr value.
+    pushl $0
+    pushl $0
 
-    pop %ebp
+    // Read gdt to the stack.
+    sgdt (%esp)
+    
+    popl %eax
+    popl %edx
+
+    movl %ebp, %esp
+    popl %ebp
     ret
 
-.global load_gdtr
+.global _load_gdtr
 load_gdtr:
-
-    push %ebp
+    pushl %ebp
     movl %esp, %ebp
 
-    sub $8, %esp
-    movl $0, (%esp)
-    movl $0, 4(%esp)
-
-    // Load new GDTR values into (%esp)  
-    
-    movw 20(%esp), %ax
-    movw %ax, (%esp)
-
-    movl 16(%esp), %eax
-    movl %eax, 2(%esp)
-
-    // Let's also get our new data segment.
-
-    movw 24(%esp), %ax
-
-    cli
+    // Push the given gdtr onto the stack.
+    // This is technically redundant, but whatever.
+    movl 12(%ebp), %eax
+    pushl %eax
+    movl 8(%ebp), %eax
+    pushl %eax
 
     lgdt (%esp)
-    jmp $0x08, $._reload_cs
 
-._reload_cs:
+    // Now reload all the segments plz.
+    jmp $0x08, $.seg_reload
+
+.seg_reload:
+    movw $0x10, %ax
     movw %ax, %ds
     movw %ax, %es
     movw %ax, %fs
     movw %ax, %gs
     movw %ax, %ss
 
-    sti
 
-    // Clean up stack.
-
-    add $8, %esp
-    pop %ebp
+    movl %ebp, %esp
+    popl %ebp
     ret
-    */
+

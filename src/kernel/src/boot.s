@@ -78,9 +78,7 @@ _start:
 	runtime support to work as well.
 	*/
 
-    //call gdt_init
-    //call idt_init
-    //call paging_init
+    call init_all
 
 	/*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte
@@ -93,8 +91,6 @@ _start:
 	call kernel_main
 
     call lock_up
-
-my_str: .ascii "Hello\n\0"
 
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
