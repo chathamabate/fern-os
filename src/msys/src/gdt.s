@@ -27,10 +27,8 @@ _load_gdtr:
 
     // Push the given gdtr onto the stack.
     // This is technically redundant, but whatever.
-    movl 12(%ebp), %eax
-    pushl %eax
-    movl 8(%ebp), %eax
-    pushl %eax
+    pushl 12(%ebp)
+    pushl 8(%ebp)
 
     lgdt (%esp)
 

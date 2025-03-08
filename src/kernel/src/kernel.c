@@ -1,6 +1,7 @@
 
 
 #include "fstndutil/str.h"
+#include "msys/dt.h"
 #include "msys/gdt.h"
 #include "msys/debug.h"
 #include "msys/intr.h"
@@ -10,9 +11,8 @@
 #include "fstndutil/test/str.h"
 
 int kernel_main(void) {
-
-    gdtr_val_t v = read_gdtr();
-    seg_desc_t *d = gdtv_get_base(v);
+    dtr_val_t v = read_gdtr();
+    seg_desc_t *d = (seg_desc_t *)dtv_get_base(v);
     term_put_seg_desc(d[4]);
 
     return 0;

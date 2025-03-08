@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "fstndutil/misc.h"
-
+#include "msys/dt.h"
 
 typedef uint64_t seg_desc_t;
 
@@ -387,71 +387,10 @@ static inline uint8_t esd_get_def(data_seg_desc_t esd) {
     return (ESD_DEFAULT_MASK & esd) >> ESD_DEFAULT_OFF;
 }
 
-/*
- * TODO: Add system segment descriptors.
- */
+// Accessing / modifying the gdtr register.
 
-// GDTR Work.
-
-// The GDTR Register has the following format:
-// size   [0  : 15] (size of the table - 1 in bytes)
-// offset [16 : 47] (physical address of where the table begins)
-//
-// NOTE: The register only holds 48 bits, we'll abstract it as 64 bits here in C.
-typedef uint64_t gdtr_val_t;
-
-#define GDTV_SIZE_OFF (0)      
-#define GDTV_SIZE_WID (16)  
-#define GDTV_SIZE_WID_MASK TO_MASK64(GDTV_SIZE_WID)
-#define GDTV_SIZE_MASK (GDTV_SIZE_WID_MASK << GDTV_SIZE_OFF)       
-
-#define GDTV_BASE_OFF (16)      
-#define GDTV_BASE_WID (32)  
-#define GDTV_BASE_WID_MASK TO_MASK64(GDTV_BASE_WID)
-#define GDTV_BASE_MASK (GDTV_BASE_WID_MASK << GDTV_BASE_OFF)       
-
-static inline gdtr_val_t gdtr_val(void) {
-    return 0;
-}
-
-static inline uint32_t gdtv_get_size(gdtr_val_t gdtv) {
-    return ((gdtv & GDTV_SIZE_MASK) >> GDTV_SIZE_OFF) + 1;
-}
-
-static inline void gdtv_set_size(gdtr_val_t *gdtv, uint32_t size) {
-    gdtr_val_t g = *gdtv;
-
-    g &= ~(GDTV_SIZE_MASK);
-    g |= ((size - 1) & GDTV_SIZE_WID_MASK) << GDTV_SIZE_OFF;
-
-    *gdtv = g;
-}
-
-static inline uint32_t gdtv_get_num_entries(gdtr_val_t gdtv) {
-    return gdtv_get_size(gdtv) / sizeof(seg_desc_t);
-}
-
-static inline void gdtv_set_num_entries(gdtr_val_t *gdtv, uint32_t num_entries) {
-    gdtv_set_size(gdtv, num_entries * sizeof(seg_desc_t));
-}
-
-// NOTE: These two function freak out clangd for some reason, they are correct though.
-
-static inline seg_desc_t *gdtv_get_base(gdtr_val_t gdtv) {
-    return (seg_desc_t *)(uint32_t)((gdtv & GDTV_BASE_MASK) >> GDTV_BASE_OFF);
-}
-
-static inline void gdtv_set_base(gdtr_val_t *gdtv, seg_desc_t *base) {
-    gdtr_val_t g = *gdtv;
-
-    g &= ~(GDTV_BASE_MASK);
-    g |= ((uint32_t)base & GDTV_BASE_WID_MASK) << GDTV_BASE_OFF;
-
-    *gdtv = g;
-}
-
-gdtr_val_t read_gdtr(void);
+dtr_val_t read_gdtr(void);
 
 // NOTE: After doing the register load, cs will be loaded with 0x08, and all other
 // segment registers will be set with 0x10.
-void load_gdtr(gdtr_val_t v);
+void load_gdtr(dtr_val_t v);

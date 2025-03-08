@@ -93,15 +93,15 @@ void term_put_seg_desc(seg_desc_t sd) {
     }
 }
 
-void term_put_gdtv(gdtr_val_t gdtv) {
+void term_put_dtv(dtr_val_t dtv) {
     char buf[128];
 
-    str_fmt(buf, "%8X", gdtv_get_base(gdtv));
+    str_fmt(buf, "%8X", dtv_get_base(dtv));
     term_put_pair("Base", buf);
 
-    str_fmt(buf, "%8X", gdtv_get_size(gdtv));
+    str_fmt(buf, "%8X", dtv_get_size(dtv));
     term_put_pair("Size", buf);
 
-    str_fmt(buf, "%u " ANSII_LIGHT_GREY_FG "(Decimal)" ANSII_RESET, gdtv_get_num_entries(gdtv));
+    str_fmt(buf, "%u " ANSII_LIGHT_GREY_FG "(Decimal)" ANSII_RESET, dtv_get_num_entries(dtv));
     term_put_pair("Entries", buf);
 }

@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include "fstndutil/misc.h"
+#include "msys/dt.h"
+#include "msys/gdt.h"
 
 typedef uint64_t gate_desc_t;
 
@@ -211,3 +213,64 @@ static inline uint32_t trgd_get_base(trap_gate_desc_t trgd) {
 
     return base;
 }
+
+// The below is basically a copy and paste of the gdtr register logic.
+
+typedef uint64_t idtr_val_t;
+
+#define IDTV_SIZE_OFF (0)      
+#define IDTV_SIZE_WID (16)  
+#define IDTV_SIZE_WID_MASK TO_MASK64(IDTV_SIZE_WID)
+#define IDTV_SIZE_MASK (IDTV_SIZE_WID_MASK << IDTV_SIZE_OFF)       
+
+#define IDTV_BASE_OFF (16)      
+#define IDTV_BASE_WID (32)  
+#define IDTV_BASE_WID_MASK TO_MASK64(IDTV_BASE_WID)
+#define IDTV_BASE_MASK (IDTV_BASE_WID_MASK << IDTV_BASE_OFF)       
+
+static inline idtr_val_t idtr_val(void) {
+    return 0;
+}
+
+static inline uint32_t idtv_get_size(idtr_val_t idtv) {
+    return ((idtv & IDTV_SIZE_MASK) >> IDTV_SIZE_OFF) + 1;
+}
+
+static inline void idtv_set_size(idtr_val_t *idtv, uint32_t size) {
+    idtr_val_t g = *idtv;
+
+    g &= ~(IDTV_SIZE_MASK);
+    g |= ((size - 1) & IDTV_SIZE_WID_MASK) << IDTV_SIZE_OFF;
+
+    *idtv = g;
+}
+
+static inline uint32_t idtv_get_num_entries(idtr_val_t idtv) {
+    return idtv_get_size(idtv) / sizeof(gate_desc_t);
+}
+
+static inline void idtv_set_num_entries(idtr_val_t *idtv, uint32_t num_entries) {
+    idtv_set_size(idtv, num_entries * sizeof(gate_desc_t));
+}
+
+// NOTE: These two function freak out clangd for some reason, they are correct though.
+
+static inline gate_desc_t *idtv_get_base(idtr_val_t idtv) {
+    return (gate_desc_t *)(uint32_t)((idtv & IDTV_BASE_MASK) >> IDTV_BASE_OFF);
+}
+
+static inline void idtv_set_base(idtr_val_t *idtv, gate_desc_t *base) {
+    idtr_val_t g = *idtv;
+
+    g &= ~(IDTV_BASE_MASK);
+    g |= ((uint32_t)base & IDTV_BASE_WID_MASK) << IDTV_BASE_OFF;
+
+    *idtv = g;
+}
+
+// Unlike for GDT, both of the functions are implemented entirely in assembly.
+// interrupts are not explicitly disabled when calling write_idtr.
+// This should be OK as long as idtv points to a correctly organized idt.
+dtr_val_t read_idtr(void);
+void load_idtr(dtr_val_t idtv);
+
