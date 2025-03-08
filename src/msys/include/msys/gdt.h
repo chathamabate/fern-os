@@ -78,7 +78,7 @@ typedef uint64_t seg_desc_t;
 #define SD_BASE_UPPER_WID_MASK TO_MASK64(SD_BASE_UPPER_WID)
 #define SD_BASE_UPPER_MASK (SD_BASE_UPPER_WID_MASK << SD_BASE_UPPER_OFF)   
 
-static inline seg_desc_t not_present_desc(void) {
+static inline seg_desc_t not_present_seg_desc(void) {
     return 0;
 }
 
@@ -228,7 +228,7 @@ typedef seg_desc_t data_seg_desc_t;
 #define DSD_BIG_MASK (DSD_BIG_WID_MASK << DSD_BIG_OFF)       
 
 static inline data_seg_desc_t data_seg_desc(void) {
-    data_seg_desc_t dsd = not_present_desc();
+    data_seg_desc_t dsd = not_present_seg_desc();
 
     sd_set_type(&dsd, 0x10); // 0b10000 for data seg.
     sd_set_present(&dsd, 1); // Set as present.
@@ -327,7 +327,7 @@ typedef seg_desc_t exec_seg_desc_t;
 #define ESD_DEFAULT_MASK (ESD_DEFAULT_WID_MASK << ESD_DEFAULT_OFF)       
 
 static inline exec_seg_desc_t exec_seg_desc(void) {
-    exec_seg_desc_t esd = not_present_desc();
+    exec_seg_desc_t esd = not_present_seg_desc();
 
     sd_set_type(&esd, 0x18); // 0b11000 for exec seg.
     sd_set_present(&esd, 1); // Set as present.

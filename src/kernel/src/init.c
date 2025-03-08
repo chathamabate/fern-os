@@ -10,7 +10,7 @@ static seg_desc_t gdt[NUM_GDT_ENTRIES] __attribute__((aligned(0x8)));
 
 static void init_gdt(void) {
     for (size_t i = 0; i < NUM_GDT_ENTRIES; i++) {
-        gdt[i] = not_present_desc();
+        gdt[i] = not_present_gate_desc();
     }
 
     // I don't totally understand the conforming bit at this time tbh.
