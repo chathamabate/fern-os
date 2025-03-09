@@ -69,3 +69,41 @@ uint16_t pic_get_isr(void)
 {
     return pic_get_irq_reg(PIC_READ_ISR);
 }
+
+void pic_mask_all(void) {
+	outb(PIC1_DATA, 0xFF);
+	outb(PIC2_DATA, 0xFF);
+}
+
+void pic_unmask_all(void) {
+	outb(PIC1_DATA, 0x0);
+	outb(PIC2_DATA, 0x0);
+}
+
+void pic_set_mask(uint8_t irq) {
+    uint16_t port;
+    uint8_t value;
+
+    if(irq < 8) {
+        port = PIC1_DATA;
+    } else {
+        port = PIC2_DATA;
+        irq -= 8;
+    }
+    value = inb(port) | (1 << irq);
+    outb(port, value);        
+}
+
+void pic_clear_mask(uint8_t irq) {
+    uint16_t port;
+    uint8_t value;
+
+    if(irq < 8) {
+        port = PIC1_DATA;
+    } else {
+        port = PIC2_DATA;
+        irq -= 8;
+    }
+    value = inb(port) & ~(1 << irq);
+    outb(port, value);        
+}

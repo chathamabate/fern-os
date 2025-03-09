@@ -40,3 +40,9 @@ void pic_remap(int offset1, int offset2);
 
 uint16_t pic_get_irr(void);
 uint16_t pic_get_isr(void);
+
+void pic_mask_all(void);
+void pic_unmask_all(void);
+
+void pic_set_mask(uint8_t irq);
+void pic_clear_mask(uint8_t irq);

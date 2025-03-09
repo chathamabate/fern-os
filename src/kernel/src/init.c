@@ -134,6 +134,7 @@ void init_all(void) {
     disable_intrs();
 
     init_gdt();
+
     init_idt();
 
     term_init();
