@@ -13,8 +13,6 @@ static void init_gdt(void) {
         gdt[i] = not_present_seg_desc();
     }
 
-    // I don't totally understand the conforming bit at this time tbh.
-
     exec_seg_desc_t *kernel_code = &(gdt[1]);  // 0x08
     *kernel_code = exec_seg_desc();
 
@@ -63,7 +61,20 @@ static void init_gdt(void) {
     dsd_set_writable(user_data, 0x1);
     dsd_set_big(user_data, 0x1);
 
-    // Actually set it up now plz.
+    // Useful experiments
+    /*
+    data_seg_desc_t *high_data = &(gdt[5]);  // 0x28
+    *high_data = data_seg_desc();
+
+    sd_set_base(high_data, 0x80000000);
+    sd_set_limit(high_data, 0xFFFFF);
+    sd_set_gran(high_data, 0x1);
+    sd_set_privilege(high_data, 0x03);
+
+    dsd_set_ex_down(high_data, 0x0);
+    dsd_set_writable(high_data, 0x1);
+    dsd_set_big(high_data, 0x1);
+    */
 
     dtr_val_t dtv = dtr_val();
 
@@ -71,6 +82,13 @@ static void init_gdt(void) {
     dtv_set_num_entries(&dtv, NUM_GDT_ENTRIES);
 
     load_gdtr(dtv);
+}
+
+#define NUM_IDT_ENTRIES 0x100
+static seg_desc_t idt[NUM_IDT_ENTRIES] __attribute__((aligned(0x8)));
+
+static void init_idt(void) {
+
 }
 
 void init_all(void) {

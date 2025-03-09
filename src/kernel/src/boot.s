@@ -80,6 +80,11 @@ _start:
 
     call init_all
 
+    // Maybe try testing out this gdt one more time?
+    // We could attempt multi tasking or paging??
+    // Or not??
+    // IDK tbh what to do next...
+
 	/*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte
 	aligned at the time of the call instruction (which afterwards pushes
@@ -90,9 +95,6 @@ _start:
 	*/
 	call kernel_main
 
-
-
-
     call lock_up
 
 /*
@@ -101,7 +103,10 @@ This is useful when debugging or when you implement call tracing.
 */
 .size _start, . - _start
 
-/*
+fmt: .ascii "0x%X\n\0"
+buf: .skip 0x100
+
+/* Some local symbols here...
 proc2:
 2:
     call kernel_main
@@ -109,8 +114,6 @@ proc2:
     jmp 1b
     call lock_up
 */
-
-
 
 
 

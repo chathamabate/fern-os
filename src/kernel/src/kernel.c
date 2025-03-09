@@ -21,6 +21,13 @@ void hndlr(void) {
 
 int kernel_main(void) {
     /*
+    dtr_val_t dt = read_gdtr();
+    seg_desc_t *gdt = dtv_get_base(dt);
+
+    term_put_seg_desc(gdt[5]);
+    */
+
+    /*
     intr_gate_desc_t gd = intr_gate_desc();
 
     gd_set_selector(&gd, 0x8);
