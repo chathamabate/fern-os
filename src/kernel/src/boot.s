@@ -92,32 +92,21 @@ _start:
 
     call lock_up
 
+.global timer_handler
+timer_handler:
+
+    pushl $msg
+    call term_put_s
+    popl %eax
+
+    call pic_send_master_eoi
+    iret
+
+msg: .ascii "Timer IRQ\n\0"
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.
 */
 .size _start, . - _start
 
-fmt: .ascii "0x%X\n\0"
-buf: .skip 0x100
-
-/* Some local symbols here...
-proc2:
-2:
-    call kernel_main
-2:
-    jmp 1b
-    call lock_up
-*/
-
-
-
-/*
-    EFLAGS
-    0000 CS
-    EIP         <- What iret expects.
-    Error Code  <- What will also be added on during exception.
-
-    8 general purpose registers!
-*/
 

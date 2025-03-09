@@ -11,9 +11,17 @@
 #include "term/term_sys_helpers.h"
 #include "fstndutil/test/str.h"
 
+void timer_handler(void);
+
 int kernel_main(void) {
-    // Let's just relax a little bit man, it's all going to be OK!
-    term_put_s("HELLO\nHELLO\n");
+    intr_gate_desc_t gd = intr_gate_desc();
+
+    gd_set_selector(&gd, 0x8);
+    gd_set_privilege(&gd, 0x0);
+    igd_set_base(&gd, timer_handler);
+
+    set_gd(32, gd);
+
     while (1);
     // OK, looks like this is kinda working??
     /*
