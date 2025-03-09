@@ -13,9 +13,9 @@ typedef uint64_t gate_desc_t;
 // ...
 // selector  [16 : 31]
 // ... 
-// type      [48 : 52]
-// privilege [53 : 54]
-// present   [55 : 55]
+// type      [40 : 44]
+// privilege [45 : 46]
+// present   [47 : 47]
 // ...
 
 #define GD_SELECTOR_OFF (16)      
@@ -23,26 +23,26 @@ typedef uint64_t gate_desc_t;
 #define GD_SELECTOR_WID_MASK TO_MASK64(GD_SELECTOR_WID)
 #define GD_SELECTOR_MASK (GD_SELECTOR_WID_MASK << GD_SELECTOR_OFF)       
 
-#define GD_TYPE_OFF (48)      
-#define GD_TYPE_WID (5)  
+#define GD_TYPE_OFF (40)      
+#define GD_TYPE_WID (4)  
 #define GD_TYPE_WID_MASK TO_MASK64(GD_TYPE_WID)
 #define GD_TYPE_MASK (GD_TYPE_WID_MASK << GD_TYPE_OFF)       
 
-#define GD_PRIVILEGE_OFF (53)      
+#define GD_PRIVILEGE_OFF (45)      
 #define GD_PRIVILEGE_WID (2)  
 #define GD_PRIVILEGE_WID_MASK TO_MASK64(GD_PRIVILEGE_WID)
 #define GD_PRIVILEGE_MASK (GD_PRIVILEGE_WID_MASK << GD_PRIVILEGE_OFF)       
 
-#define GD_PRESENT_OFF (55)      
+#define GD_PRESENT_OFF (47)      
 #define GD_PRESENT_WID (1)  
-#define GD_PRESENT_WID_MASK TO_MASK64(GD_PRIVILEGE_WID)
-#define GD_PRESENT_MASK (GD_PRIVILEGE_WID_MASK << GD_PRIVILEGE_OFF)       
+#define GD_PRESENT_WID_MASK TO_MASK64(GD_PRESENT_WID)
+#define GD_PRESENT_MASK (GD_PRESENT_WID_MASK << GD_PRESENT_OFF)       
 
 static inline gate_desc_t not_present_gate_desc(void) {
     return 0;
 }
 
-static inline void gd_set_selector(gate_desc_t *gd, uint32_t selector) {
+static inline void gd_set_selector(gate_desc_t *gd, seg_selector_t selector) {
     gate_desc_t d = *gd;
 
     d &= ~(GD_SELECTOR_MASK);
@@ -51,7 +51,7 @@ static inline void gd_set_selector(gate_desc_t *gd, uint32_t selector) {
     *gd = d;
 }
 
-static inline uint32_t gd_get_selector(gate_desc_t gd) {
+static inline seg_selector_t gd_get_selector(gate_desc_t gd) {
     return (gd & GD_SELECTOR_MASK) >> GD_SELECTOR_OFF;
 }
 
@@ -94,6 +94,12 @@ static inline uint8_t gd_get_present(gate_desc_t gd) {
     return (gd & GD_PRESENT_MASK) >> GD_PRESENT_OFF;
 }
 
+// Gate Descriptor Types
+
+#define GD_TASK_GATE_TYPE (0x5)
+#define GD_INTR_GATE_TYPE (0xE)
+#define GD_TRAP_GATE_TYPE (0xF)
+
 typedef gate_desc_t task_gate_desc_t;
 
 // Format of task gate desc :
@@ -104,7 +110,7 @@ static inline task_gate_desc_t task_gate_desc(void) {
     task_gate_desc_t tgd = not_present_gate_desc();
 
     gd_set_present(&tgd, 0x1);
-    gd_set_type(&tgd, 0x5);
+    gd_set_type(&tgd, GD_TASK_GATE_TYPE);
 
     return tgd;
 
@@ -116,7 +122,7 @@ typedef gate_desc_t intr_gate_desc_t;
 //
 // offset_lower [0: 15]
 //
-// zeros        [36 : 39]
+// zeros        [37 : 39]
 // type = 01110
 //
 // offset_upper [48 : 63]
@@ -136,7 +142,7 @@ static inline intr_gate_desc_t intr_gate_desc(void) {
     intr_gate_desc_t igd = not_present_gate_desc(); 
 
     gd_set_present(&igd, 0x1);
-    gd_set_type(&igd, 0xE);
+    gd_set_type(&igd, GD_INTR_GATE_TYPE);
 
     return igd;
 }
@@ -168,7 +174,7 @@ typedef gate_desc_t trap_gate_desc_t;
 //
 // offset_lower [0: 15]
 //
-// zeros        [36 : 39]
+// zeros        [37 : 39]
 // type = 01111
 //
 // offset_upper [48 : 63]
@@ -188,7 +194,7 @@ static inline trap_gate_desc_t trap_gate_desc(void) {
     trap_gate_desc_t trgd = not_present_gate_desc(); 
 
     gd_set_present(&trgd, 0x1);
-    gd_set_type(&trgd, 0xF);
+    gd_set_type(&trgd, GD_TRAP_GATE_TYPE);
 
     return trgd;
 }
@@ -268,9 +274,6 @@ static inline void idtv_set_base(idtr_val_t *idtv, gate_desc_t *base) {
     *idtv = g;
 }
 
-// Unlike for GDT, both of the functions are implemented entirely in assembly.
-// interrupts are not explicitly disabled when calling write_idtr.
-// This should be OK as long as idtv points to a correctly organized idt.
 dtr_val_t read_idtr(void);
 void load_idtr(dtr_val_t idtv);
 

@@ -5,6 +5,78 @@
 #include "fstndutil/misc.h"
 #include "msys/dt.h"
 
+// Segment Selector stuff: 
+
+typedef uint16_t seg_selector_t;
+
+// Selector Format :
+// RPL [0 :  1]
+// TI  [2 :  2] // What table to use, 0 means GDT
+// Ind [3 : 15]
+
+// requested privilege level [0 : 1]
+#define SSR_RPL_OFF (0)
+#define SSR_RPL_WID (2)  
+#define SSR_RPL_WID_MASK TO_MASK64(SSR_RPL_WID)
+#define SSR_RPL_MASK (SSR_RPL_WID_MASK << SSR_RPL_OFF)       
+
+// TI [2 : 2]
+#define SSR_TI_OFF (2)
+#define SSR_TI_WID (1)  
+#define SSR_TI_WID_MASK TO_MASK64(SSR_TI_WID)
+#define SSR_TI_MASK (SSR_TI_WID_MASK << SSR_TI_OFF)       
+
+// IND [3 : 15]
+#define SSR_IND_OFF (3)
+#define SSR_IND_WID (12)  
+#define SSR_IND_WID_MASK TO_MASK64(SSR_IND_WID)
+#define SSR_IND_MASK (SSR_IND_WID_MASK << SSR_IND_OFF)       
+
+static inline seg_selector_t seg_selector(void) {
+    return 0;
+}
+
+static inline void ssr_set_rpl(seg_selector_t *ssr, uint8_t rpl) {
+    seg_selector_t d = *ssr;
+
+    d &= ~(SSR_RPL_MASK);
+    d |= (SSR_RPL_WID_MASK & rpl) << SSR_RPL_OFF;
+
+    *ssr = d;
+}
+
+static inline uint8_t ssr_get_rpl(seg_selector_t ssr) {
+    return (SSR_RPL_MASK & ssr) >> SSR_RPL_OFF;
+}
+
+static inline void ssr_set_ti(seg_selector_t *ssr, uint8_t ti) {
+    seg_selector_t d = *ssr;
+
+    d &= ~(SSR_TI_MASK);
+    d |= (SSR_TI_WID_MASK & ti) << SSR_TI_OFF;
+
+    *ssr = d;
+}
+
+static inline uint8_t ssr_get_ti(seg_selector_t ssr) {
+    return (SSR_TI_MASK & ssr) >> SSR_TI_OFF;
+}
+
+static inline void ssr_set_ind(seg_selector_t *ssr, uint16_t ind) {
+    seg_selector_t d = *ssr;
+
+    d &= ~(SSR_IND_MASK);
+    d |= (SSR_IND_WID_MASK & ind) << SSR_IND_OFF;
+
+    *ssr = d;
+}
+
+static inline uint16_t ssr_get_ind(seg_selector_t ssr) {
+    return (SSR_IND_MASK & ssr) >> SSR_IND_OFF;
+}
+
+// Now actual GDT stuff.
+
 typedef uint64_t seg_desc_t;
 
 // Generic Segmet Descriptor Format :
@@ -394,3 +466,6 @@ dtr_val_t read_gdtr(void);
 // NOTE: After doing the register load, cs will be loaded with 0x08, and all other
 // segment registers will be set with 0x10.
 void load_gdtr(dtr_val_t v);
+
+
+
