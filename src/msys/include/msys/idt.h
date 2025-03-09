@@ -277,3 +277,6 @@ static inline void idtv_set_base(idtr_val_t *idtv, gate_desc_t *base) {
 dtr_val_t read_idtr(void);
 void load_idtr(dtr_val_t idtv);
 
+gate_desc_t get_gd(uint8_t i);
+void set_gd(uint8_t i, gate_desc_t gd);
+

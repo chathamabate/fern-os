@@ -4,32 +4,32 @@
 #include "msys/dt.h"
 #include "msys/gdt.h"
 #include "msys/debug.h"
+#include "msys/idt.h"
 #include "msys/intr.h"
 #include "term/term.h"
 #include "fstndutil/ansii.h"
 #include "term/term_sys_helpers.h"
 #include "fstndutil/test/str.h"
 
+void hndlr(void) {
+    disable_intrs();
+
+    term_put_s("HERE\n");
+
+    lock_up();
+}
+
 int kernel_main(void) {
-    dtr_val_t idtv = read_idtr();
-    term_put_dtr(idtv);
-
-    term_cursor_next_line();
-
-    uint32_t num_entries = dtv_get_num_entries(idtv);
-    gate_desc_t *idt = dtv_get_base(idtv);
-
-    term_put_gate_desc(idt[11]);
-
     /*
-    for (uint32_t i = 0; i < num_entries; i++) {
-        gate_desc_t gd = idt[i];
+    intr_gate_desc_t gd = intr_gate_desc();
 
-        if (gd_get_present(gd)) {
-            term_put_gate_desc(gd);
-            break;
-        }
-    }
+    gd_set_selector(&gd, 0x8);
+    gd_set_privilege(&gd, 0x0);
+    igd_set_base(&gd, (uint32_t)hndlr);
+
+    set_gd(32, gd);
+
+    term_put_gate_desc(gd);
     */
 
     return 0;

@@ -28,6 +28,6 @@ read_ds:
 .global lock_up
 lock_up:
     cli
-.loop:
+1:
     hlt 
-    jmp .loop
+    jmp 1b

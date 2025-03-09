@@ -90,6 +90,9 @@ _start:
 	*/
 	call kernel_main
 
+
+
+
     call lock_up
 
 /*
@@ -97,6 +100,18 @@ Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.
 */
 .size _start, . - _start
+
+/*
+proc2:
+2:
+    call kernel_main
+2:
+    jmp 1b
+    call lock_up
+*/
+
+
+
 
 
 /*
