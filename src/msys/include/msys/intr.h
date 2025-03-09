@@ -34,8 +34,6 @@ void nop_handler(void);
 
 // PIC Stuff...
 
-void pic_send_eoi(uint8_t irq);
-
 void pic_remap(int offset1, int offset2);
 
 uint16_t pic_get_irr(void);
@@ -46,3 +44,26 @@ void pic_unmask_all(void);
 
 void pic_set_mask(uint8_t irq);
 void pic_clear_mask(uint8_t irq);
+
+// These two ONLY send eoi to either the master or the slave!
+void pic_send_master_eoi(void);
+void pic_send_slave_eoi(void);
+
+// This will send an eoi to master AND to slave if necessary
+void pic_send_eoi(uint8_t irq);
+
+// This function will read the isr, and send as many eoi's as needed to 
+// "service" as many interrupts as possible. 
+//
+// The point of this is to kinda "reset" the pic.
+//
+// I think this should only be called when all interrupts are masked. 
+void pic_eoi_all(void);
+
+void nop_master_irq_handler(void);
+void nop_master_irq7_handler(void); // For spurious.
+
+void nop_slave_irq_handler(void);
+void nop_slave_irq15_handler(void); // For spurious.
+
+

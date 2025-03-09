@@ -11,13 +11,6 @@
 #define PIC2_DATA	(PIC2+1)
 #define PIC_EOI		0x20		/* End-of-interrupt command code */
 
-void pic_send_eoi(uint8_t irq) {
-	if(irq >= 8)
-		outb(PIC2_COMMAND,PIC_EOI);
-	
-	outb(PIC1_COMMAND,PIC_EOI);
-}
-
 #define ICW1_ICW4	0x01		/* Indicates that ICW4 will be present */
 #define ICW1_SINGLE	0x02		/* Single (cascade) mode */
 #define ICW1_INTERVAL4	0x04	/* Call address interval 4 (8) */
@@ -31,6 +24,12 @@ void pic_send_eoi(uint8_t irq) {
 #define ICW4_SFNM	0x10		/* Special fully nested (not) */
 
 void pic_remap(int offset1, int offset2) {
+    // I am pretty sure that the "wait" nature of the below calls is necessary
+    // when using in-line assembly. I believe that since my outb impl is an actual function,
+    // the "wait" call isn't really needed as my outb is pretty slow. 
+    //
+    // Regardless, leaving it in for now.
+
 	outb_and_wait(PIC1_COMMAND, ICW1_INIT | ICW1_ICW4);  // starts the initialization sequence (in cascade mode)
 	outb_and_wait(PIC2_COMMAND, ICW1_INIT | ICW1_ICW4);
 	outb_and_wait(PIC1_DATA, offset1);                 // ICW2: Master PIC vector offset
@@ -107,3 +106,49 @@ void pic_clear_mask(uint8_t irq) {
     value = inb(port) & ~(1 << irq);
     outb(port, value);        
 }
+
+void pic_send_master_eoi(void) {
+    outb(PIC1_COMMAND,PIC_EOI);
+}
+
+void pic_send_slave_eoi(void) {
+    outb(PIC2_COMMAND,PIC_EOI);
+}
+
+void pic_send_eoi(uint8_t irq) {
+	if(irq >= 8)
+		outb(PIC2_COMMAND,PIC_EOI);
+	
+	outb(PIC1_COMMAND,PIC_EOI);
+}
+
+void pic_eoi_all(void) {
+    uint16_t isr = pic_get_isr(); 
+
+    for (uint32_t i = 0; i < 16; i++) {
+        // I'm honestly still a bit confused about what happens when mulitple
+        // interupts happen in the slave PIC. Whatever though.
+        if (isr & (1 << i)) {
+            outb(i < 8 ? PIC1_COMMAND : PIC2_COMMAND, PIC_EOI);
+        }
+    }
+}
+
+void _nop_master_irq7_handler(void) {
+    // Only send eoi if bit 7 was actually set to in-service.
+    uint16_t isr = pic_get_isr();
+    if (isr & (1 << 7)) {
+        pic_send_master_eoi();        
+    }
+}
+
+void _nop_slave_irq15_handler(void) {
+    uint16_t isr = pic_get_isr();
+    if (isr & (1 << 15)) {
+        pic_send_slave_eoi();
+    }
+
+    // Always send slave eoi
+    pic_send_master_eoi();
+}
+
