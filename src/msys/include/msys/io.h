@@ -9,3 +9,14 @@
 // on the stack in 4-bytes chunks.
 void outb(uint32_t port, uint32_t value);
 
+uint8_t inb(uint32_t port);
+
+static inline void io_wait(void) {
+    outb(0x80, 0x0);
+}
+
+static inline void outb_and_wait(uint32_t port, uint32_t value) {
+    outb(port, value);
+    io_wait();
+}
+

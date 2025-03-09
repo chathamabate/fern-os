@@ -10,3 +10,7 @@ enable_intrs:
 disable_intrs:
     cli
     ret
+
+.global nop_handler
+nop_handler:
+    iret

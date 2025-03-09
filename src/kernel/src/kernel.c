@@ -11,15 +11,11 @@
 #include "term/term_sys_helpers.h"
 #include "fstndutil/test/str.h"
 
-void hndlr(void) {
-    disable_intrs();
-
-    term_put_s("HERE\n");
-
-    lock_up();
-}
-
 int kernel_main(void) {
+    // Let's just relax a little bit man, it's all going to be OK!
+    term_put_s("HELLO\nHELLO\n");
+    while (1);
+    // OK, looks like this is kinda working??
     /*
     dtr_val_t dt = read_gdtr();
     seg_desc_t *gdt = dtv_get_base(dt);

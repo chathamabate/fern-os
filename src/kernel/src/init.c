@@ -1,5 +1,6 @@
 
 #include "kernel/init.h"
+#include "msys/dt.h"
 #include "msys/intr.h"
 #include "msys/gdt.h"
 #include "term/term.h"
@@ -84,17 +85,56 @@ static void init_gdt(void) {
     load_gdtr(dtv);
 }
 
+static void dflt_intr_handler(void) {
+    disable_intrs();
+
+    const char *msg = "Interrupt occured with no handler!";
+    const char *iter = msg;
+    volatile uint16_t *t = TERMINAL_BUFFER;
+
+    char c;
+    while ((c = *(iter++)) != '\0') {
+        *(t++) = vga_entry(c, vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
+    }
+
+    lock_up();
+}
+
 #define NUM_IDT_ENTRIES 0x100
 static seg_desc_t idt[NUM_IDT_ENTRIES] __attribute__((aligned(0x8)));
 
 static void init_idt(void) {
+    intr_gate_desc_t gd = intr_gate_desc();
 
+    gd_set_selector(&gd, 0x8);
+    gd_set_privilege(&gd, 0);
+    igd_set_base(&gd, dflt_intr_handler);
+
+    for (uint32_t i = 0; i < NUM_IDT_ENTRIES; i++) {
+        idt[i] = gd;    
+    }
+
+    // Handler which does nothing. (Just calls iret)
+    intr_gate_desc_t ngd = intr_gate_desc();
+    gd_set_selector(&ngd, 0x8);
+    gd_set_privilege(&ngd, 0);
+    igd_set_base(&ngd, nop_handler);
+
+    // Remeber, double fault intially causes problems!
+    idt[0x8] = ngd;
+
+    dtr_val_t dtv = dtr_val();
+    dtv_set_base(&dtv, idt);
+    dtv_set_num_entries(&dtv, NUM_IDT_ENTRIES);
+
+    load_idtr(dtv);
 }
 
 void init_all(void) {
     disable_intrs();
 
     init_gdt();
+    init_idt();
 
     term_init();
 

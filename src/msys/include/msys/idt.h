@@ -147,14 +147,14 @@ static inline intr_gate_desc_t intr_gate_desc(void) {
     return igd;
 }
 
-static inline void igd_set_base(intr_gate_desc_t *igd, uint32_t base) {
+static inline void igd_set_base(intr_gate_desc_t *igd, void (*base)(void)) {
     intr_gate_desc_t gd = *igd;
 
     gd &= ~(IGD_BASE_LOWER_MASK);
-    gd |= (base & IGD_BASE_LOWER_WID_MASK) << IGD_BASE_LOWER_OFF;
+    gd |= ((uint32_t)base & IGD_BASE_LOWER_WID_MASK) << IGD_BASE_LOWER_OFF;
 
     gd &= ~(IGD_BASE_UPPER_MASK);
-    gd |= ((base >> IGD_BASE_LOWER_WID) & IGD_BASE_UPPER_WID_MASK) << IGD_BASE_UPPER_OFF;
+    gd |= (((uint32_t)base >> IGD_BASE_LOWER_WID) & IGD_BASE_UPPER_WID_MASK) << IGD_BASE_UPPER_OFF;
 
     *igd = gd;
 }
@@ -199,14 +199,14 @@ static inline trap_gate_desc_t trap_gate_desc(void) {
     return trgd;
 }
 
-static inline void trgd_set_base(trap_gate_desc_t *trgd, uint32_t base) {
+static inline void trgd_set_base(trap_gate_desc_t *trgd, void (*base)(void)) {
     trap_gate_desc_t gd = *trgd;
 
     gd &= ~(TRGD_BASE_LOWER_MASK);
-    gd |= (base & TRGD_BASE_LOWER_WID_MASK) << TRGD_BASE_LOWER_OFF;
+    gd |= ((uint32_t)base & TRGD_BASE_LOWER_WID_MASK) << TRGD_BASE_LOWER_OFF;
 
     gd &= ~(TRGD_BASE_UPPER_MASK);
-    gd |= ((base >> TRGD_BASE_LOWER_WID) & TRGD_BASE_UPPER_WID_MASK) << TRGD_BASE_UPPER_OFF;
+    gd |= (((uint32_t)base >> TRGD_BASE_LOWER_WID) & TRGD_BASE_UPPER_WID_MASK) << TRGD_BASE_UPPER_OFF;
 
     *trgd = gd;
 }

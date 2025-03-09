@@ -80,11 +80,6 @@ _start:
 
     call init_all
 
-    // Maybe try testing out this gdt one more time?
-    // We could attempt multi tasking or paging??
-    // Or not??
-    // IDK tbh what to do next...
-
 	/*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte
 	aligned at the time of the call instruction (which afterwards pushes

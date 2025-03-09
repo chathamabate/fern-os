@@ -4,7 +4,7 @@
 MOD_NAME 	?= msys
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= gdt.c idt.c
+_SRCS 		?= gdt.c idt.c intr.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= io.s gdt.s idt.s intr.s debug.s
