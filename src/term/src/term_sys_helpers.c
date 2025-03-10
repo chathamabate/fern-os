@@ -1,5 +1,6 @@
 
 #include "term/term_sys_helpers.h"
+#include "msys/page.h"
 #include "term/term.h"
 #include "fstndutil/ansii.h"
 #include "fstndutil/str.h"
@@ -175,4 +176,33 @@ void term_put_dtr(dtr_val_t dtv) {
 
     str_fmt(buf, "%u", dtv_get_num_entries(dtv));
     term_put_pair("Entries", buf);
+}
+
+void term_put_pte(pt_entry_t pte) {
+    char buf[128];
+
+    uint8_t p = pte_get_present(pte);
+    term_put_cond("Prsnt", p);
+
+    if (!p) {
+        return;
+    }
+
+    uint8_t wr = pte_get_writable(pte);
+    term_put_cond("Write", wr);
+
+    uint8_t priv = pte_get_user(pte);
+    if (priv) {
+        term_put_pair("Priv", ANSII_GREEN_FG "USER" ANSII_RESET);
+    } else {
+        term_put_pair("Priv", ANSII_GREEN_FG "ROOT" ANSII_RESET);
+    }
+
+    uint8_t avail = pte_get_avail(pte);
+    str_fmt(buf, "0x%2X", avail);
+    term_put_pair("Avail", buf);
+
+    void *base = pte_get_base(pte);
+    str_fmt(buf, "0x%8X", base);
+    term_put_pair("Base", buf);
 }
