@@ -107,3 +107,7 @@ void enable_paging(void);
 
 phys_addr_t get_page_directory(void);
 void set_page_directory(phys_addr_t pd);
+
+static inline void flush_page_cache(void) {
+    set_page_directory(get_page_directory());
+}
