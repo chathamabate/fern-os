@@ -1,9 +1,9 @@
 
-#include "kernel/init.h"
-#include "msys/dt.h"
-#include "msys/idt.h"
-#include "msys/intr.h"
-#include "msys/gdt.h"
+#include "k_startup/init.h"
+#include "k_sys/dt.h"
+#include "k_sys/idt.h"
+#include "k_sys/intr.h"
+#include "k_sys/gdt.h"
 #include "term/term.h"
 #include "term/term_sys_helpers.h"
 
@@ -15,29 +15,29 @@ static void init_gdt(void) {
         gdt[i] = not_present_seg_desc();
     }
 
-    exec_seg_desc_t *kernel_code = &(gdt[1]);  // 0x08
-    *kernel_code = exec_seg_desc();
+    exec_seg_desc_t *k_startup_code = &(gdt[1]);  // 0x08
+    *k_startup_code = exec_seg_desc();
 
-    sd_set_base(kernel_code, 0x0);
-    sd_set_limit(kernel_code, 0xFFFFF);
-    sd_set_gran(kernel_code, 0x1);
-    sd_set_privilege(kernel_code, 0x0);
+    sd_set_base(k_startup_code, 0x0);
+    sd_set_limit(k_startup_code, 0xFFFFF);
+    sd_set_gran(k_startup_code, 0x1);
+    sd_set_privilege(k_startup_code, 0x0);
 
-    esd_set_def(kernel_code, 0x1);
-    esd_set_readable(kernel_code, 0x1);
-    esd_set_conforming(kernel_code, 0x0);
+    esd_set_def(k_startup_code, 0x1);
+    esd_set_readable(k_startup_code, 0x1);
+    esd_set_conforming(k_startup_code, 0x0);
 
-    data_seg_desc_t *kernel_data = &(gdt[2]);  // 0x10
-    *kernel_data = data_seg_desc();
+    data_seg_desc_t *k_startup_data = &(gdt[2]);  // 0x10
+    *k_startup_data = data_seg_desc();
 
-    sd_set_base(kernel_data, 0x0);
-    sd_set_limit(kernel_data, 0xFFFFF);
-    sd_set_gran(kernel_data, 0x1);
-    sd_set_privilege(kernel_data, 0x0);
+    sd_set_base(k_startup_data, 0x0);
+    sd_set_limit(k_startup_data, 0xFFFFF);
+    sd_set_gran(k_startup_data, 0x1);
+    sd_set_privilege(k_startup_data, 0x0);
 
-    dsd_set_ex_down(kernel_data, 0x0);
-    dsd_set_writable(kernel_data, 0x1);
-    dsd_set_big(kernel_data, 0x1);
+    dsd_set_ex_down(k_startup_data, 0x0);
+    dsd_set_writable(k_startup_data, 0x1);
+    dsd_set_big(k_startup_data, 0x1);
 
     exec_seg_desc_t *user_code = &(gdt[3]);  // 0x18
     *user_code = exec_seg_desc();
@@ -171,7 +171,7 @@ static void init_idt(void) {
 
 void init_all(void) {
     // NOTE: This should be basically the first function called
-    // after loading from grub. Grub enters the kernel with interrupts
+    // after loading from grub. Grub enters the k_startup with interrupts
     // disabled.
     //
     // So this is slighlty redundant, but whatever.

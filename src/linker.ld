@@ -51,6 +51,7 @@ SECTIONS
 
     /* Should we have one page directory?? */
 
+    /* I believe this is just this initial stack */
     .stack BLOCK(4K) : ALIGN(4K) {
         _stack_bottom = .;
         . += STACK_SIZE;

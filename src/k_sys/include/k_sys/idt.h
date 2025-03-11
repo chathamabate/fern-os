@@ -2,9 +2,9 @@
 #pragma once
 
 #include <stdint.h>
-#include "fstndutil/misc.h"
-#include "msys/dt.h"
-#include "msys/gdt.h"
+#include "s_util/misc.h"
+#include "k_sys/dt.h"
+#include "k_sys/gdt.h"
 
 typedef uint64_t gate_desc_t;
 

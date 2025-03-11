@@ -1,12 +1,12 @@
 
 #include "term/term_sys_helpers.h"
-#include "msys/page.h"
+#include "k_sys/page.h"
 #include "term/term.h"
-#include "fstndutil/ansii.h"
-#include "fstndutil/str.h"
+#include "s_util/ansii.h"
+#include "s_util/str.h"
 #include <stdint.h>
 
-#include "msys/gdt.h"
+#include "k_sys/gdt.h"
 
 static void term_put_64bit(uint64_t v) {
     term_put_fmt_s(ANSII_CYAN_FG "[4] " ANSII_RESET "%08X" "\n", (uint32_t)(v >> 32));

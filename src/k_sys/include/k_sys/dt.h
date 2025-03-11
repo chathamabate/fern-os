@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fstndutil/misc.h"
+#include "s_util/misc.h"
 #include <stdint.h>
 
 // Descriptor table register work.

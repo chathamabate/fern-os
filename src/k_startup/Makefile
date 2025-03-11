@@ -1,19 +1,16 @@
 
 
-# NOTE: This module is freestanding utility code.
-# IT DEPENDS ON NOTHING!!!
-
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
-MOD_NAME 	?= fstndutil
+MOD_NAME 	?= k_startup
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= str.c
+_SRCS 		?= kernel.c init.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
-_ASMS		?= 
+_ASMS		?= boot.s
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= test.c str.c
+_TEST_SRCS 	?= test.c
 
 -include ../mod_stub.mk
 

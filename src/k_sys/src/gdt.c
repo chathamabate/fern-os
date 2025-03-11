@@ -1,7 +1,7 @@
 
-#include "msys/dt.h"
-#include "msys/gdt.h"
-#include "msys/intr.h"
+#include "k_sys/dt.h"
+#include "k_sys/gdt.h"
+#include "k_sys/intr.h"
 
 // Load the gdtr register without worrying about interrupt toggling.
 extern void _load_gdtr(dtr_val_t v);

@@ -1,5 +1,5 @@
 
-#include "fstndutil/str.h"
+#include "s_util/str.h"
 #include <stdarg.h>
 
 // Consider rewriting these in assembly!

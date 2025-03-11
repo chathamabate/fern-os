@@ -1,7 +1,7 @@
 
-#include "msys/dt.h"
-#include "msys/idt.h"
-#include "msys/intr.h"
+#include "k_sys/dt.h"
+#include "k_sys/idt.h"
+#include "k_sys/intr.h"
 
 extern void _load_idtr(dtr_val_t idtv);
 

@@ -2,8 +2,8 @@
 #pragma once
 
 #include <stdint.h>
-#include "fstndutil/misc.h"
-#include "msys/dt.h"
+#include "s_util/misc.h"
+#include "k_sys/dt.h"
 
 // Segment Selector stuff: 
 

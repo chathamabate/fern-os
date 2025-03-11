@@ -1,10 +1,10 @@
 
 #pragma once
 
-#include "msys/dt.h"
-#include "msys/idt.h"
-#include "msys/gdt.h"
-#include "msys/page.h"
+#include "k_sys/dt.h"
+#include "k_sys/idt.h"
+#include "k_sys/gdt.h"
+#include "k_sys/page.h"
 
 void term_put_seg_selector(seg_selector_t ssr);
 void term_put_seg_desc(seg_desc_t sd);

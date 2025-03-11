@@ -1,8 +1,8 @@
 
 #include "term/term.h"
-#include "msys/io.h"
-#include "fstndutil/ansii.h"
-#include "fstndutil/str.h"
+#include "k_sys/io.h"
+#include "s_util/ansii.h"
+#include "s_util/str.h"
 
 static void disable_bios_cursor(void) {
     outb(0x3D4, 0x0A);

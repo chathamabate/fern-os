@@ -1,7 +1,7 @@
 
-#include "fstndutil/str.h"
-#include "fstndutil/test/str.h"
-#include "fstndutil/test.h"
+#include "s_util/str.h"
+#include "s_util/test/str.h"
+#include "s_util/test.h"
 
 // Pretty simple tests ngl.
 

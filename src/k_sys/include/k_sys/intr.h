@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "msys/debug.h"
-#include "msys/io.h"
+#include "k_sys/debug.h"
+#include "k_sys/io.h"
 
 void enable_intrs(void);
 void disable_intrs(void);
@@ -51,14 +51,6 @@ void pic_send_slave_eoi(void);
 
 // This will send an eoi to master AND to slave if necessary
 void pic_send_eoi(uint8_t irq);
-
-// This function will read the isr, and send as many eoi's as needed to 
-// "service" as many interrupts as possible. 
-//
-// The point of this is to kinda "reset" the pic.
-//
-// I think this should only be called when all interrupts are masked. 
-void pic_eoi_all(void);
 
 void nop_master_irq_handler(void);
 void nop_master_irq7_handler(void); // For spurious.

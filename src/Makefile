@@ -8,14 +8,11 @@ MODS_DIR    := $(GIT_TOP)/src
 
 # While the order they exist here doesn't matter, I like to list
 # the modules in order of independence.
-#
-# kernel depends on everything
-# fstndutil depends on nothing
 MODS := \
-		kernel \
+		k_startup \
 		term \
-		msys \
-		fstndutil 
+		k_sys \
+		s_util 
 
 
 # Install Headers
@@ -81,7 +78,7 @@ $(BIN_FILE): lib.install | $(BUILD_DIR)
 bin: $(BIN_FILE)
 
 qemu.bin: $(BIN_FILE)
-	qemu-system-i386 -m 4G -kernel $(BIN_FILE)
+	qemu-system-x86_64 -m 4G -kernel $(BIN_FILE)
 
 # NOTE: When we start working with disk read/write... I'd really like to figure out ISO packaging!
 

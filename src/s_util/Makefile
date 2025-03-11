@@ -1,16 +1,19 @@
 
 
+# NOTE: This module is freestanding utility code.
+# IT DEPENDS ON NOTHING!!!
+
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
-MOD_NAME 	?= msys
+MOD_NAME 	?= s_util
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= gdt.c idt.c intr.c
+_SRCS 		?= str.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
-_ASMS		?= io.s page.s gdt.s idt.s intr.s debug.s
+_ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= test.c
+_TEST_SRCS 	?= test.c str.c
 
 -include ../mod_stub.mk
 

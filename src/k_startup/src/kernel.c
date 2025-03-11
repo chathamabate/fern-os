@@ -1,16 +1,16 @@
 
 
-#include "fstndutil/str.h"
-#include "msys/dt.h"
-#include "msys/gdt.h"
-#include "msys/debug.h"
-#include "msys/idt.h"
-#include "msys/intr.h"
+#include "s_util/str.h"
+#include "k_sys/dt.h"
+#include "k_sys/gdt.h"
+#include "k_sys/debug.h"
+#include "k_sys/idt.h"
+#include "k_sys/intr.h"
 #include "term/term.h"
-#include "fstndutil/ansii.h"
+#include "s_util/ansii.h"
 #include "term/term_sys_helpers.h"
-#include "fstndutil/test/str.h"
-#include "msys/page.h"
+#include "s_util/test/str.h"
+#include "k_sys/page.h"
 
 
 int kernel_main(void) {
@@ -24,12 +24,14 @@ int kernel_main(void) {
     set_gd(32, gd);
     */
 
+    /*
     pt_entry_t pte = not_present_pt_entr();
 
     pte_set_present(&pte, 1);
     pte_set_base(&pte, (void *)0x80000000);
 
     term_put_pte(pte);
+    */
 
 
     return 0;

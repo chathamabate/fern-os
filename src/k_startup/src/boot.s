@@ -90,6 +90,17 @@ _start:
 	*/
 	call kernel_main
 
+    movl $0x00010002, %eax
+    movl $0x00030004, %ebx
+    movl $0x3, %ecx
+    movl $0x4, %edx
+
+    pushal
+
+    pushl %esp
+    pushl $0x10
+    call term_put_trace
+
     call lock_up
 
 .global timer_handler

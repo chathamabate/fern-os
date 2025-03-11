@@ -1,5 +1,5 @@
 
-#include "msys/intr.h"
+#include "k_sys/intr.h"
 
 // Ok, now some PIC stuff..... (Much of this taken from OSdev Wiki
 
@@ -122,18 +122,6 @@ void pic_send_eoi(uint8_t irq) {
 	outb(PIC1_COMMAND,PIC_EOI);
 }
 
-void pic_eoi_all(void) {
-    uint16_t isr = pic_get_isr(); 
-
-    for (uint32_t i = 0; i < 16; i++) {
-        // I'm honestly still a bit confused about what happens when mulitple
-        // interupts happen in the slave PIC. Whatever though.
-        if (isr & (1 << i)) {
-            outb(i < 8 ? PIC1_COMMAND : PIC2_COMMAND, PIC_EOI);
-        }
-    }
-}
-
 void _nop_master_irq7_handler(void) {
     // Only send eoi if bit 7 was actually set to in-service.
     uint16_t isr = pic_get_isr();
@@ -148,7 +136,7 @@ void _nop_slave_irq15_handler(void) {
         pic_send_slave_eoi();
     }
 
-    // Always send slave eoi
+    // Always send master eoi
     pic_send_master_eoi();
 }
 

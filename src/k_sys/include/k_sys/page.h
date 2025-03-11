@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "fstndutil/misc.h"
+#include "s_util/misc.h"
 #include <stdint.h>
 
 typedef uint32_t pt_entry_t;
@@ -111,3 +111,5 @@ void set_page_directory(phys_addr_t pd);
 static inline void flush_page_cache(void) {
     set_page_directory(get_page_directory());
 }
+
+
