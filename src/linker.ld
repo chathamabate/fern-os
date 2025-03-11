@@ -4,6 +4,8 @@
    designated as the entry point. */
 ENTRY(_start)
 
+INCLUDE "os_defs.ld"
+
 /*
  * I'm sick of always doing these calcs.
  *
@@ -19,15 +21,21 @@ ENTRY(_start)
  * 0x1_0000_0000 =   4 GB
  */
 
-STACK_SIZE =    0x10000; /* 64 KB (Should this maybe be larger?) */
+KERNEL_STACK_SIZE = 64K;
 
 MEMORY 
 {
     /* 
      * This will be mapped 1:1 from virtual memory.
      * A virtual address in this range will map to an identical physical address.
+     *
+     * As of now, the entire compiled operating system with user code will live
+     * in this range. 
+     *
+     * (IF I ever make a compiler for my system, maybe this will
+     * only ever include kernel code)
      */
-    static_area : ORIGIN = 0x400000, LENGTH = 0xC00000 /* 4 MB - 16 MB */
+    identity_area : ORIGIN = IDENTITY_AREA_START, LENGTH = (IDENTITY_AREA_END - IDENTITY_AREA_START)
 
 }
 
@@ -47,42 +55,109 @@ SECTIONS
 	   work around this issue. This does not use that feature, so 2M was
 	   chosen as a safer option than the traditional 1M. */
 
-	. = 0x400000; /* Actually starting at 4 MB here to make initial paging easy */
+    /* THIS WILL BE 4MB ALIGNED ALWAYS */
+    . = IDENTITY_AREA_START;
 
-    /* Should we have one page directory?? */
-
-    /* I believe this is just this initial stack */
-    .stack BLOCK(4K) : ALIGN(4K) {
-        _stack_bottom = .;
-        . += STACK_SIZE;
-        _stack_top = .;
-    } > static_area
-
-	/* First put the multiboot header, as it is required to be put very early
-	   in the image or the bootloader won't recognize the file format.
-	   Next we'll put the .text section. */
-	.text BLOCK(4K) : ALIGN(4K)
-	{
+    .multiboot : {
 		*(.multiboot)
-		*(.text)
-	} > static_area
- 
-	/* Read-only data. */
-	.rodata BLOCK(4K) : ALIGN(4K)
-	{
-		*(.rodata)
-	} > static_area
- 
-	/* Read-write data (initialized) */
-	.data BLOCK(4K) : ALIGN(4K)
-	{
-		*(.data)
-	} > static_area
- 
-	/* Read-write data (uninitialized) and stack */
-	.bss BLOCK(4K) : ALIGN(4K)
-	{
-		*(COMMON)
-		*(.bss)
-	} > static_area
+    } > identity_area
+
+    .text : {
+        *(.text)
+    } > identity_area
+
+    .rodata : {
+        *(.rodata)
+    } > identity_area
+
+    .data : {
+        . = ALIGN(4K);
+
+        _data_start = .;
+        *(.data)
+        . = ALIGN(4K);
+        _data_end = .;
+    } > identity_area
+
+    .bss : {
+
+        . = ALIGN(4K);
+
+        _bss_start = .;
+        *(.bss)
+        . = ALIGN(4K);
+        _bss_end = .;
+    } > identity_area
+
+    /* As of now, all code compiled */
+    .ro_area : {
+        . = ALIGN(4K);
+        _ro_start = .;
+
+        _kernel_ro_start = .;
+
+        /* Always start with multiboot header */
+		*(.multiboot)
+
+        *libk_*.a:*.o(.text)
+        *libk_*.a:*.o(.rodata)
+        
+        . = ALIGN(4K);
+
+        _kernel_ro_end = .;
+        _shared_ro_start = .;
+
+        *libs_*.a:*.o(.text)
+        *libs_*.a:*.o(.rodata)
+
+        . = ALIGN(4K);
+        _shared_ro_end = .;
+
+        _user_ro_start = .;
+        *libu_*.a:*.o(.text)
+        *libu_*.a:*.o(.rodata)
+
+        . = ALIGN(4K);
+        _user_ro_end = .;
+
+        _ro_end = .;
+    } > identity_area
+    
+    .rw_area : {
+        . = ALIGN(4K);
+        _rw_start = .;
+
+        _kernel_rw_start = .;
+
+        *libk_*.a:*.o(COMMON)
+        *libk_*.a:*.o(.bss)
+        *libk_*.a:*.o(.data)
+
+        . = ALIGN(4K);
+        _kernel_rw_end = .;
+
+        _shared_rw_start = .;
+        *libs_*.a:*.o(COMMON)
+        *libs_*.a:*.o(.bss)
+        *libs_*.a:*.o(.data)
+        
+        . = ALIGN(4K);
+        _shared_rw_end = .;
+
+        _user_rw_start = .;
+        *libu_*.a:*.o(COMMON)
+        *libu_*.a:*.o(.bss)
+        *libu_*.a:*.o(.data)
+        
+        . = ALIGN(4K);
+        _user_rw_end = .;
+
+
+        _kernel_stack_bottom = .;
+        . += KERNEL_STACK_SIZE;
+        _kernel_stack_top = .;
+        . = ALIGN(4K);
+
+        _rw_end = .;
+    } > identity_area
 }

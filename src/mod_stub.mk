@@ -69,7 +69,7 @@ INSTALL_LIB	:= $(INSTALL_DIR)/$(_LIB)
 BUILD_TEST_DIR := $(BUILD_DIR)/test
 TEST_OBJS	   := $(patsubst %.c,$(BUILD_TEST_DIR)/%.o,$(_TEST_SRCS))
 
-_TEST_LIB		 := libtest_$(MOD_NAME).a
+_TEST_LIB		 := lib$(MOD_NAME)_test.a
 BUILD_TEST_LIB 	 := $(BUILD_TEST_DIR)/$(_TEST_LIB)
 INSTALL_TEST_LIB := $(INSTALL_DIR)/$(_TEST_LIB)
 

@@ -3,8 +3,10 @@ GIT_TOP ?= $(shell git rev-parse --show-toplevel)
 
 BUILD_DIR   := $(GIT_TOP)/build
 INSTALL_DIR := $(BUILD_DIR)/install
+INCLUDE_DIR := $(INSTALL_DIR)/include
 MODS_DIR    := $(GIT_TOP)/src
 
+THIS_FILE := $(MODS_DIR)/Makefile
 
 # While the order they exist here doesn't matter, I like to list
 # the modules in order of independence.
@@ -14,13 +16,38 @@ MODS := \
 		k_sys \
 		s_util 
 
+# Static memory layout header and linker generation:
+
+$(INCLUDE_DIR):
+	mdkir -p $@
+
+# Some constant for memory layout generation. 
+# NOTE: THESE MUST BE 4M ALIGNED!
+#
+# For reference: 4M = 0x40_0000 
+
+# These definitions will be pasted into .ld and .h files, hence the math expressions.
+4MB := 0x400000
+IDENTITY_AREA_START := ($(4MB))
+IDENTITY_AREA_END   := ($(IDENTITY_AREA_START) + (3 * $(4MB)))
+
+OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
+$(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
+	echo "#pragma once" > $@
+	echo "#define IDENTITY_AREA_START $(IDENTITY_AREA_START)" >> $@
+	echo "#define IDENTITY_AREA_END $(IDENTITY_AREA_END)" >> $@
+
+OS_DEFS_LD := $(INSTALL_DIR)/os_defs.ld
+$(OS_DEFS_LD): $(THIS_FILE)
+	echo "IDENTITY_AREA_START = $(IDENTITY_AREA_START);" > $@
+	echo "IDENTITY_AREA_END = $(IDENTITY_AREA_END);" >> $@
 
 # Install Headers
 
 HDRS_INSTALL_TARS := $(addprefix hdrs.install.,$(MODS))
 
 .PHONY: hdrs.install $(HDRS_INSTALL_TARS)
-hdrs.install: $(HDRS_INSTALL_TARS)
+hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H)
 
 $(HDRS_INSTALL_TARS): hdrs.install.%:
 	make -C $(MODS_DIR)/$* hdrs.install test_hdrs.install
@@ -59,7 +86,7 @@ clean.clangd: $(CLANGD_CLEAN_TARS)
 # Finally now for actual kernel packaging!
 
 OS_NAME := fernos
-C_COMPILER := i386-elf-gcc
+C_COMPILER := i686-elf-gcc
 
 LDSCRIPT := $(MODS_DIR)/linker.ld
 
@@ -68,9 +95,9 @@ BIN_FILE := $(BUILD_DIR)/$(OS_NAME).bin
 $(BUILD_DIR):
 	mkdir -p $@
 
-LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod) -ltest_$(mod))
+LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod) -l$(mod)_test)
 
-$(BIN_FILE): lib.install | $(BUILD_DIR)
+$(BIN_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) $(LIB_FLAGS) -lgcc
 
 .PHONY: bin qemu.bin
@@ -88,3 +115,4 @@ qemu.bin: $(BIN_FILE)
 
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -f $(OS_DEFS_LD)

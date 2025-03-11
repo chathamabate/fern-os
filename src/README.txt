@@ -13,3 +13,5 @@ interrupt.
 
 There will also be functions which are "standalone", in that they can execute in any 
 environment. Modules of such type will be prefixed `s_`.
+
+Finally, user libraries should be prefixed with `u_`.
