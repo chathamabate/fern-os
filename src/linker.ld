@@ -58,17 +58,19 @@ SECTIONS
     /* THIS WILL BE 4MB ALIGNED ALWAYS */
     . = IDENTITY_AREA_START;
 
-    .multiboot : {
-		*(.multiboot)
-    } > identity_area
-
     .text : {
+		*(.multiboot)
         *(.text)
     } > identity_area
 
     .rodata : {
         *(.rodata)
     } > identity_area
+
+    /* 
+     * Basically, everything in the identity_area should be readonly except for 
+     * .data, .bss, COMMON, and .kernel_stack
+     */
 
     .data : {
         . = ALIGN(4K);
@@ -79,8 +81,17 @@ SECTIONS
         _data_end = .;
     } > identity_area
 
-    .bss : {
+    COMMON : {
+        . = ALIGN(4K);
 
+        _common_start = .;
+        *(COMMON)
+
+        . = ALIGN(4K);
+        _common_end = .;
+    } > identity_area
+
+    .bss : {
         . = ALIGN(4K);
 
         _bss_start = .;
@@ -89,75 +100,12 @@ SECTIONS
         _bss_end = .;
     } > identity_area
 
-    /* As of now, all code compiled */
-    .ro_area : {
+    .kernel_stack : {
         . = ALIGN(4K);
-        _ro_start = .;
-
-        _kernel_ro_start = .;
-
-        /* Always start with multiboot header */
-		*(.multiboot)
-
-        *libk_*.a:*.o(.text)
-        *libk_*.a:*.o(.rodata)
-        
-        . = ALIGN(4K);
-
-        _kernel_ro_end = .;
-        _shared_ro_start = .;
-
-        *libs_*.a:*.o(.text)
-        *libs_*.a:*.o(.rodata)
-
-        . = ALIGN(4K);
-        _shared_ro_end = .;
-
-        _user_ro_start = .;
-        *libu_*.a:*.o(.text)
-        *libu_*.a:*.o(.rodata)
-
-        . = ALIGN(4K);
-        _user_ro_end = .;
-
-        _ro_end = .;
-    } > identity_area
-    
-    .rw_area : {
-        . = ALIGN(4K);
-        _rw_start = .;
-
-        _kernel_rw_start = .;
-
-        *libk_*.a:*.o(COMMON)
-        *libk_*.a:*.o(.bss)
-        *libk_*.a:*.o(.data)
-
-        . = ALIGN(4K);
-        _kernel_rw_end = .;
-
-        _shared_rw_start = .;
-        *libs_*.a:*.o(COMMON)
-        *libs_*.a:*.o(.bss)
-        *libs_*.a:*.o(.data)
-        
-        . = ALIGN(4K);
-        _shared_rw_end = .;
-
-        _user_rw_start = .;
-        *libu_*.a:*.o(COMMON)
-        *libu_*.a:*.o(.bss)
-        *libu_*.a:*.o(.data)
-        
-        . = ALIGN(4K);
-        _user_rw_end = .;
-
 
         _kernel_stack_bottom = .;
-        . += KERNEL_STACK_SIZE;
-        _kernel_stack_top = .;
+        . +=  KERNEL_STACK_SIZE;
         . = ALIGN(4K);
-
-        _rw_end = .;
+        _kernel_stack_top = .;
     } > identity_area
 }
