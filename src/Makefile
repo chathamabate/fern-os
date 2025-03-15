@@ -28,18 +28,21 @@ $(INCLUDE_DIR):
 
 # These definitions will be pasted into .ld and .h files, hence the math expressions.
 4MB := 0x400000
-IDENTITY_AREA_START := ($(4MB))
-IDENTITY_AREA_END   := ($(IDENTITY_AREA_START) + (3 * $(4MB)))
+IDENTITY_AREA_START := (0x0)
+IDENTITY_AREA_FERNOS_OFFSET := ($(4MB))
+IDENTITY_AREA_END   := ($(IDENTITY_AREA_START) + (4 * $(4MB)))
 
 OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
 $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
 	echo "#pragma once" > $@
 	echo "#define IDENTITY_AREA_START $(IDENTITY_AREA_START)" >> $@
+	echo "#define IDENTITY_AREA_FERNOS_OFFSET $(IDENTITY_AREA_FERNOS_OFFSET)" >> $@
 	echo "#define IDENTITY_AREA_END $(IDENTITY_AREA_END)" >> $@
 
 OS_DEFS_LD := $(INSTALL_DIR)/os_defs.ld
 $(OS_DEFS_LD): $(THIS_FILE)
 	echo "IDENTITY_AREA_START = $(IDENTITY_AREA_START);" > $@
+	echo "IDENTITY_AREA_FERNOS_OFFSET = $(IDENTITY_AREA_FERNOS_OFFSET);" >> $@
 	echo "IDENTITY_AREA_END = $(IDENTITY_AREA_END);" >> $@
 
 # Install Headers

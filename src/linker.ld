@@ -23,20 +23,18 @@ INCLUDE "os_defs.ld"
 
 KERNEL_STACK_SIZE = 64K;
 
+/* 
+ * The beginning of the Identity area will be BIOS stuff which may still be useful during kernel setup.
+ * For example, the terminal graphics buffer.
+ */
+
+/* THESE MUST BE 4K ALIGNED TO HELP WITH PAGING */
+FERNOS_START = IDENTITY_AREA_START + IDENTITY_AREA_FERNOS_OFFSET;
+FERNOS_END =  IDENTITY_AREA_END;
+
 MEMORY 
 {
-    /* 
-     * This will be mapped 1:1 from virtual memory.
-     * A virtual address in this range will map to an identical physical address.
-     *
-     * As of now, the entire compiled operating system with user code will live
-     * in this range. 
-     *
-     * (IF I ever make a compiler for my system, maybe this will
-     * only ever include kernel code)
-     */
-    identity_area : ORIGIN = IDENTITY_AREA_START, LENGTH = (IDENTITY_AREA_END - IDENTITY_AREA_START)
-
+    fernos_area   : ORIGIN = FERNOS_START, LENGTH = FERNOS_END - FERNOS_START 
 }
 
 /* Tell where the various sections of the object files will be put in the final
@@ -55,20 +53,17 @@ SECTIONS
 	   work around this issue. This does not use that feature, so 2M was
 	   chosen as a safer option than the traditional 1M. */
 
-    /* THIS WILL BE 4MB ALIGNED ALWAYS */
-    . = IDENTITY_AREA_START;
-
     .text : {
 		*(.multiboot)
         *(.text)
-    } > identity_area
+    } > fernos_area
 
     .rodata : {
         *(.rodata)
-    } > identity_area
+    } > fernos_area
 
     /* 
-     * Basically, everything in the identity_area should be readonly except for 
+     * Basically, everything in the fernos_area should be readonly except for 
      * .data, .bss, COMMON, and .kernel_stack
      */
 
@@ -79,7 +74,7 @@ SECTIONS
         *(.data)
         . = ALIGN(4K);
         _data_end = .;
-    } > identity_area
+    } > fernos_area
 
     COMMON : {
         . = ALIGN(4K);
@@ -89,7 +84,7 @@ SECTIONS
 
         . = ALIGN(4K);
         _common_end = .;
-    } > identity_area
+    } > fernos_area
 
     .bss : {
         . = ALIGN(4K);
@@ -98,14 +93,15 @@ SECTIONS
         *(.bss)
         . = ALIGN(4K);
         _bss_end = .;
-    } > identity_area
+    } > fernos_area
 
     .kernel_stack : {
         . = ALIGN(4K);
 
+        /* This may even be allowed to just be an array tbh */
         _kernel_stack_bottom = .;
         . +=  KERNEL_STACK_SIZE;
         . = ALIGN(4K);
         _kernel_stack_top = .;
-    } > identity_area
+    } > fernos_area
 }
