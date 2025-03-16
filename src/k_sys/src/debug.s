@@ -8,6 +8,11 @@ read_eflags:
     popl %eax
     ret
 
+.global read_cr0
+read_cr0:
+    movl %cr0, %eax
+    ret
+
 .global read_esp
 read_esp:
     leal 4(%esp), %eax

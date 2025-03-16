@@ -11,28 +11,30 @@
 #include "term/term_sys_helpers.h"
 #include "s_util/test/str.h"
 #include "k_sys/page.h"
+#include "k_startup/page.h"
 
+#include "os_defs.h"
+
+void gpf_hndlr(void) {
+    term_put_s("Oh no, a general protection fault\n");
+
+    lock_up();
+}
+
+void pf_hndlr(void) {
+    term_put_s("OH NO A PF\n");
+
+    lock_up();
+}
 
 int kernel_main(void) {
-    /*
-    intr_gate_desc_t gd = intr_gate_desc();
+    if (is_paging_enabled()) {
+        term_put_s("Paging enabled\n");
+    } else {
+        term_put_s("Paging disabled\n");
+    }
 
-    gd_set_selector(&gd, 0x8);
-    gd_set_privilege(&gd, 0x0);
-    igd_set_base(&gd, timer_handler);
-
-    set_gd(32, gd);
-    */
-
-    /*
-    pt_entry_t pte = not_present_pt_entr();
-
-    pte_set_present(&pte, 1);
-    pte_set_base(&pte, (void *)0x80000000);
-
-    term_put_pte(pte);
-    */
-
+    term_put_fmt_s("%X\n", NUM_IDENTITY_PTS);
 
     return 0;
 }

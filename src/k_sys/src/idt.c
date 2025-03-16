@@ -1,4 +1,5 @@
 
+#include "k_sys/debug.h"
 #include "k_sys/dt.h"
 #include "k_sys/idt.h"
 #include "k_sys/intr.h"

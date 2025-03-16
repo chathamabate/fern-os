@@ -28,13 +28,10 @@ KERNEL_STACK_SIZE = 64K;
  * For example, the terminal graphics buffer.
  */
 
-/* THESE MUST BE 4K ALIGNED TO HELP WITH PAGING */
-FERNOS_START = IDENTITY_AREA_START + IDENTITY_AREA_FERNOS_OFFSET;
-FERNOS_END =  IDENTITY_AREA_END;
 
 MEMORY 
 {
-    fernos_area   : ORIGIN = FERNOS_START, LENGTH = FERNOS_END - FERNOS_START 
+    fernos_area   : ORIGIN = IDENTITY_AREA_FERNOS_OFFSET, LENGTH = IDENTITY_AREA_SIZE
 }
 
 /* Tell where the various sections of the object files will be put in the final
@@ -54,12 +51,24 @@ SECTIONS
 	   chosen as a safer option than the traditional 1M. */
 
     .text : {
+        . = ALIGN(4K);
+
+        _text_start = .;
 		*(.multiboot)
         *(.text)
+
+        . = ALIGN(4K);
+        _text_end = .;
     } > fernos_area
 
     .rodata : {
+        . = ALIGN(4K);
+
+        _rodata_start = .;
         *(.rodata)
+
+        . = ALIGN(4K);
+        _rodata_end = .;
     } > fernos_area
 
     /* 

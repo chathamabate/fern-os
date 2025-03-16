@@ -8,8 +8,7 @@ MODS_DIR    := $(GIT_TOP)/src
 
 THIS_FILE := $(MODS_DIR)/Makefile
 
-# While the order they exist here doesn't matter, I like to list
-# the modules in order of independence.
+# I like to list the modules in order of dependence.
 MODS := \
 		k_startup \
 		term \
@@ -25,25 +24,24 @@ $(INCLUDE_DIR):
 # NOTE: THESE MUST BE 4M ALIGNED!
 #
 # For reference: 4M = 0x40_0000 
+#
+# The "Identity Area" will always start at 0x0 and go to Identity area end (Exclusively)
 
 # These definitions will be pasted into .ld and .h files, hence the math expressions.
 4MB := 0x400000
-IDENTITY_AREA_START := (0x0)
 IDENTITY_AREA_FERNOS_OFFSET := ($(4MB))
-IDENTITY_AREA_END   := ($(IDENTITY_AREA_START) + (4 * $(4MB)))
+IDENTITY_AREA_SIZE   := (4 * $(4MB))
 
 OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
 $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
 	echo "#pragma once" > $@
-	echo "#define IDENTITY_AREA_START $(IDENTITY_AREA_START)" >> $@
 	echo "#define IDENTITY_AREA_FERNOS_OFFSET $(IDENTITY_AREA_FERNOS_OFFSET)" >> $@
-	echo "#define IDENTITY_AREA_END $(IDENTITY_AREA_END)" >> $@
+	echo "#define IDENTITY_AREA_SIZE $(IDENTITY_AREA_SIZE)" >> $@
 
 OS_DEFS_LD := $(INSTALL_DIR)/os_defs.ld
 $(OS_DEFS_LD): $(THIS_FILE)
-	echo "IDENTITY_AREA_START = $(IDENTITY_AREA_START);" > $@
-	echo "IDENTITY_AREA_FERNOS_OFFSET = $(IDENTITY_AREA_FERNOS_OFFSET);" >> $@
-	echo "IDENTITY_AREA_END = $(IDENTITY_AREA_END);" >> $@
+	echo "IDENTITY_AREA_FERNOS_OFFSET = $(IDENTITY_AREA_FERNOS_OFFSET);" > $@
+	echo "IDENTITY_AREA_SIZE = $(IDENTITY_AREA_SIZE);" >> $@
 
 # Install Headers
 
@@ -108,7 +106,7 @@ $(BIN_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 bin: $(BIN_FILE)
 
 qemu.bin: $(BIN_FILE)
-	qemu-system-x86_64 -m 4G -kernel $(BIN_FILE)
+	qemu-system-x86_64 -m 4G -kernel $(BIN_FILE) -monitor stdio
 
 # NOTE: When we start working with disk read/write... I'd really like to figure out ISO packaging!
 

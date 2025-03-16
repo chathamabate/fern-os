@@ -1,11 +1,13 @@
 
 #include "k_startup/init.h"
 #include "k_sys/dt.h"
+#include "k_sys/page.h"
 #include "k_sys/idt.h"
 #include "k_sys/intr.h"
 #include "k_sys/gdt.h"
 #include "term/term.h"
 #include "term/term_sys_helpers.h"
+#include "os_defs.h"
 
 #define NUM_GDT_ENTRIES 0x10
 static seg_desc_t gdt[NUM_GDT_ENTRIES] __attribute__((aligned(0x8)));
@@ -19,7 +21,7 @@ static void init_gdt(void) {
     *k_startup_code = exec_seg_desc();
 
     sd_set_base(k_startup_code, 0x0);
-    sd_set_limit(k_startup_code, 0xFFFFF);
+    sd_set_limit(k_startup_code, 0x80000);
     sd_set_gran(k_startup_code, 0x1);
     sd_set_privilege(k_startup_code, 0x0);
 
@@ -31,7 +33,7 @@ static void init_gdt(void) {
     *k_startup_data = data_seg_desc();
 
     sd_set_base(k_startup_data, 0x0);
-    sd_set_limit(k_startup_data, 0xFFFFF);
+    sd_set_limit(k_startup_data, 0x80000);
     sd_set_gran(k_startup_data, 0x1);
     sd_set_privilege(k_startup_data, 0x0);
 
@@ -43,7 +45,7 @@ static void init_gdt(void) {
     *user_code = exec_seg_desc();
 
     sd_set_base(user_code, 0x0);
-    sd_set_limit(user_code, 0xFFFFF);
+    sd_set_limit(user_code, 0x80000);
     sd_set_gran(user_code, 0x1);
     sd_set_privilege(user_code, 0x3);
 
@@ -55,7 +57,7 @@ static void init_gdt(void) {
     *user_data = data_seg_desc();
 
     sd_set_base(user_data, 0x0);
-    sd_set_limit(user_data, 0xFFFFF);
+    sd_set_limit(user_data, 0x80000);
     sd_set_gran(user_data, 0x1);
     sd_set_privilege(user_data, 0x3);
 
@@ -69,7 +71,7 @@ static void init_gdt(void) {
     *high_data = data_seg_desc();
 
     sd_set_base(high_data, 0x80000000);
-    sd_set_limit(high_data, 0xFFFFF);
+    sd_set_limit(high_data, 0x80000);
     sd_set_gran(high_data, 0x1);
     sd_set_privilege(high_data, 0x03);
 
@@ -168,6 +170,12 @@ static void init_idt(void) {
 
     pic_remap(32, 40);
 }
+
+
+void init_paging(void) {
+
+}
+
 
 void init_all(void) {
     // NOTE: This should be basically the first function called

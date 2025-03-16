@@ -2,8 +2,13 @@
 
 #pragma once
 
+#include "k_sys/debug.h"
+#include "k_sys/page.h"
 #include "s_util/misc.h"
 #include <stdint.h>
+
+typedef uint32_t phys_addr_t;
+#define NULL_PHYS_ADDR (0)
 
 typedef uint32_t pt_entry_t;
 
@@ -88,22 +93,24 @@ static inline uint8_t pte_get_avail(pt_entry_t pte) {
     return (pte & PTE_AVAIL_MASK) >> PTE_AVAIL_OFF;
 }
 
-static inline void pte_set_base(pt_entry_t *pte, void *base) {
+static inline void pte_set_base(pt_entry_t *pte, phys_addr_t base) {
     pt_entry_t te = *pte;
 
     te &= ~(PTE_BASE_MASK);
-    te |= (uint32_t)base & ~TO_MASK64(PTE_BASE_OFF); 
+    te |= base & ~TO_MASK64(PTE_BASE_OFF); 
 
     *pte = te;
 }
 
-static inline void *pte_get_base(pt_entry_t pte) {
-    return (void *)(pte & (uint32_t)PTE_BASE_MASK);
+static inline phys_addr_t pte_get_base(pt_entry_t pte) {
+    return (pte & (uint32_t)PTE_BASE_MASK);
 }
 
-typedef uint32_t phys_addr_t;
-
 void enable_paging(void);
+
+static inline uint32_t is_paging_enabled(void) {
+    return read_cr0() & (1 << 31);
+}
 
 phys_addr_t get_page_directory(void);
 void set_page_directory(phys_addr_t pd);
@@ -111,5 +118,21 @@ void set_page_directory(phys_addr_t pd);
 static inline void flush_page_cache(void) {
     set_page_directory(get_page_directory());
 }
+
+// Initialize a large area of memory as being a "paged" area.
+// All this does is create a linked list embedded within the area such that
+// it is easy to later pop and push free pages from the area.
+//
+// All given physical addresses MUST be 4K aligned, or an error is returned.
+//
+// It may be of interest to attatch this linked list to another linkedlist of 
+// free pages. To do so, specify the "tail" as the physical address of the first
+// page in the next linked list. Otherwise, set tail as NULL_PHYS_ADDR.
+//
+// NOTE: This function will work both when paging is enabled, and when paging
+// is disabled!
+//
+// returns 0 on success, 1 on error.
+int init_paged_area(phys_addr_t start, phys_addr_t end, phys_addr_t tail);
 
 
