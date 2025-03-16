@@ -119,20 +119,5 @@ static inline void flush_page_cache(void) {
     set_page_directory(get_page_directory());
 }
 
-// Initialize a large area of memory as being a "paged" area.
-// All this does is create a linked list embedded within the area such that
-// it is easy to later pop and push free pages from the area.
-//
-// All given physical addresses MUST be 4K aligned, or an error is returned.
-//
-// It may be of interest to attatch this linked list to another linkedlist of 
-// free pages. To do so, specify the "tail" as the physical address of the first
-// page in the next linked list. Otherwise, set tail as NULL_PHYS_ADDR.
-//
-// NOTE: This function will work both when paging is enabled, and when paging
-// is disabled!
-//
-// returns 0 on success, 1 on error.
-int init_paged_area(phys_addr_t start, phys_addr_t end, phys_addr_t tail);
 
 
