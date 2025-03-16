@@ -28,13 +28,9 @@ void pf_hndlr(void) {
 }
 
 int kernel_main(void) {
-    if (is_paging_enabled()) {
-        term_put_s("Paging enabled\n");
-    } else {
-        term_put_s("Paging disabled\n");
-    }
 
-    term_put_fmt_s("%X\n", NUM_IDENTITY_PTS);
+    term_put_fmt_s("%X %X\n",
+            identity_pts, identity_pts + 1);
 
     return 0;
 }
