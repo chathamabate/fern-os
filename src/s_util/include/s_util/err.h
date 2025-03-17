@@ -16,7 +16,7 @@ typedef uint16_t fernos_error_t;
 /**
  * Given when a range's end is less than a range's start.
  */
-#define FOS_INVALID_RANGE_ERROR  (3)
+#define FOS_INVALID_RANGE (3)
 
 /**
  * A given argument is invalid for an unspecified reason.

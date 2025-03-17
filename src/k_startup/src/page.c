@@ -148,7 +148,7 @@ static fernos_error_t init_free_page_area(void) {
     }
 
     if (FREE_PAGE_AREA_END < FREE_PAGE_AREA_START) {
-        return FOS_INVALID_RANGE_ERROR;
+        return FOS_INVALID_RANGE;
     }
 
     // Each page points to the next!
@@ -260,19 +260,42 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr) {
 
     *page_addr = old_free_page;
     num_free_pages--;
+
     return FOS_SUCCESS;
 }
 
-fernos_error_t allocate_pages(pt_entry_t **pd, void *start, void *end, void **true_end) {
-    // Should pd itself be a physical address??
-    // Ever think about that one??
-    // Might it be helpful to have 2 free pages??
-    // Ok this is when things get hard tbh!
+fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **true_end) {
+    CHECK_ALIGN(pd, M_4K);
+    CHECK_ALIGN((phys_addr_t)start, M_4K);
+    CHECK_ALIGN((phys_addr_t)end, M_4K);
+
+    if (!true_end) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (start == end) {
+        *true_end = end;
+        return FOS_SUCCESS;
+    }
+
+    if ((uint32_t)end < (uint32_t)start) {
+        return FOS_INVALID_RANGE;
+    }
+
+    // Ok, now for the real work!
     //
-    return FOS_SUCCESS;
+    // First load the page directory, this will always be loaded.
+    // Then load each page table one at a time... Potentially allocating page tables as needed.
+
+    fernos_error_t err = FOS_SUCCESS;
+
+    if (err == FOS_SUCCESS) {
+        
+    }
+
+    return err;
 }
 
-fernos_error_t free_pages(pt_entry_t **pd, void *start, void *end) {
+fernos_error_t free_pages(phys_addr_t pd, void *start, void *end) {
     return FOS_SUCCESS;
 }
-

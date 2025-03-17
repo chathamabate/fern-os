@@ -55,7 +55,7 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr);
  *
  * FOS_NO_MEM means some or none of the pages were allocated.
  */
-fernos_error_t allocate_pages(pt_entry_t **pd, void *start, void *end, void **true_end);
+fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **true_end);
 
 /**
  * This will attempt to free pages from start up until end. 
@@ -64,5 +64,5 @@ fernos_error_t allocate_pages(pt_entry_t **pd, void *start, void *end, void **tr
  *
  * Error is only returned if given arguemnts are invalid somehow.
  */
-fernos_error_t free_pages(pt_entry_t **pd, void *start, void *end);
+fernos_error_t free_pages(phys_addr_t pd, void *start, void *end);
 
