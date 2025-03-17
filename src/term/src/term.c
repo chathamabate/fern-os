@@ -2,6 +2,7 @@
 #include "term/term.h"
 #include "k_sys/io.h"
 #include "s_util/ansii.h"
+#include "s_util/err.h"
 #include "s_util/str.h"
 
 static void disable_bios_cursor(void) {
@@ -25,7 +26,7 @@ typedef struct _term_state_t {
 
 static term_state_t term_state;
 
-void term_init(void) {
+fernos_error_t init_term(void) {
     disable_bios_cursor();
 
     term_state.show_cursor = true;
@@ -35,6 +36,8 @@ void term_init(void) {
     term_state.cursor_col = 0;
 
     term_clear();
+
+    return FOS_SUCCESS;
 }
 
 static void term_flip_cursor_color(void) {

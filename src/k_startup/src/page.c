@@ -2,6 +2,7 @@
 #include "k_sys/page.h"
 
 #include "k_startup/page.h"
+#include "os_defs.h"
 #include "s_util/misc.h"
 #include "s_util/err.h"
 
@@ -16,11 +17,18 @@ extern const char _text_end[];
 extern const char _rodata_start[];
 extern const char _rodata_end[];
 
+/**
+ * Setup the identity_pts array.
+ *
+ * Returns an error if there was an error with alignments.
+ */
 static fernos_error_t init_identity_pts(void) {
-    uint32_t mask_4k = M_4K - 1;
-    if ((mask_4k & IDENTITY_AREA_SIZE) || (mask_4k )) {
+    CHECK_ALIGN(IDENTITY_AREA_SIZE, M_4M);
 
-    }
+    CHECK_ALIGN((phys_addr_t)_text_start, M_4K);
+    CHECK_ALIGN((phys_addr_t)_text_end, M_4K);
+    CHECK_ALIGN((phys_addr_t)_rodata_start, M_4K);
+    CHECK_ALIGN((phys_addr_t)_rodata_end, M_4K);
 
     // By default, just set all identity pages as writeable.
     pt_entry_t *ptes = (pt_entry_t *)identity_pts;
@@ -54,9 +62,11 @@ static fernos_error_t init_identity_pts(void) {
     // Take out NULL page.
     pt_entry_t *null_pte = &(ptes[0]);
     pte_set_present(null_pte, 0);
+
+    return FOS_SUCCESS;
 }
 
-static void init_kernel_pd(void) {
+static fernos_error_t init_kernel_pd(void) {
     // Set all as non present to start.
     for (uint32_t ptei = 0; ptei < 1024; ptei++) {
         pt_entry_t *pte = &(kernel_pd[ptei]);
@@ -74,24 +84,22 @@ static void init_kernel_pd(void) {
         pte_set_base(pte, (phys_addr_t)pt);
     }
 
-    // And that's it for now!
+    return FOS_SUCCESS;
 }
 
 phys_addr_t next_free_page;
 
 static fernos_error_t init_free_page_area(void) {
-    uint32_t mask_4k = M_4K - 1;
-    if ((FREE_PAGE_AREA_START & mask_4k) || (FREE_PAGE_AREA_END & mask_4k)) {
-        return FOS_ALIGN_ERROR;
-    }
+    next_free_page = NULL_PHYS_ADDR;
+
+    CHECK_ALIGN(FREE_PAGE_AREA_START, M_4K);
+    CHECK_ALIGN(FREE_PAGE_AREA_END, M_4K);
 
     if (FREE_PAGE_AREA_START == FREE_PAGE_AREA_END) {
-        next_free_page = NULL_PHYS_ADDR;
         return FOS_SUCCESS;
     }
 
     if (FREE_PAGE_AREA_END < FREE_PAGE_AREA_START) {
-        next_free_page = NULL_PHYS_ADDR;
         return FOS_INVALID_RANGE_ERROR;
     }
 
@@ -109,10 +117,14 @@ static fernos_error_t init_free_page_area(void) {
 }
 
 fernos_error_t init_paging(void) {
+    fernos_error_t err;
 
-    init_identity_pts();
-    init_kernel_pd();
-    init_free_page_area();
+    PROP_ERR(init_identity_pts(), err);
+    PROP_ERR(init_kernel_pd(), err);
+    PROP_ERR(init_free_page_area(), err);
+
+    set_page_directory((phys_addr_t)kernel_pd);
+    enable_paging();
 
     return FOS_SUCCESS;
 }

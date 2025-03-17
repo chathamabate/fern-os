@@ -1,37 +1,37 @@
 
-
-#include "s_util/str.h"
-#include "k_sys/dt.h"
-#include "k_sys/gdt.h"
+#include "s_util/err.h"
 #include "k_sys/debug.h"
-#include "k_sys/idt.h"
-#include "k_sys/intr.h"
-#include "term/term.h"
-#include "s_util/ansii.h"
-#include "term/term_sys_helpers.h"
-#include "s_util/test/str.h"
-#include "k_sys/page.h"
+#include "k_startup/gdt.h"
+#include "k_startup/idt.h"
 #include "k_startup/page.h"
+#include "term/term.h"
 
-#include "os_defs.h"
+void kernel_init(void) {
+    uint8_t init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
-void gpf_hndlr(void) {
-    term_put_s("Oh no, a general protection fault\n");
+    if (init_gdt() != FOS_SUCCESS) {
+        out_bios_vga(init_err_style, "Failed to set up GDT");
+        lock_up();
+    }
 
-    lock_up();
-}
+    if (init_idt() != FOS_SUCCESS) {
+        out_bios_vga(init_err_style, "Failed to set up IDT");
+        lock_up();
+    }
 
-void pf_hndlr(void) {
-    term_put_s("OH NO A PF\n");
+    if (init_paging() != FOS_SUCCESS) {
+        out_bios_vga(init_err_style, "Failed to set up Paging");
+        lock_up();
+    }
 
-    lock_up();
+    if (init_term() != FOS_SUCCESS) {
+        out_bios_vga(init_err_style, "Failed to set up Terminal");
+        lock_up();
+    }
 }
 
 int kernel_main(void) {
-
-    term_put_fmt_s("%X %X\n",
-            identity_pts, identity_pts + 1);
-
+    term_put_s("Hello World\n");
     return 0;
 }
 
