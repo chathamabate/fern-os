@@ -1,4 +1,5 @@
 
+#include "k_sys/idt.h"
 #include "s_util/err.h"
 #include "k_sys/debug.h"
 #include "k_startup/gdt.h"
@@ -30,8 +31,30 @@ void kernel_init(void) {
     }
 }
 
+void _bad_handler(void) {
+    term_put_s("Hello From Bad Handler\n");
+}
+
+void timer_handler(void);
+
+void bad_handler(void);
+
 int kernel_main(void) {
-    term_put_s("Hello World\n");
+    intr_gate_desc_t timer = intr_gate_desc();
+    gd_set_selector(&timer, 0x8);
+    gd_set_privilege(&timer, 0x0);
+    igd_set_base(&timer, timer_handler);
+
+    set_gd(32, timer);
+
+    intr_gate_desc_t gd = intr_gate_desc();
+    gd_set_selector(&gd, 0x8);
+    gd_set_privilege(&gd, 0x0);
+    igd_set_base(&gd, bad_handler);
+
+    set_gd(0x1D, gd);
+
+
     return 0;
 }
 

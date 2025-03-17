@@ -88,18 +88,38 @@ _start:
 	stack since (pushed 0 bytes so far), so the alignment has thus been
 	preserved and the call is well defined.
 	*/
+    sti
 	call kernel_main
+
+t:
+    int $0x1D
+    jmp t
 
     call lock_up
 
+
+.global bad_handler
+bad_handler:
+    pushal
+    call _bad_handler
+    popal
+    iret
+
+// I think it is safe to say that when an interrupt gate runs
+// all other external interrupts are blocked..
+// Same as when an exception occurs?
+// The timer will be blocked, but not necessarily an exception!
+
 .global timer_handler
 timer_handler:
+    pushal
 
     pushl $msg
     call term_put_s
     popl %eax
 
     call pic_send_master_eoi
+    popal
     iret
 
 msg: .ascii "Timer IRQ\n\0"
