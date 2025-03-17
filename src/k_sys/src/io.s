@@ -10,8 +10,8 @@ outb:
     movl 0x8(%ebp), %edx
     movl 0xc(%ebp), %eax
     outb %al, %dx    // Write it out.
-    movl %eax, 0x0
-    movl %edx, 0x0
+    movl $0x0, %eax
+    movl $0x0, %edx
     
     movl %ebp, %esp
     popl %ebp 

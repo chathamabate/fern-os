@@ -41,6 +41,9 @@ static fernos_error_t init_identity_pts(void) {
         pte_set_writable(pte, 1);
     }
 
+    // NOTE: It has come to my attention that the writeable bit does nothing in
+    // supervisor mode... going to leave these loops in here anyway.
+
     // Set text area as read only.
     const uint32_t text_ptei_start = (phys_addr_t)_text_start / M_4K;
     const uint32_t text_ptei_end = (phys_addr_t)_text_end / M_4K;

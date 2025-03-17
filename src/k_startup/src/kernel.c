@@ -19,12 +19,10 @@ void kernel_init(void) {
         lock_up();
     }
 
-    /*
     if (init_paging() != FOS_SUCCESS) {
         out_bios_vga(init_err_style, "Failed to set up Paging");
         lock_up();
     }
-    */
 
     if (init_term() != FOS_SUCCESS) {
         out_bios_vga(init_err_style, "Failed to set up Terminal");
