@@ -6,6 +6,8 @@
 #include "s_util/err.h"
 #include "k_sys/debug.h"
 
+seg_desc_t idt[NUM_IDT_ENTRIES] __attribute__ ((aligned(8)));
+
 static void dflt_intr_handler(void) {
     disable_intrs();
 
