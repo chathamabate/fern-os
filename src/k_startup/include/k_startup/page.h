@@ -22,8 +22,6 @@
 #define FREE_PAGE_AREA_START (IDENTITY_AREA_SIZE)
 #define FREE_PAGE_AREA_END (0xC0000000)
 
-
-
 /**
  * Initialize all structures required for paging, and enable paging.
  *
@@ -46,6 +44,23 @@ fernos_error_t push_free_page(phys_addr_t page_addr);
  */
 fernos_error_t pop_free_page(phys_addr_t *page_addr);
 
+/**
+ * This will attempt to allocate pages from start to end in the given page directory.
+ *
+ * If all arguments are valid, an error will only be returned if we run out of memory mid 
+ * allocation. If so, pages which were allocated will not be freed. The "true_end" field will hold
+ * the highest virtual address in the given range which was not allocated.
+ *
+ * If true_end = end, the allocation was entirely successful!
+ */
+fernos_error_t allocate_pages(pt_entry_t **pd, void *start, void *end, void **true_end);
 
-
+/**
+ * This will attempt to free pages from start up until end. 
+ *
+ * Free pages which already exist in this range will be ignored.
+ *
+ * Error is only returned if given arguemnts are invalid somehow.
+ */
+fernos_error_t free_pages(pt_entry_t **pd, void *start, void *end);
 

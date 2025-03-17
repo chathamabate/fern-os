@@ -5,6 +5,7 @@
 #include "os_defs.h"
 #include "s_util/misc.h"
 #include "s_util/err.h"
+#include <stdbool.h>
 
 /**
  * These are the page tables to always use for addressing into the identity area.
@@ -33,6 +34,11 @@ static uint8_t free_page[M_4K] __attribute__ ((aligned(M_4K)));
  * this will equal NULL_PHYS_ADDR.
  */
 static phys_addr_t next_free_page;
+
+/**
+ * The number of free pages in the free page linked list.
+ */
+static uint32_t num_free_pages;
 
 extern const char _text_start[];
 extern const char _text_end[];
@@ -130,6 +136,7 @@ static fernos_error_t init_kernel_pd(void) {
 
 static fernos_error_t init_free_page_area(void) {
     next_free_page = NULL_PHYS_ADDR;
+    num_free_pages = 0;
 
     CHECK_ALIGN(FREE_PAGE_AREA_START, M_4K);
     CHECK_ALIGN(FREE_PAGE_AREA_END, M_4K);
@@ -145,6 +152,7 @@ static fernos_error_t init_free_page_area(void) {
     // Each page points to the next!
     for (phys_addr_t p = FREE_PAGE_AREA_START; p < FREE_PAGE_AREA_END; p += M_4K) {
         *(phys_addr_t *)p = p + M_4K;
+        num_free_pages++;
     }
 
     // Last page always points to NULL.
@@ -197,12 +205,13 @@ fernos_error_t push_free_page(phys_addr_t page_addr) {
     // Write next free page into the start bytes of the this new free page.
     *(phys_addr_t *)free_page = next_free_page;
 
+    // Set this new free page as the head of the free list.
+    next_free_page = page_addr;
+    num_free_pages++;
+
     // Remove given free page from kernel page table.
     pte_set_present(free_page_pte, 0);
     flush_page_cache();
-
-    // Finally set next_free_page
-    next_free_page = page_addr;
 
     return FOS_SUCCESS;
 }
@@ -235,7 +244,9 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr) {
     flush_page_cache();
 
     const phys_addr_t free_page_to_return = next_free_page;
+
     next_free_page = *(phys_addr_t *)free_page;
+    num_free_pages--;
 
     pte_set_present(free_page_pte, 0);
     flush_page_cache();
@@ -244,4 +255,11 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr) {
     return FOS_SUCCESS;
 }
 
+fernos_error_t allocate_pages(pt_entry_t **pd, void *start, void *end, void **true_end) {
+    return FOS_SUCCESS;
+}
+
+fernos_error_t free_pages(pt_entry_t **pd, void *start, void *end) {
+    return FOS_SUCCESS;
+}
 
