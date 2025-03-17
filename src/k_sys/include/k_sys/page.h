@@ -37,7 +37,7 @@ typedef uint32_t pt_entry_t;
 #define PTE_BASE_WID_MASK TO_MASK64(PTE_BASE_WID)
 #define PTE_BASE_MASK (PTE_BASE_WID_MASK << PTE_BASE_OFF)       
 
-static inline pt_entry_t not_present_pt_entr(void) {
+static inline pt_entry_t not_present_pt_entry(void) {
     return 0;
 }
 

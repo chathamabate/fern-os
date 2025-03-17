@@ -23,33 +23,6 @@
 #define FREE_PAGE_AREA_END (0xC0000000)
 
 
-/**
- * These are the page tables to always use for addressing into the identity area.
- * Do not change these ever.
- *
- * Also, note that the first pte is always marked to preset so that a NULL derefernce results 
- * in a page fault.
- */
-extern pt_entry_t identity_pts[NUM_IDENTITY_PTS][1024];
-
-/**
- * The page directory used by the kernel.
- *
- * This can and will be modified to give the kernel access to user task pages
- */
-extern pt_entry_t kernel_pd[1024];
-
-/**
- * A free page which is used inside the kernel to help with page table modification.
- */
-extern uint8_t free_page[M_4K];
-
-/**
- * Can only be accessed after calling `init_free_page_area`.
- * If no free pages are available or an error occured during initialization,
- * this will equal NULL_PHYS_ADDR.
- */
-extern phys_addr_t next_free_page;
 
 /**
  * Initialize all structures required for paging, and enable paging.
@@ -57,4 +30,22 @@ extern phys_addr_t next_free_page;
  * NOTE: The first page directory used will be `kernel_pd`.
  */
 fernos_error_t init_paging(void);
+
+/**
+ * An error is returned if the given page_addr is blatantly invalid.
+ * (i.e. it's in the identity area)
+ *
+ * NOTE: If page addr is not in the identity area, it is assumed to be valid, so be careful!
+ */
+fernos_error_t push_free_page(phys_addr_t page_addr);
+
+/**
+ * Attempt to pop a free page from the free page linked list.
+ *
+ * An error is returned if there are no free pages left, or page_addr is NULL.
+ */
+fernos_error_t pop_free_page(phys_addr_t *page_addr);
+
+
+
 
