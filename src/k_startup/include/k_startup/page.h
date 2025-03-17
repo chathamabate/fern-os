@@ -4,6 +4,7 @@
 #include "k_sys/page.h"
 #include "os_defs.h"
 #include "s_util/misc.h"
+#include "s_util/err.h"
 #include <stdint.h>
 
 #define NUM_IDENTITY_PTS        (IDENTITY_AREA_SIZE / M_4M)
@@ -43,9 +44,17 @@ extern pt_entry_t kernel_pd[1024];
  */
 extern uint8_t free_page[M_4K];
 
+/**
+ * Can only be accessed after calling `init_free_page_area`.
+ * If no free pages are available or an error occured during initialization,
+ * this will equal NULL_PHYS_ADDR.
+ */
+extern phys_addr_t next_free_page;
 
-
-
-// Returns 0 on success, 1 on Failure.
-//int init_paging(void);
+/**
+ * Initialize all structures required for paging, and enable paging.
+ *
+ * NOTE: The first page directory used will be `kernel_pd`.
+ */
+fernos_error_t init_paging(void);
 

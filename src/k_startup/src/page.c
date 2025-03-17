@@ -1,6 +1,5 @@
 
 #include "k_sys/page.h"
-#include "os_defs.h"
 
 #include "k_startup/page.h"
 #include "s_util/misc.h"
@@ -17,7 +16,12 @@ extern const char _text_end[];
 extern const char _rodata_start[];
 extern const char _rodata_end[];
 
-static void init_identity_pts(void) {
+static fernos_error_t init_identity_pts(void) {
+    uint32_t mask_4k = M_4K - 1;
+    if ((mask_4k & IDENTITY_AREA_SIZE) || (mask_4k )) {
+
+    }
+
     // By default, just set all identity pages as writeable.
     pt_entry_t *ptes = (pt_entry_t *)identity_pts;
     for (uint32_t ptei = 0; ptei < NUM_IDENTITY_PT_ENTRIES; ptei++) {
@@ -73,12 +77,7 @@ static void init_kernel_pd(void) {
     // And that's it for now!
 }
 
-/**
- * Can only be accessed after calling `init_free_page_area`.
- * If no free pages are available or an error occured during initialization,
- * this will equal NULL_PHYS_ADDR.
- */
-static phys_addr_t next_free_page;
+phys_addr_t next_free_page;
 
 static fernos_error_t init_free_page_area(void) {
     uint32_t mask_4k = M_4K - 1;
@@ -109,14 +108,12 @@ static fernos_error_t init_free_page_area(void) {
     return FOS_SUCCESS;
 }
 
-
-
-int _init_paging(void) {
+fernos_error_t init_paging(void) {
 
     init_identity_pts();
     init_kernel_pd();
     init_free_page_area();
 
-    return 0;
+    return FOS_SUCCESS;
 }
 
