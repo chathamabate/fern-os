@@ -52,6 +52,8 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr);
  * the highest virtual address in the given range which was not allocated.
  *
  * If true_end = end, the allocation was entirely successful!
+ *
+ * FOS_NO_MEM means some or none of the pages were allocated.
  */
 fernos_error_t allocate_pages(pt_entry_t **pd, void *start, void *end, void **true_end);
 

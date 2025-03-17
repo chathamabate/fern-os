@@ -23,10 +23,15 @@ static pt_entry_t identity_pts[NUM_IDENTITY_PTS][1024] __attribute__ ((aligned(M
  */
 static pt_entry_t kernel_pd[1024] __attribute__ ((aligned(M_4K)));
 
+#define NUM_TMP_FREE_PAGES (3)
+
 /**
- * A free page which is used inside the kernel to help with page table modification.
+ * Free pages which is used inside the kernel to help with page table modification.
+ *
+ * I am using 3 since, we may need 1 for a page directory, 1 for a page table, and then 1 for
+ * a specific data page.
  */
-static uint8_t free_page[M_4K] __attribute__ ((aligned(M_4K)));
+static uint8_t tmp_free_pages[NUM_TMP_FREE_PAGES][M_4K] __attribute__ ((aligned(M_4K)));
 
 /**
  * Can only be accessed after calling `init_free_page_area`.
@@ -93,18 +98,15 @@ static fernos_error_t init_identity_pts(void) {
         pte_set_writable(rodata_pte, 0);
     }
 
-    // The kernel free page is a reserved area which will have an underlying physical page.
-    // However, this underlying physical page should never be used. 
-    // Instead, it should be swapped out accordingly with arbitrary pages.
-    // We give it memory in the kernel so that we know no data/text will be placed there 
-    // (Both physically and virtually)
-    //
-    // Unless being used, this page's PTE in the kernel should always be not present.
-    
-    const uint32_t free_page_ptei = (uint32_t)free_page / M_4K;
-    pt_entry_t *free_page_pte = &(ptes[free_page_ptei]);
-    pte_set_present(free_page_pte, 0);
+    // Kernel temp free pages are reserved, not available for general use.
+    // They will start as unmapped.
 
+    const uint32_t tmp_ptei_start = (phys_addr_t)tmp_free_pages / M_4K;
+    const uint32_t tmp_ptei_end = tmp_ptei_start + NUM_TMP_FREE_PAGES;
+    for (uint32_t tmp_ptei = tmp_ptei_start; tmp_ptei < tmp_ptei_end; tmp_ptei++) {
+        pt_entry_t *tmp_pte = &(ptes[tmp_ptei]);
+        pte_set_present(tmp_pte, 0);
+    }
 
     // Take out NULL page.
     pt_entry_t *null_pte = &(ptes[0]);
@@ -176,42 +178,64 @@ fernos_error_t init_paging(void) {
     return FOS_SUCCESS;
 }
 
-fernos_error_t push_free_page(phys_addr_t page_addr) {
-    CHECK_ALIGN(page_addr, M_4K);
-
-    if (page_addr < IDENTITY_AREA_SIZE) {
+/**
+ * This function maps a static free page to the physical page, page.
+ */
+static fernos_error_t assign_free_page(uint32_t ti, phys_addr_t page) {
+    if (ti >= NUM_TMP_FREE_PAGES) {
         return FOS_BAD_ARGS;
     }
-    
-    // To push a free page, we must write the address of the next free page into the first
-    // 4 bytes of the given page.
-    
+
+    CHECK_ALIGN(page, M_4K);
+    if (page < IDENTITY_AREA_SIZE) {
+        return FOS_BAD_ARGS;
+    }
+
     pt_entry_t *ptes = (pt_entry_t *)identity_pts;
-
-    const uint32_t free_page_ptei = (uint32_t)free_page / M_4K;
+    const uint32_t free_page_ptei = (uint32_t)(tmp_free_pages[ti]) / M_4K;  
     pt_entry_t *free_page_pte = &(ptes[free_page_ptei]);
-    
-    pt_entry_t pte = not_present_pt_entry();
 
-    pte_set_present(&pte, 1);
-    pte_set_base(&pte, page_addr);
-    pte_set_writable(&pte, 1);
-    pte_set_user(&pte, 0);
+    pte_set_base(free_page_pte, page);
+    pte_set_user(free_page_pte, 0);
+    pte_set_writable(free_page_pte, 1);
+    pte_set_present(free_page_pte, 1);
 
-    // Point the kernel free page to the page which is being pushed!
-    *free_page_pte = pte;
     flush_page_cache();
-    
-    // Write next free page into the start bytes of the this new free page.
-    *(phys_addr_t *)free_page = next_free_page;
+
+    return FOS_SUCCESS;
+}
+
+/**
+ * Set the static free page's PTE as not present.
+ */
+static fernos_error_t clear_free_page(uint32_t ti) {
+    if (ti >= NUM_TMP_FREE_PAGES) {
+        return FOS_BAD_ARGS;
+    }
+
+    pt_entry_t *ptes = (pt_entry_t *)identity_pts;
+    const uint32_t free_page_ptei = (uint32_t)(tmp_free_pages[ti]) / M_4K;  
+    pt_entry_t *free_page_pte = &(ptes[free_page_ptei]);
+
+    pte_set_present(free_page_pte, 0);
+
+    flush_page_cache();
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t push_free_page(phys_addr_t page_addr) {
+    fernos_error_t err;
+
+    // If assign/clear ever fail, there is something very wrong with my kernel code.
+
+    PROP_ERR(assign_free_page(0, page_addr), err);
+    *(phys_addr_t *)(tmp_free_pages[0]) = next_free_page;
+    PROP_ERR(clear_free_page(0), err);
 
     // Set this new free page as the head of the free list.
     next_free_page = page_addr;
     num_free_pages++;
-
-    // Remove given free page from kernel page table.
-    pte_set_present(free_page_pte, 0);
-    flush_page_cache();
 
     return FOS_SUCCESS;
 }
@@ -226,36 +250,25 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr) {
         return FOS_NO_MEM;
     }  
 
-    // Ok now, we need to extract the next free page from the starting bytes of the page being 
-    // popped.
+    fernos_error_t err;
 
-    pt_entry_t *ptes = (pt_entry_t *)identity_pts;
-    const uint32_t free_page_ptei = (uint32_t)free_page / M_4K;
-    pt_entry_t *free_page_pte = &(ptes[free_page_ptei]);
+    phys_addr_t old_free_page = next_free_page;
 
-    pt_entry_t pte = not_present_pt_entry();
+    PROP_ERR(assign_free_page(0, next_free_page), err);
+    next_free_page = *(phys_addr_t *)(tmp_free_pages[0]);
+    PROP_ERR(clear_free_page(0), err);
 
-    pte_set_base(&pte, next_free_page);
-    pte_set_user(&pte, 0);
-    pte_set_present(&pte, 1);
-    pte_set_writable(&pte, 1);
-
-    *free_page_pte = pte;
-    flush_page_cache();
-
-    const phys_addr_t free_page_to_return = next_free_page;
-
-    next_free_page = *(phys_addr_t *)free_page;
+    *page_addr = old_free_page;
     num_free_pages--;
-
-    pte_set_present(free_page_pte, 0);
-    flush_page_cache();
-
-    *page_addr = free_page_to_return;
     return FOS_SUCCESS;
 }
 
 fernos_error_t allocate_pages(pt_entry_t **pd, void *start, void *end, void **true_end) {
+    // Should pd itself be a physical address??
+    // Ever think about that one??
+    // Might it be helpful to have 2 free pages??
+    // Ok this is when things get hard tbh!
+    //
     return FOS_SUCCESS;
 }
 
