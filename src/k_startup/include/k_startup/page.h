@@ -64,6 +64,10 @@ fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **tru
  *
  * Free pages which already exist in this range will be ignored.
  *
+ * NOTE: In the current implementation, completely empty page tables are themselves left allocated.
+ * So, if you deallocate a full 4MB region, the page table for that 4MB area will only contain 
+ * not present entries, but it will remain allocated and in the parent page directory.
+ *
  * Error is only returned if given arguemnts are invalid somehow.
  */
 fernos_error_t free_pages(phys_addr_t pd, void *start, void *end);

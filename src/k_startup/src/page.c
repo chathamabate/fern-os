@@ -301,6 +301,7 @@ fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **tru
     // Should we start with some begginning moves??
     
     uint32_t loaded_pdi = 1024;
+    pt_entry_t *page_table = NULL_PTR;
 
     const uint32_t pi_start = (uint32_t)start / M_4K;
     const uint32_t pi_end = (uint32_t)end / M_4K;
@@ -343,11 +344,11 @@ fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **tru
             }
 
             loaded_pdi = pdi;
+            page_table = (pt_entry_t *)(tmp_free_pages[1]);
         }
 
         // Also should be a quick mask.
         uint32_t pti = pi % 1024;
-        pt_entry_t *page_table = (pt_entry_t *)(tmp_free_pages[1]);
         pt_entry_t *pte = &(page_table[pti]);
 
         if (pte_get_present(*pte)) {
@@ -359,7 +360,7 @@ fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **tru
 
         phys_addr_t p;
         err = pop_free_page(&p);
-        if (err != FOS_SUCCESS) {{
+        if (err != FOS_SUCCESS) {
             break;
         }
 
@@ -383,6 +384,72 @@ fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **tru
 }
 
 fernos_error_t free_pages(phys_addr_t pd, void *start, void *end) {
-    // This is going to be a pretty similair function tbh.
-    return FOS_SUCCESS;
+    CHECK_ALIGN(pd, M_4K);
+    CHECK_ALIGN((phys_addr_t)start, M_4K);
+    CHECK_ALIGN((phys_addr_t)end, M_4K);
+
+    if (start == end) {
+        return FOS_SUCCESS;
+    }
+
+    if ((uint32_t)end < (uint32_t)start) {
+        return FOS_INVALID_RANGE;
+    }
+
+    if ((uint32_t)start < IDENTITY_AREA_SIZE) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    PROP_ERR(assign_free_page(0, pd), err);
+    pt_entry_t *page_dir = (pt_entry_t *)(tmp_free_pages[0]);
+
+    uint32_t loaded_pdi = 1024;
+    pt_entry_t *page_table = NULL_PTR;
+
+    const uint32_t pi_start = (uint32_t)start / M_4K;
+    const uint32_t pi_end = (uint32_t)end / M_4K;
+
+    for (uint32_t pi = pi_start; pi < pi_end; pi++) {
+
+        uint32_t pdi = pi / 1024;
+        if (pdi != loaded_pdi) {
+            pt_entry_t *pde = &(page_dir[pdi]);
+
+            // If not present, sweet, just skip ahead.
+            if (!pte_get_present(*pde)) {
+                pi += (1024 - 1); 
+                continue;
+            }
+
+            // Otherwise, let's load it into temp page 1.
+            err = assign_free_page(1, pte_get_base(*pde));
+            if (err != FOS_SUCCESS) {
+                break;
+            }  
+
+            loaded_pdi = pdi;
+            page_table = (pt_entry_t *)(tmp_free_pages[1]);
+        }
+
+        uint32_t pti = pi % 1024;
+        pt_entry_t *pte = &(page_table[pti]);
+
+        // Only free our page if needed!
+        if (pte_get_present(*pte)) {
+            phys_addr_t p = pte_get_base(*pte);
+            err = push_free_page(p);
+            if (err != FOS_SUCCESS) {
+                break;
+            }
+
+            pte_set_present(pte, 0);
+        }
+    }
+
+    (void)clear_free_page(1);
+    (void)clear_free_page(0);
+
+    return err;
 }
