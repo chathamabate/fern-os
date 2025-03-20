@@ -22,6 +22,49 @@
 #define FREE_PAGE_AREA_START (IDENTITY_AREA_SIZE)
 #define FREE_PAGE_AREA_END (0xC0000000)
 
+/**
+ * These values are used in the available bits of a page table entry.
+ *
+ * A unique entry points to a page which is only refernced by this page table. If this page table
+ * is deleted, the refernced page should be returned to the page free list.
+ *
+ * A shared entry points to a page which is referenced by other page tables. If this page table
+ * is deleted, the referenced page should NOT be returned to the page free list.
+ */
+
+#define UNIQUE_ENTRY (0)
+#define SHARED_ENTRY (1)
+
+static inline pt_entry_t fos_present_pt_entry(phys_addr_t base) {
+    pt_entry_t pte;
+
+    // I consider this FOS specific because FOS doesn't use privilege levels.
+    // All pages are ring 0.
+
+    pte_set_present(&pte, 1);
+    pte_set_base(&pte, base);
+    pte_set_user(&pte, 0);
+    pte_set_writable(&pte, 1);
+
+    return pte;
+}
+
+static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base) {
+    pt_entry_t pte = fos_present_pt_entry(base);
+
+    pte_set_avail(&pte, UNIQUE_ENTRY);
+
+    return pte;
+}
+
+static inline pt_entry_t fos_shared_pt_entry(phys_addr_t base) {
+    pt_entry_t pte = fos_present_pt_entry(base);
+
+    pte_set_avail(&pte, SHARED_ENTRY);
+
+    return pte;
+}
+
 /*
  * NOTE: There will be a page directory stored in static memory which must always be loaded when
  * the kernel thread is running! 
@@ -51,6 +94,16 @@ fernos_error_t push_free_page(phys_addr_t page_addr);
  * An error is returned if there are no free pages left, or page_addr is NULL.
  */
 fernos_error_t pop_free_page(phys_addr_t *page_addr);
+
+/**
+ * Create a new page table, all entries will start as not present.
+ */
+fernos_error_t new_page_table(phys_addr_t *pt_addr);
+
+/**
+ * Delete a page table. 
+ */
+fernos_error_t delete_page_table(phys_addr_t pt_addr);
 
 /**
  * Create a new default page directory and store it's physical address at pd_addr.
