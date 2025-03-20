@@ -223,6 +223,8 @@ static fernos_error_t clear_tmp_page(uint32_t ti, phys_addr_t *old) {
 }
 
 fernos_error_t push_free_page(phys_addr_t page_addr) {
+    CHECK_ALIGN(page_addr, M_4K);
+
     // An identity area page can never be pushed onto the free list.
     if (page_addr < IDENTITY_AREA_SIZE) {
         return FOS_IDENTITY_OVERWRITE;
@@ -319,6 +321,8 @@ fernos_error_t new_page_table(phys_addr_t *pt_addr) {
 }
 
 fernos_error_t delete_page_table(phys_addr_t pt_addr) {
+    CHECK_ALIGN(pt_addr, M_4K);
+
     if (pt_addr < IDENTITY_AREA_SIZE) {
         return FOS_IDENTITY_OVERWRITE;
     }
@@ -380,13 +384,31 @@ fernos_error_t new_page_directory(phys_addr_t *pd_addr) {
 }
 
 fernos_error_t delete_page_directory(phys_addr_t pd_addr) {
+    CHECK_ALIGN(pd_addr, M_4K);
+
     if (pd_addr < IDENTITY_AREA_SIZE) {
         return FOS_IDENTITY_OVERWRITE;
     }
 
+    phys_addr_t old_tmp_addr;
 
-    // Hmmmmm...
-    // Ok, this is when things get tricky imo..
+    PROP_ERR(assign_tmp_page(0, pd_addr, &old_tmp_addr));
+
+    pt_entry_t *pdes = (pt_entry_t *)(tmp_free_pages[0]);
+
+    for (uint32_t i = 0; i < 1024; i++) {
+        pt_entry_t pde = pdes[i];
+        if (pte_get_present(pde) && pte_get_avail(pde) == UNIQUE_ENTRY) {
+            PROP_ERR(delete_page_table(pte_get_base(pde)));
+        }
+    }
+
+    PROP_ERR(assign_tmp_page(0, old_tmp_addr, NULL));
+
+    // Finally, delete the page directory itself!
+    
+    PROP_ERR(push_free_page(pd_addr));
+
     return FOS_SUCCESS;
 }
 
