@@ -101,9 +101,26 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr);
 fernos_error_t new_page_table(phys_addr_t *pt_addr);
 
 /**
+ * Add new pages to the given page table! (s and e are indecies into a page table, e is exclusive)
+ *
+ * If an error is returned, it is possible that not all pages were allocated.
+ * Always check the `true_e` argument when SUCCESS isn't returned to see how much progress was
+ * made in the allocation.
+ *
+ * If *true_e == e, all pages were allocated!
+ */
+fernos_error_t pt_add_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e, uint32_t *true_e);
+
+/**
+ * Remove pages from a page table. Pages marked UNIQUE will be added back to the free list.
+ */
+fernos_error_t pt_remove_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e);
+
+/**
  * Delete a page table. 
  */
 fernos_error_t delete_page_table(phys_addr_t pt_addr);
+
 
 /**
  * Create a new default page directory and store it's physical address at pd_addr.
@@ -115,7 +132,7 @@ fernos_error_t new_page_directory(phys_addr_t *pd_addr);
 
 /**
  * Take the physical address of a page directory and clean up all of it's pages, page tables, and
- * finally, the page directory it self!
+ * finally, the page directory itself!
  */
 fernos_error_t delete_page_directory(phys_addr_t pd_addr);
 
