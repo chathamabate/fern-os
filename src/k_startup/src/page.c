@@ -166,11 +166,9 @@ static fernos_error_t init_free_page_area(void) {
 }
 
 fernos_error_t init_paging(void) {
-    fernos_error_t err;
-
-    PROP_ERR(init_identity_pts(), err);
-    PROP_ERR(init_kernel_pd(), err);
-    PROP_ERR(init_free_page_area(), err);
+    PROP_ERR(init_identity_pts());
+    PROP_ERR(init_kernel_pd());
+    PROP_ERR(init_free_page_area());
 
     set_page_directory((phys_addr_t)kernel_pd);
     enable_paging();
@@ -224,8 +222,6 @@ static fernos_error_t clear_free_page(uint32_t ti) {
 }
 
 fernos_error_t push_free_page(phys_addr_t page_addr) {
-    fernos_error_t err;
-
     // An identity area page can never be pushed onto the free list.
     if (page_addr < IDENTITY_AREA_SIZE) {
         return FOS_BAD_ARGS;
@@ -233,9 +229,9 @@ fernos_error_t push_free_page(phys_addr_t page_addr) {
 
     // If assign/clear ever fail, there is something very wrong with my kernel code.
 
-    PROP_ERR(assign_free_page(0, page_addr), err);
+    PROP_ERR(assign_free_page(0, page_addr));
     *(phys_addr_t *)(tmp_free_pages[0]) = next_free_page;
-    PROP_ERR(clear_free_page(0), err);
+    PROP_ERR(clear_free_page(0));
 
     // Set this new free page as the head of the free list.
     next_free_page = page_addr;
@@ -254,13 +250,11 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr) {
         return FOS_NO_MEM;
     }  
 
-    fernos_error_t err;
-
     phys_addr_t old_free_page = next_free_page;
 
-    PROP_ERR(assign_free_page(0, next_free_page), err);
+    PROP_ERR(assign_free_page(0, next_free_page));
     next_free_page = *(phys_addr_t *)(tmp_free_pages[0]);
-    PROP_ERR(clear_free_page(0), err);
+    PROP_ERR(clear_free_page(0));
 
     *page_addr = old_free_page;
     num_free_pages--;
@@ -292,10 +286,10 @@ fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **tru
         return FOS_BAD_ARGS;
     }
 
-    fernos_error_t err;
+    fernos_error_t err = FOS_SUCCESS;
 
     // Always start by loading the page directory into temp page 0.
-    PROP_ERR(assign_free_page(0, pd), err);
+    PROP_ERR(assign_free_page(0, pd));
     pt_entry_t *page_dir = (pt_entry_t *)(tmp_free_pages[0]);
 
     // Should we start with some begginning moves??
@@ -400,9 +394,9 @@ fernos_error_t free_pages(phys_addr_t pd, void *start, void *end) {
         return FOS_BAD_ARGS;
     }
 
-    fernos_error_t err;
+    fernos_error_t err = FOS_SUCCESS;
 
-    PROP_ERR(assign_free_page(0, pd), err);
+    PROP_ERR(assign_free_page(0, pd));
     pt_entry_t *page_dir = (pt_entry_t *)(tmp_free_pages[0]);
 
     uint32_t loaded_pdi = 1024;

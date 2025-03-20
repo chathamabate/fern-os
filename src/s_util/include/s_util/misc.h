@@ -20,7 +20,10 @@
         return FOS_ALIGN_ERROR; \
     }
 
-#define PROP_ERR(expr, err) \
-    if ((err = (expr)) != FOS_SUCCESS) { \
-        return err;  \
-    }
+#define PROP_ERR(expr) \
+    do { \
+        fernos_error_t __err = expr; \
+        if (__err != FOS_SUCCESS) { \
+            return __err; \
+        } \
+    } while (0);
