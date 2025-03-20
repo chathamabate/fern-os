@@ -6,6 +6,7 @@
 #include "s_util/misc.h"
 #include "s_util/err.h"
 #include <stdbool.h>
+#include <stdlib.h>
 
 /**
  * These are the page tables to always use for addressing into the identity area.
@@ -115,16 +116,19 @@ static fernos_error_t init_identity_pts(void) {
     return FOS_SUCCESS;
 }
 
-static fernos_error_t init_kernel_pd(void) {
+/**
+ * Factored out helper code for intializing a page directory given we have it's virtual address.
+ */
+static void _init_pd(pt_entry_t *pd) {
     // Set all as non present to start.
     for (uint32_t ptei = 0; ptei < 1024; ptei++) {
-        pt_entry_t *pte = &(kernel_pd[ptei]);
+        pt_entry_t *pte = &(pd[ptei]);
         *pte = not_present_pt_entry();
     }
 
-    // Add all identity pages to the kernel directory.
+    // Add all identity pages to the directory.
     for (uint32_t i = 0; i < NUM_IDENTITY_PTS; i++) {
-        pt_entry_t *pte = &(kernel_pd[i]);
+        pt_entry_t *pte = &(pd[i]);
         pt_entry_t *pt = identity_pts[i];
 
         pte_set_present(pte, 1);
@@ -133,6 +137,10 @@ static fernos_error_t init_kernel_pd(void) {
         pte_set_base(pte, (phys_addr_t)pt);
     }
 
+}
+
+static fernos_error_t init_kernel_pd(void) {
+    _init_pd(kernel_pd);
     return FOS_SUCCESS;
 }
 
@@ -154,13 +162,13 @@ static fernos_error_t init_free_page_area(void) {
     // Each page points to the next!
     for (phys_addr_t p = FREE_PAGE_AREA_START; p < FREE_PAGE_AREA_END; p += M_4K) {
         *(phys_addr_t *)p = p + M_4K;
-        num_free_pages++;
     }
 
     // Last page always points to NULL.
     *(phys_addr_t *)(FREE_PAGE_AREA_END - M_4K) = NULL_PHYS_ADDR;
 
     next_free_page = FREE_PAGE_AREA_START;
+    num_free_pages = (FREE_PAGE_AREA_END - FREE_PAGE_AREA_START) / M_4K;
 
     return FOS_SUCCESS;
 }
@@ -295,7 +303,7 @@ fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **tru
     // Should we start with some begginning moves??
     
     uint32_t loaded_pdi = 1024;
-    pt_entry_t *page_table = NULL_PTR;
+    pt_entry_t *page_table = NULL;
 
     const uint32_t pi_start = (uint32_t)start / M_4K;
     const uint32_t pi_end = (uint32_t)end / M_4K;
@@ -400,7 +408,7 @@ fernos_error_t free_pages(phys_addr_t pd, void *start, void *end) {
     pt_entry_t *page_dir = (pt_entry_t *)(tmp_free_pages[0]);
 
     uint32_t loaded_pdi = 1024;
-    pt_entry_t *page_table = NULL_PTR;
+    pt_entry_t *page_table = NULL;
 
     const uint32_t pi_start = (uint32_t)start / M_4K;
     const uint32_t pi_end = (uint32_t)end / M_4K;

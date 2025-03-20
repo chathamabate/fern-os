@@ -22,6 +22,14 @@
 #define FREE_PAGE_AREA_START (IDENTITY_AREA_SIZE)
 #define FREE_PAGE_AREA_END (0xC0000000)
 
+/*
+ * NOTE: There will be a page directory stored in static memory which must always be loaded when
+ * the kernel thread is running! 
+ *
+ * `init_paging` sets up the kernel page directory and loads it as the directory to use
+ * when paging is first enabled!
+ */
+
 /**
  * Initialize all structures required for paging, and enable paging.
  *
@@ -43,6 +51,20 @@ fernos_error_t push_free_page(phys_addr_t page_addr);
  * An error is returned if there are no free pages left, or page_addr is NULL.
  */
 fernos_error_t pop_free_page(phys_addr_t *page_addr);
+
+/**
+ * Create a new default page directory and store it's physical address at pd_addr.
+ *
+ * NOTE: This is just a directory where all identity page tables are mapped, and all other page
+ * entries are marked non-present.
+ */
+fernos_error_t new_page_directory(phys_addr_t *pd_addr);
+
+/**
+ * Take the physical address of a page directory and clean up all of it's pages, page tables, and
+ * finally, the page directory it self!
+ */
+fernos_error_t delete_page_directory(phys_addr_t pd_addr);
 
 /**
  * This will attempt to allocate pages from start to end in the given page directory.
