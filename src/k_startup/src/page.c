@@ -115,8 +115,7 @@ static fernos_error_t init_identity_pts(void) {
 static void _init_pd(pt_entry_t *pd) {
     // Set all as non present to start.
     for (uint32_t pdei = 0; pdei < 1024; pdei++) {
-        pt_entry_t *pte = &(pd[pdei]);
-        *pte = not_present_pt_entry();
+        pd[pdei] = not_present_pt_entry();
     }
 
     // Add all identity pages to the directory.
@@ -283,41 +282,111 @@ fernos_error_t new_page_table(phys_addr_t *pt_addr) {
         return FOS_BAD_ARGS;
     }
 
-    phys_addr_t pt;
-
     fernos_error_t err = FOS_SUCCESS;
+    phys_addr_t pt = NULL_PHYS_ADDR;
+    phys_addr_t old_tmp_page = NULL_PHYS_ADDR;
 
     if (err == FOS_SUCCESS) {
         err = pop_free_page(&pt);
     }
 
     if (err == FOS_SUCCESS) {
-        err = assign_tmp_page(ti, pt);
+        err = assign_tmp_page(0, pt, &old_tmp_page);
     }
 
     if (err == FOS_SUCCESS) {
-        pt_entry_t *ptes = (pt_entry_t *)(tmp_free_pages[ti]);
+        pt_entry_t *ptes = (pt_entry_t *)(tmp_free_pages[0]);
         for (uint32_t i = 0; i < 1024; i++) {
             ptes[i] = not_present_pt_entry(); 
         }
     }
 
-    (void)clear_tmp_page(ti);
+    if (err == FOS_SUCCESS) {
+        err = assign_tmp_page(0, old_tmp_page, NULL);
+    }
 
-    *pt_addr = err == FOS_SUCCESS ? pt : NULL_PHYS_ADDR;
+    if (err == FOS_SUCCESS) {
+        *pt_addr = pt;
+    } else {
+        // On error, return our page table page back to free list if necessary.
+        *pt_addr = NULL_PHYS_ADDR;
+        if (pt != NULL_PHYS_ADDR) {
+            (void)push_free_page(pt);
+        }
+    }
 
     return err;
 }
 
 fernos_error_t delete_page_table(phys_addr_t pt_addr) {
+    if (pt_addr < IDENTITY_AREA_SIZE) {
+        return FOS_IDENTITY_OVERWRITE;
+    }
+
+    phys_addr_t old_tmp_page = NULL_PHYS_ADDR;
+
+    PROP_ERR(assign_tmp_page(0, pt_addr, &old_tmp_page));
+    pt_entry_t *ptes = (pt_entry_t *)(tmp_free_pages[0]);
+
+    for (uint32_t pti = 0; pti < 1024; pti++) {
+        pt_entry_t pte = ptes[pti];
+
+        if (pte_get_present(pte) && pte_get_avail(pte) == UNIQUE_ENTRY) {
+            PROP_ERR(push_free_page(pte_get_base(pte)));
+        }
+    }
+
+    PROP_ERR(assign_tmp_page(0, old_tmp_page, NULL));
+
+    // Finally, delete the page table itself!    
+
+    PROP_ERR(push_free_page(pt_addr));
+
     return FOS_SUCCESS;
 }
 
 fernos_error_t new_page_directory(phys_addr_t *pd_addr) {
-    return FOS_SUCCESS;
+    if (!pd_addr) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err = FOS_SUCCESS;
+    phys_addr_t old_tmp_page = NULL_PHYS_ADDR;
+    phys_addr_t new_pd_addr = NULL_PHYS_ADDR;
+    
+    if (err == FOS_SUCCESS) {
+        err = pop_free_page(&new_pd_addr); 
+    }
+
+    if (err == FOS_SUCCESS) {
+        err = assign_tmp_page(0, new_pd_addr, &old_tmp_page);
+    }
+
+    if (err == FOS_SUCCESS) {
+        _init_pd((pt_entry_t *)(tmp_free_pages[0]));
+        err = assign_tmp_page(0, old_tmp_page, NULL);
+    }
+
+    if (err == FOS_SUCCESS) {
+        *pd_addr = new_pd_addr; 
+    } else {
+        *pd_addr = NULL_PHYS_ADDR;
+        if (new_pd_addr != NULL_PHYS_ADDR) {
+            (void)push_free_page(new_pd_addr);
+        }
+    }
+
+    return err;
 }
 
 fernos_error_t delete_page_directory(phys_addr_t pd_addr) {
+    if (pd_addr < IDENTITY_AREA_SIZE) {
+        return FOS_IDENTITY_OVERWRITE;
+    }
+
+
+    // Hmmmmm...
+    // Ok, this is when things get tricky imo..
     return FOS_SUCCESS;
 }
 
