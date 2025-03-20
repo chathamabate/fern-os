@@ -28,6 +28,11 @@ typedef uint16_t fernos_error_t;
  */
 #define FOS_NO_MEM      (5)
 
+/**
+ * We attempted to allocate an area which already was in use.
+ */
+#define FOS_ALREADY_ALLOCATED (6)
+
 
 
 

@@ -47,13 +47,15 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr);
 /**
  * This will attempt to allocate pages from start to end in the given page directory.
  *
- * If all arguments are valid, an error will only be returned if we run out of memory mid 
- * allocation. If so, pages which were allocated will not be freed. The "true_end" field will hold
- * the highest virtual address in the given range which was not allocated.
- *
+ * The last page which was not allocated will be stored in `true_end`
  * If true_end = end, the allocation was entirely successful!
  *
- * FOS_NO_MEM means some or none of the pages were allocated.
+ * FOS_NO_MEM means memory was exhausted somehow while performing the allocation.
+ * FOS_ALREADY_ALLOCATED means at some point in the given range there already existed an 
+ * allocated range.
+ *
+ * In case of an error, pages which were allocated will NOT be freed. Use `true_end` to determine
+ * how much of the range was successfully allocated.
  */
 fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **true_end);
 

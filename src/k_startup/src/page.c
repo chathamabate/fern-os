@@ -180,6 +180,8 @@ fernos_error_t init_paging(void) {
 
 /**
  * This function maps a static free page to the physical page, page.
+ *
+ * NOTE: This can be a page anywhere, (even in the identity area)
  */
 static fernos_error_t assign_free_page(uint32_t ti, phys_addr_t page) {
     if (ti >= NUM_TMP_FREE_PAGES) {
@@ -187,9 +189,6 @@ static fernos_error_t assign_free_page(uint32_t ti, phys_addr_t page) {
     }
 
     CHECK_ALIGN(page, M_4K);
-    if (page < IDENTITY_AREA_SIZE) {
-        return FOS_BAD_ARGS;
-    }
 
     pt_entry_t *ptes = (pt_entry_t *)identity_pts;
     const uint32_t free_page_ptei = (uint32_t)(tmp_free_pages[ti]) / M_4K;  
@@ -226,6 +225,11 @@ static fernos_error_t clear_free_page(uint32_t ti) {
 
 fernos_error_t push_free_page(phys_addr_t page_addr) {
     fernos_error_t err;
+
+    // An identity area page can never be pushed onto the free list.
+    if (page_addr < IDENTITY_AREA_SIZE) {
+        return FOS_BAD_ARGS;
+    }
 
     // If assign/clear ever fail, there is something very wrong with my kernel code.
 
@@ -273,29 +277,112 @@ fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **tru
         return FOS_BAD_ARGS;
     }
 
+    *true_end = start;
+
     if (start == end) {
-        *true_end = end;
         return FOS_SUCCESS;
     }
 
     if ((uint32_t)end < (uint32_t)start) {
+        *true_end = NULL_PHYS_ADDR;
         return FOS_INVALID_RANGE;
     }
 
-    // Ok, now for the real work!
-    //
-    // First load the page directory, this will always be loaded.
-    // Then load each page table one at a time... Potentially allocating page tables as needed.
-
-    fernos_error_t err = FOS_SUCCESS;
-
-    if (err == FOS_SUCCESS) {
-        
+    if ((uint32_t)start < IDENTITY_AREA_SIZE) {
+        return FOS_BAD_ARGS;
     }
 
+    fernos_error_t err;
+
+    // Always start by loading the page directory into temp page 0.
+    PROP_ERR(assign_free_page(0, pd), err);
+    pt_entry_t *page_dir = (pt_entry_t *)(tmp_free_pages[0]);
+
+    // Should we start with some begginning moves??
+    
+    uint32_t loaded_pdi = 1024;
+
+    const uint32_t pi_start = (uint32_t)start / M_4K;
+    const uint32_t pi_end = (uint32_t)end / M_4K;
+
+    uint32_t pi;
+
+    for (pi = pi_start; pi < pi_end; pi++) {
+        // This should be converted to a pretty fast bit shift tbh.
+        uint32_t pdi = pi / 1024;
+
+        // Must we switch to a new page table?
+        if (pdi != loaded_pdi) {
+            pt_entry_t *pde = &(page_dir[pdi]);
+            
+            // Is there a page table allocated for this slot yet??
+            if (!pte_get_present(*pde)) {
+                phys_addr_t pt;
+
+                err = pop_free_page(&pt);
+                if (err != FOS_SUCCESS) {
+                    break;
+                }
+
+                *pde = not_present_pt_entry();
+                pte_set_present(pde, 1);
+                pte_set_user(pde, 0);
+                pte_set_writable(pde, 1);
+                pte_set_base(pde, pt);
+
+                // I don't think wee need to flush the TLB here because while we did modify a page
+                // table, this page table is not necessary being used by the kernel's page 
+                // directory.
+            }
+
+            // When we actually put the page table into the kernel's temp pages, this is when
+            // we flush the page cache. (which is done by assign free page)
+            err = assign_free_page(1, pte_get_base(*pde));
+            if (err != FOS_SUCCESS) {
+               break;
+            }
+
+            loaded_pdi = pdi;
+        }
+
+        // Also should be a quick mask.
+        uint32_t pti = pi % 1024;
+        pt_entry_t *page_table = (pt_entry_t *)(tmp_free_pages[1]);
+        pt_entry_t *pte = &(page_table[pti]);
+
+        if (pte_get_present(*pte)) {
+            err = FOS_ALREADY_ALLOCATED;
+            break;
+        }
+
+        // FINALLY ALLOCATE OUR PAGE!!!
+
+        phys_addr_t p;
+        err = pop_free_page(&p);
+        if (err != FOS_SUCCESS) {{
+            break;
+        }
+
+        *pte = not_present_pt_entry();
+
+        pte_set_base(pte, p);
+        pte_set_present(pte, 1);
+        pte_set_user(pte, 0);
+        pte_set_writable(pte, 1);
+    }
+
+    // Try to clear both temporary free pages, don't worry if there was an error.
+    (void)clear_free_page(1);
+    (void)clear_free_page(0);
+
+    // Finally tell the user how far we got!
+
+    *true_end = (void *)(pi * M_4K);
+    
     return err;
 }
 
 fernos_error_t free_pages(phys_addr_t pd, void *start, void *end) {
+    // This is going to be a pretty similair function tbh.
     return FOS_SUCCESS;
 }
