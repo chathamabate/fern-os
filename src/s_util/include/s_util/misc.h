@@ -13,8 +13,10 @@
 // Converts a number n to a 64-bit constant with n 1 lsbs
 #define TO_MASK64(wid) ((1LL << wid) - 1)
 
+#define IS_ALIGNED(val, align) (((val) & ((align) - 1)) == 0)
+
 #define CHECK_ALIGN(val, align) \
-    if ((val) & (align - 1)) { \
+    if (!IS_ALIGNED(val, align)) { \
         return FOS_ALIGN_ERROR; \
     }
 

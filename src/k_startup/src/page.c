@@ -173,59 +173,74 @@ fernos_error_t init_paging(void) {
 /**
  * This function maps a static free page to the physical page, page.
  *
+ * If old is given, the old physical address mapped at ti will be put into old.
+ *
+ * If page is the NULL_PHYS_ADDR, the page tmp page will set as not present in the kernel pts.
+ *
  * NOTE: This can be a page anywhere, (even in the identity area)
  */
-static fernos_error_t assign_tmp_page(uint32_t ti, phys_addr_t page) {
-    if (ti >= NUM_TMP_FREE_PAGES) {
-        return FOS_BAD_ARGS;
+static fernos_error_t assign_tmp_page(uint32_t ti, phys_addr_t page, phys_addr_t *old) {
+    fernos_error_t err = FOS_SUCCESS;
+    phys_addr_t old_page = NULL_PHYS_ADDR;
+
+    if (err == FOS_SUCCESS && ti >= NUM_TMP_FREE_PAGES) {
+        err = FOS_BAD_ARGS;
     }
 
-    CHECK_ALIGN(page, M_4K);
+    if (err == FOS_SUCCESS && !IS_ALIGNED(page, M_4K)) {
+        err = FOS_ALIGN_ERROR;
+    }
 
-    pt_entry_t *ptes = (pt_entry_t *)identity_pts;
-    const uint32_t free_page_ptei = (uint32_t)(tmp_free_pages[ti]) / M_4K;  
+    if (err == FOS_SUCCESS) {
+        pt_entry_t *ptes = (pt_entry_t *)identity_pts;
+        const uint32_t tmp_page_ptei = (uint32_t)(tmp_free_pages[ti]) / M_4K;  
+        pt_entry_t *pte = &(ptes[tmp_page_ptei]); 
 
-    ptes[free_page_ptei] = fos_shared_pt_entry(page);
+        if (pte_get_present(*pte)) {
+            old_page = pte_get_base(*pte);
+        }
 
-    flush_page_cache();
+        if (page == NULL_PHYS_ADDR) {
+            pte_set_present(pte, 0);
+        } else {
+            *pte = fos_shared_pt_entry(page); 
+        }
+    }
 
-    return FOS_SUCCESS;
+    if (old) {
+        *old = old_page;
+    }
+
+    return err;
 }
 
 /**
  * Set the static free page's PTE as not present.
+ * 
+ * If old is given, 
  */
-static fernos_error_t clear_tmp_page(uint32_t ti) {
-    if (ti >= NUM_TMP_FREE_PAGES) {
-        return FOS_BAD_ARGS;
-    }
-
-    pt_entry_t *ptes = (pt_entry_t *)identity_pts;
-    const uint32_t free_page_ptei = (uint32_t)(tmp_free_pages[ti]) / M_4K;  
-    pt_entry_t *free_page_pte = &(ptes[free_page_ptei]);
-
-    pte_set_present(free_page_pte, 0);
-
-    flush_page_cache();
-
-    return FOS_SUCCESS;
+static fernos_error_t clear_tmp_page(uint32_t ti, phys_addr_t *old) {
+    return assign_tmp_page(ti, NULL_PHYS_ADDR, old);
 }
 
 fernos_error_t push_free_page(phys_addr_t page_addr) {
     // An identity area page can never be pushed onto the free list.
     if (page_addr < IDENTITY_AREA_SIZE) {
-        return FOS_BAD_ARGS;
+        return FOS_IDENTITY_OVERWRITE;
     }
 
-    // If assign/clear ever fail, there is something very wrong with my kernel code.
+    // Ok now what, I think we always use ti 0.
+    phys_addr_t old_tmp_page = NULL_PHYS_ADDR;
 
-    PROP_ERR(assign_tmp_page(0, page_addr));
+    PROP_ERR(assign_tmp_page(0, page_addr, &old_tmp_page));
+
+    // We can push!
     *(phys_addr_t *)(tmp_free_pages[0]) = next_free_page;
-    PROP_ERR(clear_tmp_page(0));
 
-    // Set this new free page as the head of the free list.
     next_free_page = page_addr;
     num_free_pages++;
+
+    PROP_ERR(assign_tmp_page(0, old_tmp_page, NULL));
 
     return FOS_SUCCESS;
 }
@@ -235,27 +250,35 @@ fernos_error_t pop_free_page(phys_addr_t *page_addr) {
         return FOS_BAD_ARGS;
     }
 
-    if (next_free_page == NULL_PHYS_ADDR) {
-        *page_addr = NULL_PHYS_ADDR;
-        return FOS_NO_MEM;
-    }  
+    fernos_error_t err = FOS_SUCCESS;
+    phys_addr_t old_tmp_page = NULL_PHYS_ADDR;
+    phys_addr_t popped_free_page = NULL_PHYS_ADDR;
 
-    phys_addr_t old_free_page = next_free_page;
+    if (err == FOS_SUCCESS && next_free_page == NULL_PHYS_ADDR) {
+        err = FOS_NO_MEM; 
+    }
 
-    PROP_ERR(assign_tmp_page(0, next_free_page));
-    next_free_page = *(phys_addr_t *)(tmp_free_pages[0]);
-    PROP_ERR(clear_tmp_page(0));
+    if (err == FOS_SUCCESS) {
+        err = assign_tmp_page(0, popped_free_page, &old_tmp_page);
+    }
 
-    *page_addr = old_free_page;
-    num_free_pages--;
+    if (err == FOS_SUCCESS) {
+        // Here we successfully did the pop!
 
-    return FOS_SUCCESS;
+        popped_free_page = next_free_page;
+
+        next_free_page = *(phys_addr_t *)(tmp_free_pages[0]);
+        num_free_pages--;
+
+
+        err = assign_tmp_page(0, old_tmp_page, NULL);
+    }
+
+    *page_addr = popped_free_page; 
+    return err;
 }
 
-/**
- * Use a specified temp page while creating a page table.
- */
-static fernos_error_t _new_page_table(uint32_t ti, phys_addr_t *pt_addr) {
+fernos_error_t new_page_table(phys_addr_t *pt_addr) {
     if (!pt_addr) {
         return FOS_BAD_ARGS;
     }
@@ -284,10 +307,6 @@ static fernos_error_t _new_page_table(uint32_t ti, phys_addr_t *pt_addr) {
     *pt_addr = err == FOS_SUCCESS ? pt : NULL_PHYS_ADDR;
 
     return err;
-}
-
-fernos_error_t new_page_table(phys_addr_t *pt_addr) {
-    return _new_page_table(0, pt_addr);
 }
 
 fernos_error_t delete_page_table(phys_addr_t pt_addr) {

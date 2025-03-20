@@ -33,6 +33,11 @@ typedef uint16_t fernos_error_t;
  */
 #define FOS_ALREADY_ALLOCATED (6)
 
+/**
+ * You tried to allocate/deallocate pages in the identity area.
+ */
+#define FOS_IDENTITY_OVERWRITE (7)
+
 
 
 
