@@ -1,7 +1,7 @@
 
-#include "term/term_sys_helpers.h"
+#include "k_bios_term/term.h"
+#include "k_bios_term/term_sys_helpers.h"
 #include "k_sys/page.h"
-#include "term/term.h"
 #include "s_util/ansii.h"
 #include "s_util/str.h"
 #include <stdint.h>
@@ -202,7 +202,7 @@ void term_put_pte(pt_entry_t pte) {
     str_fmt(buf, "0x%2X", avail);
     term_put_pair("Avail", buf);
 
-    void *base = pte_get_base(pte);
+    phys_addr_t base = pte_get_base(pte);
     str_fmt(buf, "0x%8X", base);
     term_put_pair("Base", buf);
 }

@@ -3,6 +3,8 @@
 
 #include "s_util/err.h"
 
+#define NULL ((void *)0)
+
 #define M_4K       (0x1000)
 #define M_64K     (0x10000)
 #define M_1M     (0x100000)

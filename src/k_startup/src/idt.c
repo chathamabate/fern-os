@@ -5,6 +5,7 @@
 #include "k_sys/intr.h"
 #include "s_util/err.h"
 #include "k_sys/debug.h"
+#include "k_bios_term/term.h"
 
 seg_desc_t idt[NUM_IDT_ENTRIES] __attribute__ ((aligned(8)));
 

@@ -1,9 +1,19 @@
 
-#include "term/term.h"
+#include "k_bios_term/term.h"
 #include "k_sys/io.h"
 #include "s_util/ansii.h"
 #include "s_util/err.h"
 #include "s_util/str.h"
+
+void out_bios_vga(uint8_t style, const char *str) {
+    uint32_t i = 0;
+    char c;
+
+    while ((c = str[i]) != '\0') {
+       TERMINAL_BUFFER[i] = vga_entry(c, style); 
+       i++; 
+    }
+}
 
 static void disable_bios_cursor(void) {
     outb(0x3D4, 0x0A);

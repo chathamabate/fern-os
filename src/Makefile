@@ -11,7 +11,7 @@ THIS_FILE := $(MODS_DIR)/Makefile
 # I like to list the modules in order of dependence.
 MODS := \
 		k_startup \
-		term \
+		k_bios_term \
 		k_sys \
 		s_util 
 

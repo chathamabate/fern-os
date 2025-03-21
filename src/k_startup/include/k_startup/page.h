@@ -81,19 +81,16 @@ static inline pt_entry_t fos_shared_pt_entry(phys_addr_t base) {
 fernos_error_t init_paging(void);
 
 /**
- * An error is returned if the given page_addr is blatantly invalid.
- * (i.e. it's in the identity area)
- *
- * NOTE: If page addr is not in the identity area, it is assumed to be valid, so be careful!
+ * If the given address is blatantly invalid, it will simply be ignored.
  */
-fernos_error_t push_free_page(phys_addr_t page_addr);
+void push_free_page(phys_addr_t page_addr);
 
 /**
  * Attempt to pop a free page from the free page linked list.
  *
- * An error is returned if there are no free pages left, or page_addr is NULL.
+ * NULL_PHYS_ADDR is returned if there are no pages to pop.
  */
-fernos_error_t pop_free_page(phys_addr_t *page_addr);
+phys_addr_t pop_free_page(void);
 
 /**
  * Create a new page table, all entries will start as not present.
@@ -114,12 +111,12 @@ fernos_error_t pt_add_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e, uint32_
 /**
  * Remove pages from a page table. Pages marked UNIQUE will be added back to the free list.
  */
-fernos_error_t pt_remove_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e);
+void pt_remove_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e);
 
 /**
  * Delete a page table. 
  */
-fernos_error_t delete_page_table(phys_addr_t pt_addr);
+void delete_page_table(phys_addr_t pt_addr);
 
 
 /**
@@ -129,6 +126,25 @@ fernos_error_t delete_page_table(phys_addr_t pt_addr);
  * entries are marked non-present.
  */
 fernos_error_t new_page_directory(phys_addr_t *pd_addr);
+
+/**
+ * Add pages (and page table if necessary) to a page directory.
+ *
+ * If we run out of memory, FOS_NO_MEM is returned.
+ * If we run into an already page, FOS_ALREADY_ALLOCATED is returned.
+ *
+ * Use true_e to determine how many pages were actually allocated in case of error.
+ */
+fernos_error_t pd_add_pages(phys_addr_t pd_addr, void *s, void *e, void **true_e);
+
+/**
+ * Remove all removeable pages from s to e in the given page directory.
+ * 
+ * NOTE: For ease of implementation, this does not delete any page tables.
+ * Even if all the entries within a page table are empty, the page table will stay 
+ * allocated and referenced in the page directory.
+ */
+void pd_remove_pages(phys_addr_t pd_addr, void *s, void *e);
 
 /**
  * Take the physical address of a page directory and clean up all of it's pages, page tables, and
@@ -149,7 +165,7 @@ fernos_error_t delete_page_directory(phys_addr_t pd_addr);
  * In case of an error, pages which were allocated will NOT be freed. Use `true_end` to determine
  * how much of the range was successfully allocated.
  */
-fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **true_end);
+// fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **true_end);
 
 /**
  * This will attempt to free pages from start up until end. 
@@ -162,5 +178,5 @@ fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **tru
  *
  * Error is only returned if given arguemnts are invalid somehow.
  */
-fernos_error_t free_pages(phys_addr_t pd, void *start, void *end);
+// fernos_error_t free_pages(phys_addr_t pd, void *start, void *end);
 

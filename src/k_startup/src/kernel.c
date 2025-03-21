@@ -5,7 +5,7 @@
 #include "k_startup/gdt.h"
 #include "k_startup/idt.h"
 #include "k_startup/page.h"
-#include "term/term.h"
+#include "k_bios_term/term.h"
 
 void kernel_init(void) {
     uint8_t init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);

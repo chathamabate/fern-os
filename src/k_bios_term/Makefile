@@ -1,7 +1,7 @@
 
 
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
-MOD_NAME 	?= term
+MOD_NAME 	?= k_bios_term
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
 _SRCS 		?= term.c \
