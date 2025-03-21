@@ -81,6 +81,11 @@ static inline pt_entry_t fos_shared_pt_entry(phys_addr_t base) {
 fernos_error_t init_paging(void);
 
 /**
+ * Number of free pages left. (Useful for testing)
+ */
+uint32_t get_num_free_pages(void);
+
+/**
  * If the given address is blatantly invalid, it will simply be ignored.
  */
 void push_free_page(phys_addr_t page_addr);
@@ -149,33 +154,4 @@ void pd_remove_pages(phys_addr_t pd_addr, void *s, void *e);
  * Take the physical address of a page directory and clean up all of it's pages, page tables, and
  * finally, the page directory itself!
  */
-fernos_error_t delete_page_directory(phys_addr_t pd_addr);
-
-/**
- * This will attempt to allocate pages from start to end in the given page directory.
- *
- * The last page which was not allocated will be stored in `true_end`
- * If true_end = end, the allocation was entirely successful!
- *
- * FOS_NO_MEM means memory was exhausted somehow while performing the allocation.
- * FOS_ALREADY_ALLOCATED means at some point in the given range there already existed an 
- * allocated range.
- *
- * In case of an error, pages which were allocated will NOT be freed. Use `true_end` to determine
- * how much of the range was successfully allocated.
- */
-// fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **true_end);
-
-/**
- * This will attempt to free pages from start up until end. 
- *
- * Free pages which already exist in this range will be ignored.
- *
- * NOTE: In the current implementation, completely empty page tables are themselves left allocated.
- * So, if you deallocate a full 4MB region, the page table for that 4MB area will only contain 
- * not present entries, but it will remain allocated and in the parent page directory.
- *
- * Error is only returned if given arguemnts are invalid somehow.
- */
-// fernos_error_t free_pages(phys_addr_t pd, void *start, void *end);
-
+void delete_page_directory(phys_addr_t pd_addr);

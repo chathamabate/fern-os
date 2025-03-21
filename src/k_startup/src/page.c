@@ -168,6 +168,10 @@ fernos_error_t init_paging(void) {
     return FOS_SUCCESS;
 }
 
+uint32_t get_num_free_pages(void) {
+    return num_free_pages;
+}
+
 /**
  * This function maps a static free page to the physical page, page.
  *
@@ -281,7 +285,7 @@ fernos_error_t pt_add_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e, uint32_
         return FOS_BAD_ARGS;
     }
 
-    if (s >= 1024 || e >= 1025 || s > e) {
+    if (s > 1023 || e > 1024 || s > e) {
         return FOS_INVALID_RANGE;
     }
 
@@ -324,7 +328,7 @@ void pt_remove_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e) {
         return;
     }
 
-    if (s >= 1024 || e >= 1025 || s > e) {
+    if (s > 1023 || e > 1024 || s > e) {
         return;
     }
 
@@ -454,7 +458,7 @@ fernos_error_t pd_add_pages(phys_addr_t pd_addr, void *s, void *e, void **true_e
         // OK, because be is always greater than i. (alloc end)
         uint32_t ae = be % 1024;
         if (be == 0) {
-            ae = 1025;
+            ae = 1024;
         }
 
         uint32_t te; // (true end)
@@ -531,10 +535,10 @@ void pd_remove_pages(phys_addr_t pd_addr, void *s, void *e) {
             // We know be > i, so this is ok.
             uint32_t re = be % 1024;
             if (re == 0) {
-                re = 1025; // Because removal is exclusive
+                re = 1024; // Because removal is exclusive
             }
 
-            if (rs == 0 && re == 1025) {
+            if (rs == 0 && re == 1024) {
                 // Are we deleting the full page table??
 
                 delete_page_table(pt_addr);
@@ -554,6 +558,28 @@ void pd_remove_pages(phys_addr_t pd_addr, void *s, void *e) {
     assign_tmp_page(0, old_tmp_page);
 }
 
-fernos_error_t delete_page_directory(phys_addr_t pd_addr) {
-    return FOS_SUCCESS;
+void delete_page_directory(phys_addr_t pd_addr) {
+    if (!IS_ALIGNED(pd_addr, M_4K)) {
+        return;
+    }
+
+    if (pd_addr < IDENTITY_AREA_SIZE) {
+        return;
+    }
+
+    phys_addr_t old_temp_page = assign_tmp_page(0, pd_addr);
+    pt_entry_t *pdes = (pt_entry_t *)(tmp_free_pages[0]);
+
+    for (uint32_t i = 0; i < 1024; i++) {
+        // Basically just delete all non-shared page tables in this page directory.
+        pt_entry_t pde = pdes[i];
+        if (pte_get_present(pde) && pte_get_avail(pde) != SHARED_ENTRY) {
+            delete_page_table(pte_get_base(pde));
+        }
+    }
+
+    assign_tmp_page(0, old_temp_page);
+
+    // Finally, through this bad boy on the free list.
+    push_free_page(pd_addr);
 }
