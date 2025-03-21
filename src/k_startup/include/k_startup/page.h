@@ -139,10 +139,9 @@ fernos_error_t pd_add_pages(phys_addr_t pd_addr, void *s, void *e, void **true_e
 
 /**
  * Remove all removeable pages from s to e in the given page directory.
- * 
- * NOTE: For ease of implementation, this does not delete any page tables.
- * Even if all the entries within a page table are empty, the page table will stay 
- * allocated and referenced in the page directory.
+ *
+ * NOTE: Given addresses must ALWAYS be 4K aligned (This is the case for all functions in the 
+ * header file, but still)
  */
 void pd_remove_pages(phys_addr_t pd_addr, void *s, void *e);
 

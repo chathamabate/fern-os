@@ -315,7 +315,7 @@ fernos_error_t pt_add_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e, uint32_
 
     assign_tmp_page(0, old_tmp_page);
 
-    *true_e = e;
+    *true_e = i;
     return err;
 }
 
@@ -413,69 +413,62 @@ fernos_error_t pd_add_pages(phys_addr_t pd_addr, void *s, void *e, void **true_e
 
     fernos_error_t err = FOS_SUCCESS; 
 
-    phys_addr_t old_tmp_pages[2];
-
-    old_tmp_pages[0] = assign_tmp_page(0, pd_addr);
-    old_tmp_pages[1] = assign_tmp_page(1, NULL_PHYS_ADDR);
+    phys_addr_t old_tmp_page = assign_tmp_page(0, pd_addr);
 
     pt_entry_t *pdes = (pt_entry_t *)(tmp_free_pages[0]);
-    pt_entry_t *ptes = (pt_entry_t *)(tmp_free_pages[1]);
 
     uint32_t is = ((uint32_t)s / M_4K);
     uint32_t ie = ((uint32_t)e / M_4K);
-    uint32_t i;
 
-    // No loaded page table at first.
-    phys_addr_t loaded_pdi = 1024;
+    uint32_t i = is;
+    uint32_t be = i + (1024 - (i % 1024)); // batch end.
 
-    for (i = is; i < ie; i++) {
+    while (i < ie) {
         uint32_t pdi = i / 1024;
+        pt_entry_t *pde = &(pdes[pdi]);
 
-        // Do we have the correct page table loaded in tmp page 1?
-        if (pdi != loaded_pdi) {
-            pt_entry_t *pde = &(pdes[pdi]); 
+        if (be > ie) {
+            be = ie;
+        }
 
-            if (!pte_get_present(*pde)) {
-                phys_addr_t new_pt;
-                err = new_page_table(&new_pt);
-                if (err != FOS_SUCCESS) {
-                    break;
-                }
-
-                *pde = fos_unique_pt_entry(new_pt);
-            } 
-
-            // NOTE: I may change this later, but for now we cannot allocate
-            // into a shared page table.
-            if (pte_get_avail(*pde) == SHARED_ENTRY) {
-                err = FOS_ALREADY_ALLOCATED;
-                break;
+        if (!pte_get_present(*pde)) {
+            // If necessary, attempt to add a new page table to our pd.
+            phys_addr_t pt_addr; 
+            err = new_page_table(&pt_addr);
+            if (err != FOS_SUCCESS) {
+                break; 
             }
 
-            // Ok, finally, let's just load it up...
-            assign_tmp_page(1, pte_get_base(*pde)); 
-
-            loaded_pdi = pdi;
+            *pde = fos_unique_pt_entry(pt_addr);
         }
 
-        uint32_t pti = i % 1024;
-        pt_entry_t *pte = &(ptes[pti]);
-        if (pte_get_present(*pte)) {
-            err = FOS_ALREADY_ALLOCATED; 
-            break;
-        }
-        
-        phys_addr_t new_page = pop_free_page();
-        if (new_page == NULL_PHYS_ADDR) {
-            err = FOS_NO_MEM;
+        // We don't allow allocating into a shared page table!
+        if (pte_get_avail(*pde) == SHARED_ENTRY) {
+            err = FOS_ALREADY_ALLOCATED;
             break;
         }
 
-        *pte = fos_unique_pt_entry(new_page);
+        // Now, do the allocation! (alloc start)
+        uint32_t as = i % 1024;
+
+        // OK, because be is always greater than i. (alloc end)
+        uint32_t ae = be % 1024;
+        if (be == 0) {
+            ae = 1025;
+        }
+
+        uint32_t te; // (true end)
+        err = pt_add_pages(pte_get_base(*pde), as, ae, &te);
+        if (err != FOS_SUCCESS) {
+            i += (te - as); // Add the number of pages which were successfully added.
+            break;
+        }
+       
+        i = be;
+        be += 1024;
     }
 
-    assign_tmp_page(1, old_tmp_pages[1]);
-    assign_tmp_page(0, old_tmp_pages[0]);
+    assign_tmp_page(0, old_tmp_page);
 
     *true_e = (void *)(i * M_4K);
 
@@ -483,230 +476,84 @@ fernos_error_t pd_add_pages(phys_addr_t pd_addr, void *s, void *e, void **true_e
 }
 
 void pd_remove_pages(phys_addr_t pd_addr, void *s, void *e) {
+    if (!IS_ALIGNED(pd_addr, M_4K)) {
+        return;
+    }
 
+    if (!IS_ALIGNED((uint32_t)s, M_4K)) {
+        return;
+    }
+
+    if (!IS_ALIGNED((uint32_t)e, M_4K)) {
+        return;
+    }
+
+    if (s == e) {
+        return;
+    }
+
+    if ((uint32_t)s > (uint32_t)e) {
+        return;
+    }
+
+
+    phys_addr_t old_tmp_page = assign_tmp_page(0, pd_addr);
+    pt_entry_t *pdes = (pt_entry_t *)(tmp_free_pages[0]);
+
+    uint32_t is = (uint32_t)s / M_4K;
+    uint32_t ie = (uint32_t)e / M_4K;
+
+    uint32_t i = is;
+
+    // The idea is that we will delete in "batches".
+    // No batch being larger than 4MB.
+    //
+    // Start by setting be to the end of the first batch!
+    uint32_t be = i + (1024 - (i % 1024));
+
+    while (i < ie) {
+        uint32_t pdi = i / 1024;
+        pt_entry_t *pde = &(pdes[pdi]);
+
+        // Did we overshoot the actual end?
+        if (be > ie) {
+            be = ie;
+        }
+
+        if (pte_get_present(*pde) && pte_get_avail(*pde) != SHARED_ENTRY) {
+            phys_addr_t pt_addr = pte_get_base(*pde);
+
+            // Start of removal with in the pt.
+            uint32_t rs = i % 1024;
+
+            // end of removal within the pt (exclusive)
+
+            // We know be > i, so this is ok.
+            uint32_t re = be % 1024;
+            if (re == 0) {
+                re = 1025; // Because removal is exclusive
+            }
+
+            if (rs == 0 && re == 1025) {
+                // Are we deleting the full page table??
+
+                delete_page_table(pt_addr);
+                pte_set_present(pde, 0);
+            } else {
+                // Otherwise, just remove a set of pages!
+
+                pt_remove_pages(pt_addr, rs, re);        
+            }
+        }
+
+        // Advance to next batch.
+        i = be;
+        be += 1024;
+    }
+
+    assign_tmp_page(0, old_tmp_page);
 }
 
 fernos_error_t delete_page_directory(phys_addr_t pd_addr) {
-    /*
-    CHECK_ALIGN(pd_addr, M_4K);
-
-    if (pd_addr < IDENTITY_AREA_SIZE) {
-        return FOS_IDENTITY_OVERWRITE;
-    }
-
-    fernos_error_t err = FOS_SUCCESS;
-
-    phys_addr_t old_tmp_addr = assign_tmp_page(0, pd_addr);
-
-    pt_entry_t *pdes = (pt_entry_t *)(tmp_free_pages[0]);
-
-    for (uint32_t i = 0; i < 1024; i++) {
-        pt_entry_t pde = pdes[i];
-        if (pte_get_present(pde) && pte_get_avail(pde) == UNIQUE_ENTRY) {
-            err = delete_page_table(pte_get_base(pde));
-            if (err != FOS_SUCCESS) {
-                break;
-            }
-        }
-    }
-
-    assign_tmp_page(0, old_tmp_addr);
-
-    if (err == FOS_SUCCESS) {
-        err = push_free_page(pd_addr);
-    }
-
-    return err;
-    */
     return FOS_SUCCESS;
 }
-
-// TODO REWRITE THESE BELOW!
-
-/*
-fernos_error_t allocate_pages(phys_addr_t pd, void *start, void *end, void **true_end) {
-    CHECK_ALIGN(pd, M_4K);
-    CHECK_ALIGN((phys_addr_t)start, M_4K);
-    CHECK_ALIGN((phys_addr_t)end, M_4K);
-
-    if (!true_end) {
-        return FOS_BAD_ARGS;
-    }
-
-    *true_end = start;
-
-    if (start == end) {
-        return FOS_SUCCESS;
-    }
-
-    if ((uint32_t)end < (uint32_t)start) {
-        *true_end = NULL_PHYS_ADDR;
-        return FOS_INVALID_RANGE;
-    }
-
-    if ((uint32_t)start < IDENTITY_AREA_SIZE) {
-        return FOS_BAD_ARGS;
-    }
-
-    fernos_error_t err = FOS_SUCCESS;
-
-    // Always start by loading the page directory into temp page 0.
-    PROP_ERR(assign_tmp_page(0, pd));
-    pt_entry_t *page_dir = (pt_entry_t *)(tmp_free_pages[0]);
-
-    // Should we start with some begginning moves??
-    
-    uint32_t loaded_pdi = 1024;
-    pt_entry_t *page_table = NULL;
-
-    const uint32_t pi_start = (uint32_t)start / M_4K;
-    const uint32_t pi_end = (uint32_t)end / M_4K;
-
-    uint32_t pi;
-
-    for (pi = pi_start; pi < pi_end; pi++) {
-        // This should be converted to a pretty fast bit shift tbh.
-        uint32_t pdi = pi / 1024;
-
-        // Must we switch to a new page table?
-        if (pdi != loaded_pdi) {
-            pt_entry_t *pde = &(page_dir[pdi]);
-            
-            // Is there a page table allocated for this slot yet??
-            if (!pte_get_present(*pde)) {
-                phys_addr_t pt;
-
-                err = pop_free_page(&pt);
-                if (err != FOS_SUCCESS) {
-                    break;
-                }
-
-                *pde = not_present_pt_entry();
-                pte_set_present(pde, 1);
-                pte_set_user(pde, 0);
-                pte_set_writable(pde, 1);
-                pte_set_base(pde, pt);
-
-                // I don't think wee need to flush the TLB here because while we did modify a page
-                // table, this page table is not necessary being used by the kernel's page 
-                // directory.
-            }
-
-            // When we actually put the page table into the kernel's temp pages, this is when
-            // we flush the page cache. (which is done by assign free page)
-            err = assign_tmp_page(1, pte_get_base(*pde));
-            if (err != FOS_SUCCESS) {
-               break;
-            }
-
-            loaded_pdi = pdi;
-            page_table = (pt_entry_t *)(tmp_free_pages[1]);
-        }
-
-        // Also should be a quick mask.
-        uint32_t pti = pi % 1024;
-        pt_entry_t *pte = &(page_table[pti]);
-
-        if (pte_get_present(*pte)) {
-            err = FOS_ALREADY_ALLOCATED;
-            break;
-        }
-
-        // FINALLY ALLOCATE OUR PAGE!!!
-
-        phys_addr_t p;
-        err = pop_free_page(&p);
-        if (err != FOS_SUCCESS) {
-            break;
-        }
-
-        *pte = not_present_pt_entry();
-
-        pte_set_base(pte, p);
-        pte_set_present(pte, 1);
-        pte_set_user(pte, 0);
-        pte_set_writable(pte, 1);
-    }
-
-    // Try to clear both temporary free pages, don't worry if there was an error.
-    (void)clear_tmp_page(1);
-    (void)clear_tmp_page(0);
-
-    // Finally tell the user how far we got!
-
-    *true_end = (void *)(pi * M_4K);
-    
-    return err;
-}
-
-fernos_error_t free_pages(phys_addr_t pd, void *start, void *end) {
-    CHECK_ALIGN(pd, M_4K);
-    CHECK_ALIGN((phys_addr_t)start, M_4K);
-    CHECK_ALIGN((phys_addr_t)end, M_4K);
-
-    if (start == end) {
-        return FOS_SUCCESS;
-    }
-
-    if ((uint32_t)end < (uint32_t)start) {
-        return FOS_INVALID_RANGE;
-    }
-
-    if ((uint32_t)start < IDENTITY_AREA_SIZE) {
-        return FOS_BAD_ARGS;
-    }
-
-    fernos_error_t err = FOS_SUCCESS;
-
-    PROP_ERR(assign_tmp_page(0, pd));
-    pt_entry_t *page_dir = (pt_entry_t *)(tmp_free_pages[0]);
-
-    uint32_t loaded_pdi = 1024;
-    pt_entry_t *page_table = NULL;
-
-    const uint32_t pi_start = (uint32_t)start / M_4K;
-    const uint32_t pi_end = (uint32_t)end / M_4K;
-
-    for (uint32_t pi = pi_start; pi < pi_end; pi++) {
-
-        uint32_t pdi = pi / 1024;
-        if (pdi != loaded_pdi) {
-            pt_entry_t *pde = &(page_dir[pdi]);
-
-            // If not present, sweet, just skip ahead.
-            if (!pte_get_present(*pde)) {
-                pi += (1024 - 1); 
-                continue;
-            }
-
-            // Otherwise, let's load it into temp page 1.
-            err = assign_tmp_page(1, pte_get_base(*pde));
-            if (err != FOS_SUCCESS) {
-                break;
-            }  
-
-            loaded_pdi = pdi;
-            page_table = (pt_entry_t *)(tmp_free_pages[1]);
-        }
-
-        uint32_t pti = pi % 1024;
-        pt_entry_t *pte = &(page_table[pti]);
-
-        // Only free our page if needed!
-        if (pte_get_present(*pte)) {
-            phys_addr_t p = pte_get_base(*pte);
-            err = push_free_page(p);
-            if (err != FOS_SUCCESS) {
-                break;
-            }
-
-            pte_set_present(pte, 0);
-        }
-    }
-
-    (void)clear_tmp_page(1);
-    (void)clear_tmp_page(0);
-
-    return err;
-}
-*/
