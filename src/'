@@ -71,8 +71,7 @@ SECTIONS
      *
      * When a user thread is running, it will have a shared data area and a user data area.
      *
-     * The user data which is initially loaded will be what is used for the first task.
-     * After that, data will be copied using forks.
+     * The user code data which is initially loaded will be what is used for the first task.
      */
 
     /* Shared Sections */

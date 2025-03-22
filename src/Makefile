@@ -18,30 +18,54 @@ MODS := \
 # Static memory layout header and linker generation:
 
 $(INCLUDE_DIR):
-	mdkir -p $@
+	mkdir -p $@
 
-# Some constant for memory layout generation. 
-# NOTE: THESE MUST BE 4M ALIGNED!
-#
-# For reference: 4M = 0x40_0000 
-#
-# The "Identity Area" will always start at 0x0 and go to Identity area end (Exclusively)
+####################################################################################################
 
-# These definitions will be pasted into .ld and .h files, hence the math expressions.
+# Layout Header and LD script generation.
+
+# On startup FernOS will have 4 Linker Script specified areas.
+# Each area must have an offset and size which are both multiples of 4MB.
+
 4MB := 0x400000
-IDENTITY_AREA_FERNOS_OFFSET := ($(4MB))
-IDENTITY_AREA_SIZE   := (4 * $(4MB))
+
+PREFACE_OFFSET := 0
+PREFACE_SIZE := 1
+
+# RO includes all RO data and Text.
+RO_OFFSET := 1
+RO_SIZE	  := 1
+
+SHARED_DATA_OFFSET := 2
+SHARED_DATA_SIZE   := 1
+
+KERNEL_DATA_OFFSET := 3
+KERNEL_DATA_SIZE   := 1
+
+USER_DATA_OFFSET := 4
+USER_DATA_SIZE   := 1
+
+SECT_DEFS := PREFACE_OFFSET PREFACE_SIZE \
+		  RO_OFFSET RO_SIZE \
+		  SHARED_DATA_OFFSET SHARED_DATA_SIZE \
+		  KERNEL_DATA_OFFSET KERNEL_DATA_SIZE \
+		  USER_DATA_OFFSET USER_DATA_SIZE 
+
+C_MACRO_GEN = echo "\#define $1 ($($1) * $(4MB))" >> $@;
+LD_DEF_GEN = echo "$1 = ($($1) * $(4MB));" >> $@;
+
 
 OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
 $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
 	echo "#pragma once" > $@
-	echo "#define IDENTITY_AREA_FERNOS_OFFSET $(IDENTITY_AREA_FERNOS_OFFSET)" >> $@
-	echo "#define IDENTITY_AREA_SIZE $(IDENTITY_AREA_SIZE)" >> $@
+	$(foreach def,$(SECT_DEFS),$(call C_MACRO_GEN,$(def)))
 
 OS_DEFS_LD := $(INSTALL_DIR)/os_defs.ld
 $(OS_DEFS_LD): $(THIS_FILE)
-	echo "IDENTITY_AREA_FERNOS_OFFSET = $(IDENTITY_AREA_FERNOS_OFFSET);" > $@
-	echo "IDENTITY_AREA_SIZE = $(IDENTITY_AREA_SIZE);" >> $@
+	$(foreach def,$(SECT_DEFS),$(call LD_DEF_GEN,$(def)))
+
+a: $(OS_DEFS_LD)
+####################################################################################################
 
 # Install Headers
 
