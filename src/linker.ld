@@ -71,46 +71,98 @@ SECTIONS
         _rodata_end = .;
     } > fernos_area
 
-    /* 
-     * Basically, everything in the fernos_area should be readonly except for 
-     * .data, .bss, COMMON, and .kernel_stack
+    /*
+     * Ok, I am going to separate, the kernel data and bss from the user data/bss.
+     * The idea here being that when I implement task forking, I can easily remove access to
+     * kernel data from the user task. Additionally, I can give all user tasks there own copy of
+     * the data/bss easily.
      */
 
-    .data : {
+    .data.kernel : {
         . = ALIGN(4K);
+        _data_kernel_start = .;
+        libk_*.a:*.o(.data)
 
-        _data_start = .;
-        *(.data)
         . = ALIGN(4K);
-        _data_end = .;
+        _data_kernel_end = .;
     } > fernos_area
 
-    COMMON : {
+    COMMON.kernel : {
         . = ALIGN(4K);
-
-        _common_start = .;
-        *(COMMON)
+        _COMMON_kernel_start = .;
+        libk_*.a:*.o(.COMMON)
 
         . = ALIGN(4K);
-        _common_end = .;
+        _COMMON_kernel_end = .;
+    }
+
+    .bss.kernel : {
+        . = ALIGN(4K);
+        _bss_kernel_start = .;
+        libk_*.a:*.o(.bss)
+
+        . = ALIGN(4K);
+        _bss_kernel_end = .;
     } > fernos_area
 
-    .bss : {
-        . = ALIGN(4K);
+    /* User sections */
 
-        _bss_start = .;
-        *(.bss)
+    .data.user : {
         . = ALIGN(4K);
-        _bss_end = .;
+        _data_user_start = .;
+        libu_*.a:*.o(.data)
+
+        . = ALIGN(4K);
+        _data_user_end = .;
     } > fernos_area
 
-    .kernel_stack : {
+    COMMON.user : {
         . = ALIGN(4K);
+        _COMMON_user_start = .;
+        libu_*.a:*.o(.COMMON)
 
-        /* This may even be allowed to just be an array tbh */
-        _kernel_stack_bottom = .;
-        . +=  KERNEL_STACK_SIZE;
         . = ALIGN(4K);
-        _kernel_stack_top = .;
+        _COMMON_user_end = .;
+    }
+
+    .bss.user : {
+        . = ALIGN(4K);
+        _bss_user_start = .;
+        libu_*.a:*.o(.bss)
+
+        . = ALIGN(4K);
+        _bss_user_end = .;
     } > fernos_area
+
+    /* Shared Sections */
+
+    .data.shared : {
+        . = ALIGN(4K);
+        _data_shared_start = .;
+        libs_*.a:*.o(.data)
+
+        . = ALIGN(4K);
+        _data_shared_end = .;
+    } > fernos_area
+
+    COMMON.shared : {
+        . = ALIGN(4K);
+        _COMMON_shared_start = .;
+        libs_*.a:*.o(.COMMON)
+
+        . = ALIGN(4K);
+        _COMMON_shared_end = .;
+    }
+
+    .bss.shared : {
+        . = ALIGN(4K);
+        _bss_shared_start = .;
+        libs_*.a:*.o(.bss)
+
+        . = ALIGN(4K);
+        _bss_shared_end = .;
+    } > fernos_area
+
+    /* Stack should not be defined in the linker script! */
+
 }
