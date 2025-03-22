@@ -53,7 +53,24 @@ static bool test_simple_page_table(void) {
     TEST_SUCCEED();
 }
 
+static bool test_complex_page_table0(void) {
+    fernos_error_t err;
+    phys_addr_t pt;
+
+    err = new_page_table(&pt);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    uint32_t e; 
+    err = pt_add_pages(pt, 0, 1, &e);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    delete_page_table(pt);
+
+    TEST_SUCCEED();
+}
+
 void test_page(void) {
     RUN_TEST(test_push_and_pop);
     RUN_TEST(test_simple_page_table);
+    RUN_TEST(test_complex_page_table0);
 }
