@@ -57,8 +57,8 @@ int kernel_main(void) {
 
     set_gd(0x1D, gd);
     */
-    //test_page();
-    test_str();
+    test_page();
+    //test_str();
 
 
     return 0;

@@ -53,6 +53,11 @@ static bool test_simple_page_table(void) {
     TEST_SUCCEED();
 }
 
+
+
+// Test basic add/remove with little real checking??
+// Might be the correct direction for now tbh...
+
 void test_page(void) {
     RUN_TEST(test_push_and_pop);
     RUN_TEST(test_simple_page_table);
