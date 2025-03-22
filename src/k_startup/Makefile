@@ -10,7 +10,7 @@ _SRCS 		?= kernel.c page.c gdt.c idt.c
 _ASMS		?= boot.s
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= test.c
+_TEST_SRCS 	?= test.c page.c
 
 -include ../mod_stub.mk
 

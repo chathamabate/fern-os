@@ -1,9 +1,16 @@
 
+#include "k_bios_term/term.h"
+
+// Allowing this for now.
+#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+
+#include "s_util/test.h"
 #include "s_util/str.h"
 #include "s_util/test/str.h"
-#include "s_util/test.h"
 
 // Pretty simple tests ngl.
+// Since making these, I have introduced numeric comparison macros,
+// too lazy to copy them in here tho.
 
 static bool test_mem_cmp(void) {
     uint8_t buf1[16] = { 1, 2, 4 };
@@ -312,19 +319,19 @@ static bool test_str_fmt(void) {
 }
 
 bool test_str(void) {
-    TEST_TRUE(test_mem_cmp());
-    TEST_TRUE(test_mem_cpy());
-    TEST_TRUE(test_str_eq());
-    TEST_TRUE(test_str_cpy());
-    TEST_TRUE(test_str_len());
-    TEST_TRUE(test_str_of_u());
-    TEST_TRUE(test_str_of_i());
-    TEST_TRUE(test_str_of_hex_pad());
-    TEST_TRUE(test_str_of_hex_no_pad());
-    TEST_TRUE(test_str_la());
-    TEST_TRUE(test_str_ra());
-    TEST_TRUE(test_str_center());
-    TEST_TRUE(test_str_fmt());
+    RUN_TEST(test_mem_cmp);
+    RUN_TEST(test_mem_cpy);
+    RUN_TEST(test_str_eq);
+    RUN_TEST(test_str_cpy);
+    RUN_TEST(test_str_len);
+    RUN_TEST(test_str_of_u);
+    RUN_TEST(test_str_of_i);
+    RUN_TEST(test_str_of_hex_pad);
+    RUN_TEST(test_str_of_hex_no_pad);
+    RUN_TEST(test_str_la);
+    RUN_TEST(test_str_ra);
+    RUN_TEST(test_str_center);
+    RUN_TEST(test_str_fmt);
 
     TEST_SUCCEED();
 }
