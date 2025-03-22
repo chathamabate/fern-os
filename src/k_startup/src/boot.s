@@ -89,11 +89,8 @@ _start:
 	preserved and the call is well defined.
 	*/
     sti
-	call kernel_main
 
-t:
-    int $0x1D
-    jmp t
+	call kernel_main
 
     call lock_up
 

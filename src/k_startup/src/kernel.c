@@ -1,6 +1,7 @@
 
 #include "k_sys/idt.h"
 #include "s_util/err.h"
+#include "s_util/test/str.h"
 #include "k_sys/debug.h"
 #include "k_startup/gdt.h"
 #include "k_startup/idt.h"
@@ -40,6 +41,7 @@ void timer_handler(void);
 void bad_handler(void);
 
 int kernel_main(void) {
+    /*
     intr_gate_desc_t timer = intr_gate_desc();
     gd_set_selector(&timer, 0x8);
     gd_set_privilege(&timer, 0x0);
@@ -53,6 +55,8 @@ int kernel_main(void) {
     igd_set_base(&gd, bad_handler);
 
     set_gd(0x1D, gd);
+    */
+    test_str();
 
 
     return 0;
