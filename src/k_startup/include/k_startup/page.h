@@ -7,6 +7,40 @@
 #include "s_util/err.h"
 #include <stdint.h>
 
+/*
+ * Here are all the section layouts as defined in the linker script.
+ *
+ * NOTE: For the end is EXCLUSIVE!
+ *
+ * The ends is os_defs are INCLUSIVE!
+ */
+
+extern const char _ro_shared_start[]; 
+extern const char _ro_shared_end[]; 
+
+extern const char _ro_kernel_start[]; 
+extern const char _ro_kernel_end[]; 
+
+extern const char _ro_user_start[]; 
+extern const char _ro_user_end[]; 
+
+extern const char _bss_shared_start[]; 
+extern const char _bss_shared_end[]; 
+extern const char _data_shared_start[]; 
+extern const char _data_shared_end[]; 
+
+extern const char _bss_kernel_start[]; 
+extern const char _bss_kernel_end[]; 
+extern const char _data_kernel_start[]; 
+extern const char _data_kernel_end[]; 
+
+extern const char _bss_user_start[]; 
+extern const char _bss_user_end[]; 
+extern const char _data_user_start[]; 
+extern const char _data_user_end[]; 
+
+// Ok, I need to redo this big time.
+
 #define NUM_IDENTITY_PTS        (IDENTITY_AREA_SIZE / M_4M)
 #define NUM_IDENTITY_PT_ENTRIES (IDENTITY_AREA_SIZE / M_4K)
 

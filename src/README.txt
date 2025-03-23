@@ -55,4 +55,8 @@ which is used by the shared libraries (i.e. the libraries useable in either kern
 Every thread will have it's own copy of the "shared data" since every thread has permission to use
 the code from the shared libraries. 
 
+Everything between the prologue and the heap is called the `static area`. This area never grows
+in size. The area containing the heap and stack is called the `dynamic area`. The prologue, epilogue
+dynamic area, and static area, must all be 4MB aligned to help with paging!
+
 (If I ever create a compiler... loaded code will need to go somewhere too...)
