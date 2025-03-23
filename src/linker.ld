@@ -21,8 +21,6 @@ INCLUDE "os_defs.ld"
  * 0x1_0000_0000 =   4 GB
  */
 
-KERNEL_STACK_SIZE = 64K;
-
 /* 
  * The beginning of the Identity area will be BIOS stuff which may still be useful during kernel setup.
  * For example, the terminal graphics buffer.

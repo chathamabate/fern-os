@@ -17,7 +17,7 @@ MODS := \
 
 # Static memory layout header and linker generation:
 
-$(INCLUDE_DIR):
+$(INCLUDE_DIR) $(INSTALL_DIR):
 	mkdir -p $@
 
 ####################################################################################################
@@ -26,32 +26,24 @@ $(INCLUDE_DIR):
 
 # On startup FernOS will have 4 Linker Script specified areas.
 # Each area must have an offset and size which are both multiples of 4MB.
+#
+# Ends are exlusive here...
 
-4MB := 0x400000
+PROLOGUE_START :=        0x0
+PROLOGUE_END   :=   0x3FFFFF
 
-PREFACE_OFFSET := 0
-PREFACE_SIZE := 1
+FERNOS_START   :=   0x400000
+FERNOS_END     := 0xBFFFFFFF   # Up to 3 GB
 
-# RO includes all RO data and Text.
-RO_OFFSET := 1
-RO_SIZE	  := 1
+EPILOGUE_START := 0xC0000000
+EPILOGUE_END   := 0xFFFFFFFF
 
-SHARED_DATA_OFFSET := 2
-SHARED_DATA_SIZE   := 1
+SECT_DEFS := PROLOGUE_START PROLOGUE_END \
+			 FERNOS_START FERNOS_END \
+			 EPILOGUE_START EPILOGUE_END 
 
-KERNEL_DATA_OFFSET := 3
-KERNEL_DATA_SIZE   := 1
-
-USER_DATA_OFFSET := 4
-USER_DATA_SIZE   := 1
-
-SECT_DEFS := PREFACE_OFFSET PREFACE_SIZE \
-		  RO_OFFSET RO_SIZE \
-		  SHARED_DATA_OFFSET SHARED_DATA_SIZE \
-		  KERNEL_DATA_OFFSET KERNEL_DATA_SIZE \
-		  USER_DATA_OFFSET USER_DATA_SIZE 
-
-C_MACRO_GEN = echo "\#define $1 ($($1) * $(4MB))" >> $@;
+C_MACRO_GEN = printf "\#define $1 (0x%X)\n" $$(($($1) * $()) >> $@;
+C_MACRO_GEN = echo "\#define $1 ($(shell printf "0x%X" $$($($1) * $(4MB))))" >> $@;
 LD_DEF_GEN = echo "$1 = ($($1) * $(4MB));" >> $@;
 
 
@@ -61,7 +53,7 @@ $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
 	$(foreach def,$(SECT_DEFS),$(call C_MACRO_GEN,$(def)))
 
 OS_DEFS_LD := $(INSTALL_DIR)/os_defs.ld
-$(OS_DEFS_LD): $(THIS_FILE)
+$(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
 	$(foreach def,$(SECT_DEFS),$(call LD_DEF_GEN,$(def)))
 
 a: $(OS_DEFS_LD)
