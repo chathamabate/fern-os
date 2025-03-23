@@ -33,7 +33,7 @@ PROLOGUE_START :=        0x0
 PROLOGUE_END   :=   0x3FFFFF
 
 FERNOS_START   :=   0x400000
-FERNOS_END     := 0xBFFFFFFF   # Up to 3 GB
+FERNOS_END     := 0xBFFFFFFF
 
 EPILOGUE_START := 0xC0000000
 EPILOGUE_END   := 0xFFFFFFFF
@@ -42,10 +42,8 @@ SECT_DEFS := PROLOGUE_START PROLOGUE_END \
 			 FERNOS_START FERNOS_END \
 			 EPILOGUE_START EPILOGUE_END 
 
-C_MACRO_GEN = printf "\#define $1 (0x%X)\n" $$(($($1) * $()) >> $@;
-C_MACRO_GEN = echo "\#define $1 ($(shell printf "0x%X" $$($($1) * $(4MB))))" >> $@;
-LD_DEF_GEN = echo "$1 = ($($1) * $(4MB));" >> $@;
-
+C_MACRO_GEN = echo "\#define $1 $($1)" >> $@;
+LD_DEF_GEN = echo "$1 = ($($1));" >> $@;
 
 OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
 $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
@@ -54,9 +52,9 @@ $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
 
 OS_DEFS_LD := $(INSTALL_DIR)/os_defs.ld
 $(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
+	rm $@; touch $@;
 	$(foreach def,$(SECT_DEFS),$(call LD_DEF_GEN,$(def)))
 
-a: $(OS_DEFS_LD)
 ####################################################################################################
 
 # Install Headers

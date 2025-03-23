@@ -64,7 +64,8 @@ _start:
 	stack (as it grows downwards on x86 systems). This is necessarily done
 	in assembly as languages such as C cannot function without a stack.
 	*/
-	movl $_kernel_stack_top, %esp
+	//movl $_kernel_stack_top, %esp
+	movl $0xB0000000, %esp
     movl %esp, %ebp
 
 	/*

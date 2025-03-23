@@ -5,7 +5,7 @@
 #include "k_sys/debug.h"
 #include "k_startup/gdt.h"
 #include "k_startup/idt.h"
-#include "k_startup/page.h"
+//#include "k_startup/page.h"
 #include "k_bios_term/term.h"
 #include "k_startup/test/page.h"
 
@@ -22,10 +22,12 @@ void kernel_init(void) {
         lock_up();
     }
 
+    /*
     if (init_paging() != FOS_SUCCESS) {
         out_bios_vga(init_err_style, "Failed to set up Paging");
         lock_up();
     }
+    */
 
     if (init_term() != FOS_SUCCESS) {
         out_bios_vga(init_err_style, "Failed to set up Terminal");
@@ -57,8 +59,10 @@ int kernel_main(void) {
 
     set_gd(0x1D, gd);
     */
-    test_page();
+    //test_page();
     //test_str();
+    //
+    term_put_s("HEllo\n");
 
 
     return 0;

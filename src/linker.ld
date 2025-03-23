@@ -31,11 +31,9 @@ MEMORY
 {
     /* Nothing goes in the preface area! These all will be 4MB aligned to help with paging. */
 
-    preface_area : ORIGIN = PREFACE_OFFSET, LENGTH = PREFACE_SIZE
-    ro_area : ORIGIN = RO_OFFSET, LENGTH = RO_SIZE
-    shared_data_area : ORIGIN = SHARED_DATA_OFFSET, LENGTH = SHARED_DATA_SIZE
-    kernel_data_area : ORIGIN = KERNEL_DATA_OFFSET, LENGTH = KERNEL_DATA_SIZE
-    user_data_area : ORIGIN = USER_DATA_OFFSET, LENGTH = USER_DATA_SIZE
+    prologue : ORIGIN = PROLOGUE_START, LENGTH = PROLOGUE_END - PROLOGUE_START + 1
+    fernos   : ORIGIN = FERNOS_START,   LENGTH = FERNOS_END - FERNOS_START + 1
+    epilogue : ORIGIN = EPILOGUE_START, LENGTH = EPILOGUE_END - EPILOGUE_START + 1
 }
 
 /* Tell where the various sections of the object files will be put in the final
@@ -54,14 +52,74 @@ SECTIONS
 	   work around this issue. This does not use that feature, so 2M was
 	   chosen as a safer option than the traditional 1M. */
 
-    .text : {
-		*(.multiboot)
-        *(.text)
-    } > ro_area
+    /*
+     * Three types of areas (shared, kernel, and user)
+     * Five parts per area (text, rodata, data, common, bss)
+     */
 
-    .rodata : {
-        *(.rodata)
-    } > ro_area
+
+    .multiboot : {
+        /* The truth is that this is not working correctly!)*/
+    } > fernos
+
+    .ro.shared : {
+        . = ALIGN(4K);
+        _ro_shared_start = .;
+		*(.multiboot)
+        libs_*.a:*.o(.text)
+        libs_*.a:*.o(.rodata)
+        . = ALIGN(4K);
+        _ro_shared_end = .;
+    } > fernos
+
+    .ro.kernel : {
+        . = ALIGN(4K);
+        _ro_kernel_start = .;
+        libk_*.a:*.o(.text)
+        libk_*.a:*.o(.rodata)
+        . = ALIGN(4K);
+        _ro_kernel_end = .;
+    } > fernos
+
+    .ro.user : {
+        . = ALIGN(4K);
+        _ro_user_start = .;
+        libu_*.a:*.o(.text)
+        libu_*.a:*.o(.rodata)
+        . = ALIGN(4K);
+        _ro_user_end = .;
+    } > fernos
+
+    .rw.shared : {
+        . = ALIGN(4K);
+        _rw_shared_start = .;
+        libs_*.a:*.o(.bss)
+        libs_*.a:*.o(COMMON)
+        libs_*.a:*.o(.data)
+        . = ALIGN(4K);
+        _rw_shared_end = .;
+    } > fernos
+
+    .rw.kernel : {
+        . = ALIGN(4K);
+        _rw_kernel_start = .;
+        libk_*.a:*.o(.bss)
+        libk_*.a:*.o(COMMON)
+        libk_*.a:*.o(.data)
+        . = ALIGN(4K);
+        _rw_kernel_end = .;
+    } > fernos
+
+    .rw.user : {
+        . = ALIGN(4K);
+        _rw_user_start = .;
+        libu_*.a:*.o(.bss)
+        libu_*.a:*.o(COMMON)
+        libu_*.a:*.o(.data)
+        . = ALIGN(4K);
+        _rw_user_end = .;
+    } > fernos
+
 
     /*
      * Other than during initialization, when the kernel thread is running, it will have a shared
@@ -74,48 +132,6 @@ SECTIONS
      */
 
     /* Shared Sections */
-
-    .data.shared : {
-        libs_*.a:*.o(.data)
-    } > shared_data_area
-
-    COMMON.shared : {
-        libs_*.a:*.o(.COMMON)
-    } > shared_data_area
-
-    .bss.shared : {
-        libs_*.a:*.o(.bss)
-    } > shared_data_area
-
-    /* Kernel Sections */
-
-    .data.kernel : {
-        libk_*.a:*.o(.data)
-    } > kernel_data_area
-
-    COMMON.kernel : {
-        libk_*.a:*.o(.COMMON)
-    } > kernel_data_area
-
-    .bss.kernel : {
-        libk_*.a:*.o(.bss)
-    } > kernel_data_area
-
-    /* User sections */
-
-    .data.user : {
-        libu_*.a:*.o(.data)
-    } > user_data_area
-
-    COMMON.user : {
-        libu_*.a:*.o(.COMMON)
-    } > user_data_area
-
-    .bss.user : {
-        libu_*.a:*.o(.bss)
-    } > user_data_area
-
-
     /* Stack should not be defined in the linker script! */
 
 }
