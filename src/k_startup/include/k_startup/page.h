@@ -10,7 +10,7 @@
 /*
  * Here are all the section layouts as defined in the linker script.
  *
- * NOTE: For the end is EXCLUSIVE!
+ * NOTE: end is EXCLUSIVE!
  *
  * The ends is os_defs are INCLUSIVE!
  */
@@ -39,35 +39,27 @@ extern const char _bss_user_end[];
 extern const char _data_user_start[]; 
 extern const char _data_user_end[]; 
 
-// Ok, I need to redo this big time.
-
-#define NUM_IDENTITY_PTS        (IDENTITY_AREA_SIZE / M_4M)
-#define NUM_IDENTITY_PT_ENTRIES (IDENTITY_AREA_SIZE / M_4K)
-
 /**
- * The area of pages which can be partitioned at runtime.
+ * These values are used in the available bits of a page table entry. NOTE: They have
+ * no meaning for entries in page directories. Other than the kernel page tables, 
+ * all page tables will be placed in arbitrary pages! (Not shared or strictly identity)
  *
- * NOTE: In QEMU, even with 4G memory, the highest Gig is reserved for other things.
- * For now, we only use the bottom 3 Gigs.
- *
- * These both must be 4K aligned!
- */
-
-#define FREE_PAGE_AREA_START (IDENTITY_AREA_SIZE)
-#define FREE_PAGE_AREA_END (0xC0000000)
-
-/**
- * These values are used in the available bits of a page table entry.
+ * An Identity Entry, is an entry which points to an identity page. This is a page
+ * who's physical and virtual addresses are equal. This page should NEVER be added
+ * to the free list, and always placed at the correct virtual address.
  *
  * A unique entry points to a page which is only refernced by this page table. If this page table
  * is deleted, the refernced page should be returned to the page free list.
- *
- * A shared entry points to a page which is referenced by other page tables. If this page table
- * is deleted, the referenced page should NOT be returned to the page free list.
  */
 
-#define UNIQUE_ENTRY (0)
-#define SHARED_ENTRY (1)
+#define IDENTITY_ENTRY (0)
+#define UNIQUE_ENTRY   (1)
+
+/**
+ * Later we may want to introduce a concept of shared memory, not now tho!
+ * (This is one page which is referenced by multiple page tables)
+ */
+// #define SHARED_ENTRY (2)
 
 static inline pt_entry_t fos_present_pt_entry(phys_addr_t base) {
     pt_entry_t pte;
@@ -83,6 +75,14 @@ static inline pt_entry_t fos_present_pt_entry(phys_addr_t base) {
     return pte;
 }
 
+static inline pt_entry_t fos_identity_pt_entry(phys_addr_t base) {
+    pt_entry_t pte = fos_present_pt_entry(base);
+
+    pte_set_avail(&pte, IDENTITY_ENTRY);
+
+    return pte;
+}
+
 static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base) {
     pt_entry_t pte = fos_present_pt_entry(base);
 
@@ -91,13 +91,6 @@ static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base) {
     return pte;
 }
 
-static inline pt_entry_t fos_shared_pt_entry(phys_addr_t base) {
-    pt_entry_t pte = fos_present_pt_entry(base);
-
-    pte_set_avail(&pte, SHARED_ENTRY);
-
-    return pte;
-}
 
 /*
  * NOTE: There will be a page directory stored in static memory which must always be loaded when

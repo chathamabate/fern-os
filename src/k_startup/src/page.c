@@ -7,6 +7,71 @@
 #include "s_util/err.h"
 #include <stdbool.h>
 
+/*
+ * NOTE: Functions starting with `_` in this file denote functions which can only be
+ * called before virtual memory is enabled.
+ */
+
+static bool paging_enabled = false;
+
+static phys_addr_t kernel_pd = NULL_PHYS_ADDR;
+
+/**
+ * This is just the range to use to set up the initial free list.
+ * After initialization, pages outside this range can be added to the free list
+ * without consequence. (Just be careful)
+ */
+#define INITIAL_FREE_AREA_START (DYNAMIC_START) 
+#define INITIAL_FREE_AREA_END  (EPILOGUE_START) // Exclusive end.
+
+static phys_addr_t free_list_head = NULL_PHYS_ADDR;
+static uint32_t free_list_len = 0;
+
+static fernos_error_t _init_free_list(void) {
+    if (paging_enabled) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    CHECK_ALIGN(INITIAL_FREE_AREA_START, M_4K);
+    CHECK_ALIGN(INITIAL_FREE_AREA_END, M_4K);
+
+    if (INITIAL_FREE_AREA_START == INITIAL_FREE_AREA_END) {
+        return FOS_SUCCESS;
+    }
+
+    if (INITIAL_FREE_AREA_END < INITIAL_FREE_AREA_START) {
+        return FOS_INVALID_RANGE;
+    }
+
+    for (phys_addr_t iter = INITIAL_FREE_AREA_START; iter < INITIAL_FREE_AREA_END; iter += M_4K) {
+        *(phys_addr_t *)iter = iter + M_4K;
+    }
+
+    // Set final link to NULL.
+    *(phys_addr_t *)(INITIAL_FREE_AREA_END - M_4K) = NULL_PHYS_ADDR;
+    
+    free_list_head = INITIAL_FREE_AREA_START;
+    free_list_len = (INITIAL_FREE_AREA_END - INITIAL_FREE_AREA_START) / M_4K;
+    
+    return FOS_SUCCESS;
+}
+
+/**
+ * Must be called after _init_free_list.
+ *
+ * Pops a free page from the free list before paging is enabled.
+ */
+static phys_addr_t _pop_free_page(void) {
+
+}
+
+static void _push_free_page(void) {
+
+}
+
+
+
+
 /**
  * These are the page tables to always use for addressing into the identity area.
  * Do not change these ever.

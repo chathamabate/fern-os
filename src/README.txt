@@ -59,4 +59,8 @@ Everything between the prologue and the heap is called the `static area`. This a
 in size. The area containing the heap and stack is called the `dynamic area`. The prologue, epilogue
 dynamic area, and static area, must all be 4MB aligned to help with paging!
 
+All RO data and code will be identity mapped, meaning there virtual and physical addresses are the
+same. Kernel data will also be identity mapped. The first copy of user data will technically be
+identity mapped. After forks though, these will be copied into arbitrary physical pages.
+
 (If I ever create a compiler... loaded code will need to go somewhere too...)
