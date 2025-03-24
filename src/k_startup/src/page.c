@@ -12,9 +12,26 @@
  * called before virtual memory is enabled.
  */
 
-static bool paging_enabled = false;
-
 static phys_addr_t kernel_pd = NULL_PHYS_ADDR;
+
+
+/**
+ * A single reserved page in the kernel to be used for page table editing.
+ *
+ * Always should be marked Identity, never should be added to the free list.
+ */
+static uint8_t free_kernel_page[M_4K] __attribute__((aligned(M_4K)));
+
+/**
+ * After paging is initialized, these structures will be used to modify what
+ * the free_kernel_page actually points to.
+ * 
+ * NOTE: The page table referenced here will not actually be "identity", this
+ * 1024 entry space is reserved and mapped to an arbitrary page which contains
+ * the correct page table.
+ */
+static pt_entry_t free_kernel_page_pt[1024] __attribute__((aligned(M_4K)));
+static pt_entry_t *free_kernel_page_pte = NULL;
 
 /**
  * This is just the range to use to set up the initial free list.
@@ -28,10 +45,6 @@ static phys_addr_t free_list_head = NULL_PHYS_ADDR;
 static uint32_t free_list_len = 0;
 
 static fernos_error_t _init_free_list(void) {
-    if (paging_enabled) {
-        return FOS_UNKNWON_ERROR;
-    }
-
     CHECK_ALIGN(INITIAL_FREE_AREA_START, M_4K);
     CHECK_ALIGN(INITIAL_FREE_AREA_END, M_4K);
 
@@ -62,14 +75,34 @@ static fernos_error_t _init_free_list(void) {
  * Pops a free page from the free list before paging is enabled.
  */
 static phys_addr_t _pop_free_page(void) {
+    if (free_list_head == NULL_PHYS_ADDR) {
+        return NULL_PHYS_ADDR;
+    }
 
+    phys_addr_t popped = free_list_head;
+
+    free_list_head = *(phys_addr_t *)free_list_head;
+    free_list_len--;
+
+    return popped;
 }
 
-static void _push_free_page(void) {
+/**
+ * Initialize kernel page directory, obviously before paging is setup.
+ */
+static fernos_error_t _init_kernel_pd(void) {
+    // First intialize free list.
+    PROP_ERR(_init_free_list());
+    
+    phys_addr_t kernel_pd = _pop_free_page();
+    if (kernel_pd == NULL_PHYS_ADDR) {
+        return FOS_NO_MEM;
+    }
+    
 
+    
+    return FOS_SUCCESS;
 }
-
-
 
 
 /**
