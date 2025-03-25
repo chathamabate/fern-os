@@ -15,7 +15,7 @@
 // Converts a number n to a 64-bit constant with n 1 lsbs
 #define TO_MASK64(wid) ((1LL << wid) - 1)
 
-#define IS_ALIGNED(val, align) (((val) & ((align) - 1)) == 0)
+#define IS_ALIGNED(val, align) (((unsigned int)(val) & ((align) - 1)) == 0)
 
 #define CHECK_ALIGN(val, align) \
     if (!IS_ALIGNED(val, align)) { \

@@ -4,7 +4,7 @@
 MOD_NAME 	?= k_startup
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= kernel.c gdt.c idt.c
+_SRCS 		?= kernel.c gdt.c idt.c page.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= boot.s
