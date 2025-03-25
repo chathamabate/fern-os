@@ -44,8 +44,9 @@ void timer_handler(void);
 void bad_handler(void);
 
 int kernel_main(void) {
-    term_put_s("HEllo\n");
+    //term_put_s("HEllo\n");
 
+    *(int *)(0x1000000) = 1232;
 
     return 0;
 }

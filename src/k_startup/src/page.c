@@ -139,11 +139,12 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
             pt_entry_t *pde = &(pd[pdi]);
 
             if (!pte_get_present(*pde)) {
-                term_put_s("New PT\n");
                 phys_addr_t new_page = _pop_free_page();
                 if (new_page == NULL_PHYS_ADDR) {
                     return FOS_NO_MEM;
                 }
+
+                term_put_fmt_s("New PT @ %X\n", new_page);
 
                 pt_entry_t *new_pt = (pt_entry_t *)new_page;
                 for (uint32_t ti = 0; ti < 1024; ti++) {
@@ -180,7 +181,6 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
             }
         }
 
-
         pt[pti] = identity ? fos_identity_pt_entry(page_addr) : fos_unique_pt_entry(page_addr);
     }
 
@@ -206,7 +206,6 @@ static fernos_error_t _init_kernel_pd(void) {
     }
 
     PROP_ERR(_place_range(pd, PROLOGUE_START, PROLOGUE_END + 1, true, false));    
-
     PROP_ERR(_place_range(pd, (phys_addr_t)_ro_shared_start, (phys_addr_t)_ro_shared_end, true, false));
     PROP_ERR(_place_range(pd, (phys_addr_t)_ro_kernel_start, (phys_addr_t)_ro_kernel_end, true, false));
 
@@ -215,6 +214,8 @@ static fernos_error_t _init_kernel_pd(void) {
 
     PROP_ERR(_place_range(pd, (phys_addr_t)_bss_kernel_start, (phys_addr_t)_bss_kernel_end, false, false));
     PROP_ERR(_place_range(pd, (phys_addr_t)_data_kernel_start, (phys_addr_t)_data_kernel_end, false, false));
+
+    PROP_ERR(_place_range(pd,  0xB0000000 - (10 * M_4K),0xB0000000, false, false));
 
     kernel_pd = kpd;
     
@@ -295,13 +296,7 @@ fernos_error_t init_paging(void) {
     //PROP_ERR(_init_first_user_pd());
 
     set_page_directory(kernel_pd);
-    //enable_paging();
-
-    pt_entry_t *pd = (pt_entry_t *)kernel_pd;
-    pt_entry_t *pt = (pt_entry_t *)pte_get_base(pd[1]);
-    for (uint32_t i = 0; i < 8; i++) {
-        term_put_fmt_s("BASE: %X\n", pte_get_base(pt[i]));
-    }
+    enable_paging();
 
     return FOS_SUCCESS;
 }
