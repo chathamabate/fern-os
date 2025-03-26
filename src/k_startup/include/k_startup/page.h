@@ -39,6 +39,9 @@ extern const char _bss_user_end[];
 extern const char _data_user_start[]; 
 extern const char _data_user_end[]; 
 
+extern const char _static_area_end[];
+
+
 /**
  * These values are used in the available bits of a page table entry. NOTE: They have
  * no meaning for entries in page directories. Other than the kernel page tables, 

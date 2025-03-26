@@ -26,14 +26,15 @@ INCLUDE "os_defs.ld"
  * For example, the terminal graphics buffer.
  */
 
+/* 16 KB */
+INIT_KERNEL_STACK_SIZE =  0x4000;
 
 MEMORY 
 {
     /* Nothing goes in the preface area! These all will be 4MB aligned to help with paging. */
 
     prologue       : ORIGIN = PROLOGUE_START, LENGTH = PROLOGUE_END - PROLOGUE_START + 1
-    static_area    : ORIGIN = STATIC_START,   LENGTH = STATIC_END - STATIC_START + 1
-    dynamic_area   : ORIGIN = DYNAMIC_START,  LENGTH = DYNAMIC_END - DYNAMIC_START + 1
+    fernos_area    : ORIGIN = FERNOS_START,   LENGTH = FERNOS_END   - FERNOS_START + 1
     epilogue       : ORIGIN = EPILOGUE_START, LENGTH = EPILOGUE_END - EPILOGUE_START + 1
 }
 
@@ -69,7 +70,7 @@ SECTIONS
         *libs_*.a:*.o(.rodata)
         . = ALIGN(4K);
         _ro_shared_end = .;
-    } > static_area
+    } > fernos_area
 
     .text.kernel : {
         . = ALIGN(4K);
@@ -78,7 +79,7 @@ SECTIONS
         *libk_*.a:*.o(.rodata)
         . = ALIGN(4K);
         _ro_kernel_end = .;
-    } > static_area
+    } > fernos_area
 
     .text.user : {
         . = ALIGN(4K);
@@ -87,7 +88,7 @@ SECTIONS
         *libu_*.a:*.o(.rodata)
         . = ALIGN(4K);
         _ro_user_end = .;
-    } > static_area
+    } > fernos_area
 
     /* BSS and Data Sections */
 
@@ -98,7 +99,7 @@ SECTIONS
         *libs_*.a:*.o(COMMON)
         . = ALIGN(4K);
         _bss_shared_end = .;
-    } > static_area
+    } > fernos_area
 
     .data.shared : {
         . = ALIGN(4K);
@@ -106,7 +107,7 @@ SECTIONS
         *libs_*.a:*.o(.data)
         . = ALIGN(4K);
         _data_shared_end = .;
-    } > static_area
+    } > fernos_area
 
     .bss.kernel (NOLOAD) : {
         . = ALIGN(4K);
@@ -115,7 +116,7 @@ SECTIONS
         *libk_*.a:*.o(COMMON)
         . = ALIGN(4K);
         _bss_kernel_end = .;
-    } > static_area
+    } > fernos_area
 
     .data.kernel : {
         . = ALIGN(4K);
@@ -123,7 +124,7 @@ SECTIONS
         *libk_*.a:*.o(.data)
         . = ALIGN(4K);
         _data_kernel_end = .;
-    } > static_area
+    } > fernos_area
 
     .bss.user (NOLOAD) : {
         . = ALIGN(4K);
@@ -132,7 +133,7 @@ SECTIONS
         *libu_*.a:*.o(COMMON)
         . = ALIGN(4K);
         _bss_user_end = .;
-    } > static_area
+    } > fernos_area
 
     .data.user : {
         . = ALIGN(4K);
@@ -140,5 +141,10 @@ SECTIONS
         *libu_*.a:*.o(.data)
         . = ALIGN(4K);
         _data_user_end = .;
-    } > static_area
+    } > fernos_area
+
+    .misc : {
+        . = ALIGN(4K);
+        _static_area_end = .;
+    } > fernos_area
 }

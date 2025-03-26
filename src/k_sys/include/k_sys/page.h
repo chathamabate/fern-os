@@ -119,5 +119,11 @@ static inline void flush_page_cache(void) {
     set_page_directory(get_page_directory());
 }
 
+static inline void clear_page_table(pt_entry_t *pt) {
+    for (uint32_t i = 0; i < 1024; i++) {
+        pt[i] = not_present_pt_entry();
+    }
+}
+
 
 

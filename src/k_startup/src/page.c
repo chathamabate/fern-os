@@ -51,8 +51,8 @@ static pt_entry_t *free_kernel_page_pte = NULL;
  * After initialization, pages outside this range can be added to the free list
  * without consequence. (Just be careful)
  */
-#define INITIAL_FREE_AREA_START (DYNAMIC_START) 
-#define INITIAL_FREE_AREA_END  (EPILOGUE_START) // Exclusive end.
+#define INITIAL_FREE_AREA_START ((phys_addr_t)_static_area_end) 
+#define INITIAL_FREE_AREA_END  ((phys_addr_t)EPILOGUE_START) // Exclusive end.
 
 static phys_addr_t free_list_head = NULL_PHYS_ADDR;
 static uint32_t free_list_len = 0;
@@ -89,12 +89,10 @@ static fernos_error_t _init_free_list(void) {
  */
 static phys_addr_t _pop_free_page(void) {
     if (free_list_head == NULL_PHYS_ADDR) {
-        term_put_fmt_s("FREE HEAD: %X\n", free_list_head);
         return NULL_PHYS_ADDR;
     }
 
     phys_addr_t popped = free_list_head;
-
 
     free_list_head = *(phys_addr_t *)free_list_head;
     free_list_len--;
@@ -112,8 +110,6 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
     if (identity && allocate) {
         return FOS_BAD_ARGS;
     }
-
-    term_put_fmt_s("RANGE %X %X\n", s, e);
 
     CHECK_ALIGN(pd, M_4K);
     CHECK_ALIGN(s, M_4K);
@@ -135,16 +131,16 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
 
         uint32_t pdi = pi / 1024;
 
+        // Must we access a different entry in the given page directory?
         if (pdi != curr_pdi) {
             pt_entry_t *pde = &(pd[pdi]);
 
+            // Must we allocate a new page table?
             if (!pte_get_present(*pde)) {
                 phys_addr_t new_page = _pop_free_page();
                 if (new_page == NULL_PHYS_ADDR) {
                     return FOS_NO_MEM;
                 }
-
-                term_put_fmt_s("New PT @ %X\n", new_page);
 
                 pt_entry_t *new_pt = (pt_entry_t *)new_page;
                 for (uint32_t ti = 0; ti < 1024; ti++) {
@@ -201,11 +197,9 @@ static fernos_error_t _init_kernel_pd(void) {
 
     // First, 0 out the whole area.
     pt_entry_t *pd = (pt_entry_t *)kpd;
-    for (uint32_t pdi = 0; pdi < 1024; pdi++) {
-        pd[pdi] = not_present_pt_entry();
-    }
+    clear_page_table(pd);
 
-    PROP_ERR(_place_range(pd, PROLOGUE_START, PROLOGUE_END + 1, true, false));    
+    PROP_ERR(_place_range(pd, PROLOGUE_START + M_4K, PROLOGUE_END + 1, true, false));    
     PROP_ERR(_place_range(pd, (phys_addr_t)_ro_shared_start, (phys_addr_t)_ro_shared_end, true, false));
     PROP_ERR(_place_range(pd, (phys_addr_t)_ro_kernel_start, (phys_addr_t)_ro_kernel_end, true, false));
 
@@ -214,6 +208,9 @@ static fernos_error_t _init_kernel_pd(void) {
 
     PROP_ERR(_place_range(pd, (phys_addr_t)_bss_kernel_start, (phys_addr_t)_bss_kernel_end, false, false));
     PROP_ERR(_place_range(pd, (phys_addr_t)_data_kernel_start, (phys_addr_t)_data_kernel_end, false, false));
+
+    // Ok, what do we do about the stack...
+    // Maybe there could be an initial kernel stack section??
 
     PROP_ERR(_place_range(pd,  0xB0000000 - (10 * M_4K),0xB0000000, false, false));
 
@@ -228,6 +225,7 @@ static fernos_error_t _init_kernel_pd(void) {
  * NOTE: This assumes the range of addresses given already exists in both the given
  * page directories!
  */
+/*
 static fernos_error_t _copy_range(pt_entry_t *dest_pd, const pt_entry_t *src_pd, 
         phys_addr_t s, phys_addr_t e) {
     CHECK_ALIGN(dest_pd, M_4K);
@@ -252,10 +250,12 @@ static fernos_error_t _copy_range(pt_entry_t *dest_pd, const pt_entry_t *src_pd,
 
     return FOS_SUCCESS;
 }
+*/
 
 /**
  * _init_kernel_pd must be called before calling this function!
  */
+/*
 static fernos_error_t _init_first_user_pd(void) {
     phys_addr_t upd = _pop_free_page();
     if (upd == NULL_PHYS_ADDR) {
@@ -289,6 +289,7 @@ static fernos_error_t _init_first_user_pd(void) {
 
     return FOS_SUCCESS;
 }
+*/
 
 fernos_error_t init_paging(void) {
     PROP_ERR(_init_free_list());
