@@ -41,6 +41,8 @@ extern const char _data_user_end[];
 
 extern const char _static_area_end[];
 
+extern const char _init_kstack_start[];
+extern const char _init_kstack_end[];
 
 /**
  * These values are used in the available bits of a page table entry. NOTE: They have

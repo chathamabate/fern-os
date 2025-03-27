@@ -65,7 +65,7 @@ _start:
 	in assembly as languages such as C cannot function without a stack.
 	*/
 	//movl $_kernel_stack_top, %esp
-	movl $0xB0000000, %esp
+	movl $_init_kstack_end, %esp
     movl %esp, %ebp
 
 	/*

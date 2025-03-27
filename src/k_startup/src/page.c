@@ -52,7 +52,7 @@ static pt_entry_t *free_kernel_page_pte = NULL;
  * without consequence. (Just be careful)
  */
 #define INITIAL_FREE_AREA_START ((phys_addr_t)_static_area_end) 
-#define INITIAL_FREE_AREA_END  ((phys_addr_t)EPILOGUE_START) // Exclusive end.
+#define INITIAL_FREE_AREA_END  ((phys_addr_t)_init_kstack_start) // Exclusive end.
 
 static phys_addr_t free_list_head = NULL_PHYS_ADDR;
 static uint32_t free_list_len = 0;
@@ -143,9 +143,7 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
                 }
 
                 pt_entry_t *new_pt = (pt_entry_t *)new_page;
-                for (uint32_t ti = 0; ti < 1024; ti++) {
-                    new_pt[ti] = not_present_pt_entry(); 
-                }
+                clear_page_table(new_pt);
 
                 *pde = fos_present_pt_entry((phys_addr_t)new_pt);
             }
@@ -209,11 +207,67 @@ static fernos_error_t _init_kernel_pd(void) {
     PROP_ERR(_place_range(pd, (phys_addr_t)_bss_kernel_start, (phys_addr_t)_bss_kernel_end, false, false));
     PROP_ERR(_place_range(pd, (phys_addr_t)_data_kernel_start, (phys_addr_t)_data_kernel_end, false, false));
 
-    // Ok, what do we do about the stack...
-    // Maybe there could be an initial kernel stack section??
+    PROP_ERR(_place_range(pd, (phys_addr_t)_init_kstack_start, (phys_addr_t)_init_kstack_end, false, false));
 
-    PROP_ERR(_place_range(pd,  0xB0000000 - (10 * M_4K),0xB0000000, false, false));
+    // Now setup up the free kernel page!
+    phys_addr_t fkp = (phys_addr_t)free_kernel_page;
 
+    uint32_t fkp_pi = fkp / M_4K;
+    uint32_t fkp_pdi = fkp_pi / 1024;
+    uint32_t fkp_pti = fkp_pi % 1024;
+
+    // Let's get the page table which references fkp.
+    pt_entry_t *pte = pd[fkp_pdi];
+    if (!pte_get_present(*pte)) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    // Ok, this page table will contain the entry for the free kernel page!
+    pt_entry_t *fkp_pt = (pt_entry_t *)pte_get_base(*pte);
+
+    // Start by setting the free page as not present!
+    fkp_pt[fkp_pti] = not_present_pt_entry();
+
+    pt_entry_t *fkp_pt_alias = (phys_addr_t)free_kernel_page_pt;
+    uint32_t fkp_pt_alias_pi = fkp_pt_alias / M_4K;
+    uint32_t fkp_pt_alias_pdi = fkp_pt_alias_pi / 1024;
+    uint32_t fkp_pt_alias_pti = fkp_pt_alias_pi % 1024;
+    
+    // Now alias the fkp page table 
+    
+    pte = pd[fkp_pt_alias_pdi];
+    if (!pte_get_present(*pte)) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+
+
+
+
+    pte = ((pt_entry_t *)pte_get_base(*pte))[fkp_pt_alias_pti];
+    *pte = fos_unique_pt_entry((phys_addr_t)fkp_pt);
+     
+
+    /*
+    phys_addr_t fkp_pt = (phys_addr_t)free_kernel_page_pt;
+
+    uint32_t fkp_pt_pi = fkp_pt / M_4K;
+    uint32_t fkp_pt_pdi = fkp_pt_pi / 1024;
+    uint32_t fkp_pt_pti = fkp_pt_pi % 1024;
+
+    // First map the page table page, to the page table which contains the free kernel page!
+
+    pt_entry_t *fkp_
+
+    if (!pte_get_present(*fkp_pde)) {
+        return FOS_UNKNWON_ERROR;
+    }
+    */
+
+    
+
+
+    
     kernel_pd = kpd;
     
     return FOS_SUCCESS;

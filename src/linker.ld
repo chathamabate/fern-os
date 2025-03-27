@@ -21,20 +21,28 @@ INCLUDE "os_defs.ld"
  * 0x1_0000_0000 =   4 GB
  */
 
-/* 
- * The beginning of the Identity area will be BIOS stuff which may still be useful during kernel setup.
- * For example, the terminal graphics buffer.
- */
-
 /* 16 KB */
 INIT_KERNEL_STACK_SIZE =  0x4000;
+
+/* 
+ * I had some issues with the linker script behaving how I wanted when placing the initial kernel
+ * stack.
+ *
+ * Now, the fernos area is divided into 2 sections.
+ * The initial kernel stack (fernos_area_1) and everything else (fernos_area_0)
+ */
+
+FERNOS_LENGTH = FERNOS_END - FERNOS_START + 1;
+FERNOS_0_LENGTH = FERNOS_LENGTH - INIT_KERNEL_STACK_SIZE;
+FERNOS_1_LENGTH = INIT_KERNEL_STACK_SIZE;
 
 MEMORY 
 {
     /* Nothing goes in the preface area! These all will be 4MB aligned to help with paging. */
 
     prologue       : ORIGIN = PROLOGUE_START, LENGTH = PROLOGUE_END - PROLOGUE_START + 1
-    fernos_area    : ORIGIN = FERNOS_START,   LENGTH = FERNOS_END   - FERNOS_START + 1
+    fernos_area_0  : ORIGIN = FERNOS_START,                     LENGTH  = FERNOS_0_LENGTH
+    fernos_area_1  : ORIGIN = FERNOS_START + FERNOS_0_LENGTH,   LENGTH  = FERNOS_1_LENGTH
     epilogue       : ORIGIN = EPILOGUE_START, LENGTH = EPILOGUE_END - EPILOGUE_START + 1
 }
 
@@ -42,17 +50,6 @@ MEMORY
    kernel image. */
 SECTIONS
 {
-	/* It used to be universally recommended to use 1M as a start offset,
-	   as it was effectively guaranteed to be available under BIOS systems.
-	   However, UEFI has made things more complicated, and experimental data
-	   strongly suggests that 2M is a safer place to load. In 2016, a new
-	   feature was introduced to the multiboot2 spec to inform bootloaders
-	   that a kernel can be loaded anywhere within a range of addresses and
-	   will be able to relocate itself to run from such a loader-selected
-	   address, in order to give the loader freedom in selecting a span of
-	   memory which is verified to be available by the firmware, in order to
-	   work around this issue. This does not use that feature, so 2M was
-	   chosen as a safer option than the traditional 1M. */
 
     /*
      * Three types of areas (shared, kernel, and user)
@@ -70,7 +67,7 @@ SECTIONS
         *libs_*.a:*.o(.rodata)
         . = ALIGN(4K);
         _ro_shared_end = .;
-    } > fernos_area
+    } > fernos_area_0
 
     .text.kernel : {
         . = ALIGN(4K);
@@ -79,7 +76,7 @@ SECTIONS
         *libk_*.a:*.o(.rodata)
         . = ALIGN(4K);
         _ro_kernel_end = .;
-    } > fernos_area
+    } > fernos_area_0
 
     .text.user : {
         . = ALIGN(4K);
@@ -88,7 +85,7 @@ SECTIONS
         *libu_*.a:*.o(.rodata)
         . = ALIGN(4K);
         _ro_user_end = .;
-    } > fernos_area
+    } > fernos_area_0
 
     /* BSS and Data Sections */
 
@@ -99,7 +96,7 @@ SECTIONS
         *libs_*.a:*.o(COMMON)
         . = ALIGN(4K);
         _bss_shared_end = .;
-    } > fernos_area
+    } > fernos_area_0
 
     .data.shared : {
         . = ALIGN(4K);
@@ -107,7 +104,7 @@ SECTIONS
         *libs_*.a:*.o(.data)
         . = ALIGN(4K);
         _data_shared_end = .;
-    } > fernos_area
+    } > fernos_area_0
 
     .bss.kernel (NOLOAD) : {
         . = ALIGN(4K);
@@ -116,7 +113,7 @@ SECTIONS
         *libk_*.a:*.o(COMMON)
         . = ALIGN(4K);
         _bss_kernel_end = .;
-    } > fernos_area
+    } > fernos_area_0
 
     .data.kernel : {
         . = ALIGN(4K);
@@ -124,7 +121,7 @@ SECTIONS
         *libk_*.a:*.o(.data)
         . = ALIGN(4K);
         _data_kernel_end = .;
-    } > fernos_area
+    } > fernos_area_0
 
     .bss.user (NOLOAD) : {
         . = ALIGN(4K);
@@ -133,7 +130,7 @@ SECTIONS
         *libu_*.a:*.o(COMMON)
         . = ALIGN(4K);
         _bss_user_end = .;
-    } > fernos_area
+    } > fernos_area_0
 
     .data.user : {
         . = ALIGN(4K);
@@ -141,10 +138,18 @@ SECTIONS
         *libu_*.a:*.o(.data)
         . = ALIGN(4K);
         _data_user_end = .;
-    } > fernos_area
+    } > fernos_area_0
 
     .misc : {
         . = ALIGN(4K);
         _static_area_end = .;
-    } > fernos_area
+    } > fernos_area_0
+
+    .init_kernel_stack (NOLOAD) : {
+        . = ALIGN(4K);
+        _init_kstack_start = .;
+        . += INIT_KERNEL_STACK_SIZE;
+        . = ALIGN(4K);
+        _init_kstack_end = .;
+    } > fernos_area_1
 }
