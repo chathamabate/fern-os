@@ -474,18 +474,6 @@ static void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e) {
     assign_free_page(old);
 }
 
-static uint8_t mm[M_4K] __attribute__ ((aligned(M_4K)));
-
-void dss(void) {
-    assign_free_page((phys_addr_t)mm); 
-
-    phys_addr_t p = pop_free_page();
-
-    free_kernel_page[0] = 0xFE;
-    term_put_fmt_s("%X\n", mm[0]);
-    term_put_fmt_s("%X\n", p);
-}
-
 fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
     CHECK_ALIGN(pd, M_4K);
     CHECK_ALIGN(s, M_4K);
@@ -506,27 +494,23 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
     }
 
     fernos_error_t err = FOS_SUCCESS;
-    uint8_t *i;
+
+    uint32_t pi_s = (uint32_t)s / 1024;
+    uint32_t pi_e = (uint32_t)e / 1024;
+    uint32_t pi = pi_s;
 
     phys_addr_t old = assign_free_page(pd);
 
     pt_entry_t *pdes = (pt_entry_t *)free_kernel_page;
 
-    i = (uint8_t *)s;
-
-    while (err == FOS_SUCCESS && i < (uint8_t *)e) {
-        uint8_t *next_bound = ALIGN(i + M_4M, M_4M);
-        if (next_bound > (uint8_t *)e) {
-            next_bound = e;
+    while (err == FOS_SUCCESS && pi < pi_e) {
+        uint32_t nb = ALIGN(pi + 1024, 1024);
+        if (nb > pi_e) {
+            nb = pi_e;
         }
-
-        uint32_t pi_s = (uint32_t)i / M_4K;
-        uint32_t pi_e = (uint32_t)next_bound / M_4K;
-
-        // Ok, it is in here where we do the allocs!
         
-        uint32_t pdi = pi_s / 1024;
-        pt_entry_t *pde = pdes[pdi];
+        uint32_t pdi = pi / 1024;
+        pt_entry_t *pde = &(pdes[pdi]);
 
         if (!pte_get_present(*pde)) {
             phys_addr_t new_pt = new_page_table();
@@ -540,13 +524,20 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
 
         phys_addr_t pt = pte_get_base(*pde);
 
-        uint32_t pti_s = pi_s % 1024;
-        uint32_t pti_e = pi_e % 1024;
+        uint32_t pti   = pi % 1024;
 
-        uint32_t true_e;
-        err = pt_alloc_range(pt, pti_s, pti_e, &true_e);
+        // If we make it here, we know pi_s and pi_e span a non-empty range.
+        // It is impossible for nb to be 0. If nb is on a boundary, set pti_e
+        // to 1024!
+        uint32_t pti_e = nb % 1024;
+        if (pti_e == 0) {
+            pti_e = 1024;
+        }
 
-        i = (uint8_t *)((pdi * M_4M) + (true_e * M_4K));
+        uint32_t true_pti_e;
+        err = pt_alloc_range(pt, pti, pti_e, &true_pti_e);
+
+        pi += (true_pti_e - pti);
     }
 
     assign_free_page(old);
@@ -557,8 +548,35 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
 }
 
 void pd_free_pages(phys_addr_t pd, void *s, void *e) {
+    if (!IS_ALIGNED(pd, M_4K) || !IS_ALIGNED(s, M_4K) || !IS_ALIGNED(e, M_4K)) {
+        return;
+    }
 
+    if (s == e) {
+        return;
+    }
+
+    if (e < s) {
+        return;
+    }
+
+    phys_addr_t old = assign_free_page(pd);
+
+
+    assign_free_page(old);
 }
 
 
+
+static uint8_t mm[M_4K] __attribute__ ((aligned(M_4K)));
+
+void dss(void) {
+    assign_free_page((phys_addr_t)mm); 
+
+    phys_addr_t p = pop_free_page();
+
+    free_kernel_page[0] = 0xFE;
+    term_put_fmt_s("%X\n", mm[0]);
+    term_put_fmt_s("%X\n", p);
+}
 
