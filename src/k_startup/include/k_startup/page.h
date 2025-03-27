@@ -129,31 +129,8 @@ void push_free_page(phys_addr_t page_addr);
  */
 phys_addr_t pop_free_page(void);
 
-/**
- * Create a new page table, all entries will start as not present.
- */
-fernos_error_t new_page_table(phys_addr_t *pt_addr);
+void dss(void);
 
-/**
- * Add new pages to the given page table! (s and e are indecies into a page table, e is exclusive)
- *
- * If an error is returned, it is possible that not all pages were allocated.
- * Always check the `true_e` argument when SUCCESS isn't returned to see how much progress was
- * made in the allocation.
- *
- * If *true_e == e, all pages were allocated!
- */
-fernos_error_t pt_add_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e, uint32_t *true_e);
-
-/**
- * Remove pages from a page table. Pages marked UNIQUE will be added back to the free list.
- */
-void pt_remove_pages(phys_addr_t pt_addr, uint32_t s, uint32_t e);
-
-/**
- * Delete a page table. 
- */
-void delete_page_table(phys_addr_t pt_addr);
 
 
 /**
@@ -172,7 +149,7 @@ fernos_error_t new_page_directory(phys_addr_t *pd_addr);
  *
  * Use true_e to determine how many pages were actually allocated in case of error.
  */
-fernos_error_t pd_add_pages(phys_addr_t pd_addr, void *s, void *e, void **true_e);
+fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e);
 
 /**
  * Remove all removeable pages from s to e in the given page directory.
@@ -180,7 +157,7 @@ fernos_error_t pd_add_pages(phys_addr_t pd_addr, void *s, void *e, void **true_e
  * NOTE: Given addresses must ALWAYS be 4K aligned (This is the case for all functions in the 
  * header file, but still)
  */
-void pd_remove_pages(phys_addr_t pd_addr, void *s, void *e);
+void pd_free_pages(phys_addr_t pd, void *s, void *e);
 
 /**
  * Take the physical address of a page directory and clean up all of it's pages, page tables, and

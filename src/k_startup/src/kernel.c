@@ -57,9 +57,10 @@ int rec_thing(void) {
 
 int kernel_main(void) {
     term_put_s("HEllo\n");
+    dss();
 
     // Wooo this works!!
-    *(int *)(0xC0000000 - 0x4001) = 10;
+   // *(int *)(0xC0000000 - 0x4001) = 10;
 
     // The handler it self uses the stack!
     //*(int *)(0x1000000) = 1232;
