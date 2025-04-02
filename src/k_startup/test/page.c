@@ -121,7 +121,35 @@ static bool test_pd_alloc(void) {
     TEST_SUCCEED();
 }
 
+static bool test_pd_overlapping_alloc(void) {
+    uint8_t * const S = (uint8_t *)_static_area_end;
+    phys_addr_t pd = get_page_directory();
+
+    fernos_error_t err;
+    void *true_e;
+
+    err = pd_alloc_pages(pd, S + (2*M_4K), S + (8*M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(S + (8*M_4K), true_e);
+
+    pd_free_pages(pd, S, S + (6*M_4K));
+
+    err = pd_alloc_pages(pd, S, S + (3*M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(S + (3*M_4K), true_e);
+
+    // 3, 4, and 5 should all be free.
+    err = pd_alloc_pages(pd, S + (3*M_4K), S + (7*M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_ALREADY_ALLOCATED, err);
+    TEST_EQUAL_HEX(S + (6*M_4K), true_e);
+
+    pd_free_pages(pd, S, S + (8*M_4K));
+
+    TEST_SUCCEED();
+}
+
 void test_page(void) {
     RUN_TEST(test_push_and_pop);
     RUN_TEST(test_pd_alloc);
+    RUN_TEST(test_pd_overlapping_alloc);
 }
