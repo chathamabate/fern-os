@@ -127,11 +127,6 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
     }
 
     const bool writeable = (flags & _R_WRITEABLE) == _R_WRITEABLE;
-    if (writeable) {
-        term_put_fmt_s("Writeable Range: %X, %X\n", s, e);
-    } else {
-        term_put_fmt_s("UnWriteable Range: %X, %X\n", s, e);
-    }
 
     uint32_t curr_pdi = 1024;
     pt_entry_t *pt = NULL;
@@ -603,6 +598,21 @@ void pd_free_pages(phys_addr_t pd, void *s, void *e) {
 
             pt_free_range(pt, fs, fe);
 
+            /*
+             * NOTE: When we all entries in the page table, we know we can push the page table back
+             * onto the free list.
+             *
+             * However, understand this is not a perfect solution. If we allocate just a few pages
+             * in an empty page table, then later free those pages. Since we aren't freeing the
+             * entire range of the page table, this method will not realize the page table is 
+             * entirely empty.
+             *
+             * Right now, we can expect that sometimes this function is smart enough to free empty
+             * page tables, other times it is not.
+             *
+             * TODO: Consider improving.
+             */
+
             // Did we free a whole page table?
             if (fs == 0 && fe == 1024) {
                 push_free_page(pt);
@@ -614,5 +624,31 @@ void pd_free_pages(phys_addr_t pd, void *s, void *e) {
     }
 
     assign_free_page(old);
+}
+
+void delete_page_directory(phys_addr_t pd) {
+    if (pd == NULL_PHYS_ADDR) {
+        return;
+    }
+
+    phys_addr_t old = assign_free_page(pd);
+    pt_entry_t *pdes = (pt_entry_t *)free_kernel_page;
+
+    for (uint32_t pdi = 0; pdi < 1024; pdi++) {
+        pt_entry_t pde = pdes[pdi]; 
+
+        // Is there a page table in this slot?
+        if (pte_get_present(pde)) {
+            phys_addr_t pt = pte_get_base(pde);
+
+            // Remember, page tables are NEVER shared.
+            pt_free_range(pt, 0, 1024); 
+            push_free_page(pt);
+        }
+    }
+
+    assign_free_page(old);
+
+    push_free_page(pd);
 }
 

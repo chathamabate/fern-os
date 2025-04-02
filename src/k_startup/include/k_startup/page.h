@@ -101,7 +101,6 @@ static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base, bool writeable) {
     return pte;
 }
 
-
 /*
  * NOTE: There will be a page directory stored in static memory which must always be loaded when
  * the kernel thread is running! 
@@ -165,4 +164,4 @@ void pd_free_pages(phys_addr_t pd, void *s, void *e);
  * Take the physical address of a page directory and clean up all of it's pages, page tables, and
  * finally, the page directory itself!
  */
-void delete_page_directory(phys_addr_t pd_addr);
+void delete_page_directory(phys_addr_t pd);
