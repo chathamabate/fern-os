@@ -100,14 +100,17 @@ static phys_addr_t _pop_free_page(void) {
     return popped;
 }
 
+#define _R_IDENTITY  (1 << 0)
+#define _R_ALLOCATE  (1 << 1)
+#define _R_WRITEABLE (1 << 2)
+
 /**
  * Make a certain range available within a page table.
  *
  * e is exclusive.
  */
-static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e, 
-        bool identity, bool allocate) {
-    if (identity && allocate) {
+static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e, uint8_t flags) {
+    if ((flags & _R_IDENTITY) && (flags & _R_ALLOCATE)) {
         return FOS_BAD_ARGS;
     }
 
@@ -121,6 +124,13 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
 
     if (e < s) {
         return FOS_INVALID_RANGE;
+    }
+
+    const bool writeable = (flags & _R_WRITEABLE) == _R_WRITEABLE;
+    if (writeable) {
+        term_put_fmt_s("Writeable Range: %X, %X\n", s, e);
+    } else {
+        term_put_fmt_s("UnWriteable Range: %X, %X\n", s, e);
     }
 
     uint32_t curr_pdi = 1024;
@@ -145,7 +155,8 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
                 pt_entry_t *new_pt = (pt_entry_t *)new_page;
                 clear_page_table(new_pt);
 
-                *pde = fos_present_pt_entry((phys_addr_t)new_pt);
+                // Page tables are always writeable.
+                *pde = fos_present_pt_entry((phys_addr_t)new_pt, true);
             }
             
             curr_pdi = pdi;
@@ -168,14 +179,16 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
         // doesn't mean that that entry must be marked identity!
 
         phys_addr_t page_addr = i;
-        if (allocate) {
+        if (flags & _R_ALLOCATE) {
             page_addr = _pop_free_page();
             if (page_addr == NULL_PHYS_ADDR) {
                 return FOS_NO_MEM;
             }
         }
 
-        pt[pti] = identity ? fos_identity_pt_entry(page_addr) : fos_unique_pt_entry(page_addr);
+        pt[pti] = (flags & _R_IDENTITY) 
+            ? fos_identity_pt_entry(page_addr, writeable) 
+            : fos_unique_pt_entry(page_addr, writeable);
     }
 
     return FOS_SUCCESS;
@@ -197,17 +210,17 @@ static fernos_error_t _init_kernel_pd(void) {
     pt_entry_t *pd = (pt_entry_t *)kpd;
     clear_page_table(pd);
 
-    PROP_ERR(_place_range(pd, PROLOGUE_START + M_4K, PROLOGUE_END + 1, true, false));    
-    PROP_ERR(_place_range(pd, (phys_addr_t)_ro_shared_start, (phys_addr_t)_ro_shared_end, true, false));
-    PROP_ERR(_place_range(pd, (phys_addr_t)_ro_kernel_start, (phys_addr_t)_ro_kernel_end, true, false));
+    PROP_ERR(_place_range(pd, PROLOGUE_START + M_4K, PROLOGUE_END + 1, _R_IDENTITY | _R_WRITEABLE));    
+    PROP_ERR(_place_range(pd, (phys_addr_t)_ro_shared_start, (phys_addr_t)_ro_shared_end, _R_IDENTITY));
+    PROP_ERR(_place_range(pd, (phys_addr_t)_ro_kernel_start, (phys_addr_t)_ro_kernel_end, _R_IDENTITY));
 
-    PROP_ERR(_place_range(pd, (phys_addr_t)_bss_shared_start, (phys_addr_t)_bss_shared_end, false, false));
-    PROP_ERR(_place_range(pd, (phys_addr_t)_data_shared_start, (phys_addr_t)_data_shared_end, false, false));
+    PROP_ERR(_place_range(pd, (phys_addr_t)_bss_shared_start, (phys_addr_t)_bss_shared_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, (phys_addr_t)_data_shared_start, (phys_addr_t)_data_shared_end, _R_WRITEABLE));
 
-    PROP_ERR(_place_range(pd, (phys_addr_t)_bss_kernel_start, (phys_addr_t)_bss_kernel_end, false, false));
-    PROP_ERR(_place_range(pd, (phys_addr_t)_data_kernel_start, (phys_addr_t)_data_kernel_end, false, false));
+    PROP_ERR(_place_range(pd, (phys_addr_t)_bss_kernel_start, (phys_addr_t)_bss_kernel_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, (phys_addr_t)_data_kernel_start, (phys_addr_t)_data_kernel_end, _R_WRITEABLE));
 
-    PROP_ERR(_place_range(pd, (phys_addr_t)_init_kstack_start, (phys_addr_t)_init_kstack_end, false, false));
+    PROP_ERR(_place_range(pd, (phys_addr_t)_init_kstack_start, (phys_addr_t)_init_kstack_end, _R_WRITEABLE));
 
     // Now setup up the free kernel page!
     // THIS IS VERY CONFUSING SADLY!
@@ -243,7 +256,7 @@ static fernos_error_t _init_kernel_pd(void) {
     }
 
     pt_entry_t *fkp_pt_alias_pt = (pt_entry_t *)pte_get_base(*pte);
-    fkp_pt_alias_pt[fkp_pt_alias_pti] = fos_unique_pt_entry((phys_addr_t)fkp_pt);
+    fkp_pt_alias_pt[fkp_pt_alias_pti] = fos_unique_pt_entry((phys_addr_t)fkp_pt, true);
 
     free_kernel_page_pte = &(free_kernel_page_pt[fkp_pti]);
 
@@ -347,7 +360,7 @@ static phys_addr_t assign_free_page(phys_addr_t p) {
         ret = pte_get_base(*free_kernel_page_pte); 
     }
 
-    *free_kernel_page_pte = fos_unique_pt_entry(p);
+    *free_kernel_page_pte = fos_unique_pt_entry(p, true);
 
     flush_page_cache();
 
@@ -433,7 +446,7 @@ static fernos_error_t pt_alloc_range(phys_addr_t pt, uint32_t s, uint32_t e, uin
             break;
         }
 
-        *pte = fos_unique_pt_entry(new_page);
+        *pte = fos_unique_pt_entry(new_page, true);
     }
 
     assign_free_page(old);
@@ -495,8 +508,8 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
 
     fernos_error_t err = FOS_SUCCESS;
 
-    uint32_t pi_s = (uint32_t)s / 1024;
-    uint32_t pi_e = (uint32_t)e / 1024;
+    uint32_t pi_s = (uint32_t)s / M_4K;
+    uint32_t pi_e = (uint32_t)e / M_4K;
     uint32_t pi = pi_s;
 
     phys_addr_t old = assign_free_page(pd);
@@ -519,7 +532,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
                 break;
             }
 
-            *pde = fos_unique_pt_entry(new_pt);
+            *pde = fos_unique_pt_entry(new_pt, true);
         }
 
         phys_addr_t pt = pte_get_base(*pde);
@@ -542,7 +555,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
 
     assign_free_page(old);
 
-    *true_e = i;
+    *true_e = (void *)(pi * M_4K);
 
     return err;
 }
@@ -560,23 +573,46 @@ void pd_free_pages(phys_addr_t pd, void *s, void *e) {
         return;
     }
 
-    phys_addr_t old = assign_free_page(pd);
+    uint32_t pi_s = (uint32_t)s / M_4K;
+    uint32_t pi_e = (uint32_t)e / M_4K;
+    uint32_t pi = pi_s;
 
+    phys_addr_t old = assign_free_page(pd);
+    pt_entry_t *pdes = (pt_entry_t *)free_kernel_page;
+
+    while (pi < pi_e) {
+        uint32_t nb = ALIGN(pi + 1024, 1024);
+        if (nb > pi_e) {
+            nb = pi_e;
+        }
+
+        uint32_t pdi = pi / 1024; 
+        pt_entry_t *pde = &(pdes[pdi]);
+
+        // Ok are we working with a present page table?
+        if (pte_get_present(*pde)) {
+            phys_addr_t pt = pte_get_base(*pde);
+
+            // Remeber pi < nb always here!
+
+            uint32_t fs = pi % 1024;
+            uint32_t fe = nb % 1024;
+            if (fe == 0) {
+                fe = 1024;
+            }
+
+            pt_free_range(pt, fs, fe);
+
+            // Did we free a whole page table?
+            if (fs == 0 && fe == 1024) {
+                push_free_page(pt);
+                *pde = not_present_pt_entry();
+            }
+        }
+
+        pi = nb;
+    }
 
     assign_free_page(old);
-}
-
-
-
-static uint8_t mm[M_4K] __attribute__ ((aligned(M_4K)));
-
-void dss(void) {
-    assign_free_page((phys_addr_t)mm); 
-
-    phys_addr_t p = pop_free_page();
-
-    free_kernel_page[0] = 0xFE;
-    term_put_fmt_s("%X\n", mm[0]);
-    term_put_fmt_s("%X\n", p);
 }
 

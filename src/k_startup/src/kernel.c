@@ -1,5 +1,6 @@
 
 #include "k_startup/page.h"
+#include "k_startup/test/page.h"
 #include "k_sys/idt.h"
 #include "s_util/err.h"
 #include "s_util/test/str.h"
@@ -30,16 +31,6 @@ void kernel_init(void) {
         out_bios_vga(init_err_style, "Failed to set up Paging");
         lock_up();
     }
-
-    /*
-    fernos_error_t err = init_paging();
-    if (err != FOS_SUCCESS) {
-        term_put_fmt_s("Couldn't set this up %X\n", err);
-        //out_bios_vga(init_err_style, "Failed to set up Paging");
-        lock_up();
-
-    }
-    */
 }
 
 void _bad_handler(void) {
@@ -50,20 +41,9 @@ void timer_handler(void);
 
 void bad_handler(void);
 
-int rec_thing(void) {
-    term_put_s("Aye yo\n");
-    return rec_thing() + 1;
-}
 
 int kernel_main(void) {
-    term_put_s("HEllo\n");
-    dss();
-
-    // Wooo this works!!
-   // *(int *)(0xC0000000 - 0x4001) = 10;
-
-    // The handler it self uses the stack!
-    //*(int *)(0x1000000) = 1232;
+    test_page();
 
     return 0;
 }

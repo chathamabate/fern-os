@@ -5,6 +5,7 @@
 #include "os_defs.h"
 #include "s_util/misc.h"
 #include "s_util/err.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 /*
@@ -55,6 +56,10 @@ extern const char _init_kstack_end[];
  *
  * A unique entry points to a page which is only refernced by this page table. If this page table
  * is deleted, the refernced page should be returned to the page free list.
+ *
+ * NOTE: In my pt_entry helpers below, I take a writeable bool. Since I am always running in 
+ * supervisor role, this option is pointless. However, I will leave it in to remind the user
+ * that certain pages shouldn't be written to.
  */
 
 #define IDENTITY_ENTRY (0)
@@ -66,7 +71,7 @@ extern const char _init_kstack_end[];
  */
 // #define SHARED_ENTRY (2)
 
-static inline pt_entry_t fos_present_pt_entry(phys_addr_t base) {
+static inline pt_entry_t fos_present_pt_entry(phys_addr_t base, bool writeable) {
     pt_entry_t pte;
 
     // I consider this FOS specific because FOS doesn't use privilege levels.
@@ -75,21 +80,21 @@ static inline pt_entry_t fos_present_pt_entry(phys_addr_t base) {
     pte_set_present(&pte, 1);
     pte_set_base(&pte, base);
     pte_set_user(&pte, 0);
-    pte_set_writable(&pte, 1);
+    pte_set_writable(&pte, writeable ? 1 : 0);
 
     return pte;
 }
 
-static inline pt_entry_t fos_identity_pt_entry(phys_addr_t base) {
-    pt_entry_t pte = fos_present_pt_entry(base);
+static inline pt_entry_t fos_identity_pt_entry(phys_addr_t base, bool writeable) {
+    pt_entry_t pte = fos_present_pt_entry(base, writeable);
 
     pte_set_avail(&pte, IDENTITY_ENTRY);
 
     return pte;
 }
 
-static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base) {
-    pt_entry_t pte = fos_present_pt_entry(base);
+static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base, bool writeable) {
+    pt_entry_t pte = fos_present_pt_entry(base, writeable);
 
     pte_set_avail(&pte, UNIQUE_ENTRY);
 
@@ -129,10 +134,6 @@ void push_free_page(phys_addr_t page_addr);
  */
 phys_addr_t pop_free_page(void);
 
-void dss(void);
-
-
-
 /**
  * Create a new default page directory and store it's physical address at pd_addr.
  *
@@ -143,6 +144,7 @@ fernos_error_t new_page_directory(phys_addr_t *pd_addr);
 
 /**
  * Add pages (and page table if necessary) to a page directory.
+ * The pages will always be marked as writeable.
  *
  * If we run out of memory, FOS_NO_MEM is returned.
  * If we run into an already page, FOS_ALREADY_ALLOCATED is returned.
