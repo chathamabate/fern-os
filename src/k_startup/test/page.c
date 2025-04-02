@@ -70,6 +70,13 @@ static bool test_pd_alloc(void) {
 
     const case_t CASES[] = {
         {.s = S, .e = S + M_4K},
+        {.s = S, .e = S + (4 * M_4K)},
+        {.s = S, .e = S + M_4M},
+        {.s = S + (13 * M_4K), .e = S + M_4M},
+        {.s = S + (132 * M_4K), .e = S + M_4M - (12 * M_4K)},
+        {.s = S, .e = S + (3 * M_4M)},
+        {.s = S + (13 * M_4K), .e = S + (6 * M_4M)},
+        {.s = S + (132 * M_4K), .e = S + (4 * M_4M) - (12 * M_4K)},
     };
     const size_t NUM_CASES = sizeof(CASES) / sizeof(CASES[0]);
 
