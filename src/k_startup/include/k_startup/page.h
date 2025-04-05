@@ -45,17 +45,22 @@ extern const char _static_area_end[];
 extern const char _init_kstack_start[];
 extern const char _init_kstack_end[];
 
+
 /**
  * These values are used in the available bits of a page table entry. NOTE: They have
  * no meaning for entries in page directories. Other than the kernel page tables, 
  * all page tables will be placed in arbitrary pages! (Not shared or strictly identity)
  *
  * An Identity Entry, is an entry which points to an identity page. This is a page
- * who's physical and virtual addresses are equal. This page should NEVER be added
+ * who's physical and virtual addresses are always equal. This page should NEVER be added
  * to the free list, and always placed at the correct virtual address.
  *
  * A unique entry points to a page which is only refernced by this page table. If this page table
  * is deleted, the refernced page should be returned to the page free list.
+ *
+ * A shared entry points to a non-identity page which is referenced by many page tables.
+ * These functions offer little support for shared entries. It is the job the kernel to manage
+ * such pages correctly.
  *
  * NOTE: In my pt_entry helpers below, I take a writeable bool. Since I am always running in 
  * supervisor role, this option is pointless. However, I will leave it in to remind the user
@@ -64,12 +69,12 @@ extern const char _init_kstack_end[];
 
 #define IDENTITY_ENTRY (0)
 #define UNIQUE_ENTRY   (1)
+#define SHARED_ENTRY   (2)
 
 /**
  * Later we may want to introduce a concept of shared memory, not now tho!
  * (This is one page which is referenced by multiple page tables)
  */
-// #define SHARED_ENTRY (2)
 
 static inline pt_entry_t fos_present_pt_entry(phys_addr_t base, bool writeable) {
     pt_entry_t pte;
@@ -101,6 +106,14 @@ static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base, bool writeable) {
     return pte;
 }
 
+static inline pt_entry_t fos_shared_pt_entry(phys_addr_t base, bool writeable) {
+    pt_entry_t pte = fos_present_pt_entry(base, writeable);
+
+    pte_set_avail(&pte, SHARED_ENTRY);
+
+    return pte;
+}
+
 /*
  * NOTE: There will be a page directory stored in static memory which must always be loaded when
  * the kernel thread is running! 
@@ -115,6 +128,24 @@ static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base, bool writeable) {
  * NOTE: The first page directory used will be `kernel_pd`.
  */
 fernos_error_t init_paging(void);
+
+/**
+ * Get the physical address of the kernel page table.
+ */
+phys_addr_t get_kernel_pd(void);
+
+/**
+ * The number of free kernel pages exposed. MUST BE A POWER OF 2.
+ */
+#define NUM_FREE_KERNEL_PAGES (4)
+
+extern uint8_t free_kernel_pages[NUM_FREE_KERNEL_PAGES][M_4K];
+
+/**
+ * This asigns the kernel page at index slot, to the page at physical address p.
+ * returns whatever page was previously in said slot.
+ */
+phys_addr_t assign_free_page(uint32_t slot, phys_addr_t p);
 
 /**
  * Number of free pages left. (Useful for testing)
@@ -152,6 +183,13 @@ fernos_error_t new_page_directory(phys_addr_t *pd_addr);
  */
 fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e);
 
+/*
+ * NOTE neither pd_free_pages nor delete_page_directory clean up shared pages.
+ *
+ * If you want your kernel to support pages shared between spaces you must write your own deletion
+ * logic before calling these functions.
+ */
+
 /**
  * Remove all removeable pages from s to e in the given page directory.
  *
@@ -165,3 +203,8 @@ void pd_free_pages(phys_addr_t pd, void *s, void *e);
  * finally, the page directory itself!
  */
 void delete_page_directory(phys_addr_t pd);
+
+/**
+ * Copy the contents of physical page at source, to physical page at dest.
+ */
+void page_copy(phys_addr_t dest, phys_addr_t src);

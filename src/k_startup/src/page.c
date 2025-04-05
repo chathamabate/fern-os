@@ -29,11 +29,14 @@ static phys_addr_t kernel_pd = NULL_PHYS_ADDR;
 static phys_addr_t first_user_pd = NULL_PHYS_ADDR;
 
 /**
- * A single reserved page in the kernel to be used for page table editing.
+ * A set of reserved pages in the kernel to be used for page table editing.
  *
  * Always should be marked Identity, never should be added to the free list.
+ *
+ * By Aligning by M_4K * NUM_FKPs, this should be guaranteed to be in the same 4 MB region.
+ * Thus all ptes should be in the same pt. (This is why NUM_FREE_KPs must be a power of 2)
  */
-static uint8_t free_kernel_page[M_4K] __attribute__((aligned(M_4K)));
+uint8_t free_kernel_pages[NUM_FREE_KERNEL_PAGES][M_4K] __attribute__((aligned(NUM_FREE_KERNEL_PAGES * M_4K)));
 
 /**
  * After paging is initialized, these structures will be used to modify what
@@ -44,7 +47,7 @@ static uint8_t free_kernel_page[M_4K] __attribute__((aligned(M_4K)));
  * the correct page table.
  */
 static pt_entry_t free_kernel_page_pt[1024] __attribute__((aligned(M_4K)));
-static pt_entry_t *free_kernel_page_pte = NULL;
+static pt_entry_t *free_kernel_page_ptes[NUM_FREE_KERNEL_PAGES];
 
 /**
  * This is just the range to use to set up the initial free list.
@@ -217,9 +220,9 @@ static fernos_error_t _init_kernel_pd(void) {
 
     PROP_ERR(_place_range(pd, (phys_addr_t)_init_kstack_start, (phys_addr_t)_init_kstack_end, _R_WRITEABLE));
 
-    // Now setup up the free kernel page!
+    // Now setup up the free kernel pages!
     // THIS IS VERY CONFUSING SADLY!
-    phys_addr_t fkp = (phys_addr_t)free_kernel_page;
+    phys_addr_t fkp = (phys_addr_t)free_kernel_pages;
 
     uint32_t fkp_pi = fkp / M_4K;
     uint32_t fkp_pdi = fkp_pi / 1024;
@@ -231,11 +234,8 @@ static fernos_error_t _init_kernel_pd(void) {
         return FOS_UNKNWON_ERROR;
     }
 
-    // Ok, this page table will contain the entry for the free kernel page!
+    // Ok, this page table will contain the entry for the free kernel pages!
     pt_entry_t *fkp_pt = (pt_entry_t *)pte_get_base(*pte);
-
-    // Start by setting the free page as not present!
-    fkp_pt[fkp_pti] = not_present_pt_entry();
 
     phys_addr_t fkp_pt_alias = (phys_addr_t)free_kernel_page_pt;
 
@@ -253,7 +253,13 @@ static fernos_error_t _init_kernel_pd(void) {
     pt_entry_t *fkp_pt_alias_pt = (pt_entry_t *)pte_get_base(*pte);
     fkp_pt_alias_pt[fkp_pt_alias_pti] = fos_unique_pt_entry((phys_addr_t)fkp_pt, true);
 
-    free_kernel_page_pte = &(free_kernel_page_pt[fkp_pti]);
+    for (uint32_t pti = 0; pti < NUM_FREE_KERNEL_PAGES; pti++) {
+        // Set all kernel pages at not present to start.
+        fkp_pt[fkp_pti + pti] = not_present_pt_entry();
+
+        // Now store a reference to each pte for easy access later.
+        free_kernel_page_ptes[pti] =  &(free_kernel_page_pt[fkp_pti + pti]);
+    }
 
     kernel_pd = kpd;
     
@@ -333,6 +339,11 @@ static fernos_error_t _init_first_user_pd(void) {
 */
 
 fernos_error_t init_paging(void) {
+    // The functions in the C file require at least 2 kernel free pages.
+    if (NUM_FREE_KERNEL_PAGES < 2) {
+        return FOS_NO_MEM;
+    }
+
     PROP_ERR(_init_free_list());
     PROP_ERR(_init_kernel_pd());
     //PROP_ERR(_init_first_user_pd());
@@ -345,12 +356,15 @@ fernos_error_t init_paging(void) {
 
 /* NOW PAGING HAS BEEN ENABLED */
 
-uint32_t get_num_free_pages(void) {
-    return free_list_len;
+phys_addr_t get_kernel_pd(void) {
+    return kernel_pd;    
 }
 
-static phys_addr_t assign_free_page(phys_addr_t p) {
+phys_addr_t assign_free_page(uint32_t slot, phys_addr_t p) {
     phys_addr_t ret = NULL_PHYS_ADDR;
+
+    pt_entry_t *free_kernel_page_pte = free_kernel_page_ptes[slot];
+
     if (pte_get_present(*free_kernel_page_pte)) {
         ret = pte_get_base(*free_kernel_page_pte); 
     }
@@ -362,14 +376,18 @@ static phys_addr_t assign_free_page(phys_addr_t p) {
     return ret;
 }
 
+uint32_t get_num_free_pages(void) {
+    return free_list_len;
+}
+
 void push_free_page(phys_addr_t page_addr) {
     if (!(IS_ALIGNED(page_addr, M_4K))) {
         return;
     }
     
-    phys_addr_t old = assign_free_page(page_addr);
-    *(phys_addr_t *)free_kernel_page = free_list_head;
-    assign_free_page(old);
+    phys_addr_t old = assign_free_page(0, page_addr);
+    *(phys_addr_t *)(free_kernel_pages[0]) = free_list_head;
+    assign_free_page(0, old);
 
     free_list_head = page_addr;
     free_list_len++; 
@@ -380,9 +398,9 @@ phys_addr_t pop_free_page(void) {
         return NULL_PHYS_ADDR; 
     }
 
-    phys_addr_t old = assign_free_page(free_list_head);
-    phys_addr_t next = *(phys_addr_t *)free_kernel_page;
-    assign_free_page(old);
+    phys_addr_t old = assign_free_page(0, free_list_head);
+    phys_addr_t next = *(phys_addr_t *)(free_kernel_pages[0]);
+    assign_free_page(0, old);
 
     phys_addr_t ret = free_list_head;
 
@@ -396,9 +414,9 @@ static phys_addr_t new_page_table(void) {
     phys_addr_t pt = pop_free_page();
 
     if (pt != NULL_PHYS_ADDR) {
-        phys_addr_t old = assign_free_page(pt);
-        clear_page_table((pt_entry_t *)free_kernel_page);
-        assign_free_page(old);
+        phys_addr_t old = assign_free_page(0, pt);
+        clear_page_table((pt_entry_t *)(free_kernel_pages[0]));
+        assign_free_page(0, old);
     }
 
     return pt;
@@ -423,9 +441,9 @@ static fernos_error_t pt_alloc_range(phys_addr_t pt, uint32_t s, uint32_t e, uin
     fernos_error_t err = FOS_SUCCESS;
     uint32_t i;
 
-    phys_addr_t old = assign_free_page(pt);
+    phys_addr_t old = assign_free_page(0, pt);
 
-    pt_entry_t *ptes = (pt_entry_t *)free_kernel_page;
+    pt_entry_t *ptes = (pt_entry_t *)(free_kernel_pages[0]);
 
     for (i = s; i < e; i++) {
         pt_entry_t *pte = &(ptes[i]);
@@ -444,7 +462,7 @@ static fernos_error_t pt_alloc_range(phys_addr_t pt, uint32_t s, uint32_t e, uin
         *pte = fos_unique_pt_entry(new_page, true);
     }
 
-    assign_free_page(old);
+    assign_free_page(0, old);
 
     *true_e = i;
 
@@ -464,9 +482,9 @@ static void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e) {
         return;
     }
 
-    phys_addr_t old = assign_free_page(pt);
+    phys_addr_t old = assign_free_page(0, pt);
 
-    pt_entry_t *ptes = (pt_entry_t *)free_kernel_page;
+    pt_entry_t *ptes = (pt_entry_t *)(free_kernel_pages[0]);
 
     for (uint32_t i = s; i < e; i++) {
         pt_entry_t *pte = &(ptes[i]);
@@ -479,7 +497,7 @@ static void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e) {
         *pte = not_present_pt_entry();
     }
 
-    assign_free_page(old);
+    assign_free_page(0, old);
 }
 
 fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
@@ -507,9 +525,9 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
     uint32_t pi_e = (uint32_t)e / M_4K;
     uint32_t pi = pi_s;
 
-    phys_addr_t old = assign_free_page(pd);
+    phys_addr_t old = assign_free_page(0, pd);
 
-    pt_entry_t *pdes = (pt_entry_t *)free_kernel_page;
+    pt_entry_t *pdes = (pt_entry_t *)(free_kernel_pages[0]);
 
     while (err == FOS_SUCCESS && pi < pi_e) {
         uint32_t nb = ALIGN(pi + 1024, 1024);
@@ -548,7 +566,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
         pi += (true_pti_e - pti);
     }
 
-    assign_free_page(old);
+    assign_free_page(0, old);
 
     *true_e = (void *)(pi * M_4K);
 
@@ -572,8 +590,8 @@ void pd_free_pages(phys_addr_t pd, void *s, void *e) {
     uint32_t pi_e = (uint32_t)e / M_4K;
     uint32_t pi = pi_s;
 
-    phys_addr_t old = assign_free_page(pd);
-    pt_entry_t *pdes = (pt_entry_t *)free_kernel_page;
+    phys_addr_t old = assign_free_page(0, pd);
+    pt_entry_t *pdes = (pt_entry_t *)(free_kernel_pages[0]);
 
     while (pi < pi_e) {
         uint32_t nb = ALIGN(pi + 1024, 1024);
@@ -623,7 +641,7 @@ void pd_free_pages(phys_addr_t pd, void *s, void *e) {
         pi = nb;
     }
 
-    assign_free_page(old);
+    assign_free_page(0, old);
 }
 
 void delete_page_directory(phys_addr_t pd) {
@@ -631,8 +649,8 @@ void delete_page_directory(phys_addr_t pd) {
         return;
     }
 
-    phys_addr_t old = assign_free_page(pd);
-    pt_entry_t *pdes = (pt_entry_t *)free_kernel_page;
+    phys_addr_t old = assign_free_page(0, pd);
+    pt_entry_t *pdes = (pt_entry_t *)(free_kernel_pages[0]);
 
     for (uint32_t pdi = 0; pdi < 1024; pdi++) {
         pt_entry_t pde = pdes[pdi]; 
@@ -647,8 +665,21 @@ void delete_page_directory(phys_addr_t pd) {
         }
     }
 
-    assign_free_page(old);
+    assign_free_page(0, old);
 
     push_free_page(pd);
+}
+
+void page_copy(phys_addr_t dest, phys_addr_t src) {
+    phys_addr_t old0 = assign_free_page(0, dest);
+    phys_addr_t old1 = assign_free_page(1, src);
+
+    void *vdest = free_kernel_pages[0];
+    void *vsrc = free_kernel_pages[1];
+
+    mem_cpy(vdest, vsrc, M_4K);
+
+    assign_free_page(0, old0);
+    assign_free_page(1, old1);
 }
 

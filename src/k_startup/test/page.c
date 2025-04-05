@@ -143,10 +143,18 @@ static bool test_pd_overlapping_alloc(void) {
     TEST_EQUAL_HEX(FOS_ALREADY_ALLOCATED, err);
     TEST_EQUAL_HEX(S + (6*M_4K), true_e);
 
+    err = pd_alloc_pages(pd, S + (3*M_4K), S + (7*M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_ALREADY_ALLOCATED, err);
+    TEST_EQUAL_HEX(S + (3*M_4K), true_e);
+
     pd_free_pages(pd, S, S + (8*M_4K));
 
     TEST_SUCCEED();
 }
+
+// Ok what else?
+// Can we confirm that certain areas actually work????
+// Like what exactly??
 
 void test_page(void) {
     RUN_TEST(test_push_and_pop);
