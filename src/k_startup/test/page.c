@@ -6,6 +6,8 @@
 #include "k_bios_term/term.h"
 #include "k_sys/debug.h"
 #include "s_util/err.h"
+#include "s_util/str.h"
+#include <stdint.h>
 
 static bool pretest(void);
 static bool posttest(void);
@@ -51,18 +53,23 @@ static bool posttest(void) {
     TEST_SUCCEED();
 }
 
-#define NUM_TEST_FREE_PAGES (2)
-
-static uint8_t test_free_pages[NUM_TEST_FREE_PAGES][M_4K] __attribute__ ((aligned(M_4K)));
 
 static bool test_assign_free_page(void) {
     // Ok, there are 2 free pages.
 
-    phys_addr_t old0 = assign_free_page(0, (phys_addr_t)(test_free_pages[0]));
+    enable_loss_check();
+
+    phys_addr_t p0 = pop_free_page();
+    TEST_TRUE(p0 != NULL_PHYS_ADDR);
+
+    phys_addr_t p1 = pop_free_page();
+    TEST_TRUE(p1 != NULL_PHYS_ADDR);
+
+    phys_addr_t old0 = assign_free_page(0, p0);
     // 0 -> 0
     free_kernel_pages[0][0] = 0xAB;
 
-    phys_addr_t old0p = assign_free_page(0, (phys_addr_t)(test_free_pages[1]));
+    phys_addr_t old0p = assign_free_page(0, p1);
     // 0 -> 1
     
     free_kernel_pages[0][0] = 0xFE;
@@ -70,7 +77,7 @@ static bool test_assign_free_page(void) {
     assign_free_page(0, old0p);
     // 0 -> 0
 
-    phys_addr_t old1 = assign_free_page(1, (phys_addr_t)(test_free_pages[0]));
+    phys_addr_t old1 = assign_free_page(1, p0);
     // 1 -> 0
 
     TEST_EQUAL_HEX(0xAB, free_kernel_pages[1][0]);
@@ -81,7 +88,7 @@ static bool test_assign_free_page(void) {
 
     TEST_EQUAL_HEX(0xCC, free_kernel_pages[0][0]);
 
-    old1 = assign_free_page(1, (phys_addr_t)(test_free_pages[1]));
+    old1 = assign_free_page(1, p1);
     // 1 -> 1
     
     TEST_EQUAL_HEX(0xFE, free_kernel_pages[1][0]);
@@ -91,6 +98,9 @@ static bool test_assign_free_page(void) {
 
     assign_free_page(0, old0);
     // 0 -> *
+    
+    push_free_page(p0);
+    push_free_page(p1);
     
     TEST_SUCCEED();
 }
@@ -278,6 +288,30 @@ static bool test_delete_page_directory(void) {
     TEST_SUCCEED();
 }
 
+static bool test_page_copy(void) {
+    enable_loss_check();
+
+    phys_addr_t p0 = pop_free_page();
+    TEST_TRUE(p0 != NULL_PHYS_ADDR);
+    assign_free_page(0, p0);
+
+    for (uint32_t i = 0; i < M_4K; i++) {
+        free_kernel_pages[0][i] = (i + 13) * (i + 3);
+    }
+
+    phys_addr_t p1 = pop_free_page();
+    TEST_TRUE(p1 != NULL_PHYS_ADDR);
+
+    page_copy(p1, p0);
+    assign_free_page(1, p1);
+
+    TEST_TRUE(mem_cmp(free_kernel_pages[0], free_kernel_pages[1], M_4K));
+
+    push_free_page(p1);
+    push_free_page(p0);
+
+    TEST_SUCCEED();
+}
 
 void test_page(void) {
     RUN_TEST(test_assign_free_page);
@@ -291,5 +325,6 @@ void test_page(void) {
     (void)test_pd_free_dangerous;
 
     RUN_TEST(test_delete_page_directory);
+    RUN_TEST(test_page_copy);
 }
 
