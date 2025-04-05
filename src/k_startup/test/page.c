@@ -313,7 +313,7 @@ static bool test_page_copy(void) {
     TEST_SUCCEED();
 }
 
-void test_page(void) {
+bool test_page(void) {
     BEGIN_SUITE("Paging");
 
     RUN_TEST(test_assign_free_page);
@@ -329,6 +329,6 @@ void test_page(void) {
     RUN_TEST(test_delete_page_directory);
     RUN_TEST(test_page_copy);
 
-    END_SUITE();
+    return END_SUITE();
 }
 

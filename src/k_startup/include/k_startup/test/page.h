@@ -3,4 +3,4 @@
 
 #include <stdbool.h>
 
-void test_page(void);
+bool test_page(void);

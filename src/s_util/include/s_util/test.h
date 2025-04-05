@@ -80,7 +80,10 @@ static inline void BEGIN_SUITE(const char *name) {
     LOGF_METHOD(HBAR);
 }
 
-static inline void END_SUITE(void) {
+/**
+ * Returns true on success, false on failure.
+ */
+static inline bool END_SUITE(void) {
     LOGF_METHOD(HBAR);
     if (_failures == 0) {
         LOGF_METHOD(ANSII_GREEN_FG "Suite Passed\n" ANSII_RESET);
@@ -89,6 +92,8 @@ static inline void END_SUITE(void) {
         LOGF_METHOD("%u Failure(s) / %u Test(s)\n", _failures, _total_run); 
     }
     LOGF_METHOD("\n");
+
+    return _failures == 0;
 }
 
 static inline void _run_test(const char *name, bool (*t)(void)) {

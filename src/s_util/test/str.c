@@ -318,7 +318,7 @@ static bool test_str_fmt(void) {
     TEST_SUCCEED();
 }
 
-void test_str(void) {
+bool test_str(void) {
     BEGIN_SUITE("Strings");
     RUN_TEST(test_mem_cmp);
     RUN_TEST(test_mem_cpy);
@@ -333,5 +333,5 @@ void test_str(void) {
     RUN_TEST(test_str_ra);
     RUN_TEST(test_str_center);
     RUN_TEST(test_str_fmt);
-    END_SUITE();
+    return END_SUITE();
 }

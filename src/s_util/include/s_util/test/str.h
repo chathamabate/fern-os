@@ -3,4 +3,4 @@
 
 #include <stdbool.h>
 
-void test_str(void);
+bool test_str(void);

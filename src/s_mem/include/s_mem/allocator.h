@@ -1,8 +1,8 @@
 
 #pragma once
 
-#include <stdio.h>
 #include <stdint.h>
+#include <stddef.h>
 
 /*
  * An allocator is something used to request dynamic memory.
@@ -32,6 +32,8 @@ typedef struct _allocator_impl_t {
     void *(*al_malloc)(allocator_t *al, size_t bytes);
     void *(*al_realloc)(allocator_t *al, void *ptr, size_t bytes);
     void (*al_free)(allocator_t *al, void *ptr);
+
+    size_t (*al_num_user_blocks)(allocator_t *al);
 
     void (*delete_allocator)(allocator_t *al);
 } allocator_impl_t;
@@ -92,6 +94,21 @@ static inline void al_free(allocator_t *al, void *ptr) {
     }
 
     al->impl->al_free(al, ptr);
+}
+
+/**
+ * This function primarily exists for debugging purposes.
+ *
+ * It should return the number of blocks malloc'd by the user which currently exist.
+ * I specific "malloc'd" by the user, because blocks which are created internally for the use of the
+ * allocator should be ignored.
+ */
+static inline size_t al_num_user_blocks(allocator_t *al) {
+    if (!al) {
+        return 0;
+    }
+
+    return al->impl->al_num_user_blocks(al);
 }
 
 /**
