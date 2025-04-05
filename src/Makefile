@@ -13,6 +13,7 @@ MODS := \
 		k_startup \
 		k_bios_term \
 		k_sys \
+		s_mem \
 		s_util 
 
 # Static memory layout header and linker generation:
