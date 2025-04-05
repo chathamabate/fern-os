@@ -3,9 +3,16 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
+#include "s_util/misc.h"
 #include "s_util/ansii.h"
 
+#define HBAR "-----------------------------\n"
+
+static const char *_running_suite_name;
 static const char *_running_test_name;
+static uint32_t _failures;
+static uint32_t _total_run;
 
 #ifndef PRETEST 
 #define PRETEST() true
@@ -64,6 +71,26 @@ static const char *_running_test_name;
         } \
     } while (0)
 
+static inline void BEGIN_SUITE(const char *name) {
+    _running_suite_name = name;
+    _failures = 0;
+    _total_run = 0;
+
+    LOGF_METHOD("Entering Test Suite: " ANSII_BRIGHT_CYAN_FG "%s" ANSII_RESET "\n", _running_suite_name);
+    LOGF_METHOD(HBAR);
+}
+
+static inline void END_SUITE(void) {
+    LOGF_METHOD(HBAR);
+    if (_failures == 0) {
+        LOGF_METHOD(ANSII_GREEN_FG "Suite Passed\n" ANSII_RESET);
+    } else {
+        LOGF_METHOD(ANSII_RED_FG "Suite Failed\n" ANSII_RESET);
+        LOGF_METHOD("%u Failure(s) / %u Test(s)\n", _failures, _total_run); 
+    }
+    LOGF_METHOD("\n");
+}
+
 static inline void _run_test(const char *name, bool (*t)(void)) {
     _running_test_name = name;
 
@@ -81,10 +108,14 @@ static inline void _run_test(const char *name, bool (*t)(void)) {
         res = POSTTEST();
     }
 
-    LOGF_PREFIXED("%s\n", res 
-            ? ANSII_GREEN_FG "PASSED" ANSII_RESET 
-            : ANSII_RED_FG "FAILED" ANSII_RESET
-    );
+    _total_run++;
+
+    if (res) {
+        LOGF_PREFIXED("%s\n", ANSII_GREEN_FG "PASSED" ANSII_RESET);
+    } else {
+        LOGF_PREFIXED("%s\n", ANSII_RED_FG "FAILED" ANSII_RESET);
+        _failures++;
+    }
 }
 
 #define RUN_TEST(test) _run_test(#test, test)

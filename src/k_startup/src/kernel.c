@@ -43,7 +43,7 @@ void bad_handler(void);
 
 
 int kernel_main(void) {
-    test_page();
+    test_str();
 
     return 0;
 }
