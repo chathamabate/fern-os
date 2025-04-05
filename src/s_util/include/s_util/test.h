@@ -8,11 +8,11 @@
 static const char *_running_test_name;
 
 #ifndef PRETEST 
-#define PRETEST()
+#define PRETEST() true
 #endif
 
 #ifndef POSTTEST
-#define POSTTEST()
+#define POSTTEST() true
 #endif
 
 #ifndef LOGF_METHOD
@@ -64,12 +64,22 @@ static const char *_running_test_name;
         } \
     } while (0)
 
-static void _run_test(const char *name, bool (*t)(void)) {
+static inline void _run_test(const char *name, bool (*t)(void)) {
     _running_test_name = name;
 
-    PRETEST();
-    bool res = t();
-    POSTTEST();
+    bool res = true;
+
+    if (res) {
+        res = PRETEST();
+    }
+
+    if (res) {
+        res = t();
+    }
+
+    if (res) {
+        res = POSTTEST();
+    }
 
     LOGF_PREFIXED("%s\n", res 
             ? ANSII_GREEN_FG "PASSED" ANSII_RESET 

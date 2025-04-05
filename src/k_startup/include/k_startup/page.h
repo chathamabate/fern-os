@@ -165,12 +165,11 @@ void push_free_page(phys_addr_t page_addr);
 phys_addr_t pop_free_page(void);
 
 /**
- * Create a new default page directory and store it's physical address at pd_addr.
+ * Create a new page directory. Returns NULL_PHYS_ADDR on error.
  *
- * NOTE: This is just a directory where all identity page tables are mapped, and all other page
- * entries are marked non-present.
+ * NOTE: This just a page directory with no filled entries.
  */
-fernos_error_t new_page_directory(phys_addr_t *pd_addr);
+phys_addr_t new_page_directory(void);
 
 /**
  * Add pages (and page table if necessary) to a page directory.

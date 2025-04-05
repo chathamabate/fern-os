@@ -7,8 +7,8 @@
 #include "k_sys/debug.h"
 #include "s_util/err.h"
 
-static void pretest(void);
-static void posttest(void);
+static bool pretest(void);
+static bool posttest(void);
 
 #define PRETEST() pretest()
 #define POSTTEST() posttest()
@@ -34,17 +34,65 @@ static void enable_loss_check(void) {
     expect_no_loss = true;
 }
 
-static void pretest(void) {
+static bool pretest(void) {
     expect_no_loss = false;
     initial_num_free_pages = get_num_free_pages();
+
+    TEST_SUCCEED();
 }
 
-static void posttest(void) {
+static bool posttest(void) {
     uint32_t actual_num_free_pages = get_num_free_pages();
 
     if (expect_no_loss) {
         TEST_EQUAL_HEX(initial_num_free_pages, actual_num_free_pages);
     }
+
+    TEST_SUCCEED();
+}
+
+#define NUM_TEST_FREE_PAGES (2)
+
+static uint8_t test_free_pages[NUM_TEST_FREE_PAGES][M_4K] __attribute__ ((aligned(M_4K)));
+
+static bool test_assign_free_page(void) {
+    // Ok, there are 2 free pages.
+
+    phys_addr_t old0 = assign_free_page(0, (phys_addr_t)(test_free_pages[0]));
+    // 0 -> 0
+    free_kernel_pages[0][0] = 0xAB;
+
+    phys_addr_t old0p = assign_free_page(0, (phys_addr_t)(test_free_pages[1]));
+    // 0 -> 1
+    
+    free_kernel_pages[0][0] = 0xFE;
+
+    assign_free_page(0, old0p);
+    // 0 -> 0
+
+    phys_addr_t old1 = assign_free_page(1, (phys_addr_t)(test_free_pages[0]));
+    // 1 -> 0
+
+    TEST_EQUAL_HEX(0xAB, free_kernel_pages[1][0]);
+    free_kernel_pages[1][0] = 0xCC;
+
+    assign_free_page(1, old1);
+    // 1 -> *
+
+    TEST_EQUAL_HEX(0xCC, free_kernel_pages[0][0]);
+
+    old1 = assign_free_page(1, (phys_addr_t)(test_free_pages[1]));
+    // 1 -> 1
+    
+    TEST_EQUAL_HEX(0xFE, free_kernel_pages[1][0]);
+
+    assign_free_page(1, old1);
+    // 1 -> *
+
+    assign_free_page(0, old0);
+    // 0 -> *
+    
+    TEST_SUCCEED();
 }
 
 static bool test_push_and_pop(void) {
@@ -80,7 +128,7 @@ static bool test_pd_alloc(void) {
     };
     const size_t NUM_CASES = sizeof(CASES) / sizeof(CASES[0]);
 
-    phys_addr_t pd = get_page_directory();
+    phys_addr_t pd = get_kernel_pd();
 
     uint32_t init_pages;
 
@@ -123,7 +171,7 @@ static bool test_pd_alloc(void) {
 
 static bool test_pd_overlapping_alloc(void) {
     uint8_t * const S = (uint8_t *)_static_area_end;
-    phys_addr_t pd = get_page_directory();
+    phys_addr_t pd = get_kernel_pd();
 
     fernos_error_t err;
     void *true_e;
@@ -152,12 +200,96 @@ static bool test_pd_overlapping_alloc(void) {
     TEST_SUCCEED();
 }
 
-// Ok what else?
-// Can we confirm that certain areas actually work????
-// Like what exactly??
+static bool test_pd_free(void) {
+    uint8_t * const S = (uint8_t *)_static_area_end;
+    phys_addr_t pd = get_kernel_pd();
+
+    fernos_error_t err;
+    void *true_e;
+
+    uint32_t num_fps;
+
+    /* This test isn't really that rigorous tbh */
+
+    err = pd_alloc_pages(pd, S, S + (5 * M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    num_fps = get_num_free_pages();
+
+    pd_free_pages(pd, S, S + (5 * M_4K));
+    TEST_TRUE(get_num_free_pages() >= num_fps + 5);
+
+    /* Test a larger and weirder range */
+
+    err = pd_alloc_pages(pd, S + (7 * M_4K), S + (3012 * M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    num_fps = get_num_free_pages();
+
+    pd_free_pages(pd, S + (7 * M_4K), S + (3012 * M_4K));
+    TEST_TRUE(get_num_free_pages() >= num_fps + (3012 - 7));
+
+    TEST_SUCCEED();
+}
+
+/**
+ * You should expect this test to halt the processor.
+ * (Given an interrupt handler is setup for page faults)
+ */
+static bool test_pd_free_dangerous(void) {
+    LOGF_PREFIXED("Running Dangerous Test\n");
+
+    uint8_t * const S = (uint8_t *)_static_area_end;
+    phys_addr_t pd = get_kernel_pd();
+
+    fernos_error_t err;
+    void *true_e;
+
+    err = pd_alloc_pages(pd, S, S + (4 * M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    *(uint32_t *)S = 1234;
+    LOGF_PREFIXED("We have written to S\n");
+
+    pd_free_pages(pd, S, S + (2 * M_4K));
+    *(uint32_t *)S = 1234;
+    LOGF_PREFIXED("We have written again to S\n");
+
+    TEST_SUCCEED();
+}
+
+static bool test_delete_page_directory(void) {
+    enable_loss_check();
+    fernos_error_t err;
+
+    phys_addr_t pd = new_page_directory();
+    TEST_TRUE(pd != NULL_PHYS_ADDR);
+
+    void *true_e;
+
+    err = pd_alloc_pages(pd, (void *)M_4K, (void *)M_4M, &true_e); 
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = pd_alloc_pages(pd, (void *)(4 * M_4M), (void *)(6*M_4M + 12*M_4K), &true_e); 
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    delete_page_directory(pd);
+
+    TEST_SUCCEED();
+}
+
 
 void test_page(void) {
+    RUN_TEST(test_assign_free_page);
     RUN_TEST(test_push_and_pop);
     RUN_TEST(test_pd_alloc);
     RUN_TEST(test_pd_overlapping_alloc);
+    RUN_TEST(test_pd_free);
+
+    // Remember this halts the cpu.
+    //RUN_TEST(test_pd_free_dangerous);
+    (void)test_pd_free_dangerous;
+
+    RUN_TEST(test_delete_page_directory);
 }
+

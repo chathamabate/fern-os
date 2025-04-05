@@ -500,6 +500,10 @@ static void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e) {
     assign_free_page(0, old);
 }
 
+phys_addr_t new_page_directory(void) {
+    return new_page_table();
+}
+
 fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
     CHECK_ALIGN(pd, M_4K);
     CHECK_ALIGN(s, M_4K);
