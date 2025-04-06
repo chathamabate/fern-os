@@ -56,6 +56,14 @@ typedef struct _simple_heap_allocator_t {
     size_t num_user_blocks;
 
     /**
+     * This means we cannot request any more memory.
+     * The mapped heap is at its maximum size.
+     * This is either because we reached attrs.end, we ran out of underlying memory, or we ran into
+     * another area of mapped memory.
+     */
+    bool exhausted;
+
+    /**
      * Heads of both free lists, NULL when empty.
      */
     free_block_t *small_fl_head;
@@ -101,6 +109,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
     *(void **)&(shal->heap_start) = hs;
 
     shal->brk_ptr = true_e; // This will be the end of whatever our first mem request was.
+    shal->exhausted = false;
     shal->num_user_blocks = 0;
 
     // Ok, now we gotta configure the first free block.
@@ -241,13 +250,73 @@ static void shal_add_fb(simple_heap_allocator_t *shal, mem_block_t *mb) {
 static void *shal_malloc(allocator_t *al, size_t bytes) {
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
 
+    if (bytes == 0) {
+        return NULL;
+    }
+
     if (bytes & 1) {
         bytes++; // Always round bytes up to an even number!
     }
 
     // We need to look for a free block which is at least bytes size.
 
-    if (bytes < 
+    mem_block_t *fb = NULL;
+
+    size_t i;
+
+    free_block_t *sl_iter = shal->small_fl_head;
+    free_block_t *ll_iter = shal->large_fl_head;
+
+    // Only search small list if we are requesting a small number of bytes.
+    if (bytes < shal->attrs.small_fl_cutoff) {
+        i = 0; 
+
+        while (sl_iter && (shal->attrs.small_fl_cutoff == 0 || i < shal->attrs.small_fl_cutoff)) {
+            if (mb_get_size((mem_block_t *)sl_iter) >= bytes) {
+                fb = (mem_block_t *)sl_iter;
+                break;
+            }
+
+            i++;
+            sl_iter = sl_iter->next;
+        }
+    }
+
+    // If we are yet to find a free block, let's search the large list.
+    if (!fb) {
+        i = 0;
+
+        while (ll_iter && (shal->attrs.large_fl_search_amt == 0 || i < shal->attrs.large_fl_search_amt)) {
+            if (mb_get_size((mem_block_t *)ll_iter) >= bytes) {
+                fb = (mem_block_t *)ll_iter;
+                break;
+            }
+
+            i++;
+            ll_iter = ll_iter->next;
+        }
+    }
+
+    // After doing an initial search of both lists, are we still yet to find a large enough free 
+    // block? If so, check if we can request more memory.
+    if (!fb && !(shal->exhausted)) {
+        size_t mem_needed = bytes + (2 * sizeof(mem_block_border_t));
+        if (!IS_ALIGNED(mem_needed, M_4K)) {
+            mem_needed = ALIGN(mem_needed + M_4K, M_4K);
+        }
+
+        size_t mem_left = (uint32_t)(shal->attrs.end) - (uint32_t)(shal->brk_ptr);
+
+        if (mem_left < mem_needed) {
+            mem_needed = mem_left;
+        }
+
+        void *s = (void *)shal->brk_ptr;
+        const void *e = (const uint8_t *)(shal->brk_ptr) + mem_needed;
+
+
+
+    }
 
     // Ok, so, how do we do this exactly???
 
