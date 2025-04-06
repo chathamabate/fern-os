@@ -3,13 +3,69 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 /*
+ * Memory block primitives which may be useful for allocators.
+ */
+
+typedef uint32_t mem_block_border_t;
+
+static inline void mbb_set_size(mem_block_border_t *mbb, uint32_t size) {
+    *mbb = (size & (~1UL)) | (*mbb & 1UL);
+}
+
+static inline uint32_t mbb_get_size(mem_block_border_t mbb) {
+    return mbb & (~1UL);
+}
+
+static inline void mbb_set_allocated(mem_block_border_t *mbb, bool allocated) {
+    *mbb = (*mbb & (~1UL)) | (allocated ? 1UL : 0UL);
+}
+
+static inline bool mbb_get_allocated(mem_block_border_t mbb) {
+    return (mbb & 1UL) == 1UL;
+}
+
+static inline void mbb_set(mem_block_border_t *mbb, uint32_t size, bool allocated) {
+    *mbb = (size & (~1UL)) | (allocated ? 1UL : 0UL);
+}
+
+/* uint8_t is kinda a place holder here */
+typedef uint8_t mem_block_t;
+
+static inline mem_block_border_t *mb_get_header(mem_block_t *mb) {
+    return (mem_block_border_t *)(mb - sizeof(mem_block_border_t));
+}
+
+static inline mem_block_t *header_get_mb(mem_block_border_t *hdr) {
+    return (mem_block_t *)(hdr + 1);
+}
+
+static inline mem_block_border_t *mb_get_footer(mem_block_t *mb) {
+    uint32_t size = mbb_get_size(*mb_get_header(mb));
+    return (mem_block_border_t *)(mb + size);
+}
+
+static inline mem_block_t *footer_get_mb(mem_block_border_t *ftr) {
+    uint32_t size = mbb_get_size(*ftr);
+    return (mem_block_t *)((uint8_t *)ftr - size);
+}
+
+static inline mem_block_t *mb_next_block(mem_block_t *mb) {
+    return (mem_block_t *)(mb_get_footer(mb) + 2);
+}
+
+static inline mem_block_t *mb_prev_block(mem_block_t *mb) {
+    mem_block_border_t *ftr = (mem_block_border_t *)mb - 2;
+    return footer_get_mb(ftr);
+}
+
+/**
  * An allocator is something used to request dynamic memory.
  *
  * How said memory is requested, and where it lives is up to the implementation.
  */
-
 struct _allocator_t;
 typedef struct _allocator_t allocator_t;
 
@@ -24,8 +80,10 @@ typedef struct _allocator_t allocator_t;
 /**
  * NOTE: This setter is NOT threadsafe. Nor would it really make sense to use this in a multi 
  * threaded context. It's meant to be used maybe at the beginning of some task.
+ *
+ * The setter returns whichever allocator was previously set as the default.
  */
-void set_default_allocator(allocator_t *al);
+allocator_t *set_default_allocator(allocator_t *al);
 allocator_t *get_default_allocator(void);
 
 typedef struct _allocator_impl_t {
