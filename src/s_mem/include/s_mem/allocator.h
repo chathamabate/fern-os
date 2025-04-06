@@ -34,6 +34,11 @@ static inline void mbb_set(mem_block_border_t *mbb, uint32_t size, bool allocate
 /* uint8_t is kinda a place holder here */
 typedef uint8_t mem_block_t;
 
+/*
+ * NOTE: the "size" of a memory block is just how many internal bytes there are.
+ * A memory block occupies (2 * sizeof(border)) + size bytes.
+ */
+
 static inline mem_block_border_t *mb_get_header(mem_block_t *mb) {
     return (mem_block_border_t *)(mb - sizeof(mem_block_border_t));
 }
