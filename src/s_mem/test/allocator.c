@@ -174,6 +174,51 @@ static bool test_large_malloc(void) {
 }
 
 bool test_realloc(void) {
+    uint8_t *blocks[15];
+    uint32_t num_blocks = sizeof(blocks) / sizeof(blocks[0]);
+
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        uint32_t block_eles = 30;
+        uint8_t *block = al_realloc(al, NULL, block_eles * sizeof(uint8_t));
+        TEST_TRUE(block != NULL);
+    
+        for (uint32_t j = 0; j < block_eles; j++) {
+            block[block_eles] = i;
+        }
+
+        blocks[i] = block;
+    }
+
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        uint32_t block_eles = i % 2 == 0 ? 15 : 45; 
+        uint8_t *realloc_block = al_realloc(blocks[i], block_eles * sizeof(uint8_t));
+        TEST_TRUE(realloc_block != NULL);
+
+        // For any block which was resized as larger than the original 30 elements,
+        // Fill in the blank space.
+        for (uint32_t j = 30; j < block_eles; j++) {
+            realloc_block[j] = i;
+        }
+
+        blocks[i] = realloc_block;
+    }
+
+    TEST_EQUAL_UINT(num_blocks, al_num_user_blocks(al));
+
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        // Only check elements which would've been copied.
+        uint32_t block_eles = i % 2 == 0 ? 15 : 45;
+        uint8_t *block = blocks[i];
+        
+        for (uint32_t j = 0; j < block_eles; j++) {
+            TEST_EQUAL_UINT(i, block[j]);
+        }
+    }
+
+    // Finally free everything using realloc once again.
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        al_realloc(al, blocks[i], 0);
+    }
 
     TEST_SUCCEED();
 }
