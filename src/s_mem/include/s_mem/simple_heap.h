@@ -33,6 +33,12 @@ typedef struct _simple_heap_attrs_t {
      */
     fernos_error_t (*request_mem)(void *s, const void *e, void **true_e);
 
+    /**
+     * This function is used by the allocator to return pages of memory.
+     * Both s and e must be 4K aligned.
+     */
+    void (*return_mem)(void *s, const void *e);
+
     /*
      * There will be two free lists for performance.
      *
