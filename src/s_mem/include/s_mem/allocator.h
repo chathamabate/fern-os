@@ -60,15 +60,6 @@ static inline bool mb_get_allocated(mem_block_t *mb) {
     return mbb_get_allocated(*mb_get_header(mb));
 }
 
-static inline mem_block_t *mb_next_block(mem_block_t *mb) {
-    return (mem_block_t *)(mb_get_footer(mb) + 2);
-}
-
-static inline mem_block_t *mb_prev_block(mem_block_t *mb) {
-    mem_block_border_t *ftr = (mem_block_border_t *)mb - 2;
-    return footer_get_mb(ftr);
-}
-
 /*
  * Simple Doubly linked free block structure which may be helpful for allocators!
  */

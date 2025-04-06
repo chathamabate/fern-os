@@ -94,7 +94,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
     // All blocks MUST have an even size.
     // Make sure the heap starts at an even offset.
     uint8_t *hs = (uint8_t *)(shal + 1);
-    if ((size_t)hs % 2 == 1) {
+    if ((size_t)hs & 1) {
         hs++; 
     }
 
@@ -168,38 +168,98 @@ static void shal_remove_fb(simple_heap_allocator_t *shal, mem_block_t *mb) {
     fb->next = NULL;
 }
 
+static mem_block_t *shal_mb_next(simple_heap_allocator_t *shal, mem_block_t *mb) {
+    mem_block_border_t *footer = mb_get_footer(mb);
+    mem_block_t *next = (mem_block_t *)(footer + 2);
+
+    if ((void *)next >= shal->brk_ptr) {
+        next = NULL;
+    }
+
+    return next;
+}
+
+static mem_block_t *shal_mb_prev(simple_heap_allocator_t *shal, mem_block_t *mb) {
+    mem_block_t *prev;
+    mem_block_border_t *header = mb_get_header(mb);
+
+    if (header == shal->heap_start) {
+        prev = NULL;
+    } else {
+        prev = footer_get_mb(header - 1);
+    }
+
+    return prev;
+}
+
 /**
  * Take a pointer to a block which is to be added to the free lists.
  *
  * NOTE: mb MUST have a valid size initialized!
  */
 static void shal_add_fb(simple_heap_allocator_t *shal, mem_block_t *mb) {
-    mem_block_t *prev;
-    if (mb_get_header(mb) == shal->heap_start) {
-        prev = NULL;
-    } else {
-        prev = mb_prev_block(mb);
+    mem_block_border_t *fb_hdr = mb_get_header(mb);
+    mem_block_border_t *fb_ftr = mb_get_footer(mb);
+
+    mem_block_t *prev = shal_mb_prev(shal, mb);
+    if (prev && !mb_get_allocated(prev)) {
+        shal_remove_fb(shal, prev);
+        fb_hdr = mb_get_header(prev);
     }
 
-    mem_block_t *next;
-    if (mb_get_footer(mb) + 1 == shal->brk_ptr) {
-        next = NULL;
-    } else {
-        next = mb_next_block(mb);
+    mem_block_t *next = shal_mb_next(shal, mb);
+    if (next && !mb_get_allocated(next)) {
+        shal_remove_fb(shal, next);
+        fb_ftr = mb_get_footer(next);
     }
 
-    // Ok, so what are the bounds of the free block we will be adding??
-    // That's the real question!
+    free_block_t *fb = (free_block_t *)(fb_hdr + 1);
+    uint32_t fb_size =  (uint32_t)fb_ftr - (uint32_t)(fb);
+    
+    mbb_set(fb_hdr, fb_size, false);
+    mbb_set(fb_ftr, fb_size, false);
+    
+    fb->prev = NULL;
 
+    if (fb_size < shal->attrs.small_fl_cutoff) {
+        fb->next = shal->small_fl_head;
+        if (shal->small_fl_head) {
+            shal->small_fl_head->prev = fb;
+        }
+
+        shal->small_fl_head = fb;
+    } else {
+        fb->next = shal->large_fl_head;
+        if (shal->large_fl_head) {
+            shal->large_fl_head->prev = fb;
+        }
+
+        shal->large_fl_head = fb;
+    }
 }
 
 static void *shal_malloc(allocator_t *al, size_t bytes) {
-    // Easy in some ways, hard in others....
+    simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
+
+    if (bytes & 1) {
+        bytes++; // Always round bytes up to an even number!
+    }
+
+    // We need to look for a free block which is at least bytes size.
+
+    if (bytes < 
+
+    // Ok, so, how do we do this exactly???
+
 
     return NULL;
 }
 
 static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
+
+
+
+    // Realloc is probably easier than alloc tbh!
     return NULL;
 }
 
@@ -215,29 +275,15 @@ static void shal_free(allocator_t *al, void *ptr) {
     if (!mb_get_allocated(mb)) {
         return; // Can't free a block which isn't allocated!
     }
-    
-    mem_block_t *prev_block = mb_prev_block(mb);
-    if ((void *)prev_block < shal->heap_start) {
-        // We are working with the first block in the heap.
-        prev_block = NULL;
-    }
 
-    mem_block_t *next_block = mb_next_block(mb);
-    if ((void *)next_block >= shal->brk_ptr) {
-        // We are working with the last block in the heap.
-        next_block = NULL;
-    }
+    shal_add_fb(shal, mb);
 
-
-
-
-
-    bool coal_prev = 
-
+    shal->num_user_blocks--;
 }
 
 static size_t shal_num_user_blocks(allocator_t *al) {
-    return 0;
+    simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
+    return shal->num_user_blocks;
 }
 
 static void delete_simple_heap_allocator(allocator_t *al) {
