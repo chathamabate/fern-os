@@ -19,11 +19,29 @@ static const allocator_impl_t SHAL_ALLOCATOR_IMPL = {
 
 typedef struct _simple_heap_allocator_t {
     allocator_t super;
+    const simple_heap_attrs_t attrs;
 
-    /**
-     * The start of the heap region.
+    /*
+     * The heap allocator breaks its area up into two pieces.
+     * The prologue and the heap.
+     *
+     * The prologue contains this struct (i.e. all bookkeeping info).
+     * The heap contains the actually allocated/free blocks.
+     *
+     * NOTE: The brk_ptr will ALWAYS be 4K aligned.
+     * Pages between the brk_ptr and attrs.end are expected to be unmapped.
+     *
+     * attrs.start  heap_start                 attrs.end 
+     * |            |          brk_ptr         |
+     * V            V          |               V
+     *                         V
+     * | Prologue   | Mapped   | Unmapped      |
+     * |            |                          | 
+     * |            # ------ Heap ------------ | 
+     * # --------- Allocator Region ---------- # 
      */
-    void * const heap_start; 
+
+    void * const heap_start;
 
     /**
      * The exclusive end of the allocated area of the heap region.
@@ -31,21 +49,15 @@ typedef struct _simple_heap_allocator_t {
     const void *brk_ptr;
 
     /**
-     * The exclusive end of the heap region.
-     */
-    const void * const heap_end;
-
-    /**
      * Number of user allocated blocks in the heap.
      */
     size_t num_user_blocks;
 
-    /**
-     * Ok, what is the free list structure??
-     */
+    free_block_t *small_fl_head;
+    free_block_t *large_fl_head;
 } simple_heap_allocator_t;
 
-allocator_t *new_simple_heap_allocator(void *s, const void *e, request_mem_ft rqm) {
+allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
     return NULL;
 }
 

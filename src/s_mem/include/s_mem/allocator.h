@@ -61,6 +61,18 @@ static inline mem_block_t *mb_prev_block(mem_block_t *mb) {
     return footer_get_mb(ftr);
 }
 
+/*
+ * Simple Doubly linked free block structure which may be helpful for allocators!
+ */
+
+struct _free_block_t;
+typedef struct _free_block_t free_block_t;
+
+struct _free_block_t {
+    free_block_t *prev;
+    free_block_t *next;
+};
+
 /**
  * An allocator is something used to request dynamic memory.
  *
@@ -97,12 +109,7 @@ typedef struct _allocator_impl_t {
 } allocator_impl_t;
 
 struct _allocator_t {
-    /**
-     * An allocator's implementation is never owned by the allocator itself. The idea is that when
-     * creating an allocator you define some static constant table of its functions which never
-     * changes and is pointed to by all instances of the allocator.
-     */
-    const allocator_impl_t * const impl;
+    const allocator_impl_t impl;
 };
 
 /**
@@ -118,7 +125,7 @@ static inline void *al_malloc(allocator_t *al, size_t bytes) {
         return NULL;
     }
         
-    return al->impl->al_malloc(al, bytes);
+    return al->impl.al_malloc(al, bytes);
 }
 
 /**
@@ -138,7 +145,7 @@ static inline void *al_realloc(allocator_t *al, void *ptr, size_t bytes) {
         return NULL;
     }
 
-    return al->impl->al_realloc(al, ptr, bytes);
+    return al->impl.al_realloc(al, ptr, bytes);
 }
 
 /**
@@ -151,7 +158,7 @@ static inline void al_free(allocator_t *al, void *ptr) {
         return;
     }
 
-    al->impl->al_free(al, ptr);
+    al->impl.al_free(al, ptr);
 }
 
 /**
@@ -166,7 +173,7 @@ static inline size_t al_num_user_blocks(allocator_t *al) {
         return 0;
     }
 
-    return al->impl->al_num_user_blocks(al);
+    return al->impl.al_num_user_blocks(al);
 }
 
 /**
@@ -177,5 +184,5 @@ static inline void delete_allocator(allocator_t *al) {
         return;
     }
 
-    al->impl->delete_allocator(al);
+    al->impl.delete_allocator(al);
 }
