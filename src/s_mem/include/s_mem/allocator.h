@@ -52,6 +52,14 @@ static inline mem_block_t *footer_get_mb(mem_block_border_t *ftr) {
     return (mem_block_t *)((uint8_t *)ftr - size);
 }
 
+static inline uint32_t mb_get_size(mem_block_t *mb) {
+    return mbb_get_size(*mb_get_header(mb));
+}
+
+static inline bool mb_get_allocated(mem_block_t *mb) {
+    return mbb_get_allocated(*mb_get_header(mb));
+}
+
 static inline mem_block_t *mb_next_block(mem_block_t *mb) {
     return (mem_block_t *)(mb_get_footer(mb) + 2);
 }

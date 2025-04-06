@@ -137,7 +137,65 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
     return (allocator_t *)shal;
 }
 
+/**
+ * Given a pointer to a valid free block, remove it from whatever free list it exists in.
+ *
+ * NOTE: This assumes we already know mb is a free block. (NO CHECKS)
+ */
+static void shal_remove_fb(simple_heap_allocator_t *shal, mem_block_t *mb) {
+    size_t fb_size = mb_get_size(mb); 
+
+    free_block_t *fb = (free_block_t *)mb;
+
+    if (fb->prev) {
+        fb->prev->next = fb->next;
+    } else {
+        // If there is no previous, we are working with the head of a free list.
+        // We must make sure to update the correct free list.
+
+        if (fb_size < shal->attrs.small_fl_cutoff) {
+            shal->small_fl_head = fb->next;
+        } else {
+            shal->large_fl_head = fb->next;
+        }
+    }
+
+    if (fb->next) {
+        fb->next->prev = fb->prev;
+    }
+
+    fb->prev = NULL;
+    fb->next = NULL;
+}
+
+/**
+ * Take a pointer to a block which is to be added to the free lists.
+ *
+ * NOTE: mb MUST have a valid size initialized!
+ */
+static void shal_add_fb(simple_heap_allocator_t *shal, mem_block_t *mb) {
+    mem_block_t *prev;
+    if (mb_get_header(mb) == shal->heap_start) {
+        prev = NULL;
+    } else {
+        prev = mb_prev_block(mb);
+    }
+
+    mem_block_t *next;
+    if (mb_get_footer(mb) + 1 == shal->brk_ptr) {
+        next = NULL;
+    } else {
+        next = mb_next_block(mb);
+    }
+
+    // Ok, so what are the bounds of the free block we will be adding??
+    // That's the real question!
+
+}
+
 static void *shal_malloc(allocator_t *al, size_t bytes) {
+    // Easy in some ways, hard in others....
+
     return NULL;
 }
 
@@ -146,6 +204,36 @@ static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
 }
 
 static void shal_free(allocator_t *al, void *ptr) {
+    simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
+
+    if (ptr < shal->heap_start || shal->brk_ptr <= ptr) {
+        return; // Can't free a pointer which isn't in the heap!
+    }
+
+    mem_block_t *mb = (mem_block_t *)ptr;
+
+    if (!mb_get_allocated(mb)) {
+        return; // Can't free a block which isn't allocated!
+    }
+    
+    mem_block_t *prev_block = mb_prev_block(mb);
+    if ((void *)prev_block < shal->heap_start) {
+        // We are working with the first block in the heap.
+        prev_block = NULL;
+    }
+
+    mem_block_t *next_block = mb_next_block(mb);
+    if ((void *)next_block >= shal->brk_ptr) {
+        // We are working with the last block in the heap.
+        next_block = NULL;
+    }
+
+
+
+
+
+    bool coal_prev = 
+
 }
 
 static size_t shal_num_user_blocks(allocator_t *al) {
