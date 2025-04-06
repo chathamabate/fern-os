@@ -38,6 +38,14 @@ static bool posttest(void) {
     TEST_SUCCEED();
 }
 
+static bool test_nop_args(void) {
+    TEST_TRUE(NULL == al_malloc(al, 0));
+    al_free(al, NULL);
+    TEST_TRUE(NULL == al_realloc(al, NULL, 0));
+
+    TEST_SUCCEED();
+}
+
 static bool test_simple_malloc(void) {
     uint32_t *block = al_malloc(al, sizeof(uint32_t));
 
@@ -191,7 +199,7 @@ bool test_realloc(void) {
 
     for (uint32_t i = 0; i < num_blocks; i++) {
         uint32_t block_eles = i % 2 == 0 ? 15 : 45; 
-        uint8_t *realloc_block = al_realloc(blocks[i], block_eles * sizeof(uint8_t));
+        uint8_t *realloc_block = al_realloc(al, blocks[i], block_eles * sizeof(uint8_t));
         TEST_TRUE(realloc_block != NULL);
 
         // For any block which was resized as larger than the original 30 elements,
@@ -217,7 +225,7 @@ bool test_realloc(void) {
 
     // Finally free everything using realloc once again.
     for (uint32_t i = 0; i < num_blocks; i++) {
-        al_realloc(al, blocks[i], 0);
+        TEST_TRUE(NULL == al_realloc(al, blocks[i], 0));
     }
 
     TEST_SUCCEED();
@@ -227,6 +235,7 @@ bool test_allocator(const char *name, allocator_t *(*gen)(void)) {
     gen_allocator = gen;
 
     BEGIN_SUITE(name);
+    RUN_TEST(test_nop_args);
     RUN_TEST(test_simple_malloc);
     RUN_TEST(test_repeated_malloc0);
     RUN_TEST(test_repeated_malloc1);
