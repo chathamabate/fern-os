@@ -348,6 +348,52 @@ static mem_block_t *shal_search_free_list(simple_heap_allocator_t *shal,
     return fb;
 }
 
+/**
+ * Take a block which does not belong to a free list.
+ *
+ * Shrink the block to bytes size if possible.
+ * Any free block created to the right will be coalesced and added to the free list.
+ *
+ * mb will be marked allocated.
+ */
+static void shal_shrink_left(simple_heap_allocator_t *shal, 
+        mem_block_t *mb, size_t bytes) {
+    // Since this is used internally, we assume mb is valid, and the given size is valid.
+
+    size_t mb_size = mb_get_size(mb);
+    
+    if (bytes >= mb_size) {
+        return; // Basically a bad input case, nothing is done.
+    }
+
+    size_t left_over = mb_size - bytes;
+
+    // We only can shrink mb, if the left over bytes is large enough for a fresh free block.
+    if (left_over >= (2 * sizeof(mem_block_border_t)) + sizeof(free_block_t)) {
+        mem_block_border_t *shr_mb_hdr = mb_get_header(mb);
+        mbb_set(shr_mb_hdr, bytes, true);
+        mem_block_border_t *shr_mb_ftr = mb_get_footer(mb);
+        mbb_set(shr_mb_ftr, bytes, true);
+
+        mem_block_t *new_fb = (mem_block_t *)(shr_mb_ftr + 2);
+        size_t new_fb_size = left_over - (2 * sizeof(mem_block_border_t));
+
+        mem_block_border_t *new_fb_hdr = mb_get_header(new_fb);
+        mbb_set(new_fb_hdr, new_fb_size, false);
+        mem_block_border_t *new_fb_ftr = mb_get_footer(new_fb);
+        mbb_set(new_fb_ftr, new_fb_size, false);
+        
+        new_fb = shal_coalesce(shal, new_fb);
+        shal_add_fb(shal, new_fb);
+    } else {
+        // If no shrink, just set the current block as allocated.
+        mem_block_border_t *hdr = mb_get_header(mb);
+        mbb_set_allocated(hdr, true);
+        mem_block_border_t *ftr = mb_get_footer(mb);
+        mbb_set_allocated(ftr, true);
+    }
+}
+
 
 static void *shal_malloc(allocator_t *al, size_t bytes) {
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
@@ -356,8 +402,12 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
         return NULL;
     }
 
+    if (bytes < sizeof(free_block_t)) {
+        bytes = sizeof(free_block_t);
+    } 
+
     if (bytes & 1) {
-        bytes++; // Always round bytes up to an even number!
+        bytes++;
     }
 
     // We need to look for a free block which is at least bytes size.
@@ -425,38 +475,9 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
     // block, or just a small piece.
     
     if (fb) {
-        size_t fb_size = mb_get_size(fb);
-
-        size_t left_over = fb_size - bytes;
-
-        mem_block_border_t *fb_hdr = mb_get_header(fb);
-        mem_block_border_t *fb_ftr = mb_get_footer(fb);
-
-        // If there is enough room for another block even after the allocation, let's cut
-        // the free block and add its excess to the free list.
-        if (left_over > (2 * sizeof(mem_block_border_t)) + sizeof(free_block_t)) {
-            // Shorten the free block to just the requested bytes size.
-            mbb_set(fb_hdr, bytes, false);
-
-            fb_ftr = mb_get_footer(fb);
-            mbb_set(fb_ftr, bytes, false);
-
-            // Create the cut free block and add it to the free list.
-
-            size_t cut_fb_size = left_over - (2 * sizeof(mem_block_border_t));
-
-            mem_block_border_t *cut_fb_hdr = fb_ftr + 1;
-            mbb_set(cut_fb_hdr, cut_fb_size, false);
-            mem_block_t *cut_fb = (mem_block_t *)(cut_fb_hdr + 1);
-            mem_block_border_t *cut_fb_ftr = mb_get_footer(cut_fb); 
-            mbb_set(cut_fb_ftr, cut_fb_size, false);
-
-            shal_add_fb(shal, cut_fb);
-        }
-
-        // Finally, set the free block as allocated!
-        mbb_set_allocated(fb_hdr, true);
-        mbb_set_allocated(fb_ftr, true);
+        // We take our free block and shrink it to the correct size. 
+        // (Remember, this call also marks the free block as allocated!)
+        shal_shrink_left(shal, fb, bytes);
         shal->num_user_blocks++;
     }
 
@@ -464,6 +485,11 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
 }
 
 static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
+    if (!ptr) {
+        return shal_malloc(al, bytes);
+    }
+
+    // TODO Complete this.
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
 
     if (ptr < shal->heap_start || shal->brk_ptr <= ptr) {
@@ -476,31 +502,60 @@ static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
         return NULL;  // Can't realloc a free block.
     }
 
+    // Ok now for real logic.
+
+    if (bytes < sizeof(free_block_t)) {
+        bytes = sizeof(free_block_t);
+    }
+
     if (bytes & 1) {
         bytes++; // Always a multiple of 2 please.
     }
 
     size_t mb_size = mb_get_size(mb);
 
+    mem_block_t *ret_block = NULL;
+
     if (mb_size == bytes) {
-        return ptr; // No work to be done, block is already large enough.
-    }
+        ret_block = mb; // Do nothing.
+    } else if (bytes < mb_size) { // A shrink.
+        shal_shrink_left(shal, mb, bytes);
+        ret_block = mb;
+    } else { // A stretch. 
+        // How many bytes mb must be stretched by for an inplace realloc.
+        size_t addn_req = bytes - mb_size;
 
-    if (bytes < mb_size) { // A shrink.
-        size_t left_over = mb_size - bytes; 
+        // TODO: THINK THIS THROUGH!
+        
+        mem_block_t *next = shal_mb_next(shal, mb);
 
-        if (left_over > ) {
-
+        // How many bytes are gained by merging with free block to the right.
+        size_t addn_amt = 0;
+        if (next && !(mb_get_allocated(next))) {
+            addn_amt = mb_get_size(next) + (2 * sizeof(mem_block_border_t));
         }
 
-    } else { // A stretch.
+        // Check if the merge should be done.
+        if (addn_amt >= addn_req) {
+            // This is really quite annoying.
+            // First remove next from the free lists.
+            shal_remove_fb(shal, next);
 
+            size_t next_shrink_amt = addn_amt - addn_req;
+
+            // Shrink down next. (Remember we get two border sizes for free)
+            shal_shrink_left(shal, next, addn_req - (2 * sizeof(mem_block_border_t)));
+            
+            
+            // take addn_amt and do what??
+            // We need to shrink the free block if needed.
+            // How many bytes do we need
+        } else {
+
+        }
     }
 
-    // This is actually hella annoying tbh...
-
-    // Realloc is probably easier than alloc tbh!
-    return NULL;
+    return ret_block;
 }
 
 static void shal_free(allocator_t *al, void *ptr) {
