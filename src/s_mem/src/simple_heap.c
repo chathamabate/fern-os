@@ -203,6 +203,7 @@ static mem_block_t *shal_mb_prev(simple_heap_allocator_t *shal, mem_block_t *mb)
 
 /**
  * Takes a pointer to a block and merges it with bordering free blocks.
+ * The given block should NOT be a member of either of the free lists.
  *
  * Returns a pointer to the newly created free block. (Yet to be added to a free list)
  */
@@ -316,27 +317,35 @@ static mem_block_t *shal_request_mem(simple_heap_allocator_t *shal, const void *
  * The returned free block will be removed from its free list before being returned!
  */
 static mem_block_t *shal_search_free_list(simple_heap_allocator_t *shal, 
-        bool large_list, bool stop_early, size_t bytes) {
+        bool large_list, bool stop_early, size_t bytes, size_t *searched) {
     size_t stop_amt = 0;
     if (stop_early) {
         stop_amt = large_list ? shal->attrs.large_fl_search_amt : shal->attrs.small_fl_search_amt;
     }
 
     free_block_t *iter = large_list ? shal->large_fl_head : shal->small_fl_head;
+    mem_block_t *fb = NULL;
 
     size_t i = 0;
     while (iter && (stop_amt == 0 || i < stop_amt)) {
+        i++;
 
         // Is our free block large enough?
         if (mb_get_size((mem_block_t *)iter) >= bytes) {
-            shal_remove_fb(shal, (mem_block_t *)iter);
-            return (mem_block_t *)iter;
+            fb = (mem_block_t *)iter;
+            shal_remove_fb(shal, fb);
+
+            break;
         }
         
         iter = iter->next;
     }
 
-    return NULL;
+    if (searched) {
+        *searched = i;
+    }
+
+    return fb;
 }
 
 
@@ -355,74 +364,103 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
 
     mem_block_t *fb = NULL;
 
+    size_t small_fl_searched = 0;
+    size_t large_fl_searched = 0;
+
     // Only search small list if we are requesting a small number of bytes.
     if (/* !fb && */ bytes < shal->attrs.small_fl_cutoff) {
-        size_t i = 0; 
-        free_block_t *sl_iter = shal->small_fl_head;
-
-        while (sl_iter && (shal->attrs.small_fl_cutoff == 0 || i < shal->attrs.small_fl_cutoff)) {
-            if (mb_get_size((mem_block_t *)sl_iter) >= bytes) {
-                fb = (mem_block_t *)sl_iter;
-                shal_remove_fb(shal, fb);
-                break;
-            }
-
-            i++;
-            sl_iter = sl_iter->next;
-        }
+        fb = shal_search_free_list(shal, false, true, bytes, &small_fl_searched);
     }
 
     // If we are yet to find a free block, let's search the large list.
     if (!fb) {
-        size_t i = 0;
-        free_block_t *ll_iter = shal->large_fl_head;
-
-        while (ll_iter && (shal->attrs.large_fl_search_amt == 0 || i < shal->attrs.large_fl_search_amt)) {
-            if (mb_get_size((mem_block_t *)ll_iter) >= bytes) {
-                fb = (mem_block_t *)ll_iter;
-                shal_remove_fb(shal, fb);
-                break;
-            }
-
-            i++;
-            ll_iter = ll_iter->next;
-        }
+        fb = shal_search_free_list(shal, true, true, bytes, &large_fl_searched);
     }
 
     // After doing an initial search of both lists, are we still yet to find a large enough free 
     // block? If so, check if we can request more memory.
     if (!fb && !(shal->exhausted)) {
+        size_t mem_needed = bytes;
+        if (!IS_ALIGNED(mem_needed, M_4K)) {
+            mem_needed = ALIGN(mem_needed + M_4K, M_4K);
+        }
 
+        size_t mem_left = (uint32_t)(shal->attrs.end) - (uint32_t)(shal->brk_ptr);
+        if (mem_left < mem_needed) {
+            mem_needed = mem_left; // allocate as much as we can.
+        }
+
+        // Remember, this potentially mutates the free lists.
+        mem_block_t *new_fb = shal_request_mem(shal, (uint8_t *)(shal->brk_ptr) + mem_needed);
+
+        if (new_fb) {
+            if (mb_get_size(new_fb) >= bytes) {
+                fb = new_fb; 
+            } else {
+                // If not large enough, just add it back to the free list.
+                shal_add_fb(shal, new_fb);
+            }
+        }
     }
 
     // Have we still not found a match? Let's exhaust our small free list.
-    if (!fb && bytes < shal->attrs.small_fl_cutoff) {
-        while (sl_iter) {
-            if (mb_get_size((mem_block_t *)sl_iter) >= bytes) {
-                fb = (mem_block_t *)sl_iter;
-                shal_remove_fb(shal, fb);
-                break;
-            }
-
-            sl_iter = sl_iter->next;
-        }
+    // What the equals case does is confirm that there are possible blocks in the free list we didn't
+    // search. If we didn't make it to the search_amt, we know the list's length is less than the 
+    // search amt. So, we shouldn't try again. (We already looked at everything)
+    //
+    // The slight inefficiency here is that we will search over the inital free blocks again.
+    if (!fb && bytes < shal->attrs.small_fl_cutoff && 
+            small_fl_searched == shal->attrs.small_fl_search_amt) {
+        fb = shal_search_free_list(shal, false, false, bytes, NULL);
     }
 
     // Still no match? Exhaust the large free list.
-    if (!fb) {
-        while (ll_iter) {
-            if (mb_get_size((mem_block_t *)ll_iter) >= bytes) {
-                fb = (mem_block_t *)ll_iter;
-                shal_remove_fb(shal, fb);
-                break;
-            }
-            ll_iter = ll_iter->next;
-        }
+    if (!fb && large_fl_searched == shal->attrs.large_fl_search_amt) {
+        fb = shal_search_free_list(shal, true, false, bytes, NULL);
     }
 
+    // Ok, at this point, fb is either a pointer to a free block which does not belong to a free 
+    // list. Or, fb is NULL. If fb is NULL, the allocation failed. If fb is non-null, we know it
+    // is large enough for our boy. The question becomes, will this malloc require the full free
+    // block, or just a small piece.
+    
+    if (fb) {
+        size_t fb_size = mb_get_size(fb);
 
+        size_t left_over = fb_size - bytes;
 
-    return NULL;
+        mem_block_border_t *fb_hdr = mb_get_header(fb);
+        mem_block_border_t *fb_ftr = mb_get_footer(fb);
+
+        // If there is enough room for another block even after the allocation, let's cut
+        // the free block and add its excess to the free list.
+        if (left_over > (2 * sizeof(mem_block_border_t)) + sizeof(free_block_t)) {
+            // Shorten the free block to just the requested bytes size.
+            mbb_set(fb_hdr, bytes, false);
+
+            fb_ftr = mb_get_footer(fb);
+            mbb_set(fb_ftr, bytes, false);
+
+            // Create the cut free block and add it to the free list.
+
+            size_t cut_fb_size = left_over - (2 * sizeof(mem_block_border_t));
+
+            mem_block_border_t *cut_fb_hdr = fb_ftr + 1;
+            mbb_set(cut_fb_hdr, cut_fb_size, false);
+            mem_block_t *cut_fb = (mem_block_t *)(cut_fb_hdr + 1);
+            mem_block_border_t *cut_fb_ftr = mb_get_footer(cut_fb); 
+            mbb_set(cut_fb_ftr, cut_fb_size, false);
+
+            shal_add_fb(shal, cut_fb);
+        }
+
+        // Finally, set the free block as allocated!
+        mbb_set_allocated(fb_hdr, true);
+        mbb_set_allocated(fb_ftr, true);
+        shal->num_user_blocks++;
+    }
+
+    return fb;
 }
 
 static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
