@@ -464,8 +464,40 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
 }
 
 static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
+    simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
 
+    if (ptr < shal->heap_start || shal->brk_ptr <= ptr) {
+        return NULL; // Can't realloc a pointer which isn't in the heap!
+    }
 
+    mem_block_t *mb = (mem_block_t *)ptr;
+    
+    if (!mb_get_allocated(mb)) {
+        return NULL;  // Can't realloc a free block.
+    }
+
+    if (bytes & 1) {
+        bytes++; // Always a multiple of 2 please.
+    }
+
+    size_t mb_size = mb_get_size(mb);
+
+    if (mb_size == bytes) {
+        return ptr; // No work to be done, block is already large enough.
+    }
+
+    if (bytes < mb_size) { // A shrink.
+        size_t left_over = mb_size - bytes; 
+
+        if (left_over > ) {
+
+        }
+
+    } else { // A stretch.
+
+    }
+
+    // This is actually hella annoying tbh...
 
     // Realloc is probably easier than alloc tbh!
     return NULL;
