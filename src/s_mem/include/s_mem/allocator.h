@@ -77,6 +77,25 @@ struct _free_block_t {
     free_block_t *next;
 };
 
+/*
+ * If you are using the schema above, all blocks must have an even size, and no block can
+ * have a size smaller than a free block.
+ */
+
+static inline size_t validate_mb_size(size_t mb_size) {
+    size_t mbs = mb_size;
+
+    if (mbs < sizeof(free_block_t)) {
+        mbs = sizeof(free_block_t);
+    }
+
+    if (mbs & 1) {
+        mbs++;
+    }
+
+    return mbs;
+}
+
 /**
  * An allocator is something used to request dynamic memory.
  *
@@ -109,11 +128,14 @@ typedef struct _allocator_impl_t {
 
     size_t (*al_num_user_blocks)(allocator_t *al);
 
+    // OPTIONAL
+    void (*al_dump)(allocator_t *al, void (*pf)(const char *fmt, ...));
+
     void (*delete_allocator)(allocator_t *al);
 } allocator_impl_t;
 
 struct _allocator_t {
-    const allocator_impl_t impl;
+    const allocator_impl_t * const impl;
 };
 
 /**
@@ -129,7 +151,7 @@ static inline void *al_malloc(allocator_t *al, size_t bytes) {
         return NULL;
     }
         
-    return al->impl.al_malloc(al, bytes);
+    return al->impl->al_malloc(al, bytes);
 }
 
 /**
@@ -139,6 +161,8 @@ static inline void *al_malloc(allocator_t *al, size_t bytes) {
  * If ptr is NULL, this should behave like al_malloc.
  *
  * If bytes is greater than 0, NULL is returned on error.
+ * When NULL is returned on error, the original pointer given is left untouched.
+ *
  * On success, a pointer to the resized block is returned.
  *
  * NOTE: The pointer returned is not required to be a different pointer than what is given.
@@ -149,7 +173,7 @@ static inline void *al_realloc(allocator_t *al, void *ptr, size_t bytes) {
         return NULL;
     }
 
-    return al->impl.al_realloc(al, ptr, bytes);
+    return al->impl->al_realloc(al, ptr, bytes);
 }
 
 /**
@@ -162,7 +186,7 @@ static inline void al_free(allocator_t *al, void *ptr) {
         return;
     }
 
-    al->impl.al_free(al, ptr);
+    al->impl->al_free(al, ptr);
 }
 
 /**
@@ -177,7 +201,26 @@ static inline size_t al_num_user_blocks(allocator_t *al) {
         return 0;
     }
 
-    return al->impl.al_num_user_blocks(al);
+    return al->impl->al_num_user_blocks(al);
+}
+
+/**
+ * This function also primarily exists for debugging purposes. It is completely optional, and it's
+ * behavoir is up to the implementer.
+ *
+ * The intention is that is uses the pf function to log some sort of text based representation of
+ * the underlying memory.
+ */
+static inline void al_dump(allocator_t *al, void (*pf)(const char *fmt, ...)) {
+    if (!al) {
+        return;
+    }
+
+    if (!(al->impl->al_dump)) {
+        return;
+    }
+
+    al->impl->al_dump(al, pf);
 }
 
 /**
@@ -188,5 +231,5 @@ static inline void delete_allocator(allocator_t *al) {
         return;
     }
 
-    al->impl.delete_allocator(al);
+    al->impl->delete_allocator(al);
 }

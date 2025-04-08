@@ -4,11 +4,13 @@
 #include "s_mem/allocator.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
+#include "s_util/str.h"
 
 static void *shal_malloc(allocator_t *al, size_t bytes);
 static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes);
 static void shal_free(allocator_t *al, void *ptr);
 static size_t shal_num_user_blocks(allocator_t *al);
+static void shal_dump(allocator_t *al, void (*pf)(const char *fmt, ...));
 static void delete_simple_heap_allocator(allocator_t *al);
 
 static const allocator_impl_t SHAL_ALLOCATOR_IMPL = {
@@ -16,6 +18,7 @@ static const allocator_impl_t SHAL_ALLOCATOR_IMPL = {
     .al_realloc = shal_realloc,
     .al_free = shal_free,
     .al_num_user_blocks = shal_num_user_blocks,
+    .al_dump = shal_dump,
     .delete_allocator = delete_simple_heap_allocator
 };
 
@@ -96,7 +99,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
 
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)(attrs.start);
 
-    *(allocator_impl_t *)&(shal->super.impl) = SHAL_ALLOCATOR_IMPL;
+    *(const allocator_impl_t **)&(shal->super.impl) = &SHAL_ALLOCATOR_IMPL;
     *(simple_heap_attrs_t *)&(shal->attrs) = attrs;
 
     // All blocks MUST have an even size.
@@ -402,13 +405,7 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
         return NULL;
     }
 
-    if (bytes < sizeof(free_block_t)) {
-        bytes = sizeof(free_block_t);
-    } 
-
-    if (bytes & 1) {
-        bytes++;
-    }
+    bytes = validate_mb_size(bytes);
 
     // We need to look for a free block which is at least bytes size.
 
@@ -489,7 +486,6 @@ static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
         return shal_malloc(al, bytes);
     }
 
-    // TODO Complete this.
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
 
     if (ptr < shal->heap_start || shal->brk_ptr <= ptr) {
@@ -504,58 +500,72 @@ static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
 
     // Ok now for real logic.
 
-    if (bytes < sizeof(free_block_t)) {
-        bytes = sizeof(free_block_t);
-    }
-
-    if (bytes & 1) {
-        bytes++; // Always a multiple of 2 please.
-    }
+    bytes = validate_mb_size(bytes);
 
     size_t mb_size = mb_get_size(mb);
 
-    mem_block_t *ret_block = NULL;
-
     if (mb_size == bytes) {
-        ret_block = mb; // Do nothing.
-    } else if (bytes < mb_size) { // A shrink.
-        shal_shrink_left(shal, mb, bytes);
-        ret_block = mb;
-    } else { // A stretch. 
-        // How many bytes mb must be stretched by for an inplace realloc.
-        size_t addn_req = bytes - mb_size;
-
-        // TODO: THINK THIS THROUGH!
-        
-        mem_block_t *next = shal_mb_next(shal, mb);
-
-        // How many bytes are gained by merging with free block to the right.
-        size_t addn_amt = 0;
-        if (next && !(mb_get_allocated(next))) {
-            addn_amt = mb_get_size(next) + (2 * sizeof(mem_block_border_t));
-        }
-
-        // Check if the merge should be done.
-        if (addn_amt >= addn_req) {
-            // This is really quite annoying.
-            // First remove next from the free lists.
-            shal_remove_fb(shal, next);
-
-            size_t next_shrink_amt = addn_amt - addn_req;
-
-            // Shrink down next. (Remember we get two border sizes for free)
-            shal_shrink_left(shal, next, addn_req - (2 * sizeof(mem_block_border_t)));
-            
-            
-            // take addn_amt and do what??
-            // We need to shrink the free block if needed.
-            // How many bytes do we need
-        } else {
-
-        }
+        return mb; // No realloc needed.
     }
 
-    return ret_block;
+    if (bytes < mb_size) { // A shrink.
+        shal_shrink_left(shal, mb, bytes);
+        return mb;
+    }
+
+    // If we make it here, bytes > mb_size, a stretch is being requested.
+
+    size_t addn_req = bytes - mb_size;
+    
+    mem_block_t *next = shal_mb_next(shal, mb);
+
+    // How many bytes are gained by merging with free block to the right.
+    size_t addn_amt = 0;
+    if (next && !(mb_get_allocated(next))) {
+        addn_amt = mb_get_size(next) + (2 * sizeof(mem_block_border_t));
+    }
+
+    if (addn_amt < addn_req) {
+        // In here, the right block is either allocated, or not large enouugh for the merge.
+        // We will need to do the labor intensive strat.
+        
+        mem_block_t *new_mb = shal_malloc(al, bytes);
+        if (!new_mb) {
+            return NULL; // Failed allocation.
+        }
+
+        mem_cpy(new_mb, mb, mb_size); // remember, we only copy original bytes.
+        shal_free(al, mb);
+
+        return new_mb;
+    }
+
+    // If we make it here, addn_amt >= addn_req, a merge is possible!
+
+    // First remove next from the free lists.
+    shal_remove_fb(shal, next);
+
+    // This is kinda confuisng, but we need to determine a valid size to "shrink" the right block
+    // to before merging it.
+    
+    size_t next_shr_amt = 0;
+    if (addn_req > 2 * sizeof(mem_block_border_t)) {
+        next_shr_amt = validate_mb_size(addn_req - (2 * sizeof(mem_block_border_t)));
+    } else {
+        next_shr_amt = validate_mb_size(0);
+    }
+
+    shal_shrink_left(shal, next, next_shr_amt);
+    size_t next_shr_size = mb_get_size(next);
+    size_t stretch_size = mb_size + (2 * sizeof(mem_block_border_t)) + next_shr_size;
+    
+    mem_block_border_t *stretch_hdr = mb_get_header(mb);
+    mem_block_border_t *stretch_ftr = mb_get_footer(next);
+
+    mbb_set(stretch_hdr, stretch_size, true);
+    mbb_set(stretch_ftr, stretch_size, true);
+
+    return mb;
 }
 
 static void shal_free(allocator_t *al, void *ptr) {
@@ -582,5 +592,16 @@ static size_t shal_num_user_blocks(allocator_t *al) {
     return shal->num_user_blocks;
 }
 
+static void shal_dump(allocator_t *al, void (*pf)(const char *fmt, ...)) {
+    simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
+
+    (void)shal;
+    (void)pf;
+}
+
 static void delete_simple_heap_allocator(allocator_t *al) {
+    simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
+
+    // Remember, we only return up to the break pointer.
+    shal->attrs.return_mem(shal->attrs.start, shal->brk_ptr);
 }
