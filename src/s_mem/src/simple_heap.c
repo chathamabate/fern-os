@@ -595,8 +595,11 @@ static size_t shal_num_user_blocks(allocator_t *al) {
 static void shal_dump(allocator_t *al, void (*pf)(const char *fmt, ...)) {
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
 
-    (void)shal;
-    (void)pf;
+
+    pf("Simple Heap Allocator @ 0x%X\n", shal);
+    pf("Pr: 0x%X, Hp: 0x%X, Brk: 0x%X, End: 0x%X\n", 
+            shal->attrs.start, shal->heap_start, shal->brk_ptr, shal->attrs.end);
+    pf("SFL Head: 0x%X, LFL Head, 0x%X\n", shal->small_fl_head, shal->large_fl_head);
 }
 
 static void delete_simple_heap_allocator(allocator_t *al) {
