@@ -31,7 +31,7 @@ typedef struct _simple_heap_attrs_t {
      * with an allocated region. In both cases the allocation stops, and true_e is set to the end of 
      * the newly allocated region.
      */
-    fernos_error_t (*request_mem)(void *s, const void *e, void **true_e);
+    fernos_error_t (*request_mem)(void *s, const void *e, const void **true_e);
 
     /**
      * This function is used by the allocator to return pages of memory.

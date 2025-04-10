@@ -180,7 +180,7 @@ phys_addr_t new_page_directory(void);
  *
  * Use true_e to determine how many pages were actually allocated in case of error.
  */
-fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e);
+fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, const void *e, const void **true_e);
 
 /*
  * NOTE neither pd_free_pages nor delete_page_directory clean up shared pages.
@@ -195,13 +195,21 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e);
  * NOTE: Given addresses must ALWAYS be 4K aligned (This is the case for all functions in the 
  * header file, but still)
  */
-void pd_free_pages(phys_addr_t pd, void *s, void *e);
+void pd_free_pages(phys_addr_t pd, void *s, const void *e);
 
 /**
  * Take the physical address of a page directory and clean up all of it's pages, page tables, and
  * finally, the page directory itself!
  */
 void delete_page_directory(phys_addr_t pd);
+
+static inline fernos_error_t alloc_pages(void *s, const void *e, const void **true_e) {
+    return pd_alloc_pages(get_page_directory(), s, e, true_e); 
+}
+
+static inline void free_pages(void *s, const void *e) {
+    pd_free_pages(get_page_directory(), s, e);
+}
 
 /**
  * Copy the contents of physical page at source, to physical page at dest.

@@ -9,6 +9,8 @@
 #include "k_startup/idt.h"
 #include "k_bios_term/term.h"
 
+#include "s_mem/test/simple_heap.h"
+
 void kernel_init(void) {
     uint8_t init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
@@ -43,7 +45,7 @@ void bad_handler(void);
 
 
 int kernel_main(void) {
-    test_str();
+    test_shal();
 
     return 0;
 }

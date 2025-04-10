@@ -90,7 +90,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
     fernos_error_t err;
 
     // Start by reserving a single page.
-    void *true_e;
+    const void *true_e;
     err = attrs.request_mem(attrs.start, ((const uint8_t *)(attrs.start)) + M_4K, &true_e);
 
     if (err != FOS_SUCCESS) {
@@ -283,7 +283,7 @@ static mem_block_t *shal_request_mem(simple_heap_allocator_t *shal, const void *
     fernos_error_t err;
 
     void *s = (void *)(shal->brk_ptr);
-    void *true_e;
+    const void *true_e;
 
     err = shal->attrs.request_mem(s, new_brk, &true_e);
 
@@ -595,11 +595,15 @@ static size_t shal_num_user_blocks(allocator_t *al) {
 static void shal_dump(allocator_t *al, void (*pf)(const char *fmt, ...)) {
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
 
-
     pf("Simple Heap Allocator @ 0x%X\n", shal);
     pf("Pr: 0x%X, Hp: 0x%X, Brk: 0x%X, End: 0x%X\n", 
             shal->attrs.start, shal->heap_start, shal->brk_ptr, shal->attrs.end);
     pf("SFL Head: 0x%X, LFL Head, 0x%X\n", shal->small_fl_head, shal->large_fl_head);
+
+    pf("--- Heap ---\n");
+
+    mem_block_border_t *hdr = (mem_block_border_t *)(shal->brk_ptr);
+    
 }
 
 static void delete_simple_heap_allocator(allocator_t *al) {

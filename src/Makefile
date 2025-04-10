@@ -111,7 +111,7 @@ BIN_FILE := $(BUILD_DIR)/$(OS_NAME).bin
 $(BUILD_DIR):
 	mkdir -p $@
 
-LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod) -l$(mod)_test)
+LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod)_test -l$(mod))
 
 $(BIN_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) $(LIB_FLAGS) -lgcc

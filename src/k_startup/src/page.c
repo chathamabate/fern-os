@@ -504,7 +504,7 @@ phys_addr_t new_page_directory(void) {
     return new_page_table();
 }
 
-fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
+fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, const void *e, const void **true_e) {
     CHECK_ALIGN(pd, M_4K);
     CHECK_ALIGN(s, M_4K);
     CHECK_ALIGN(e, M_4K);
@@ -577,7 +577,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, void *e, void **true_e) {
     return err;
 }
 
-void pd_free_pages(phys_addr_t pd, void *s, void *e) {
+void pd_free_pages(phys_addr_t pd, void *s, const void *e) {
     if (!IS_ALIGNED(pd, M_4K) || !IS_ALIGNED(s, M_4K) || !IS_ALIGNED(e, M_4K)) {
         return;
     }

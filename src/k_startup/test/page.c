@@ -149,7 +149,7 @@ static bool test_pd_alloc(void) {
 
         init_pages = get_num_free_pages();
 
-        void *true_e;
+        const void *true_e;
         fernos_error_t err = pd_alloc_pages(pd, c.s, c.e, &true_e);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
@@ -184,7 +184,7 @@ static bool test_pd_overlapping_alloc(void) {
     phys_addr_t pd = get_kernel_pd();
 
     fernos_error_t err;
-    void *true_e;
+    const void *true_e;
 
     err = pd_alloc_pages(pd, S + (2*M_4K), S + (8*M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -215,7 +215,7 @@ static bool test_pd_free(void) {
     phys_addr_t pd = get_kernel_pd();
 
     fernos_error_t err;
-    void *true_e;
+    const void *true_e;
 
     uint32_t num_fps;
 
@@ -253,7 +253,7 @@ static bool test_pd_free_dangerous(void) {
     phys_addr_t pd = get_kernel_pd();
 
     fernos_error_t err;
-    void *true_e;
+    const void *true_e;
 
     err = pd_alloc_pages(pd, S, S + (4 * M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -275,7 +275,7 @@ static bool test_delete_page_directory(void) {
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
-    void *true_e;
+    const void *true_e;
 
     err = pd_alloc_pages(pd, (void *)M_4K, (void *)M_4M, &true_e); 
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
