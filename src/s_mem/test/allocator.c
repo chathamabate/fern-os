@@ -89,7 +89,7 @@ static bool test_simple_realloc(void) {
     blocks[0] = al_realloc(al, blocks[0], 45);
     blocks[1] = al_realloc(al, blocks[1], 15);
     blocks[2] = al_realloc(al, blocks[2], 45);
-    blocks[3] = al_realloc(al, blocks[3], 15);
+    blocks[3] = al_realloc(al, blocks[3], 29);
 
     al_free(al, blocks[0]);
     al_free(al, blocks[1]);

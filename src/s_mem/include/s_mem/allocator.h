@@ -130,23 +130,6 @@ static inline size_t validate_mb_size(size_t mb_size) {
 struct _allocator_t;
 typedef struct _allocator_t allocator_t;
 
-/**
- * There will be a default allocator.
- *
- * How the default allocator is used is up to you.
- *
- * It's really just a global field you can get/set.
- */
-
-/**
- * NOTE: This setter is NOT threadsafe. Nor would it really make sense to use this in a multi 
- * threaded context. It's meant to be used maybe at the beginning of some task.
- *
- * The setter returns whichever allocator was previously set as the default.
- */
-allocator_t *set_default_allocator(allocator_t *al);
-allocator_t *get_default_allocator(void);
-
 typedef struct _allocator_impl_t {
     void *(*al_malloc)(allocator_t *al, size_t bytes);
     void *(*al_realloc)(allocator_t *al, void *ptr, size_t bytes);
@@ -258,4 +241,37 @@ static inline void delete_allocator(allocator_t *al) {
     }
 
     al->impl->delete_allocator(al);
+}
+
+/**
+ * There will be a default allocator.
+ *
+ * How the default allocator is used is up to you.
+ *
+ * It's really just a global field you can get/set.
+ */
+
+/**
+ * NOTE: This setter is NOT threadsafe. Nor would it really make sense to use this in a multi 
+ * threaded context. It's meant to be used maybe at the beginning of some task.
+ *
+ * The setter returns whichever allocator was previously set as the default.
+ */
+allocator_t *set_default_allocator(allocator_t *al);
+allocator_t *get_default_allocator(void);
+
+static inline void *da_malloc(size_t bytes) {
+    return al_malloc(get_default_allocator(), bytes);
+}
+
+static inline void *da_realloc(void *ptr, size_t bytes) {
+    return al_realloc(get_default_allocator(), ptr, bytes);
+}
+
+static inline void da_free(void *ptr) {
+    al_free(get_default_allocator(), ptr);
+}
+
+static inline void da_dump(void (*pf)(const char *fmt, ...)) {
+    al_dump(get_default_allocator(), pf);
 }

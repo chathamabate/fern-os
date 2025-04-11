@@ -8,6 +8,7 @@
 #include "k_startup/gdt.h"
 #include "k_startup/idt.h"
 #include "k_bios_term/term.h"
+#include "s_mem/simple_heap.h"
 
 #include "s_mem/test/simple_heap.h"
 
@@ -33,24 +34,38 @@ void kernel_init(void) {
         out_bios_vga(init_err_style, "Failed to set up Paging");
         lock_up();
     }
-}
 
-void _bad_handler(void) {
-    term_put_s("Hello From Bad Handler\n");
+    // Ok, now setup kernel heap.
+
+    simple_heap_attrs_t shal_attrs = {
+        .start = (void *)(_static_area_end + M_4K),
+        .end =   (const void *)(_static_area_end + M_4K + M_4M),
+        .mmp = (mem_manage_pair_t) {
+            .request_mem = alloc_pages,
+            .return_mem = free_pages
+        },
+
+        .small_fl_cutoff = 0x100,
+        .small_fl_search_amt = 0x10,
+        .large_fl_search_amt = 0x10
+    };
+    allocator_t *k_al = new_simple_heap_allocator(shal_attrs);
+
+    if (!k_al) {
+        out_bios_vga(init_err_style, "Failed to set up Kernel Heap");
+        lock_up();
+    }
+
+    set_default_allocator(k_al);
 }
 
 void timer_handler(void);
 
-void bad_handler(void);
-
-
 int kernel_main(void) {
-    test_shal(
-        (mem_manage_pair_t) {
-            .request_mem = alloc_pages,
-            .return_mem = free_pages
-        }
-    );
+    term_put_s("Hello world\n");
+
+    void * x= da_malloc(sizeof(uint32_t));
+    da_dump(term_put_fmt_s);
 
     return 0;
 }

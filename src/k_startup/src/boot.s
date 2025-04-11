@@ -96,12 +96,6 @@ _start:
     call lock_up
 
 
-.global bad_handler
-bad_handler:
-    pushal
-    call _bad_handler
-    popal
-    iret
 
 // I think it is safe to say that when an interrupt gate runs
 // all other external interrupts are blocked..
