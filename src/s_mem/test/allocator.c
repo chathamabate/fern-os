@@ -52,15 +52,50 @@ static bool test_simple_malloc(void) {
     *block = 100;
     TEST_EQUAL_UINT(100, *block);
 
-    al_dump(al, term_put_fmt_s);
-
     al_free(al, block);
 
     TEST_SUCCEED();
 }
 
 static bool test_simple_malloc_and_free(void) {
+    void *blocks[4];
 
+    blocks[0] = al_malloc(al, 0x10);
+    blocks[1] = al_malloc(al, 0x20);
+    blocks[2] = al_malloc(al, 0x10);
+    blocks[3] = al_malloc(al, 0x20);
+
+    al_free(al, blocks[0]);
+    al_free(al, blocks[2]);
+
+    blocks[0] = al_malloc(al, 0x10);
+
+    al_free(al, blocks[0]);
+    al_free(al, blocks[1]);
+    al_free(al, blocks[3]);
+
+    TEST_SUCCEED();
+}
+
+static bool test_simple_realloc(void) {
+    void *blocks[4];
+
+    blocks[0] = al_malloc(al, 30);
+    blocks[1] = al_malloc(al, 30);
+    blocks[2] = al_malloc(al, 30);
+    blocks[3] = al_malloc(al, 30); 
+
+    blocks[0] = al_realloc(al, blocks[0], 45);
+    blocks[1] = al_realloc(al, blocks[1], 15);
+    blocks[2] = al_realloc(al, blocks[2], 45);
+    blocks[3] = al_realloc(al, blocks[3], 15);
+
+    al_dump(al, term_put_fmt_s);
+
+    al_free(al, blocks[0]);
+    al_free(al, blocks[1]);
+    al_free(al, blocks[2]);
+    al_free(al, blocks[3]);
 
     TEST_SUCCEED();
 }
@@ -177,6 +212,7 @@ static bool test_large_malloc(void) {
         blocks[i] = NULL;
     }
 
+
     for (uint32_t i = 1; i < num_blocks; i += 3) {
         uint8_t *block = al_malloc(al, 3 * M_4K);
         blocks[i] = block;
@@ -190,7 +226,7 @@ static bool test_large_malloc(void) {
 }
 
 bool test_realloc(void) {
-    uint8_t *blocks[15];
+    uint8_t *blocks[30];
     uint32_t num_blocks = sizeof(blocks) / sizeof(blocks[0]);
 
     for (uint32_t i = 0; i < num_blocks; i++) {
@@ -199,15 +235,16 @@ bool test_realloc(void) {
         TEST_TRUE(block != NULL);
     
         for (uint32_t j = 0; j < block_eles; j++) {
-            block[block_eles] = i;
+            block[j] = i;
         }
 
         blocks[i] = block;
     }
 
     for (uint32_t i = 0; i < num_blocks; i++) {
-        uint32_t block_eles = i % 2 == 0 ? 15 : 45; 
+        uint32_t block_eles = i % 2 == 0 ? 45 : 15; 
         uint8_t *realloc_block = al_realloc(al, blocks[i], block_eles * sizeof(uint8_t));
+
         TEST_TRUE(realloc_block != NULL);
 
         // For any block which was resized as larger than the original 30 elements,
@@ -223,7 +260,7 @@ bool test_realloc(void) {
 
     for (uint32_t i = 0; i < num_blocks; i++) {
         // Only check elements which would've been copied.
-        uint32_t block_eles = i % 2 == 0 ? 15 : 45;
+        uint32_t block_eles = i % 2 == 0 ? 45 : 15;
         uint8_t *block = blocks[i];
         
         for (uint32_t j = 0; j < block_eles; j++) {
@@ -239,15 +276,60 @@ bool test_realloc(void) {
     TEST_SUCCEED();
 }
 
+static bool test_complex_actions(void) {
+    uint8_t *blocks[100];
+    uint32_t num_blocks = sizeof(blocks) / sizeof(blocks[0]);
+
+    for (uint32_t i = 0; i < num_blocks / 2; i++) {
+        blocks[i] = al_malloc(al, 0x20);
+        TEST_TRUE(blocks[i] != NULL);
+    }
+
+    for (uint32_t i = 0; i < num_blocks / 2; i += 2) {
+        al_free(al, blocks[i]);
+        blocks[i] = NULL;
+    }
+
+    for (uint32_t i = num_blocks / 2; i < num_blocks; i++) {
+        blocks[i] = al_malloc(al, 4356);
+        TEST_TRUE(blocks[i] != NULL);
+    }
+
+    for (uint32_t i = num_blocks / 2; i < num_blocks; i += 2) {
+        al_free(al, blocks[i]);
+        blocks[i] = NULL;
+    }
+
+    for (uint32_t i = 0; i < num_blocks / 2; i += 2) {
+        blocks[i] = al_malloc(al, 5000);
+        TEST_TRUE(blocks[i] != NULL);
+    }
+
+    for (uint32_t i = num_blocks / 2; i < num_blocks; i += 2) {
+        blocks[i] = al_malloc(al, 300);
+        TEST_TRUE(blocks[i] != NULL);
+    }
+
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        al_free(al, blocks[i]);
+        blocks[i] = NULL;
+    }
+
+    TEST_SUCCEED();
+}
+
 bool test_allocator(const char *name, allocator_t *(*gen)(void)) {
     gen_allocator = gen;
 
     BEGIN_SUITE(name);
     //RUN_TEST(test_nop_args);
-    RUN_TEST(test_simple_malloc);
+    //RUN_TEST(test_simple_malloc);
+    //RUN_TEST(test_simple_malloc_and_free);
+    //RUN_TEST(test_simple_realloc);
     //RUN_TEST(test_repeated_malloc0);
     //RUN_TEST(test_repeated_malloc1);
     //RUN_TEST(test_large_malloc);
     //RUN_TEST(test_realloc);
+    RUN_TEST(test_complex_actions);
     return END_SUITE();
 }

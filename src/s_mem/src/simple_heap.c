@@ -1,6 +1,7 @@
 
 
 #include "s_mem/simple_heap.h"
+#include "k_bios_term/term.h"
 #include "s_mem/allocator.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
@@ -366,9 +367,9 @@ static void shal_shrink_left(simple_heap_allocator_t *shal,
     // Since this is used internally, we assume mb is valid, and the given size is valid.
 
     size_t mb_size = mb_get_size(mb);
-    
-    if (bytes >= mb_size) {
-        return; // Basically a bad input case, nothing is done.
+
+    if (bytes > mb_size) {
+        return; // This is a bad input, bytes should always be <= the size of the block!
     }
 
     size_t left_over = mb_size - bytes;
@@ -486,6 +487,11 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
 static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
     if (!ptr) {
         return shal_malloc(al, bytes);
+    }
+
+    if (bytes == 0) {
+        shal_free(al, ptr);
+        return NULL;
     }
 
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
