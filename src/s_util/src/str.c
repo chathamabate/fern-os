@@ -28,6 +28,28 @@ void mem_cpy(void *dest, const void *src, size_t n) {
     }
 }
 
+bool mem_chk(const void *src, uint8_t val, size_t n) {
+    const uint8_t *s = src;
+    const uint8_t *e = s + n;
+
+    for (const uint8_t *i = s; i < e; i++) {
+        if (*i != val) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+void mem_set(void *dest, uint8_t val, size_t n) {
+    uint8_t *s = dest;
+    uint8_t *e = s + n;
+
+    for (uint8_t *i = s; i < e; i++) {
+        *i = val;
+    }
+}
+
 bool str_eq(const char *s1, const char *s2) {
     size_t i = 0;
     while (true) {

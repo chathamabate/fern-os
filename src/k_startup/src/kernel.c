@@ -45,12 +45,16 @@ void bad_handler(void);
 
 
 int kernel_main(void) {
+    /*
     test_shal(
         (mem_manage_pair_t) {
             .request_mem = alloc_pages,
             .return_mem = free_pages
         }
     );
+    */
+
+    test_str();
 
     return 0;
 }

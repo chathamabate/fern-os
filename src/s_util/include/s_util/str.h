@@ -9,6 +9,9 @@
 bool mem_cmp(const void *d0, const void *d1, size_t n);
 void mem_cpy(void *dest, const void *src, size_t n);
 
+bool mem_chk(const void *src, uint8_t val, size_t n);
+void mem_set(void *dest, uint8_t val, size_t n);
+
 bool str_eq(const char *s1, const char *s2);
 
 // NOTE: Unless specified otherwise, all calls that return size_t

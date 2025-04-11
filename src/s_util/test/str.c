@@ -41,6 +41,47 @@ static bool test_mem_cpy(void) {
     TEST_SUCCEED();
 }
 
+static bool test_mem_chk(void) {
+    uint8_t src[16];
+
+    src[0] = 1;
+    src[1] = 1;
+    src[2] = 1;
+    src[3] = 2;
+
+    TEST_TRUE(mem_chk(src, 1, 0));
+    TEST_TRUE(mem_chk(src, 1, 1));
+    TEST_TRUE(mem_chk(src, 1, 3));
+    TEST_FALSE(mem_chk(src, 1, 4));
+
+    src[1] = 3;
+    TEST_FALSE(mem_chk(src, 1, 3));
+
+    TEST_SUCCEED();
+}
+
+static bool test_mem_set(void) {
+    uint8_t dest[16];
+
+    mem_set(dest, 2, 10);
+
+    for (uint32_t i = 0; i < 10; i++) {
+        TEST_EQUAL_UINT(2, dest[i]);
+    }
+
+    mem_set(dest, 3, 5);
+
+    for (uint32_t i = 0; i < 5; i++) {
+        TEST_EQUAL_UINT(3, dest[i]);
+    }
+
+    for (uint32_t i = 5; i < 10; i++) {
+        TEST_EQUAL_UINT(2, dest[i]);
+    }
+
+    TEST_SUCCEED();
+}
+
 static bool test_str_eq(void) {
     TEST_TRUE(str_eq("", "")); 
     TEST_TRUE(str_eq("Hello", "Hello")); 
@@ -322,6 +363,8 @@ bool test_str(void) {
     BEGIN_SUITE("Strings");
     RUN_TEST(test_mem_cmp);
     RUN_TEST(test_mem_cpy);
+    RUN_TEST(test_mem_chk);
+    RUN_TEST(test_mem_set);
     RUN_TEST(test_str_eq);
     RUN_TEST(test_str_cpy);
     RUN_TEST(test_str_len);

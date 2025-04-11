@@ -90,8 +90,6 @@ static bool test_simple_realloc(void) {
     blocks[2] = al_realloc(al, blocks[2], 45);
     blocks[3] = al_realloc(al, blocks[3], 15);
 
-    al_dump(al, term_put_fmt_s);
-
     al_free(al, blocks[0]);
     al_free(al, blocks[1]);
     al_free(al, blocks[2]);
@@ -322,14 +320,14 @@ bool test_allocator(const char *name, allocator_t *(*gen)(void)) {
     gen_allocator = gen;
 
     BEGIN_SUITE(name);
-    //RUN_TEST(test_nop_args);
-    //RUN_TEST(test_simple_malloc);
-    //RUN_TEST(test_simple_malloc_and_free);
-    //RUN_TEST(test_simple_realloc);
-    //RUN_TEST(test_repeated_malloc0);
-    //RUN_TEST(test_repeated_malloc1);
-    //RUN_TEST(test_large_malloc);
-    //RUN_TEST(test_realloc);
+    RUN_TEST(test_nop_args);
+    RUN_TEST(test_simple_malloc);
+    RUN_TEST(test_simple_malloc_and_free);
+    RUN_TEST(test_simple_realloc);
+    RUN_TEST(test_repeated_malloc0);
+    RUN_TEST(test_repeated_malloc1);
+    RUN_TEST(test_large_malloc);
+    RUN_TEST(test_realloc);
     RUN_TEST(test_complex_actions);
     return END_SUITE();
 }
