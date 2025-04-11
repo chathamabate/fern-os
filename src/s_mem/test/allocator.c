@@ -1,5 +1,6 @@
 
 
+#include "s_util/str.h"
 #include "s_mem/test/allocator.h"
 #include "s_mem/allocator.h"
 #include "k_bios_term/term.h"
@@ -143,9 +144,7 @@ static bool test_repeated_malloc1(void) {
         uint8_t *block = al_malloc(al, block_eles * sizeof(uint8_t));
         TEST_TRUE(block != NULL);
 
-        for (uint32_t j = 0; j < block_eles; j++) {
-            block[j] = i;
-        }
+        mem_set(block, i, block_eles);
 
         blocks[i] = block;
     }
@@ -164,9 +163,7 @@ static bool test_repeated_malloc1(void) {
         uint8_t *block = al_malloc(al, block_eles * sizeof(uint8_t));
         TEST_TRUE(block != NULL);
 
-        for (uint32_t j = 0; j < block_eles; j++) {
-            block[j] = i; 
-        }
+        mem_set(block, i, block_eles);
 
         blocks[i] = block;
     }
@@ -176,9 +173,7 @@ static bool test_repeated_malloc1(void) {
         uint32_t block_eles = i % 2 == 0 ? ((i % 4) + 2) * 3 : ((i % 3) + 1) * 4;
         uint8_t *block = blocks[i]; 
 
-        for (uint32_t j = 0; j < block_eles; j++) {
-            TEST_EQUAL_UINT(i, block[j]);
-        }
+        TEST_TRUE(mem_chk(block, i, block_eles));
     }
 
     // Finally free everything.
@@ -212,12 +207,17 @@ static bool test_large_malloc(void) {
 
 
     for (uint32_t i = 1; i < num_blocks; i += 3) {
-        uint8_t *block = al_malloc(al, 3 * M_4K);
+        size_t block_size = 3 * M_4K;
+        uint8_t *block = al_malloc(al, block_size);
+
+        TEST_TRUE(block != NULL);
+
         blocks[i] = block;
     }
 
     for (uint32_t i = 0; i < num_blocks; i++) {
-        al_free(al, blocks[i]);
+        mem_block_t *mb = blocks[i];
+        al_free(al, mb);
     }
     
     TEST_SUCCEED();
