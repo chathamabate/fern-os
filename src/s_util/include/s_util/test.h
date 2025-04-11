@@ -124,6 +124,7 @@ static inline void _run_test(const char *name, bool (*t)(void)) {
 }
 
 #define RUN_TEST(test) _run_test(#test, test)
+#define ENTER_SUBTEST(st) TEST_TRUE(st())
 
 
 

@@ -348,6 +348,29 @@ static bool test_complex_actions(void) {
     TEST_SUCCEED();
 }
 
+static bool test_exhaust(void) {
+    // Here we just allocate a lot of memory... more than this allocator should have.
+
+    uint8_t *blocks[256];
+    uint32_t num_blocks = sizeof(blocks) / sizeof(blocks[0]);
+
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        blocks[i] = al_malloc(al, M_1M);
+    }
+
+    TEST_TRUE(blocks[num_blocks - 1] == NULL);
+
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        al_free(al, blocks[i]);
+    }
+
+    // Here we confirm that even after using up a lot of memory than
+    // freeing it, we can still do some complex stuff.
+    ENTER_SUBTEST(test_complex_actions);
+
+    TEST_SUCCEED();
+}
+
 bool test_allocator(const char *name, allocator_t *(*gen)(void)) {
     gen_allocator = gen;
 
@@ -361,5 +384,6 @@ bool test_allocator(const char *name, allocator_t *(*gen)(void)) {
     RUN_TEST(test_large_malloc);
     RUN_TEST(test_realloc);
     RUN_TEST(test_complex_actions);
+    RUN_TEST(test_exhaust);
     return END_SUITE();
 }
