@@ -91,7 +91,7 @@ _start:
 	*/
     sti
 
-	call kernel_main
+	call task0_main
 
     call lock_up
 
@@ -106,15 +106,16 @@ _start:
 timer_handler:
     pushal
 
-    pushl $msg
-    call term_put_s
-    popl %eax
+    movl alt_task_esp, %eax
+    movl %esp, alt_task_esp
+    mov %eax, %esp
 
     call pic_send_master_eoi
+
     popal
     iret
 
-msg: .ascii "Timer IRQ\n\0"
+msg: .ascii "Switching\n\0"
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.
