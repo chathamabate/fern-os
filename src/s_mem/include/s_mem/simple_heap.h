@@ -21,23 +21,9 @@ typedef struct _simple_heap_attrs_t {
     const void *end;
 
     /**
-     * This is a function which will be used by the allocator to request pages of memory.
-     * 
-     * s and e MUST be 4K aligned.
-     * true_e MUST be non-null.
-     *
-     * If success, the entire range was successfully allocated. (true_e is set to e).
-     * An error may occur, if there isn't enough memory. OR, if the region requested already overlaps
-     * with an allocated region. In both cases the allocation stops, and true_e is set to the end of 
-     * the newly allocated region.
+     * Functions used for requesting and returning memory.
      */
-    fernos_error_t (*request_mem)(void *s, const void *e, const void **true_e);
-
-    /**
-     * This function is used by the allocator to return pages of memory.
-     * Both s and e must be 4K aligned.
-     */
-    void (*return_mem)(void *s, const void *e);
+    mem_manage_pair_t mmp;
 
     /*
      * There will be two free lists for performance.

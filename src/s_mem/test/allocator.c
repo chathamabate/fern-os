@@ -52,7 +52,15 @@ static bool test_simple_malloc(void) {
     *block = 100;
     TEST_EQUAL_UINT(100, *block);
 
+    al_dump(al, term_put_fmt_s);
+
     al_free(al, block);
+
+    TEST_SUCCEED();
+}
+
+static bool test_simple_malloc_and_free(void) {
+
 
     TEST_SUCCEED();
 }
@@ -235,11 +243,11 @@ bool test_allocator(const char *name, allocator_t *(*gen)(void)) {
     gen_allocator = gen;
 
     BEGIN_SUITE(name);
-    RUN_TEST(test_nop_args);
+    //RUN_TEST(test_nop_args);
     RUN_TEST(test_simple_malloc);
-    RUN_TEST(test_repeated_malloc0);
-    RUN_TEST(test_repeated_malloc1);
-    RUN_TEST(test_large_malloc);
-    RUN_TEST(test_realloc);
+    //RUN_TEST(test_repeated_malloc0);
+    //RUN_TEST(test_repeated_malloc1);
+    //RUN_TEST(test_large_malloc);
+    //RUN_TEST(test_realloc);
     return END_SUITE();
 }

@@ -121,7 +121,7 @@ $(BIN_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 bin: $(BIN_FILE)
 
 qemu.bin: $(BIN_FILE)
-	qemu-system-x86_64 -m 4G -kernel $(BIN_FILE) -monitor stdio
+	qemu-system-x86_64 -display cocoa,zoom-to-fit=on,full-screen=on -m 4G -kernel $(BIN_FILE) -monitor stdio
 
 # NOTE: When we start working with disk read/write... I'd really like to figure out ISO packaging!
 

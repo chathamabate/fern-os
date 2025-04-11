@@ -5,6 +5,8 @@
 #include "s_util/err.h"
 #include "s_util/misc.h"
 #include "s_util/str.h"
+#include "s_util/ansii.h"
+#include <stdarg.h>
 
 static void *shal_malloc(allocator_t *al, size_t bytes);
 static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes);
@@ -83,7 +85,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
         return NULL;
     }
 
-    if (!attrs.request_mem || !attrs.return_mem) {
+    if (!attrs.mmp.request_mem || !attrs.mmp.return_mem) {
         return NULL;
     }
 
@@ -91,7 +93,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
 
     // Start by reserving a single page.
     const void *true_e;
-    err = attrs.request_mem(attrs.start, ((const uint8_t *)(attrs.start)) + M_4K, &true_e);
+    err = attrs.mmp.request_mem(attrs.start, ((const uint8_t *)(attrs.start)) + M_4K, &true_e);
 
     if (err != FOS_SUCCESS) {
         return NULL;
@@ -124,7 +126,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
     // This would error out in the case that our simple heap allocator structure is so large
     // that it takes up the entire first page.
     if (first_fb_size < sizeof(free_block_t)) {
-        shal->attrs.return_mem(shal->attrs.start, shal->brk_ptr);
+        shal->attrs.mmp.return_mem(shal->attrs.start, shal->brk_ptr);
         return NULL;
     }
 
@@ -285,7 +287,7 @@ static mem_block_t *shal_request_mem(simple_heap_allocator_t *shal, const void *
     void *s = (void *)(shal->brk_ptr);
     const void *true_e;
 
-    err = shal->attrs.request_mem(s, new_brk, &true_e);
+    err = shal->attrs.mmp.request_mem(s, new_brk, &true_e);
 
     mem_block_t *new_fb = NULL;
 
@@ -592,23 +594,79 @@ static size_t shal_num_user_blocks(allocator_t *al) {
     return shal->num_user_blocks;
 }
 
+static void _dump_hex_pairs(void (*pf)(const char *fmt, ...), ...) {
+    va_list va;
+    va_start(va, pf);
+
+    const char *name = va_arg(va, const char *);
+    uint32_t val;
+
+    while (name) {
+        val = va_arg(va, uint32_t);
+
+        pf(ANSII_LIGHT_GREY_FG "%s: "  ANSII_CYAN_FG "0x%X" ANSII_RESET, name, val);
+
+        name = va_arg(va, const char *);
+
+        if (name) {
+            pf(", "); 
+        }
+    }
+
+    va_end(va);
+}
+
+#define dump_hex_pairs(...) _dump_hex_pairs(__VA_ARGS__, NULL)
+
 static void shal_dump(allocator_t *al, void (*pf)(const char *fmt, ...)) {
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
 
-    pf("Simple Heap Allocator @ 0x%X\n", shal);
-    pf("Pr: 0x%X, Hp: 0x%X, Brk: 0x%X, End: 0x%X\n", 
-            shal->attrs.start, shal->heap_start, shal->brk_ptr, shal->attrs.end);
-    pf("SFL Head: 0x%X, LFL Head, 0x%X\n", shal->small_fl_head, shal->large_fl_head);
+    pf("Simple Heap Allocator\n");
+    dump_hex_pairs(pf,
+        "Pr", shal->attrs.start,
+        "Hp", shal->heap_start,
+        "Br", shal->brk_ptr,
+        "End", shal->attrs.end
+    );
+    pf("\n");
+    dump_hex_pairs(pf,
+        "SFL Head", shal->small_fl_head,
+        "LFL Head", shal->large_fl_head
+    );
+    pf("\n");
 
-    pf("--- Heap ---\n");
+    pf("------ Heap ------\n");
 
-    mem_block_border_t *hdr = (mem_block_border_t *)(shal->brk_ptr);
-    
+    mem_block_border_t *hdr = (mem_block_border_t *)(shal->heap_start); 
+
+    while ((void *)hdr < shal->brk_ptr) {
+        mem_block_t *mb = header_get_mb(hdr);
+
+        bool mb_alloc = mb_get_allocated(mb);
+        uint32_t mb_size = mb_get_size(mb);
+
+        pf("[" ANSII_CYAN_FG "0x%X" ANSII_RESET "] ", mb);
+        dump_hex_pairs(pf, "Size", mb_size);
+
+        if (mb_alloc) {
+            pf(" %s\n", ANSII_RED_FG "ALLOCATED" ANSII_RESET);
+        } else {
+            pf(" %s ", ANSII_GREEN_FG "FREE" ANSII_RESET);
+
+            free_block_t *fb = (free_block_t *)mb;
+            dump_hex_pairs(pf, "Prv", fb->prev, "Nxt", fb->next); 
+            pf("\n");
+        }
+        
+        hdr = mb_get_footer(mb) + 1;
+    }
+
+    pf("------------------\n");
 }
 
 static void delete_simple_heap_allocator(allocator_t *al) {
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
 
     // Remember, we only return up to the break pointer.
-    shal->attrs.return_mem(shal->attrs.start, shal->brk_ptr);
+    shal->attrs.mmp.return_mem(shal->attrs.start, shal->brk_ptr);
 }

@@ -4,6 +4,32 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include "s_util/err.h"
+
+/*
+ * Page oriented structure useful for allocators.
+ */
+
+typedef struct _mem_manage_pair_t {
+    /**
+     * This is a function which will be used by the an allocator to request pages of memory.
+     * 
+     * s and e MUST be 4K aligned.
+     * true_e MUST be non-null.
+     *
+     * If success, the entire range was successfully allocated. (true_e is set to e).
+     * An error may occur, if there isn't enough memory. OR, if the region requested already overlaps
+     * with an allocated region. In both cases the allocation stops, and true_e is set to the end of 
+     * the newly allocated region.
+     */
+    fernos_error_t (*request_mem)(void *s, const void *e, const void **true_e);
+
+    /**
+     * This function is used by an allocator to return pages of memory.
+     * Both s and e must be 4K aligned.
+     */
+    void (*return_mem)(void *s, const void *e);
+} mem_manage_pair_t;
 
 /*
  * Memory block primitives which may be useful for allocators.
