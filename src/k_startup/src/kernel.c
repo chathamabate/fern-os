@@ -108,6 +108,12 @@ void kernel_init(void) {
     alt_task_esp = initialize_task_stack((uint32_t *)alt_stack_end, (void *)task1_main);
 }
 
+// I think if there is a page fault exception... that's bad.
+// Not my problem right now tho I guess...
+// So we need a task set???
+// Task sets like od something???
+// IG...?
+
 int counter = 0;
 
 int task0_main(void) {
