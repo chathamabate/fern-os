@@ -276,11 +276,15 @@ bool test_realloc(void) {
 
 static bool test_complex_actions(void) {
     uint8_t *blocks[100];
+    size_t sizes[sizeof(blocks) / sizeof(blocks[0])];
     uint32_t num_blocks = sizeof(blocks) / sizeof(blocks[0]);
 
     for (uint32_t i = 0; i < num_blocks / 2; i++) {
-        blocks[i] = al_malloc(al, 0x20);
+        sizes[i] = 0x10 * (i + 1);
+        blocks[i] = al_malloc(al, sizes[i]);
         TEST_TRUE(blocks[i] != NULL);
+
+        mem_set(blocks[i], i, sizes[i]);
     }
 
     for (uint32_t i = 0; i < num_blocks / 2; i += 2) {
@@ -289,8 +293,12 @@ static bool test_complex_actions(void) {
     }
 
     for (uint32_t i = num_blocks / 2; i < num_blocks; i++) {
-        blocks[i] = al_malloc(al, 4356);
+        sizes[i] = 300 * i;
+        blocks[i] = al_malloc(al, sizes[i]);
         TEST_TRUE(blocks[i] != NULL);
+
+        mem_set(blocks[i], i, sizes[i]);
+
     }
 
     for (uint32_t i = num_blocks / 2; i < num_blocks; i += 2) {
@@ -299,13 +307,37 @@ static bool test_complex_actions(void) {
     }
 
     for (uint32_t i = 0; i < num_blocks / 2; i += 2) {
-        blocks[i] = al_malloc(al, 5000);
+        sizes[i] = 5000;
+        blocks[i] = al_malloc(al, sizes[i]);
         TEST_TRUE(blocks[i] != NULL);
+
+        mem_set(blocks[i], i, sizes[i]);
     }
 
     for (uint32_t i = num_blocks / 2; i < num_blocks; i += 2) {
-        blocks[i] = al_malloc(al, 300);
+        sizes[i] = 300;
+        blocks[i] = al_malloc(al, sizes[i]);
         TEST_TRUE(blocks[i] != NULL);
+
+        mem_set(blocks[i], i, sizes[i]);
+    }
+
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        size_t old_size = sizes[i];
+        size_t new_size = i % 3 == 0 ? old_size + (100 * i) : old_size / 2;
+
+        blocks[i] = al_realloc(al, blocks[i], new_size);
+        TEST_TRUE(blocks[i] != NULL);
+
+        for (size_t j = old_size; j < new_size; j++) {
+            blocks[i][j] = (uint8_t)i;
+        }
+
+        sizes[i] = new_size;
+    }
+
+    for (uint32_t i = 0; i < num_blocks; i++) {
+        TEST_TRUE(mem_chk(blocks[i], i, sizes[i]));
     }
 
     for (uint32_t i = 0; i < num_blocks; i++) {
