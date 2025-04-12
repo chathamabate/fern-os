@@ -77,6 +77,7 @@ void kernel_init(void) {
 
     // Ok now for expiremental multi tasking.
 
+    /*
     intr_gate_desc_t timer_gd = intr_gate_desc();
 
     gd_set_selector(&timer_gd, 0x8);
@@ -106,6 +107,7 @@ void kernel_init(void) {
     // Oop, we gotta create the inital stack frame...
 
     alt_task_esp = initialize_task_stack((uint32_t *)alt_stack_end, (void *)task1_main);
+    */
 }
 
 // I think if there is a page fault exception... that's bad.
@@ -117,11 +119,12 @@ void kernel_init(void) {
 int counter = 0;
 
 int task0_main(void) {
-    for (uint16_t i = 0; ;i++) {
-        if (i == 0) {
-            counter++;
+    test_shal(
+        (mem_manage_pair_t) {
+            .request_mem = alloc_pages,
+            .return_mem = free_pages
         }
-    }
+    );
 
     return 0;
 }

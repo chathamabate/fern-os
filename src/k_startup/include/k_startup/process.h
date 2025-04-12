@@ -150,6 +150,12 @@ typedef struct _kernel_system_t {
     process_t procs[MAX_PROCS];
 } kernel_system_t;
 
+/*
+ * Internal system style calls to only be used by the kernel thread.
+ *
+ * The user may be given aliases of these calls in userspace, but that is completely independent.
+ */
+
 /**
  * This function will copy a thread's process. 
  *
@@ -161,7 +167,7 @@ typedef struct _kernel_system_t {
  */
 fernos_error_t ks_fork(glbl_thread_id_t gtid, glbl_thread_id_t *child_gtid);
 
-fernos_error_t ks_spawn_thread(process_id_t pid, thread_id_t *tid, );
+//fernos_error_t ks_spawn_thread(process_id_t pid, thread_id_t *tid, );
 
 /**
  * This call is meant to still be usable even if I implement signals later on. This will cleanup

@@ -13,6 +13,7 @@ MODS := \
 		k_startup \
 		k_bios_term \
 		k_sys \
+		s_data \
 		s_mem \
 		s_util 
 

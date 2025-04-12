@@ -99,6 +99,22 @@ static bool test_simple_realloc(void) {
     TEST_SUCCEED();
 }
 
+static bool test_failed_realloc(void) {
+    void *block = al_malloc(al, 0x100);
+    TEST_TRUE(block != NULL);
+
+    void *reblock = al_realloc(al, block, M_256M);
+    TEST_TRUE(reblock == NULL);
+
+    // Should be able to see here that our block is still allocated
+    // and the original size.
+    // al_dump(al, term_put_fmt_s);
+
+    al_free(al, block);
+
+    TEST_SUCCEED();
+}
+
 static bool test_repeated_malloc0(void) {
     // Malloc a bunch, then free.
     
@@ -379,6 +395,7 @@ bool test_allocator(const char *name, allocator_t *(*gen)(void)) {
     RUN_TEST(test_simple_malloc);
     RUN_TEST(test_simple_malloc_and_free);
     RUN_TEST(test_simple_realloc);
+    RUN_TEST(test_failed_realloc);
     RUN_TEST(test_repeated_malloc0);
     RUN_TEST(test_repeated_malloc1);
     RUN_TEST(test_large_malloc);
