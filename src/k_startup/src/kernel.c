@@ -10,6 +10,7 @@
 #include "k_bios_term/term.h"
 #include "s_mem/simple_heap.h"
 
+#include "s_data/test/id_table.h"
 #include "s_mem/test/simple_heap.h"
 
 void timer_handler(void);
@@ -119,12 +120,16 @@ void kernel_init(void) {
 int counter = 0;
 
 int task0_main(void) {
+    /*
     test_shal(
         (mem_manage_pair_t) {
             .request_mem = alloc_pages,
             .return_mem = free_pages
         }
     );
+    */
+
+    test_id_table();
 
     return 0;
 }

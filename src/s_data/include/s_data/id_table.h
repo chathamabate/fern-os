@@ -19,18 +19,22 @@ typedef struct _id_table_entry_t {
      */
     bool allocated;
 
-    union {
-        /**
-         * If the entry is in use, this hold the arbitrary data pointer.
-         */
-        void *data;
+    /*
+     * The table contains two linked lists, a linked list of free entries, and a linked list 
+     * of allocated entries.
+     *
+     * Thus, all entries belong to one of the two linked lists.
+     *
+     * The below pointers use max_cap to signify NULL.
+     */
 
-        /**
-         * If the entry is not in use, this holds the id of the next free entry.
-         * If there are no more free entries, this holds the max_cap.
-         */
-        id_t next;
-    } cell;
+    id_t next;
+    id_t prev;
+
+    /**
+     * The arbitrary data pointer.
+     */
+    void *data;
 } id_table_entry_t;
 
 /**
@@ -38,6 +42,9 @@ typedef struct _id_table_entry_t {
  *
  * It is used when strong performance is needed when using a group of things which all have unique
  * IDs.
+ *
+ * The point is that once an ID is given it is never altered until the ID is returned.
+ * All operations have about constant time operation.
  */
 typedef struct _id_table_t {
     /**
@@ -56,6 +63,13 @@ typedef struct _id_table_t {
     uint32_t cap;
 
     /**
+     * Head entry of the allocated list.
+     *
+     * (Equals max_cap when there are no allocated entries in the table)
+     */
+    id_t al_head;
+
+    /**
      * Head of the entry free list.
      *
      * (Equals max_cap when there are no free entries in the table)
@@ -66,6 +80,11 @@ typedef struct _id_table_t {
      * The table.
      */
     id_table_entry_t *tbl;
+
+    /**
+     * The iterator. max_cap means end of allocated list has been reached.
+     */
+    id_t iter;
 } id_table_t;
 
 /**
@@ -112,7 +131,7 @@ static inline void *idtb_get(id_table_t *idtb, id_t id) {
         return NULL;
     }
 
-    return idtb->tbl[id].cell.data;
+    return idtb->tbl[id].data;
 }
 
 /**
@@ -122,7 +141,35 @@ static inline void *idtb_get(id_table_t *idtb, id_t id) {
  */
 static inline void idtb_set(id_table_t *idtb, id_t id, void *dp) {
     if (id < idtb->cap && idtb->tbl[id].allocated) {
-        idtb->tbl[id].cell.data = dp;
+        idtb->tbl[id].data = dp;
     }
 }
+
+/**
+ * An ID Table will expose an iterator which allows for efficient iterating over all allocated
+ * IDs.
+ *
+ * To use the iterator, first use this endpoint, then use `idtb_next`.
+ *
+ * NOTE: This is a stateful call! NEVER EVER edit the table while iterating.
+ * If the table IS edited, make sure to call idtb_reset_iterator before iterating again.
+ */
+void idtb_reset_iterator(id_table_t *idtb);
+
+/**
+ * Returns the ID of an allocated cell in the table which is yet to be returned since calling 
+ * idtb_reset_iterator.
+ *
+ * If there are no more allocated IDs to be returned, this returns the max capacity signifiying
+ * NULL.
+ */
+id_t idtb_next(id_table_t *idtb);
+
+/**
+ * Helpful function for debugging.
+ *
+ * No set behavoir, should just output some sort of text based representation using the given pf 
+ * function.
+ */
+void idtb_dump(id_table_t *idtb, void (*pf)(const char *fmt, ...));
 
