@@ -4,7 +4,7 @@
 #include "s_util/ansii.h"
 #include "s_util/misc.h"
 
-#define IDTB_STARTING_CAP 0x10U
+#define IDTB_STARTING_CAP 0x4
 
 id_table_t *new_id_table(allocator_t *al, uint32_t mc) {
     if (mc == 0 || !al) {
@@ -100,6 +100,7 @@ id_t idtb_pop_id(id_table_t *idtb) {
 
             idtb->fl_head = idtb->cap;
 
+            idtb->cap = new_cap;
             idtb->tbl = new_tbl;
         }
     }
@@ -148,6 +149,8 @@ void idtb_push_id(id_table_t *idtb, id_t id) {
      * Somewhat different because the pushed id can be at any location in the allocated list.
      */
 
+    // Remove from allocate list First.
+    
     id_t next = idtb->tbl[id].next;
     id_t prev = idtb->tbl[id].prev;
 
@@ -163,9 +166,13 @@ void idtb_push_id(id_table_t *idtb, id_t id) {
 
     // Now place our cell in the free list.
 
-
     idtb->tbl[id].allocated = false;
+
     idtb->tbl[id].next = idtb->fl_head;
+    if (idtb->fl_head != NULL_ID) {
+        idtb->tbl[idtb->fl_head].prev = id;
+    }
+
     idtb->tbl[id].prev = NULL_ID;
     idtb->tbl[id].data = NULL;
 
