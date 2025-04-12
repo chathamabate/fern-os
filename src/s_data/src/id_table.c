@@ -58,9 +58,52 @@ void delete_id_table(id_table_t *idtb) {
 }
 
 id_t idtb_pop_id(id_table_t *idtb) {
+    if (idtb->fl_head == idtb->max_cap && idtb->cap < idtb->max_cap) {
+        // In this case we attempt a resize.
+        
+        // We need a resize!
+        uint32_t new_cap = idtb->cap * 2;  
+        if (new_cap <= idtb->cap || new_cap > idtb->max_cap) {
+            new_cap = idtb->max_cap;
+        }
 
+        // I believe if we make it here, it is gauranteed that new_cap > cap.
+
+        id_table_entry_t *new_tbl = al_realloc(idtb->al, idtb->tbl,
+                new_cap * sizeof(id_table_entry_t));
+
+        // Did our realloc succeed?
+        if (new_tbl) {
+            for (id_t new_id = idtb->cap; new_id < new_cap; new_id++) {
+                new_tbl[new_id].allocated = false;
+                new_tbl[new_id].cell.next = new_id + 1;
+            }
+            new_tbl[new_cap - 1].cell.next = idtb->max_cap;
+
+            idtb->fl_head = idtb->cap;
+        }
+    }
+
+    if (idtb->fl_head == idtb->max_cap) {
+        return idtb->max_cap;
+    }
+    
+    id_t popped_id = idtb->fl_head;
+    idtb->fl_head = idtb->tbl[popped_id].cell.next;
+
+    idtb->tbl[popped_id].allocated = true;
+    idtb->tbl[popped_id].cell.data = NULL;
+
+    return popped_id;
 }
 
 void idtb_push_id(id_table_t *idtb, id_t id) {
-    
+    if (id >= idtb->cap || !(idtb->tbl[id].allocated)) {
+        return;
+    }
+
+    idtb->tbl[id].allocated = false;
+    idtb->tbl[id].cell.next = idtb->fl_head;
+
+    idtb->fl_head = id;
 }
