@@ -4,45 +4,6 @@
 #include "k_sys/page.h"
 #include "s_data/id_table.h"
 
-// My second kernel organization attempt.
-
-/*
- * Ok, and how would I wait on something like a process dying?
- * Or joining a thread??
- *
- * Ever think about that one??
- * Does that fit into this "condition" model??
- *
- * I wish there was one easy way to figure out thread sleeping.
- *
- * Maybe a thread sleeps with some ID and reason?
- *
- * For example, (JOIN, Thread ID) = I am sleeping until a thread with this ID exits.
- * or           (REAP, 0/PID) = I am sleeping until a process dies.
- *
- * Eh, wouldn't it be better to have some sort of listeners... to prevent all need for iteration?
- * What if a listener exits? Well, then I don't really know tbh...
- *
- * Ok, this isn't such a bad idea tbh...
- * Conditions could still come later... (As a pseudo IPC?)
- *
- * A listener is a thread which is asleep, waiting for something to happen.
- * It's someone else's responsibility to wake up the thread when the time is right.
- *
- * How do I make this work???
- *
- * A problem is that ID's will be reused, If we just pass around IDs, it's hard to confirm we are
- * speaking to the original ID holder...
- *
- * Well, what if we promise that the thread/process ID won't be reused until being reaped?
- * That's an idea... 
- *
- * When a process/thread dies, they can define what??? beneficiary, who should be notified of the 
- * death. If there is no beneficiary, then what? We just sit there anyway.
- *
- * Maybe conditions can come later???
- */
-
 /**
  * A unique ID of a running or zombie process (Only uses first 16 of the full 32 bits)
  */
@@ -97,6 +58,15 @@ typedef struct _process_t {
      *
      * If a process A tries to reap another process B while B is still running, A will be marked as
      * the "beneficiary". When B does exit, A will be notified. 
+     *
+     * What happens when a beneficiary exits before the child dies??
+     * Then what?? Maybe the parent organization is really much better??
+     * Should there be some sort of process wide stuff here???
+     * Might that be better for this design??
+     * All processes have some sort of signal flag??
+     * All processes have children??
+     * I do like the idea of children here tbh...
+     * Probably a little better IMO..
      */
     global_thread_id_t beneficiary;
 } process_t;
