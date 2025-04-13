@@ -3,10 +3,31 @@
 #include "s_data/id_table.h"
 
 #include "k_bios_term/term.h"
+#include "s_mem/allocator.h"
+
+static bool pretest(void);
+static bool posttest(void);
+
+#define PRETEST() pretest()
+#define POSTTEST() posttest()
 
 #define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
 
 #include "s_util/test.h"
+
+static size_t _num_al_blocks;
+
+static bool pretest(void) {
+    _num_al_blocks = al_num_user_blocks(get_default_allocator());
+
+    TEST_SUCCEED();
+}
+
+static bool posttest(void) {
+    TEST_EQUAL_HEX(_num_al_blocks, al_num_user_blocks(get_default_allocator()));
+
+    TEST_SUCCEED();
+}
 
 static bool test_new_id_table(void) {
     id_table_t *idtb = new_da_id_table(25);
