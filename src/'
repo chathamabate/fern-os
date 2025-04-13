@@ -1,8 +1,6 @@
 
 #pragma once
 
-#include "s_data/id_table.h"
-
 /*
  * In this module, a lot of definitions will depend on each other.
  *
@@ -82,8 +80,6 @@
 
 // Let's figure this trigger thing out first...
 // Go from there...
-
-typedef id_t thread_id_t;
 
 
 
