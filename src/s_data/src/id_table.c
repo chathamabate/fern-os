@@ -102,7 +102,10 @@ id_t idtb_pop_id(id_table_t *idtb) {
 
             idtb->cap = new_cap;
             idtb->tbl = new_tbl;
-        }
+        }     
+
+        // Remember if the realloc fails, that's OK. 
+        // The original table should be left untouched.
     }
 
     if (idtb->fl_head == NULL_ID) {

@@ -149,11 +149,89 @@ static bool test_id_table1(void) {
     TEST_SUCCEED();
 }
 
+static bool test_id_table_exhaustion(void) {
+    // Here we assume that the heap doesn have 2Gs of space.
+    id_table_t *idtb = new_da_id_table(M_2G);
+    TEST_TRUE(idtb != NULL);
+
+    // Just want to see what happens when we push it to the limit.
+
+    const id_t NULL_ID = idtb_null_id(idtb);
+
+    id_t id0 = idtb_pop_id(idtb);
+    TEST_TRUE(id0 != NULL_ID);
+
+    id_t id;
+    while ((id = idtb_pop_id(idtb)) != NULL_ID);
+
+    // Now just try using the table after the fact.
+    idtb_push_id(idtb, id0);
+    id0 = idtb_pop_id(idtb);
+    TEST_TRUE(id0 != NULL_ID);
+
+    delete_id_table(idtb);
+
+    TEST_SUCCEED();
+}
+
+#define TEST_ID_TABLE_ITER_MC 20
+static bool test_id_table_iter(void) {
+    id_table_t *idtb = new_da_id_table(TEST_ID_TABLE_ITER_MC);
+    TEST_TRUE(idtb != NULL);
+
+    const id_t NULL_ID = idtb_null_id(idtb);
+
+    // None.
+    idtb_reset_iterator(idtb);
+    TEST_EQUAL_HEX(NULL_ID, idtb_next(idtb));
+
+    // 1 element.
+    id_t id0 = idtb_pop_id(idtb);
+    TEST_TRUE(id0 != NULL_ID);
+
+    idtb_reset_iterator(idtb);
+    TEST_EQUAL_HEX(id0, idtb_next(idtb));
+    TEST_EQUAL_HEX(NULL_ID, idtb_next(idtb));
+
+    idtb_push_id(idtb, id0);
+
+    // Multiple elements.
+    bool visited[TEST_ID_TABLE_ITER_MC];
+    for (uint32_t i = 0; i < TEST_ID_TABLE_ITER_MC; i++) {
+        visited[i] = false;
+    }
+    
+    // Arbitrary amount here.
+    for (uint32_t i = 0; i < 5; i++) {
+        id_t id = idtb_pop_id(idtb); 
+        TEST_TRUE(id != NULL_ID);
+
+        visited[id] = true;
+    }
+
+    id_t iter;
+    idtb_reset_iterator(idtb);
+    while ((iter = idtb_next(idtb)) != NULL_ID) {
+        TEST_TRUE(visited[iter]);
+        visited[iter] = false;
+    }
+
+    for (uint32_t i = 0; i < TEST_ID_TABLE_ITER_MC; i++) {
+        TEST_FALSE(visited[i]);
+    }
+
+    delete_id_table(idtb);
+
+    TEST_SUCCEED();
+}
+
 bool test_id_table(void) {
     BEGIN_SUITE("ID Table");
     RUN_TEST(test_new_id_table);
     RUN_TEST(test_id_table_simple);
     RUN_TEST(test_id_table0);
     RUN_TEST(test_id_table1);
+    RUN_TEST(test_id_table_exhaustion);
+    RUN_TEST(test_id_table_iter);
     return END_SUITE();
 }
