@@ -56,10 +56,34 @@ static inline void wq_remove_thread(wait_queue_t *wq, thread_t *t) {
 }
 
 /**
- * A cond_wait_queue_t, is a wait queue used when a thread is waiting on a condition.
+ * A sig_wait_queue_t is a queue which manages threads waiting on signals to arrive.
+ */
+typedef struct _sig_wait_queue_t {
+    // TODO: Fill this in.
+    int nop;
+} sig_wait_queue_t;
+
+/**
+ * Thread t should be woken up when any one of the signals marked in sig mask are received.
+ */
+fernos_error_t swq_enqueue(sig_wait_queue_t *swq, thread_t *t, uint32_t sig_mask);
+
+/**
+ * This should iterate over the threads in the queue. If t.mask | *sig_vec, then that thread
+ * is woken up and given t.mask | *sig_vec, afterwards *sig_vec <= *sig_vec & ~t.mask.
+ *
+ * This is done repeatedly until the signal vector is empty, or all threads have been searched.
+ *
+ * In one notify call, no two threads are ever woken up for the same signal!
+ */
+void swq_notify(sig_wait_queue_t *swq, uint32_t *sig_vec);
+
+/**
+ * A cond_wait_queue_t is a wait queue used when a thread is waiting on a condition.
  */
 typedef struct _cond_wait_queue_t {
-    // Fill in later.
+    // TODO: Fill this in.
+    int nop;
 } cond_wait_queue_t;
 
 /**
