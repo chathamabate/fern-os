@@ -13,7 +13,7 @@ _SRCS 		?= id_table.c list.c
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= id_table.c
+_TEST_SRCS 	?= id_table.c list.c
 
 -include ../mod_stub.mk
 
