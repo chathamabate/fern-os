@@ -83,7 +83,10 @@
 // Let's figure this trigger thing out first...
 // Go from there...
 
+typedef id_t proc_id_t;
 typedef id_t thread_id_t;
+typedef id_t glbl_thread_id_t;
+
 
 
 
