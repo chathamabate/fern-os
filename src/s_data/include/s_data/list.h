@@ -23,9 +23,10 @@ typedef struct _list_impl_t {
     fernos_error_t (*l_push)(list_t *l, size_t i, const void *src);
     fernos_error_t (*l_pop)(list_t *l, size_t i, void *dest);
 
-    void (*l_reset_iterator)(list_t *l);
-    void *(*l_next)(list_t *l);
-    fernos_error_t (*l_push_iter)(list_t *l, const void *src);
+    void (*l_reset_iter)(list_t *l);
+    void *(*l_get_iter)(list_t *l);
+    void *(*l_next_iter)(list_t *l);
+    fernos_error_t (*l_push_after_iter)(list_t *l, const void *src);
     fernos_error_t (*l_pop_iter)(list_t *l, void *dest);
 
     void (*l_dump)(list_t *l, void (*pf)(const char *fmt, ...));
@@ -119,39 +120,44 @@ static inline fernos_error_t l_pop_back(list_t *l, void *dest) {
 /**
  * Reset the iterator state.
  */
-static inline void l_reset_iterator(list_t *l) {
-    l->impl->l_reset_iterator(l);
+static inline void l_reset_iter(list_t *l) {
+    l->impl->l_reset_iter(l);
 }
 
 /**
- * Get the a pointer to the next element in the list. 
+ * Return the current iterator.
  *
- * Just like get_ptr, this should be a pointer into the list!
- *
- * Returns NULL when the end of the list has been reached.
+ * Should return NULL when the end of the list is reached.
  */
-static inline void *l_next(list_t *l) {
-    return l->impl->l_next(l);
+static inline void *l_get_iter(list_t *l) {
+    return l->impl->l_get_iter(l);
 }
 
 /**
- * Push an element just after the iterator. The following call to next should return a pointer
- * to this newly added element.
+ * Advance the iterator and return its new value.
+ *
+ * Should return NULL when the end of the list is reached.
+ */
+static inline void *l_next_iter(list_t *l) {
+    return l->impl->l_next_iter(l);
+}
+
+/**
+ * Push an element into the position directly after the current iterator position. 
  *
  * Returns an error if src is NULL, if the end of the list has been reached, or if there
  * aren't sufficient resources to do the push.
  */
-static inline fernos_error_t l_push_iter(list_t *l, const void *src) {
-    return l->impl->l_push_iter(l, src);
+static inline fernos_error_t l_push_after_iter(list_t *l, const void *src) {
+    return l->impl->l_push_after_iter(l, src);
 }
 
 /**
- * Remove the last element to be returned by l_next.
+ * Remove the current iterator from the list and advance the iterator to the next element.
  *
  * If dest is non-null, copy the popped element into the dest.
  *
- * Returns an error if we are yet to call l_next, if we've reached the end of the list, or
- * if the list is empty.
+ * Returns an error if the iterator is NULL.
  */
 static inline fernos_error_t l_pop_iter(list_t *l, void *dest) {
     return l->impl->l_pop_iter(l, dest);
