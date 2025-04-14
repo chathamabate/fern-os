@@ -5,6 +5,13 @@
 #include "k_startup/fwd_defs.h"
 #include "s_data/id_table.h"
 
+// Basically, does the wait queue actually do the scheduling though??
+// How does that work, maybe that can be given as an interface??
+// Ehh, might be abstraction for now reason... 
+//
+// Well, let's wait, maybe there is an easy way we can pull this all together soon!
+// Could the wait queue come with a scheduler??
+
 // Worth doing all this shit at somepoint tomorrow maybe because it's getting late...
 
 typedef struct _process_t {
