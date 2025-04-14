@@ -3,6 +3,7 @@
 
 #include "k_startup/fwd_defs.h"
 #include "k_startup/wait_queue.h"
+#include "s_data/id_table.h"
 
 struct _process_t {
     /**
@@ -32,7 +33,23 @@ struct _process_t {
     sig_wait_queue_t *swq;
 
     /**
-     * OK, now what, conditions???
+     * Conditions will be local to each process. A thread from one process can NEVER wait on a 
+     * condition from another process.
+     *
+     * This is essentially a map<Local Condition ID, cond_wait_queue_t *>
+     *
+     * If a condition is deleted while threads are waiting, all threads should be woken up with 
+     * some sort of status code.
      */
-    
+    id_table_t *conds;
+
+    // How do we know when a child process has died (A signal, ok, but where does it's pid/pointer
+    // get stored?? A Hashset of living and dead children??
+    // When we do reap, how do we know who's died??
+    // A linked list maybe?? Not the worst thing in the world??
+    // A table could be better IMO... a probed table maybe??
+    // Do I really need to redo all of these data structures??
+    // ... Probably tbh...
+    // A linked list wouldn't be so bad tbh...
+    // Probs will need it for the wait_queue anyway IMO...
 };

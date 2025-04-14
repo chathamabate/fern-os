@@ -38,6 +38,16 @@ typedef uint16_t fernos_error_t;
  */
 #define FOS_IDENTITY_OVERWRITE (7)
 
+/**
+ * You gave an index which is invalid.
+ */
+#define FOS_INVALID_INDEX      (8)
+
+/**
+ * An operation cannot be completed due to an empty collection.
+ */
+#define FOS_EMPTY              (9)
+
 
 
 

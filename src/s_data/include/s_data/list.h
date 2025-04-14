@@ -1,0 +1,139 @@
+
+#pragma once
+
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include "s_util/err.h"
+
+/*
+ * Pretty predictable list interface and implementations.
+ */
+
+typedef struct _list_t list_t;
+
+typedef struct _list_impl_t {
+    void (*delete_list)(list_t *l);
+
+    size_t (*l_get_cell_size)(list_t *l);
+    size_t (*l_get_len)(list_t *l);
+
+    void *(*l_get_ptr)(list_t *l, size_t i);
+
+    fernos_error_t (*l_push)(list_t *l, size_t i, const void *src);
+    fernos_error_t (*l_pop)(list_t *l, size_t i, void *dest);
+
+    void (*l_reset_iterator)(list_t *l);
+    void *(*l_next)(list_t *l);
+    fernos_error_t (*l_push_iter)(list_t *l, const void *src);
+    fernos_error_t (*l_pop_iter)(list_t *l, void *dest);
+} list_impl_t;
+
+struct _list_t {
+    const list_impl_t * const impl;
+};
+
+/**
+ * Delete the list.
+ *
+ * If you need to do some special cleanup for each individual cell, it's expected you use the 
+ * iterator to clean up, then call this function.
+ */
+static inline void delete_list(list_t *l) {
+    if (l) {
+        l->impl->delete_list(l);
+    }
+}
+
+/**
+ * A list is a collection of equally sized cells. This returns the size of just one cell.
+ */
+static inline size_t l_get_cell_size(list_t *l) {
+    return l->impl->l_get_cell_size(l);
+}
+
+/**
+ * A list is a collection of equally sized cells. This returns the size of just one cell.
+ */
+static inline size_t l_get_len(list_t *l) {
+    return l->impl->l_get_len(l);
+}
+
+/**
+ * Get a pointer to the element at index i. If there is no index i, this should return NULL.
+ *
+ * NOTE: This should be a pointer INTO the list, NOT a copy of the element. 
+ */
+static inline void *l_get_ptr(list_t *l, size_t i) {
+    return l->impl->l_get_ptr(l, i);
+}
+
+/**
+ * Insert an element at index i. i can be the length of the list if you'd like to append the 
+ * element at the end.
+ *
+ * Returns an error if src is NULL, if i is invalid, or if there aren't enough resources to do
+ * the push.
+ */
+static inline fernos_error_t l_push(list_t *l, size_t i, const void *src) {
+    return l->impl->l_push(l, i, src);
+}
+
+/**
+ * Remove an element at index i. 
+ *
+ * if dest is non-null, copy the element'c contents to dest.
+ *
+ * Returns an error if i is invalid.
+ */
+static inline fernos_error_t l_pop(list_t *l, size_t i, void *dest) {
+    return l->impl->l_pop(l, i, dest);
+}
+
+/* Some push/pop helpers */
+
+static inline fernos_error_t l_push_front(list_t *l, const void *src) {
+    return l_push(l, 0, src);
+}
+
+static inline fernos_error_t l_pop_front(list_t *l, void *dest) {
+    return l_pop(l, 0, dest);
+}
+
+static inline fernos_error_t l_push_back(list_t *l, const void *src) {
+    return l_push(l, l_get_len(l), src);
+}
+
+static inline fernos_error_t l_pop_back(list_t *l, void *dest) {
+    return l_pop(l, l_get_len(l) - 1, dest);
+}
+
+/*
+ * Below are the "iterator" functions, these are all stateful and are to be used during iteration.
+ *
+ * When iterating, only ever use the calls below to modify the list.
+ */
+
+/**
+ * Reset the iterator state.
+ */
+static inline void l_reset_iterator(list_t *l) {
+    l->impl->l_reset_iterator(l);
+}
+
+/**
+ * Get the a pointer to the next element in the list. 
+ *
+ * Just like get_ptr, this should be a pointer into the list!
+ */
+static inline void *l_next(list_t *l) {
+    return l->impl->l_next(l);
+}
+
+static inline fernos_error_t l_push_iter(list_t *l, const void *src) {
+
+}
+
+static inline fernos_error_t l_pop_iter(list_t *l, void *dest) {
+
+}
