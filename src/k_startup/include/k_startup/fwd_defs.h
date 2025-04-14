@@ -74,18 +74,11 @@
  */
 
 
-// Maybe we could have a notion of a "triggerable"?
-// Either a thread, or a condition itself??
-// Ok, but what if a condition belongs to 2 other conditions, is that ok??
-// I think I'd say that's ok??
-// Maybe???
-
-// Let's figure this trigger thing out first...
-// Go from there...
-
 typedef id_t proc_id_t;
 typedef id_t thread_id_t;
-typedef id_t glbl_thread_id_t;
+
+typedef struct _process_t process_t;
+typedef struct _thread_t thread_t;
 
 
 
