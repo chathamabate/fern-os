@@ -27,6 +27,8 @@ typedef struct _list_impl_t {
     void *(*l_next)(list_t *l);
     fernos_error_t (*l_push_iter)(list_t *l, const void *src);
     fernos_error_t (*l_pop_iter)(list_t *l, void *dest);
+
+    void (*l_dump)(list_t *l, void (*pf)(const char *fmt, ...));
 } list_impl_t;
 
 struct _list_t {
@@ -125,15 +127,47 @@ static inline void l_reset_iterator(list_t *l) {
  * Get the a pointer to the next element in the list. 
  *
  * Just like get_ptr, this should be a pointer into the list!
+ *
+ * Returns NULL when the end of the list has been reached.
  */
 static inline void *l_next(list_t *l) {
     return l->impl->l_next(l);
 }
 
+/**
+ * Push an element just after the iterator. The following call to next should return a pointer
+ * to this newly added element.
+ *
+ * Returns an error if src is NULL, if the end of the list has been reached, or if there
+ * aren't sufficient resources to do the push.
+ */
 static inline fernos_error_t l_push_iter(list_t *l, const void *src) {
-
+    return l->impl->l_push_iter(l, src);
 }
 
+/**
+ * Remove the last element to be returned by l_next.
+ *
+ * If dest is non-null, copy the popped element into the dest.
+ *
+ * Returns an error if we are yet to call l_next, if we've reached the end of the list, or
+ * if the list is empty.
+ */
 static inline fernos_error_t l_pop_iter(list_t *l, void *dest) {
+    return l->impl->l_pop_iter(l, dest);
+}
 
+/*
+ * Misc/Debug functions.
+ */
+
+/**
+ * Optional.
+ *
+ * Intended to dump some representation of the list using the given print function.
+ */
+static inline void l_dump(list_t *l, void (*pf)(const char *fmt, ...)) {
+    if (l->impl->l_dump) {
+        l->impl->l_dump(l, pf);
+    }
 }
