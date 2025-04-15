@@ -12,3 +12,8 @@
  * the memory leak test just won't do anything.
  */
 bool test_list(const char *name, list_t *(*gen)(size_t cs)); 
+
+/**
+ * Run above suite with the linked list implementation.
+ */
+bool test_linked_list(void);

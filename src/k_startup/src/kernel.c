@@ -11,6 +11,7 @@
 #include "s_mem/simple_heap.h"
 
 #include "s_data/test/id_table.h"
+#include "s_data/test/list.h"
 #include "s_mem/test/simple_heap.h"
 
 void timer_handler(void);
@@ -129,7 +130,7 @@ int task0_main(void) {
     );
     */
 
-    test_id_table();
+    test_linked_list();
 
     return 0;
 }

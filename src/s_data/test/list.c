@@ -1,5 +1,4 @@
 
-#pragma once
 
 #include "s_data/test/list.h"
 #include "s_data/list.h"
@@ -146,7 +145,7 @@ static bool test_pop(void) {
         TEST_EQUAL_UINT(i + 4, *ptr);
     }
 
-    TEST_EQUAL_HEX(0, l_get_len(l));
+    TEST_EQUAL_HEX(5, l_get_len(l));
 
     delete_list(l);
      
@@ -335,4 +334,8 @@ bool test_list(const char *name, list_t *(*gen)(size_t cs)) {
     RUN_TEST(test_mutate_iter);
     RUN_TEST(test_bad_calls);
     return END_SUITE();
+}
+
+bool test_linked_list(void) {
+    return test_list("Linked List", new_da_linked_list);
 }

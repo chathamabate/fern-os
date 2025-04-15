@@ -146,6 +146,8 @@ static fernos_error_t ll_push_node_at(linked_list_t *ll, linked_list_node_t *pos
         ll->first = new_node;
     }
 
+    ll->len++;
+
     return FOS_SUCCESS;
 }
 
@@ -170,6 +172,8 @@ static void ll_pop_node(linked_list_t *ll, linked_list_node_t *node, void *dest)
     }
 
     al_free(ll->al, node);
+
+    ll->len--;
 }
 
 static void *ll_get_ptr(list_t *l, size_t i) {
@@ -219,7 +223,7 @@ static void ll_reset_iter(list_t *l) {
 
 static void *ll_get_iter(list_t *l) {
     linked_list_t *ll = (linked_list_t *)l;
-    return ll->iter + 1;
+    return ll->iter ? ll->iter + 1 : NULL;
 }
 
 static void *ll_next_iter(list_t *l) {
@@ -238,7 +242,7 @@ static void *ll_next_iter(list_t *l) {
         }
     }
 
-    return ll->iter + 1;
+    return ll->iter ? ll->iter + 1 : NULL;
 }
 
 static fernos_error_t ll_push_after_iter(list_t *l, const void *src) {
