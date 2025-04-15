@@ -285,5 +285,7 @@ static fernos_error_t ll_pop_iter(list_t *l, void *dest) {
 static void ll_dump(list_t *l, void (*pf)(const char *fmt, ...)) {
     (void)l;
     (void)pf;
+
+    // TODO: Maybe implement this at some point?
 }
 

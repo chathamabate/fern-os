@@ -241,6 +241,7 @@ static bool test_mutate_iter(void) {
 
     val = 3;
     TEST_TRUE(FOS_SUCCESS != l_push_after_iter(l, &val));
+    TEST_TRUE(FOS_SUCCESS != l_pop_iter(l, &val));
 
     ptr = (int *)l_next_iter(l);
     TEST_TRUE(ptr != NULL);
