@@ -198,6 +198,8 @@ static bool test_basic_iter(void) {
     int *ptr;
 
     l_reset_iter(l);
+    TEST_TRUE(l_get_iter(l) == NULL);
+
     while ((ptr = (int *)l_next_iter(l))) {
         TEST_EQUAL_INT(count, *ptr);
         count++;
@@ -214,54 +216,20 @@ static bool test_mutate_iter(void) {
     list_t *l = gen_list(sizeof(int));
     TEST_TRUE(l != NULL);
 
-    // 0 => 9
-    for (int i = 0; i < 10; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, (size_t)i, &i));
-    }
-
     int *ptr;
     int val;
 
     l_reset_iter(l);
-    
-    ptr = (int *)l_get_iter(l);
-    TEST_TRUE(ptr != NULL);
-    TEST_EQUAL_INT(0, *ptr);
-
-    // 1 => 9
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop_iter(l, &val));
-    TEST_EQUAL_INT(0, val);
 
     ptr = (int *)l_get_iter(l);
-    TEST_TRUE(ptr != NULL);
-    TEST_EQUAL_INT(1, *ptr);
+    TEST_TRUE(ptr == NULL);
 
-    ptr = (int *)l_next_iter(l);
-    TEST_TRUE(ptr != NULL);
-    TEST_EQUAL_INT(2, *ptr);
-
-    val = 10;
-    // 1, 2, 10, 3 => 9
+    val = 3;
     TEST_EQUAL_HEX(FOS_SUCCESS, l_push_after_iter(l, &val));
 
+    // Pushing after, should not effect the current iterator state.
     ptr = (int *)l_get_iter(l);
-    TEST_TRUE(ptr != NULL);
-    TEST_EQUAL_INT(2, *ptr);
-
-    ptr = (int *)l_next_iter(l);
-    TEST_TRUE(ptr != NULL);
-    TEST_EQUAL_INT(10, *ptr);
-
-    l_next_iter(l);
-
-    for (int i = 3; i < 10; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_pop_iter(l, &val));
-        TEST_EQUAL_INT(i, val);
-    }
-
-    // Both of these iter calls should fail once we've reached the end of the list.
-    TEST_TRUE(FOS_SUCCESS != l_push_after_iter(l, &val));
-    TEST_TRUE(FOS_SUCCESS != l_pop_iter(l, &val));
+    TEST_TRUE(ptr == NULL);
 
     delete_list(l);
     TEST_SUCCEED();

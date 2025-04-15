@@ -120,6 +120,9 @@ static inline fernos_error_t l_pop_back(list_t *l, void *dest) {
 
 /**
  * Reset the iterator state.
+ *
+ * It is expected that the first value the iterator holds is NULL. It is not populated until 
+ * l_next_iter is called for the first time.
  */
 static inline void l_reset_iter(list_t *l) {
     l->impl->l_reset_iter(l);
@@ -128,7 +131,8 @@ static inline void l_reset_iter(list_t *l) {
 /**
  * Return the current iterator.
  *
- * Should return NULL when the end of the list is reached.
+ * Returns NULL at the beginning of iteration before calling l_next_iter for the first time, and
+ * returns NULL at the end of iteration!
  */
 static inline void *l_get_iter(list_t *l) {
     return l->impl->l_get_iter(l);
@@ -146,8 +150,10 @@ static inline void *l_next_iter(list_t *l) {
 /**
  * Push an element into the position directly after the current iterator position. 
  *
- * Returns an error if src is NULL, if the end of the list has been reached, or if there
- * aren't sufficient resources to do the push.
+ * If we just reset the iterator, this should push to the front of the list.
+ * If we've reached end of iteration, this should push to the back of the list.
+ *
+ * Returns an error if src is NULL or if insufficient resources.
  */
 static inline fernos_error_t l_push_after_iter(list_t *l, const void *src) {
     return l->impl->l_push_after_iter(l, src);
@@ -158,7 +164,8 @@ static inline fernos_error_t l_push_after_iter(list_t *l, const void *src) {
  *
  * If dest is non-null, copy the popped element into the dest.
  *
- * Returns an error if the iterator is NULL.
+ * Returns an error if the iterator is NULL. 
+ * (Remember, the iterator is NULL at the very beginning and very end of iteration.)
  */
 static inline fernos_error_t l_pop_iter(list_t *l, void *dest) {
     return l->impl->l_pop_iter(l, dest);
@@ -200,6 +207,8 @@ struct _linked_list_node_t {
  * Standard linked list. Good for queues and stacks.
  */
 typedef struct _linked_list_t {
+    list_t super;
+
     allocator_t *al;
 
     size_t len;     
@@ -208,9 +217,13 @@ typedef struct _linked_list_t {
     linked_list_node_t *first;
     linked_list_node_t *last;
 
+    bool reached_end;
     linked_list_node_t *iter;
 } linked_list_t;
 
+/**
+ * Returns NULL on failure to allocate or if cell size is 0.
+ */
 list_t *new_linked_list(allocator_t *al, size_t cs);
 
 static inline list_t *new_da_linked_list(size_t cs) {
