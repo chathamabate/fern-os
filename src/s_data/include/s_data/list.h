@@ -150,10 +150,8 @@ static inline void *l_next_iter(list_t *l) {
 /**
  * Push an element into the position directly after the current iterator position. 
  *
- * If we just reset the iterator, this should push to the front of the list.
- * If we've reached end of iteration, this should push to the back of the list.
- *
- * Returns an error if src is NULL or if insufficient resources.
+ * Returns an error if src is NULL or if insufficient resources. Returns an error if the iterator is
+ * NULL!
  */
 static inline fernos_error_t l_push_after_iter(list_t *l, const void *src) {
     return l->impl->l_push_after_iter(l, src);

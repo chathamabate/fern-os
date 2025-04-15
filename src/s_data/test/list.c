@@ -115,6 +115,8 @@ static bool test_pop(void) {
         TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, i, &i));
     }
 
+    TEST_EQUAL_HEX(10, l_get_len(l));
+
     uint8_t val;
 
     // pop 1-3
@@ -134,6 +136,8 @@ static bool test_pop(void) {
     TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, 0, &val)); 
     TEST_EQUAL_UINT(0, val);
 
+    TEST_EQUAL_HEX(5, l_get_len(l));
+
     // 4 - 8 is left.
     for (uint8_t i = 0; i < 5; i++) {
         uint8_t *ptr = l_get_ptr(l, i);
@@ -141,6 +145,8 @@ static bool test_pop(void) {
 
         TEST_EQUAL_UINT(i + 4, *ptr);
     }
+
+    TEST_EQUAL_HEX(0, l_get_len(l));
 
     delete_list(l);
      
@@ -201,6 +207,7 @@ static bool test_basic_iter(void) {
     TEST_TRUE(l_get_iter(l) == NULL);
 
     while ((ptr = (int *)l_next_iter(l))) {
+        TEST_EQUAL_HEX(ptr, l_get_iter(l));
         TEST_EQUAL_INT(count, *ptr);
         count++;
     }
@@ -219,17 +226,81 @@ static bool test_mutate_iter(void) {
     int *ptr;
     int val;
 
+    val = 1;
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &val));
+    val = 2;
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &val));
+
+    // 1 2
+
     l_reset_iter(l);
+
+    // [] 1 2
 
     ptr = (int *)l_get_iter(l);
     TEST_TRUE(ptr == NULL);
 
     val = 3;
+    TEST_TRUE(FOS_SUCCESS != l_push_after_iter(l, &val));
+
+    ptr = (int *)l_next_iter(l);
+    TEST_TRUE(ptr != NULL);
+    TEST_EQUAL_INT(1, *ptr);
+
+    // [1] 2
+
+    val = 4;
     TEST_EQUAL_HEX(FOS_SUCCESS, l_push_after_iter(l, &val));
 
-    // Pushing after, should not effect the current iterator state.
+    val = 6;
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_after_iter(l, &val));
+
+    // [1] 6 4 2
+    
+    TEST_EQUAL_HEX(4, l_get_len(l));
+
+    ptr = (int *)l_next_iter(l);
+    TEST_TRUE(ptr != NULL);
+    TEST_EQUAL_INT(6, *ptr);
+
+    // 1 [6] 4 2
+
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop_iter(l, &val));
+    TEST_EQUAL_INT(6, val);
+
+    // 1 [4] 2
+    
+    TEST_EQUAL_HEX(3, l_get_len(l));
+
     ptr = (int *)l_get_iter(l);
-    TEST_TRUE(ptr == NULL);
+    TEST_TRUE(ptr != NULL);
+    TEST_EQUAL_INT(4, *ptr);
+
+    ptr = (int *)l_next_iter(l);
+    TEST_TRUE(ptr != NULL);
+
+    // 1 4 [2]
+
+    TEST_EQUAL_INT(2, *ptr);
+
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop_iter(l, &val));
+    TEST_EQUAL_INT(2, val);
+
+    // 1 4
+
+    TEST_TRUE(l_get_iter(l) == NULL);
+
+    TEST_TRUE(FOS_SUCCESS != l_push_after_iter(l, &val));
+
+    l_reset_iter(l);
+
+    // [] 1 4
+
+    ptr = (int *)l_next_iter(l);
+    TEST_TRUE(ptr != NULL);
+    TEST_EQUAL_INT(1, *ptr);
+
+    // [1] 4
 
     delete_list(l);
     TEST_SUCCEED();

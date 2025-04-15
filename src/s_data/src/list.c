@@ -219,7 +219,7 @@ static void ll_reset_iter(list_t *l) {
 
 static void *ll_get_iter(list_t *l) {
     linked_list_t *ll = (linked_list_t *)l;
-    return ll->iter;
+    return ll->iter + 1;
 }
 
 static void *ll_next_iter(list_t *l) {
@@ -238,7 +238,7 @@ static void *ll_next_iter(list_t *l) {
         }
     }
 
-    return ll->iter;
+    return ll->iter + 1;
 }
 
 static fernos_error_t ll_push_after_iter(list_t *l, const void *src) {
@@ -248,19 +248,13 @@ static fernos_error_t ll_push_after_iter(list_t *l, const void *src) {
         return FOS_BAD_ARGS;
     }
 
-    linked_list_node_t *pos;
-
-    if (ll->iter) {
-        pos = ll->iter->next;
-    } else {
-        // Here we are working with either the front or the back!
-        if (ll->reached_end) {
-            pos = NULL;
-        } else {
-            pos = ll->first;
-        }
+    if (!(ll->iter)) {
+        return FOS_INVALID_INDEX;
     }
 
+    linked_list_node_t *pos = ll->iter->next;
+
+    // Remember this call will work even if pos is NULL!
     return ll_push_node_at(ll, pos, src);
 }
 
