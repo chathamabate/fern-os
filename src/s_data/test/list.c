@@ -203,10 +203,7 @@ static bool test_basic_iter(void) {
     int *ptr;
 
     l_reset_iter(l);
-    TEST_TRUE(l_get_iter(l) == NULL);
-
-    while ((ptr = (int *)l_next_iter(l))) {
-        TEST_EQUAL_HEX(ptr, l_get_iter(l));
+    for (ptr = l_get_iter(l); ptr != NULL; ptr = l_next_iter(l)) {
         TEST_EQUAL_INT(count, *ptr);
         count++;
     }
@@ -234,20 +231,9 @@ static bool test_mutate_iter(void) {
 
     l_reset_iter(l);
 
-    // [] 1 2
-
-    ptr = (int *)l_get_iter(l);
-    TEST_TRUE(ptr == NULL);
-
-    val = 3;
-    TEST_TRUE(FOS_SUCCESS != l_push_after_iter(l, &val));
-    TEST_TRUE(FOS_SUCCESS != l_pop_iter(l, &val));
-
-    ptr = (int *)l_next_iter(l);
-    TEST_TRUE(ptr != NULL);
-    TEST_EQUAL_INT(1, *ptr);
-
     // [1] 2
+
+    TEST_EQUAL_INT(1, *(int *)l_get_iter(l));
 
     val = 4;
     TEST_EQUAL_HEX(FOS_SUCCESS, l_push_after_iter(l, &val));
@@ -294,13 +280,9 @@ static bool test_mutate_iter(void) {
 
     l_reset_iter(l);
 
-    // [] 1 4
-
-    ptr = (int *)l_next_iter(l);
-    TEST_TRUE(ptr != NULL);
-    TEST_EQUAL_INT(1, *ptr);
-
     // [1] 4
+    
+    TEST_EQUAL_INT(1, *(int *)l_get_iter(l));
 
     delete_list(l);
     TEST_SUCCEED();

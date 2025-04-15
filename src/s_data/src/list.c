@@ -51,7 +51,6 @@ list_t *new_linked_list(allocator_t *al, size_t cs) {
     ll->first = NULL;
     ll->last = NULL;
 
-    ll->reached_end = true;
     ll->iter = NULL;
 
     return (list_t *)ll;
@@ -216,9 +215,7 @@ static fernos_error_t ll_pop(list_t *l, size_t i, void *dest) {
 static void ll_reset_iter(list_t *l) {
     linked_list_t *ll = (linked_list_t *)l;
 
-    // reached_end is kinda confusing, but used so we can have the iterator behavoir we want.
-    ll->reached_end = ll->len == 0;
-    ll->iter = NULL;
+    ll->iter = ll->first;
 }
 
 static void *ll_get_iter(list_t *l) {
@@ -229,17 +226,8 @@ static void *ll_get_iter(list_t *l) {
 static void *ll_next_iter(list_t *l) {
     linked_list_t *ll = (linked_list_t *)l;
 
-    if (!(ll->reached_end)) {
-        if (ll->iter) {
-            ll->iter = ll->iter->next;
-        } else {
-            // Starting case!
-            ll->iter = ll->first;
-        }
-
-        if (!(ll->iter)) {
-            ll->reached_end = true;
-        }
+    if (ll->iter) {
+        ll->iter = ll->iter->next;
     }
 
     return ll->iter ? ll->iter + 1 : NULL;
@@ -273,9 +261,6 @@ static fernos_error_t ll_pop_iter(list_t *l, void *dest) {
 
     // Advance iter premptively.
     ll->iter = ll->iter->next;
-    if (!(ll->iter)) {
-        ll->reached_end = true;
-    }
 
     ll_pop_node(ll, node, dest);
 

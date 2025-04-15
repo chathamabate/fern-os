@@ -121,8 +121,7 @@ static inline fernos_error_t l_pop_back(list_t *l, void *dest) {
 /**
  * Reset the iterator state.
  *
- * It is expected that the first value the iterator holds is NULL. It is not populated until 
- * l_next_iter is called for the first time.
+ * Sets the iterator to the first element of the list.
  */
 static inline void l_reset_iter(list_t *l) {
     l->impl->l_reset_iter(l);
@@ -131,7 +130,6 @@ static inline void l_reset_iter(list_t *l) {
 /**
  * Return the current iterator.
  *
- * Returns NULL at the beginning of iteration before calling l_next_iter for the first time, and
  * returns NULL at the end of iteration!
  */
 static inline void *l_get_iter(list_t *l) {
@@ -163,7 +161,6 @@ static inline fernos_error_t l_push_after_iter(list_t *l, const void *src) {
  * If dest is non-null, copy the popped element into the dest.
  *
  * Returns an error if the iterator is NULL. 
- * (Remember, the iterator is NULL at the very beginning and very end of iteration.)
  */
 static inline fernos_error_t l_pop_iter(list_t *l, void *dest) {
     return l->impl->l_pop_iter(l, dest);
@@ -215,7 +212,6 @@ typedef struct _linked_list_t {
     linked_list_node_t *first;
     linked_list_node_t *last;
 
-    bool reached_end;
     linked_list_node_t *iter;
 } linked_list_t;
 
