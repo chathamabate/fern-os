@@ -149,7 +149,8 @@ static inline void idtb_set(id_table_t *idtb, id_t id, void *dp) {
  * An ID Table will expose an iterator which allows for efficient iterating over all allocated
  * IDs.
  *
- * To use the iterator, first use this endpoint, then use `idtb_next`.
+ * To use the iterator, first use this endpoint. This should set the iterator to one element in the 
+ * table (given it isn't empty)
  *
  * NOTE: This is a stateful call! NEVER EVER edit the table while iterating.
  * If the table IS edited, make sure to call idtb_reset_iterator before iterating again.
@@ -157,11 +158,12 @@ static inline void idtb_set(id_table_t *idtb, id_t id, void *dp) {
 void idtb_reset_iterator(id_table_t *idtb);
 
 /**
- * Returns the ID of an allocated cell in the table which is yet to be returned since calling 
- * idtb_reset_iterator.
- *
- * If there are no more allocated IDs to be returned, this returns the max capacity signifiying
- * NULL.
+ * Get the current value of the iterator, will equal the NULL_ID when the end is reached.
+ */
+id_t idtb_get_iter(id_table_t *idtb);
+
+/**
+ * Advances the iterator and returns its new value.
  */
 id_t idtb_next(id_table_t *idtb);
 

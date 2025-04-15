@@ -186,6 +186,10 @@ void idtb_reset_iterator(id_table_t *idtb) {
     idtb->iter = idtb->al_head;
 }
 
+id_t idtb_get_iter(id_table_t *idtb) {
+    return idtb->iter;
+}
+
 id_t idtb_next(id_table_t *idtb) {
     const id_t NULL_ID = idtb_null_id(idtb); 
 
@@ -195,7 +199,7 @@ id_t idtb_next(id_table_t *idtb) {
         idtb->iter = idtb->tbl[iter].next;
     }
 
-    return iter;
+    return idtb->iter;
 }
 
 void idtb_dump(id_table_t *idtb, void (*pf)(const char *fmt, ...)) {

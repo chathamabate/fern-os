@@ -211,7 +211,7 @@ static bool test_id_table_iter(void) {
     TEST_TRUE(id0 != NULL_ID);
 
     idtb_reset_iterator(idtb);
-    TEST_EQUAL_HEX(id0, idtb_next(idtb));
+    TEST_EQUAL_HEX(id0, idtb_get_iter(idtb));
     TEST_EQUAL_HEX(NULL_ID, idtb_next(idtb));
 
     idtb_push_id(idtb, id0);
@@ -232,7 +232,7 @@ static bool test_id_table_iter(void) {
 
     id_t iter;
     idtb_reset_iterator(idtb);
-    while ((iter = idtb_next(idtb)) != NULL_ID) {
+    for (iter = idtb_get_iter(idtb); iter != NULL_ID; iter = idtb_next(idtb)) {
         TEST_TRUE(visited[iter]);
         visited[iter] = false;
     }

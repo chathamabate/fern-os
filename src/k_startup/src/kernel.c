@@ -130,7 +130,7 @@ int task0_main(void) {
     );
     */
 
-    test_linked_list();
+    test_id_table();
 
     return 0;
 }
