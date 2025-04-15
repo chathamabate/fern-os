@@ -107,7 +107,181 @@ static bool test_push(void) {
 }
 
 static bool test_pop(void) {
+    list_t *l = gen_list(sizeof(uint8_t));
+    TEST_TRUE(l != NULL);
+
+    // push 0-9
+    for (uint8_t i = 0; i < 10; i++) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, i, &i));
+    }
+
+    uint8_t val;
+
+    // pop 1-3
+    for (uint8_t i = 1; i < 4; i++) {
+        
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, 1, &val));
+        TEST_EQUAL_UINT(i, val);
+    }
+
+    TEST_EQUAL_HEX(7, l_get_len(l));
+
+    // pop 9
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, l_get_len(l) - 1, &val));
+    TEST_EQUAL_UINT(9, val);
+
+    // pop 0
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, 0, &val)); 
+    TEST_EQUAL_UINT(0, val);
+
+    // 4 - 8 is left.
+    for (uint8_t i = 0; i < 5; i++) {
+        uint8_t *ptr = l_get_ptr(l, i);
+        TEST_TRUE(ptr != NULL);
+
+        TEST_EQUAL_UINT(i + 4, *ptr);
+    }
+
+    delete_list(l);
      
+    TEST_SUCCEED();
+}
+
+static bool test_big(void) {
+    list_t *l = gen_list(sizeof(int));
+    TEST_TRUE(l != NULL);
+
+    // 0 => 999
+    for (int i = 999; i >= 0; i--) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, 0, &i));
+    }
+
+    // Double every other element.
+    for (int i = 0; i < 1000; i += 2) {
+        int *ptr = l_get_ptr(l, (size_t)i);
+        TEST_TRUE(ptr != NULL);
+
+        *ptr *= 2;
+    }
+
+    // Remove even indexed elements, leaving just the doubled elements.
+    for (int i = 999; i >= 0; i -= 2) {
+        int val;
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, (size_t)i, &val));
+        TEST_EQUAL_INT(i, val);
+    }
+
+    for (int i = 0; i < 1000; i += 2) {
+        int val;
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, 0, &val));
+        TEST_EQUAL_INT(i * 2, val);
+    }
+
+    TEST_EQUAL_HEX(0, l_get_len(l));
+
+    delete_list(l);
+    TEST_SUCCEED();
+}
+
+/* Now for iterator tests */
+
+static bool test_basic_iter(void) {
+    list_t *l = gen_list(sizeof(int));
+    TEST_TRUE(l != NULL);
+
+    // 0 => 9
+    for (int i = 0; i < 10; i++) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, (size_t)i, &i));
+    }
+
+    int count = 0;
+    int *ptr;
+
+    l_reset_iter(l);
+    while ((ptr = (int *)l_next_iter(l))) {
+        TEST_EQUAL_INT(count, *ptr);
+        count++;
+    }
+
+    TEST_TRUE(l_get_iter(l) == NULL);
+    TEST_EQUAL_INT(10, count);
+
+    delete_list(l);
+    TEST_SUCCEED();
+}
+
+static bool test_mutate_iter(void) {
+    list_t *l = gen_list(sizeof(int));
+    TEST_TRUE(l != NULL);
+
+    // 0 => 9
+    for (int i = 0; i < 10; i++) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, (size_t)i, &i));
+    }
+
+    int *ptr;
+    int val;
+
+    l_reset_iter(l);
+    
+    ptr = (int *)l_get_iter(l);
+    TEST_TRUE(ptr != NULL);
+    TEST_EQUAL_INT(0, *ptr);
+
+    // 1 => 9
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop_iter(l, &val));
+    TEST_EQUAL_INT(0, val);
+
+    ptr = (int *)l_get_iter(l);
+    TEST_TRUE(ptr != NULL);
+    TEST_EQUAL_INT(1, *ptr);
+
+    ptr = (int *)l_next_iter(l);
+    TEST_TRUE(ptr != NULL);
+    TEST_EQUAL_INT(2, *ptr);
+
+    val = 10;
+    // 1, 2, 10, 3 => 9
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_after_iter(l, &val));
+
+    ptr = (int *)l_get_iter(l);
+    TEST_TRUE(ptr != NULL);
+    TEST_EQUAL_INT(2, *ptr);
+
+    ptr = (int *)l_next_iter(l);
+    TEST_TRUE(ptr != NULL);
+    TEST_EQUAL_INT(10, *ptr);
+
+    l_next_iter(l);
+
+    for (int i = 3; i < 10; i++) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_pop_iter(l, &val));
+        TEST_EQUAL_INT(i, val);
+    }
+
+    // Both of these iter calls should fail once we've reached the end of the list.
+    TEST_TRUE(FOS_SUCCESS != l_push_after_iter(l, &val));
+    TEST_TRUE(FOS_SUCCESS != l_pop_iter(l, &val));
+
+    delete_list(l);
+    TEST_SUCCEED();
+}
+
+/* Some input fuzzing not covered in above tests */
+static bool test_bad_calls(void) {
+    list_t *l = gen_list(sizeof(int));
+    TEST_TRUE(l != NULL);
+    
+    int val = 10;
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, 0, &val));
+
+    TEST_TRUE(FOS_SUCCESS != l_push(l, 10, &val));
+    TEST_TRUE(FOS_SUCCESS != l_push(l, 0, NULL));
+
+    l_reset_iter(l); 
+    TEST_TRUE(FOS_SUCCESS != l_push_after_iter(l, NULL));
+
+    delete_list(l);
     TEST_SUCCEED();
 }
 
@@ -117,5 +291,9 @@ bool test_list(const char *name, list_t *(*gen)(size_t cs)) {
     RUN_TEST(test_cell_size);
     RUN_TEST(test_push);
     RUN_TEST(test_pop);
+    RUN_TEST(test_big);
+    RUN_TEST(test_basic_iter);
+    RUN_TEST(test_mutate_iter);
+    RUN_TEST(test_bad_calls);
     return END_SUITE();
 }
