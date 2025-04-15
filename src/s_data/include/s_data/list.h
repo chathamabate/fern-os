@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "s_util/err.h"
+#include "s_mem/allocator.h"
 
 /*
  * Pretty predictable list interface and implementations.
@@ -177,3 +178,43 @@ static inline void l_dump(list_t *l, void (*pf)(const char *fmt, ...)) {
         l->impl->l_dump(l, pf);
     }
 }
+
+typedef struct _linked_list_node_t linked_list_node_t;
+
+/**
+ * This is really more of a header. The data starts directly after the node in memory.
+ */
+struct _linked_list_node_t {
+    /**
+     * Will be NULL when this is the end of the list.
+     */
+    linked_list_node_t *next;
+
+    /**
+     * Will be NULL when this is the start of the list.
+     */
+    linked_list_node_t *prev;
+};
+
+/**
+ * Standard linked list. Good for queues and stacks.
+ */
+typedef struct _linked_list_t {
+    allocator_t *al;
+
+    size_t len;     
+    size_t cs;
+
+    linked_list_node_t *first;
+    linked_list_node_t *last;
+
+    linked_list_node_t *iter;
+} linked_list_t;
+
+list_t *new_linked_list(allocator_t *al, size_t cs);
+
+static inline list_t *new_da_linked_list(size_t cs) {
+    return new_linked_list(get_default_allocator(), cs);
+}
+
+
