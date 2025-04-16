@@ -3,9 +3,52 @@
 
 #include "k_startup/fwd_defs.h"
 #include "k_startup/wait_queue.h"
+#include "k_sys/page.h"
 #include "s_data/id_table.h"
+#include "s_data/list.h"
 
 struct _process_t {
+    /**
+     * This process's global process id!
+     */
+    proc_id_t pid;
+
+    /**
+     * A pointer to the parent process, NULL if the root process.
+     */
+    process_t *parent;
+
+    /**
+     * A list<process_t *> which contains all living child processes. If this process exits, these
+     * children will be adopted by the root process or by some system daemon.
+     */
+    list_t *children;
+
+    /**
+     * A children of this process who have exited, but are yet to be reaped.
+     *
+     * When this process exits, all zombie children will be reaped!
+     * (Or maybe given to a kernel structure which reaps whe appropriate)
+     */
+    list_t *zombie_children;
+
+    /**
+     * This is a table of all threads under this process.
+     */
+    id_table_t *thread_table;
+
+    /**
+     * all processes have a main thread. When this thread exits, the process exits.
+     *
+     * (NOTE: There will also be a system call for exiting the process from any thread)
+     */
+    thread_t *main_thread;
+
+    /**
+     * Physical address of this process's page directory.
+     */
+    phys_addr_t pd;
+
     /**
      * Like in linux, signals will be one form of IPC.
      */
@@ -42,14 +85,4 @@ struct _process_t {
      * some sort of status code.
      */
     id_table_t *conds;
-
-    // How do we know when a child process has died (A signal, ok, but where does it's pid/pointer
-    // get stored?? A Hashset of living and dead children??
-    // When we do reap, how do we know who's died??
-    // A linked list maybe?? Not the worst thing in the world??
-    // A table could be better IMO... a probed table maybe??
-    // Do I really need to redo all of these data structures??
-    // ... Probably tbh...
-    // A linked list wouldn't be so bad tbh...
-    // Probs will need it for the wait_queue anyway IMO...
 };
