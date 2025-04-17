@@ -362,8 +362,61 @@ static bool test_vwq_notify_types(void) {
     vector_wait_queue_t *vwq = new_da_vector_wait_queue();
     TEST_TRUE(vwq != NULL);
 
-    //
+    for (int i = 1; i <= 10; i++) {
+        err = vwq_enqueue(vwq, (void *)i, 1 << i);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+        err = vwq_enqueue(vwq, (void *)(i + 10), (1 << i) | (1 << 0));
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Waiting [1:(1), 11:(0,1), 2:(2), 12:(0,2)... 10:(10), 20:(0,10)] Ready: []
+
+    for (int i = 2; i <= 10; i += 2) {
+        err = vwq_notify(vwq, i, VWQ_NOTIFY_ALL);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Waiting [...] Ready: [2:2, 12:2, 4:4, 14:4, ...10:10, 20:10]
+
+    err = vwq_notify(vwq, 0, VWQ_NOTIFY_ALL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    intptr_t res;
+    uint8_t ready_id;
+
+    for (int i = 2; i <= 10; i += 2) {
+        err = vwq_pop(vwq, (void **)&res, &ready_id);    
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_EQUAL_INT(i, res);
+        TEST_EQUAL_INT(i, ready_id);
+
+        err = vwq_pop(vwq, (void **)&res, &ready_id);    
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_EQUAL_INT(i + 10, res);
+        TEST_EQUAL_INT(i, ready_id);
+        
+    }
+
+    // Waiitng: [1:(1), 3:(3)... 9:(9)] Ready: [11:0, 13:0, 15:0 ... 19:0]
+    
+    for (int i = 11; i < 20; i += 2) {
+        err = vwq_pop(vwq, (void **)&res, &ready_id);    
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_EQUAL_INT(i, res);
+        TEST_EQUAL_INT(i, 0);
+    }
+
+    // Waiitng: [1:(1), 3:(3)... 9:(9)] Ready: []
+
+    err = vwq_pop(vwq, NULL, NULL);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    // Hopefully this successfully deletes the contents of the wait queue.
+    
     delete_wait_queue((wait_queue_t *)vwq);
 
     TEST_SUCCEED();
@@ -374,6 +427,7 @@ bool test_vector_wait_queue(void) {
 
     RUN_TEST(test_vwq_create_and_delete);
     RUN_TEST(test_vwq_simple);
+    RUN_TEST(test_vwq_notify_types);
 
     return END_SUITE();
 }
