@@ -480,7 +480,53 @@ static bool test_vwq_remove(void) {
     vector_wait_queue_t *vwq = new_da_vector_wait_queue();
     TEST_TRUE(vwq != NULL);
 
-    // Almost done with this testing Bull shit.
+
+    for (int i = 1; i <= 5; i++) {
+        err = vwq_enqueue(vwq, (void *)i, 1 << 1);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err); 
+    }
+
+    // Waiting: [1..5:1] Ready: []
+    
+    for (int i = 1; i <= 5; i++) {
+        err = vwq_enqueue(vwq, (void *)i, 1 << 2);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err); 
+    }
+    
+    // Waiting: [1..5:1 1...5:2] Ready: []
+
+    wq_remove((wait_queue_t *)vwq, (void *)1);
+
+    // Waiting: [2..5:1 2..5:2] Ready: []
+
+    err = vwq_notify(vwq, 2, VWQ_NOTIFY_ALL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // Waiting: [2...5:1] Ready: [2...5:2]
+
+    wq_remove((wait_queue_t *)vwq, (void *)5);
+
+    // Waiting: [2...4:1] Ready: [2...4:2]
+    
+    err = vwq_notify(vwq, 1, VWQ_NOTIFY_ALL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // Waiting: [] Ready: [2...4:2, 2...4:1]
+
+    intptr_t res;
+    uint8_t ready_id;
+    for (int i = 2; i >= 1; i--) {
+        for (int j = 2; j <= 4; j++) {
+            err = vwq_pop(vwq, (void **)&res, &ready_id);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            TEST_EQUAL_INT(j, res);
+            TEST_EQUAL_UINT(i, ready_id);
+        }
+    }
+
+    err = vwq_pop(vwq, (void **)&res, &ready_id);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
 
     delete_wait_queue((wait_queue_t *)vwq);
 
