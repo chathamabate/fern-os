@@ -412,15 +412,82 @@ static bool test_vwq_notify_types(void) {
 
     // Waiitng: [1:(1), 3:(3)... 9:(9)] Ready: []
 
-    err = vwq_pop(vwq, NULL, NULL);
+    err = vwq_pop(vwq, (void **)&res, &ready_id);    
     TEST_EQUAL_HEX(FOS_EMPTY, err);
 
+    TEST_EQUAL_HEX(NULL, (void *)res);
+    TEST_EQUAL_HEX(VWQ_NULL_READY_ID, ready_id);
+
     // Hopefully this successfully deletes the contents of the wait queue.
-    
+
     delete_wait_queue((wait_queue_t *)vwq);
 
     TEST_SUCCEED();
 }
+
+static bool test_vwq_big(void) {
+    fernos_error_t err;
+
+    vector_wait_queue_t *vwq = new_da_vector_wait_queue();
+    TEST_TRUE(vwq != NULL);
+
+    for (int i = 1; i <= 100; i++) {
+        err = vwq_enqueue(vwq, (void *)i, 1 << 0);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    for (int i = 1; i <= 100; i++) {
+        err = vwq_enqueue(vwq, (void *)i, 1 << 1);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    err = vwq_notify(vwq, 1, VWQ_NOTIFY_ALL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (int i = 1; i <= 50; i++) {
+        err = vwq_notify(vwq, 0, VWQ_NOTIFY_FIRST);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Waiting [51...100:0] Ready[1...100:1 1...50:0]
+    
+    intptr_t res;
+    uint8_t ready_id;
+    for (int i = 1; i <= 100; i++) {
+        err = vwq_pop(vwq, (void **)&res, &ready_id);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_EQUAL_INT(i, res);
+        TEST_EQUAL_UINT(1, ready_id);
+    }
+
+    err = vwq_pop(vwq, (void **)&res, &ready_id);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_EQUAL_INT(1, res);
+    TEST_EQUAL_UINT(0, ready_id);
+
+    // Now try deleting with a non-empty waiting and ready queue.
+
+    delete_wait_queue((wait_queue_t *)vwq);
+
+    TEST_SUCCEED();
+}
+
+static bool test_vwq_remove(void) {
+    fernos_error_t err;
+
+    vector_wait_queue_t *vwq = new_da_vector_wait_queue();
+    TEST_TRUE(vwq != NULL);
+
+    // Almost done with this testing Bull shit.
+
+    delete_wait_queue((wait_queue_t *)vwq);
+
+    TEST_SUCCEED();
+}
+
+// Hmmm, what else, test remove maybe?? That could be cool ig...
 
 bool test_vector_wait_queue(void) {
     BEGIN_SUITE("Vector Wait Queue");
@@ -428,6 +495,8 @@ bool test_vector_wait_queue(void) {
     RUN_TEST(test_vwq_create_and_delete);
     RUN_TEST(test_vwq_simple);
     RUN_TEST(test_vwq_notify_types);
+    RUN_TEST(test_vwq_big);
+    RUN_TEST(test_vwq_remove);
 
     return END_SUITE();
 }
