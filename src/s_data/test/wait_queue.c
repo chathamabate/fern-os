@@ -4,6 +4,7 @@
 
 #include "k_bios_term/term.h"
 #include "s_util/err.h"
+#include <stdint.h>
 
 
 static bool pretest(void);
@@ -145,10 +146,14 @@ static bool test_bwq_big(void) {
         TEST_EQUAL_INT(i * 2, res);
     }
 
+    // Waiting: [1...100] Ready: []
+
     for (int i = 0; i < 100; i++) {
         err = bwq_notify(bwq, BWQ_NOTIFY_NEXT);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
     }
+
+    // Waiting: [] Ready: [1...100]
 
     for (int i = 1; i <= 100; i++) {
         err = bwq_pop(bwq, (void **)&res);
@@ -162,6 +167,110 @@ static bool test_bwq_big(void) {
 }
 
 static bool test_bwq_remove(void) {
+    fernos_error_t err;
+
+    basic_wait_queue_t *bwq = new_da_basic_wait_queue();
+    TEST_TRUE(bwq != NULL);
+
+    for (int i = 1; i <= 20; i++) {
+        err = bwq_enqueue(bwq, (void *)i);    
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Waiting: [1...20] Ready: []
+
+    for (int i = 0; i < 10; i++) {
+        err = bwq_notify(bwq, BWQ_NOTIFY_LAST);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Waiting: [1...10] Ready: [20...11]
+
+    for (int i = 1; i <= 20; i += 2) {
+        wq_remove((wait_queue_t *)bwq, (void *)i);
+    }
+
+    // Waiting [2,4...10] Ready: [20,18...12]
+    
+    intptr_t res;
+    for (int i = 20; i > 10; i -= 2) {
+        err = bwq_pop(bwq, (void **)&res);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_INT(i, res);
+    }
+
+    // Waiting [2,4...10] Ready: []
+    err = bwq_pop(bwq, (void **)&res);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+    TEST_EQUAL_INT(0, res);
+
+    err = bwq_notify(bwq, BWQ_NOTIFY_ALL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (int i = 2; i <= 10; i += 2) {
+        err = bwq_pop(bwq, (void **)&res);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_INT(i, res);
+    }
+
+    err = bwq_pop(bwq, (void **)&res);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    // Waiting: [] Ready: []
+
+    delete_wait_queue((wait_queue_t *)bwq);
+    TEST_SUCCEED();
+}
+
+static bool test_bwq_remove_multiple(void) {
+    fernos_error_t err;
+
+    basic_wait_queue_t *bwq = new_da_basic_wait_queue();
+    TEST_TRUE(bwq != NULL);
+
+    for (int i = 1; i <= 5; i++) {
+        err = bwq_enqueue(bwq, (void *)&i);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        err = bwq_enqueue(bwq, (void *)&i);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Waiting: [1, 1, 2, 2 ... 5, 5] Ready: []
+
+    wq_remove((wait_queue_t *)bwq, (void *)2);
+    wq_remove((wait_queue_t *)bwq, (void *)4);
+
+    // Waiting: [1, 1, 3, 3, 5, 5] Ready: []
+    
+    for (int i = 0; i < 3; i++) {
+        err = bwq_notify(bwq, BWQ_NOTIFY_LAST);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Waiting: [1, 1, 3] [3, 5, 5]
+
+    wq_remove((wait_queue_t *)bwq, (void *)5);
+
+    // Waiting: [1, 1, 3] [3]
+    
+    intptr_t res;
+    err = bwq_pop(bwq, (void **)&res);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_INT(3, res);
+
+    err = bwq_pop(bwq, (void **)&res);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    // Waiting: [1, 1, 3] []
+
+    err = bwq_notify(bwq, BWQ_NOTIFY_NEXT);
+
+    // Waiting: [1, 3] [1]
+
+    // I guess just delete, make sure our destructor can handle a non-empty state.
+
+    delete_wait_queue((wait_queue_t *)bwq);
     TEST_SUCCEED();
 }
 
@@ -172,6 +281,8 @@ bool test_basic_wait_queue(void) {
     RUN_TEST(test_bwq_simple);
     RUN_TEST(test_bwq_notify_types);
     RUN_TEST(test_bwq_big);
+    RUN_TEST(test_bwq_remove);
+    RUN_TEST(test_bwq_remove_multiple);
 
     return END_SUITE();
 }

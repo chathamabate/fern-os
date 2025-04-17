@@ -48,9 +48,7 @@ static inline void delete_wait_queue(wait_queue_t *wq) {
 }
 
 /**
- * Remove all references of the given thread from the wait queue. 
- *
- * This should only be used when a thread must be deleted while it is in the waiting state.
+ * Remove all references of the given item from the wait queue. 
  */
 static inline void wq_remove(wait_queue_t *wq, void *item) {
     wq->impl->wq_remove(wq, item);
