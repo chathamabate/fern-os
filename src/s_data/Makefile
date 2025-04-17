@@ -7,7 +7,7 @@
 MOD_NAME 	?= s_data
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= id_table.c list.c
+_SRCS 		?= id_table.c list.c wait_queue.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= 
