@@ -4,6 +4,10 @@
 #include "s_mem/allocator.h"
 #include "s_util/err.h"
 
+/*
+ * Basic Wait Queue.
+ */
+
 static void delete_basic_wait_queue(wait_queue_t *wq);
 static void bwq_remove(wait_queue_t *wq, void *item);
 
@@ -23,6 +27,8 @@ basic_wait_queue_t *new_basic_wait_queue(allocator_t *al) {
         al_free(al, bwq);
         delete_list(rq);
         delete_list(wq);
+
+        return NULL;
     }
 
     // We also need to allocate two lists bruh.
@@ -130,3 +136,48 @@ static void bwq_remove(wait_queue_t *wq, void *item) {
     bwq_l_remove(bwq->wait_q, item);
     bwq_l_remove(bwq->ready_q, item);
 }
+
+/*
+ * Vector Wait Queue.
+ */
+
+static void delete_vector_wait_queue(wait_queue_t *wq);
+static void vwq_remove(wait_queue_t *wq, void *item);
+
+static const wait_queue_impl_t VWQ_IMPL = {
+    .delete_wait_queue = delete_vector_wait_queue,
+    .wq_remove = vwq_remove,
+    .wq_dump = NULL // Maybe implement one day.
+};
+
+vector_wait_queue_t *new_vector_wait_queue(allocator_t *al) {
+    vector_wait_queue_t *vwq = al_malloc(al, sizeof(vector_wait_queue_t));
+    list_t *wq = new_linked_list(al, sizeof(vwq_wait_pair_t));
+    list_t *rq =  new_linked_list(al, sizeof(vwq_ready_pair_t));
+
+    if (!vwq || !wq || !rq) {
+        al_free(al, vwq);
+
+        delete_list(wq);
+        delete_list(rq);
+
+        return NULL;
+    }
+
+    *(const wait_queue_impl_t **)&(vwq->super.impl) = &VWQ_IMPL;
+    vwq->al = al;
+    vwq->wait_q = wq;
+    vwq->ready_q = rq;
+
+    return vwq;
+}
+
+static void delete_vector_wait_queue(wait_queue_t *wq);
+
+fernos_error_t vwq_enqueue(vector_wait_queue_t *vwq, void *item, uint32_t ready_mask);
+
+fernos_error_t vwq_notify(vector_wait_queue_t *vwq, uint8_t ready_id, vwq_notify_mode_t mode);
+
+fernos_error_t vwq_pop(vector_wait_queue_t *vwq, void **item, uint8_t *ready_id);
+
+static void vwq_remove(wait_queue_t *wq, void *item);
