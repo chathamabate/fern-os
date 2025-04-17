@@ -72,6 +72,8 @@ static inline void wq_dump(wait_queue_t *wq, void (*pf)(const char *fmt, ...)) {
  * when popping items from the queue.
  */
 typedef struct _basic_wait_queue_t {
+    wait_queue_t super;
+
     allocator_t *al;
 
     /**

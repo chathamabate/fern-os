@@ -156,10 +156,6 @@ struct _allocator_t {
  * On success, a pointer to the new block is returned.
  */
 static inline void *al_malloc(allocator_t *al, size_t bytes) {
-    if (!al) {
-        return NULL;
-    }
-        
     return al->impl->al_malloc(al, bytes);
 }
 
@@ -178,10 +174,6 @@ static inline void *al_malloc(allocator_t *al, size_t bytes) {
  * (i.e. it is ok for the given block to be resized in place if possible)
  */
 static inline void *al_realloc(allocator_t *al, void *ptr, size_t bytes) {
-    if (!al) {
-        return NULL;
-    }
-
     return al->impl->al_realloc(al, ptr, bytes);
 }
 
@@ -206,10 +198,6 @@ static inline void al_free(allocator_t *al, void *ptr) {
  * allocator should be ignored.
  */
 static inline size_t al_num_user_blocks(allocator_t *al) {
-    if (!al) {
-        return 0;
-    }
-
     return al->impl->al_num_user_blocks(al);
 }
 
@@ -221,10 +209,6 @@ static inline size_t al_num_user_blocks(allocator_t *al) {
  * the underlying memory.
  */
 static inline void al_dump(allocator_t *al, void (*pf)(const char *fmt, ...)) {
-    if (!al) {
-        return;
-    }
-
     if (!(al->impl->al_dump)) {
         return;
     }

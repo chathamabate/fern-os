@@ -579,6 +579,11 @@ static void *shal_realloc(allocator_t *al, void *ptr, size_t bytes) {
 static void shal_free(allocator_t *al, void *ptr) {
     simple_heap_allocator_t *shal = (simple_heap_allocator_t *)al;
 
+    // Always do nothing for free(NULL).
+    if (!ptr) {
+        return;
+    }
+
     if (ptr < shal->heap_start || shal->brk_ptr <= ptr) {
         return; // Can't free a pointer which isn't in the heap!
     }
