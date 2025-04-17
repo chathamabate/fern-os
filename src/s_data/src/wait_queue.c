@@ -99,12 +99,34 @@ fernos_error_t bwq_notify(basic_wait_queue_t *bwq, bwq_notify_mode_t mode) {
 
 fernos_error_t bwq_pop(basic_wait_queue_t *bwq, void **item) {
     if (l_get_len(bwq->ready_q) == 0) {
+        if (item) {
+            *item = NULL;
+        }
         return FOS_EMPTY;
     }
 
     return l_pop_front(bwq->ready_q, item);
 }
 
-static void bwq_remove(wait_queue_t *wq, void *item) {
+/**
+ * Remove all occurences of the pointer item from the list l.
+ */
+static void bwq_l_remove(list_t *l, void *item) {
+    l_reset_iter(l);
+    void **iter = l_get_iter(l);
+    while (iter) {
+        if (*iter == item) {
+            l_pop_iter(l, NULL);
+            iter = l_get_iter(l);
+        } else {
+            iter = l_next_iter(l);
+        }
+    }
+}
 
+static void bwq_remove(wait_queue_t *wq, void *item) {
+    basic_wait_queue_t *bwq = (basic_wait_queue_t *)wq;
+
+    bwq_l_remove(bwq->wait_q, item);
+    bwq_l_remove(bwq->ready_q, item);
 }

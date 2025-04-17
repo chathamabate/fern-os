@@ -130,7 +130,8 @@ int task0_main(void) {
     );
     */
 
-    test_linked_list();
+    //test_linked_list();
+    test_basic_wait_queue();
 
     return 0;
 }

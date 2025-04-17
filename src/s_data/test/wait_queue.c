@@ -229,10 +229,10 @@ static bool test_bwq_remove_multiple(void) {
     TEST_TRUE(bwq != NULL);
 
     for (int i = 1; i <= 5; i++) {
-        err = bwq_enqueue(bwq, (void *)&i);
+        err = bwq_enqueue(bwq, (void *)i);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-        err = bwq_enqueue(bwq, (void *)&i);
+        err = bwq_enqueue(bwq, (void *)i);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
     }
 
@@ -278,6 +278,7 @@ static bool test_bwq_remove_multiple(void) {
 bool test_basic_wait_queue(void) {
     BEGIN_SUITE("Basic Wait Queue");
 
+    RUN_TEST(test_bwq_create_and_delete);
     RUN_TEST(test_bwq_simple);
     RUN_TEST(test_bwq_notify_types);
     RUN_TEST(test_bwq_big);
