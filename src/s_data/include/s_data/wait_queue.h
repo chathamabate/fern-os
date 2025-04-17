@@ -95,17 +95,17 @@ typedef uint32_t bwq_notify_mode_t;
 /**
  * Ready the item which has been in the queue the longest. (FIFO)
  */
-#define COND_NOTIFY_NEXT  (0)
+#define BWQ_NOTIFY_NEXT  (0)
 
 /**
  * Ready the last item to be added to the queue. (LIFO)
  */
-#define COND_NOTIFY_LAST  (1)
+#define BWQ_NOTIFY_LAST  (1)
 
 /**
- * Ready all items in the queue!
+ * Ready all items in the queue! (In FIFO Order)
  */
-#define COND_NOTIFY_ALL   (2)
+#define BWQ_NOTIFY_ALL   (2)
 
 basic_wait_queue_t *new_basic_wait_queue(allocator_t *al);
 
@@ -130,21 +130,25 @@ fernos_error_t bwq_enqueue(basic_wait_queue_t *bwq, void *item);
 fernos_error_t bwq_notify(basic_wait_queue_t *bwq, bwq_notify_mode_t mode);
 
 static inline void bwq_notify_next(basic_wait_queue_t *bwq) {
-    bwq_notify(bwq, COND_NOTIFY_NEXT);
+    bwq_notify(bwq, BWQ_NOTIFY_NEXT);
 }
 
 static inline void bwq_notify_last(basic_wait_queue_t *bwq) {
-    bwq_notify(bwq, COND_NOTIFY_LAST);
+    bwq_notify(bwq, BWQ_NOTIFY_LAST);
 }
 
 static inline void bwq_notify_all(basic_wait_queue_t *bwq) {
-    bwq_notify(bwq, COND_NOTIFY_ALL);
+    bwq_notify(bwq, BWQ_NOTIFY_ALL);
 }
 
 /**
  * Pop a ready item from the queue.
+ *
+ * Should return items in the order they were made ready!
  * 
  * Should return FOS_EMPTY if there are no ready items. (NOTE: There still may be waiting items)
+ * In this case, NULL should be written to item (if item is given)
+ *
  * Returns FOS_SUCCESS if a ready item was successfully popped. If item is given, the popped item
  * will be stored at *item.
  */
