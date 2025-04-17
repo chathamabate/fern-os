@@ -288,3 +288,93 @@ bool test_basic_wait_queue(void) {
     return END_SUITE();
 }
 
+static bool test_vwq_create_and_delete(void) {
+    vector_wait_queue_t *vwq = new_da_vector_wait_queue();
+    TEST_TRUE(vwq != NULL);
+    delete_wait_queue((wait_queue_t *)vwq);
+
+    TEST_SUCCEED();
+}
+
+static bool test_vwq_simple(void) {
+    fernos_error_t err;
+
+    vector_wait_queue_t *vwq = new_da_vector_wait_queue();
+    TEST_TRUE(vwq != NULL);
+
+    err = vwq_enqueue(vwq, (void *)1, 0);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = vwq_enqueue(vwq, (void *)1, 1 << 1);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = vwq_enqueue(vwq, (void *)2, 1 << 2);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = vwq_enqueue(vwq, (void *)3, (1 << 1) | (1 << 2));
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // Waiting [1, 2, 3] Ready []
+
+    err = vwq_pop(vwq, NULL, NULL); 
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    err = vwq_notify(vwq, 2, VWQ_NOTIFY_ALL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // Waiting [1] Ready [2:2, 3:2]
+
+    err = vwq_notify(vwq, 1, VWQ_NOTIFY_FIRST);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // Waiting [] Ready [2:2, 3:2, 1:1]
+
+    intptr_t res;
+    uint8_t ready_id;
+
+    err = vwq_pop(vwq, (void **)&res, &ready_id);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_INT(2, res);
+    TEST_EQUAL_UINT(2, ready_id);
+
+    // Waiting [] Ready [3:2, 1:1]
+
+    err = vwq_pop(vwq, (void **)&res, &ready_id);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_INT(3, res);
+    TEST_EQUAL_UINT(2, ready_id);
+
+    // Waiting [] Ready [1:1]
+    
+    err = vwq_pop(vwq, (void **)&res, &ready_id);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_INT(1, res);
+    TEST_EQUAL_UINT(1, ready_id);
+
+    delete_wait_queue((wait_queue_t *)vwq);
+
+    TEST_SUCCEED();
+}
+
+static bool test_vwq_notify_types(void) {
+    fernos_error_t err;
+
+    vector_wait_queue_t *vwq = new_da_vector_wait_queue();
+    TEST_TRUE(vwq != NULL);
+
+    //
+
+    delete_wait_queue((wait_queue_t *)vwq);
+
+    TEST_SUCCEED();
+}
+
+bool test_vector_wait_queue(void) {
+    BEGIN_SUITE("Vector Wait Queue");
+
+    RUN_TEST(test_vwq_create_and_delete);
+    RUN_TEST(test_vwq_simple);
+
+    return END_SUITE();
+}
+
