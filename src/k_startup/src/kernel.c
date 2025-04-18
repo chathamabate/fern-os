@@ -132,7 +132,8 @@ int task0_main(void) {
 
     //test_linked_list();
     //test_basic_wait_queue();
-    test_vector_wait_queue();
+    //test_vector_wait_queue();
+    term_put_s("Made it to the kernel main\n");
 
     return 0;
 }

@@ -16,34 +16,34 @@
  * The ends is os_defs are INCLUSIVE!
  */
 
-extern const char _ro_shared_start[]; 
-extern const char _ro_shared_end[]; 
+extern uint8_t _ro_shared_start[]; 
+extern uint8_t _ro_shared_end[]; 
 
-extern const char _ro_kernel_start[]; 
-extern const char _ro_kernel_end[]; 
+extern uint8_t _ro_kernel_start[]; 
+extern uint8_t _ro_kernel_end[]; 
 
-extern const char _ro_user_start[]; 
-extern const char _ro_user_end[]; 
+extern uint8_t _ro_user_start[]; 
+extern uint8_t _ro_user_end[]; 
 
-extern const char _bss_shared_start[]; 
-extern const char _bss_shared_end[]; 
-extern const char _data_shared_start[]; 
-extern const char _data_shared_end[]; 
+extern uint8_t _bss_shared_start[]; 
+extern uint8_t _bss_shared_end[]; 
+extern uint8_t _data_shared_start[]; 
+extern uint8_t _data_shared_end[]; 
 
-extern const char _bss_kernel_start[]; 
-extern const char _bss_kernel_end[]; 
-extern const char _data_kernel_start[]; 
-extern const char _data_kernel_end[]; 
+extern uint8_t _bss_kernel_start[]; 
+extern uint8_t _bss_kernel_end[]; 
+extern uint8_t _data_kernel_start[]; 
+extern uint8_t _data_kernel_end[]; 
 
-extern const char _bss_user_start[]; 
-extern const char _bss_user_end[]; 
-extern const char _data_user_start[]; 
-extern const char _data_user_end[]; 
+extern uint8_t _bss_user_start[]; 
+extern uint8_t _bss_user_end[]; 
+extern uint8_t _data_user_start[]; 
+extern uint8_t _data_user_end[]; 
 
-extern const char _static_area_end[];
+extern uint8_t _static_area_end[];
 
-extern const char _init_kstack_start[];
-extern const char _init_kstack_end[];
+extern uint8_t _init_kstack_start[];
+extern uint8_t _init_kstack_end[];
 
 
 /**

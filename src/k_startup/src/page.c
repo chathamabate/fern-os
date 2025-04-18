@@ -1,8 +1,10 @@
 
 #include "k_sys/page.h"
 
+#include "u_startup/main.h"
 #include "k_bios_term/term.h"
 #include "k_startup/page.h"
+#include "k_sys/debug.h"
 #include "os_defs.h"
 #include "s_util/misc.h"
 #include "s_util/err.h"
@@ -27,6 +29,7 @@ static phys_addr_t kernel_pd = NULL_PHYS_ADDR;
  * Once consumed by the first user task, this field should be set back to NULL.
  */
 static phys_addr_t first_user_pd = NULL_PHYS_ADDR;
+static uint32_t *first_user_esp  = NULL;
 
 /**
  * A set of reserved pages in the kernel to be used for page table editing.
@@ -112,7 +115,7 @@ static phys_addr_t _pop_free_page(void) {
  *
  * e is exclusive.
  */
-static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e, uint8_t flags) {
+static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e, uint8_t flags) {
     if ((flags & _R_IDENTITY) && (flags & _R_ALLOCATE)) {
         return FOS_BAD_ARGS;
     }
@@ -134,8 +137,8 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
     uint32_t curr_pdi = 1024;
     pt_entry_t *pt = NULL;
 
-    for (phys_addr_t i = s; i < e; i+= M_4K) {
-        uint32_t pi = i / M_4K;
+    for (uint8_t *i = s; i < e; i+= M_4K) {
+        uint32_t pi = (uint32_t)i / M_4K;
 
         uint32_t pdi = pi / 1024;
 
@@ -154,7 +157,7 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
                 clear_page_table(new_pt);
 
                 // Page tables are always writeable.
-                *pde = fos_present_pt_entry((phys_addr_t)new_pt, true);
+                *pde = fos_unique_pt_entry((phys_addr_t)new_pt, true);
             }
             
             curr_pdi = pdi;
@@ -176,8 +179,9 @@ static fernos_error_t _place_range(pt_entry_t *pd, phys_addr_t s, phys_addr_t e,
         // Just because an entry in an initial pd maps directly to the same physical address,
         // doesn't mean that that entry must be marked identity!
 
-        phys_addr_t page_addr = i;
+        phys_addr_t page_addr = (phys_addr_t)i;
         if (flags & _R_ALLOCATE) {
+            // If allocate is marked, we map the virtual address i to a different page.
             page_addr = _pop_free_page();
             if (page_addr == NULL_PHYS_ADDR) {
                 return FOS_NO_MEM;
@@ -208,17 +212,17 @@ static fernos_error_t _init_kernel_pd(void) {
     pt_entry_t *pd = (pt_entry_t *)kpd;
     clear_page_table(pd);
 
-    PROP_ERR(_place_range(pd, PROLOGUE_START + M_4K, PROLOGUE_END + 1, _R_IDENTITY | _R_WRITEABLE));    
-    PROP_ERR(_place_range(pd, (phys_addr_t)_ro_shared_start, (phys_addr_t)_ro_shared_end, _R_IDENTITY));
-    PROP_ERR(_place_range(pd, (phys_addr_t)_ro_kernel_start, (phys_addr_t)_ro_kernel_end, _R_IDENTITY));
+    PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_IDENTITY | _R_WRITEABLE));    
+    PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_IDENTITY));
+    PROP_ERR(_place_range(pd, _ro_kernel_start, _ro_kernel_end, _R_IDENTITY));
 
-    PROP_ERR(_place_range(pd, (phys_addr_t)_bss_shared_start, (phys_addr_t)_bss_shared_end, _R_WRITEABLE));
-    PROP_ERR(_place_range(pd, (phys_addr_t)_data_shared_start, (phys_addr_t)_data_shared_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _bss_shared_start, _bss_shared_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _data_shared_start, _data_shared_end, _R_WRITEABLE));
 
-    PROP_ERR(_place_range(pd, (phys_addr_t)_bss_kernel_start, (phys_addr_t)_bss_kernel_end, _R_WRITEABLE));
-    PROP_ERR(_place_range(pd, (phys_addr_t)_data_kernel_start, (phys_addr_t)_data_kernel_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _data_kernel_start, _data_kernel_end, _R_WRITEABLE));
 
-    PROP_ERR(_place_range(pd, (phys_addr_t)_init_kstack_start, (phys_addr_t)_init_kstack_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _init_kstack_start, _init_kstack_end, _R_WRITEABLE));
 
     // Now setup up the free kernel pages!
     // THIS IS VERY CONFUSING SADLY!
@@ -272,16 +276,15 @@ static fernos_error_t _init_kernel_pd(void) {
  * NOTE: This assumes the range of addresses given already exists in both the given
  * page directories!
  */
-/*
 static fernos_error_t _copy_range(pt_entry_t *dest_pd, const pt_entry_t *src_pd, 
-        phys_addr_t s, phys_addr_t e) {
+        uint8_t *s, const uint8_t *e) {
     CHECK_ALIGN(dest_pd, M_4K);
     CHECK_ALIGN(src_pd, M_4K);
     CHECK_ALIGN(s, M_4K);
     CHECK_ALIGN(e, M_4K);
 
-    for (phys_addr_t i = s; i < e; i += M_4K) {
-        uint32_t pi = i / M_4K;
+    for (uint8_t *i = s; i < e; i += M_4K) {
+        uint32_t pi = (uint32_t)i / M_4K;
 
         uint32_t pdi = pi / 1024;
         uint32_t pti = pi % 1024;
@@ -297,12 +300,10 @@ static fernos_error_t _copy_range(pt_entry_t *dest_pd, const pt_entry_t *src_pd,
 
     return FOS_SUCCESS;
 }
-*/
 
 /**
  * _init_kernel_pd must be called before calling this function!
  */
-/*
 static fernos_error_t _init_first_user_pd(void) {
     phys_addr_t upd = _pop_free_page();
     if (upd == NULL_PHYS_ADDR) {
@@ -317,36 +318,68 @@ static fernos_error_t _init_first_user_pd(void) {
         pd[pdi] = not_present_pt_entry();
     }
 
-    PROP_ERR(_place_range(pd, (phys_addr_t)_ro_shared_start, (phys_addr_t)_ro_shared_end, true, false));
-    PROP_ERR(_place_range(pd, (phys_addr_t)_ro_user_start, (phys_addr_t)_ro_user_end, true, false));
+    PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_IDENTITY));
+    PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_IDENTITY));
 
     // Here, both the kernel and user pds will need their own indepent copies of the shared data
     // and shared bss. So, when making the user space, we allocate new pages in this area.
     // Then, we copy over what is contained in the kernel pages!
-    PROP_ERR(_place_range(pd, (phys_addr_t)_bss_shared_start, (phys_addr_t)_bss_shared_end, false, true));
-    PROP_ERR(_copy_range(pd, kpd, (phys_addr_t)_bss_shared_start, (phys_addr_t)_bss_shared_end));
+    PROP_ERR(_place_range(pd, _bss_shared_start, _bss_shared_end, _R_WRITEABLE | _R_ALLOCATE));
+    PROP_ERR(_copy_range(pd, kpd, _bss_shared_start, _bss_shared_end));
 
-    PROP_ERR(_place_range(pd, (phys_addr_t)_data_shared_start, (phys_addr_t)_data_shared_end, false, true));
-    PROP_ERR(_copy_range(pd, kpd, (phys_addr_t)_data_shared_start, (phys_addr_t)_data_shared_end));
+    PROP_ERR(_place_range(pd, _data_shared_start, _data_shared_end, _R_WRITEABLE | _R_ALLOCATE));
+    PROP_ERR(_copy_range(pd, kpd, _data_shared_start, _data_shared_end));
 
-    PROP_ERR(_place_range(pd, (phys_addr_t)_bss_user_start, (phys_addr_t)_bss_user_end, false, false));
-    PROP_ERR(_place_range(pd, (phys_addr_t)_data_user_start, (phys_addr_t)_data_user_end, false, false));
+    PROP_ERR(_place_range(pd, _bss_user_start, _bss_user_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _data_user_start, _data_user_end, _R_WRITEABLE));
+
+    // NOTE: that stack start is just initial, It will be able to grow.
+    const uint8_t *stack_end = _init_kstack_end;
+    uint8_t *stack_start = (uint8_t *)(stack_end - M_4K);
+
+    PROP_ERR(_place_range(pd, stack_start, stack_end, _R_WRITEABLE | _R_ALLOCATE));
+
+    uint32_t stack_pi = (uint32_t)stack_start / M_4K; 
+    uint32_t stack_pdi = stack_pi / 1024;
+    uint32_t stack_pti = stack_pi % 1024;
+
+    // Let's get the underlying physical page of where the stack was placed.
+    pt_entry_t stack_pde = pd[stack_pdi];
+    pt_entry_t stack_pte = ((pt_entry_t *)pte_get_base(stack_pde))[stack_pti];
+    uint32_t *phys_stack_end = (uint32_t *)((uint8_t *)pte_get_base(stack_pte) + M_4K);
+
+    // Now, we need to set up the stack such that it can be switched into.
+    // We need to be able to call `popad` followed by `iret`.
+    //
+    // This will in total be 11 dwords.
+
+    uint32_t *init_stack_frame = phys_stack_end - 11;
+
+    // Zero out the inital stack frame.
+    for (uint32_t i = 0; i < 11; i++) {
+        init_stack_frame[i] = 0;
+    }
+
+    init_stack_frame[10] = read_eflags() | (1 << 9); // enable interrupts.
+    init_stack_frame[9] = 0x8;
+    init_stack_frame[8] = (uint32_t)user_main; 
+    init_stack_frame[4] = (uint32_t)(init_stack_frame + 8);
 
     first_user_pd = upd;
+    first_user_esp = init_stack_frame;
 
     return FOS_SUCCESS;
 }
-*/
 
 fernos_error_t init_paging(void) {
-    // The functions in the C file require at least 2 kernel free pages.
+    // The functions in this C file require at least 2 kernel free pages.
     if (NUM_FREE_KERNEL_PAGES < 2) {
         return FOS_NO_MEM;
     }
 
     PROP_ERR(_init_free_list());
     PROP_ERR(_init_kernel_pd());
-    //PROP_ERR(_init_first_user_pd());
+    PROP_ERR(_init_first_user_pd()); 
 
     set_page_directory(kernel_pd);
     enable_paging();
