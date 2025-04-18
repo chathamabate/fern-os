@@ -135,6 +135,17 @@ fernos_error_t init_paging(void);
 phys_addr_t get_kernel_pd(void);
 
 /**
+ * When paging is initialized, a memory space is set up to be used by the very first user process.
+ * To switch into this space, you just need the page directory physical address, and the 
+ * stack pointer to start at.
+ *
+ * This function gives those. 
+ *
+ * NOTE: This function is only meant to be used once.
+ */
+fernos_error_t pop_initial_user_info(phys_addr_t *upd, uint32_t **uesp);
+
+/**
  * The number of free kernel pages exposed. MUST BE A POWER OF 2.
  */
 #define NUM_FREE_KERNEL_PAGES (4)

@@ -4,13 +4,13 @@
 MOD_NAME 	?= s_bridge
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= 
+_SRCS 		?= switch.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
-_ASMS		?= 
+_ASMS		?= switch.s
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= 
+_TEST_SRCS 	?= test.c
 
 -include ../mod_stub.mk
 

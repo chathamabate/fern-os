@@ -393,6 +393,24 @@ phys_addr_t get_kernel_pd(void) {
     return kernel_pd;    
 }
 
+fernos_error_t pop_initial_user_info(phys_addr_t *upd, uint32_t **uesp) {
+    if (first_user_pd == NULL_PHYS_ADDR) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    if (!upd || !uesp) {
+        return FOS_BAD_ARGS;
+    }
+
+    *upd = first_user_pd;
+    *uesp = first_user_esp;
+
+    first_user_pd = NULL_PHYS_ADDR;
+    first_user_esp = NULL;
+    
+    return FOS_SUCCESS;
+}
+
 phys_addr_t assign_free_page(uint32_t slot, phys_addr_t p) {
     phys_addr_t ret = NULL_PHYS_ADDR;
 

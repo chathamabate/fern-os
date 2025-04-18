@@ -20,7 +20,13 @@ static void dflt_intr_handler(void) {
     lock_up();
 }
 
-fernos_error_t init_idt(void) {
+/**
+ * This sets up the IDT to hold valid default values.
+ *
+ * For normal interrupts, this will Print out an error message on the BIOS terminal.
+ * For the pic interrupts, this will do nothing.
+ */
+static void init_idt_defaults(void) {
     intr_gate_desc_t gd = intr_gate_desc();
 
     gd_set_selector(&gd, 0x8);
@@ -83,6 +89,15 @@ fernos_error_t init_idt(void) {
     load_idtr(dtv);
 
     pic_remap(32, 40);
+}
+
+fernos_error_t init_idt(void) {
+    init_idt_defaults();
+
+    // We need a system call interrupt handler?
+
+
+    // Ok, now we load operating system specific handlers.
     
     return FOS_SUCCESS;
 }
