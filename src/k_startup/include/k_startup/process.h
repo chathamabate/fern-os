@@ -2,7 +2,7 @@
 #pragma once
 
 #include "k_startup/fwd_defs.h"
-#include "k_startup/wait_queue.h"
+#include "s_data/wait_queue.h"
 #include "k_sys/page.h"
 #include "s_data/id_table.h"
 #include "s_data/list.h"
@@ -28,14 +28,23 @@ struct _process_t {
      * A children of this process who have exited, but are yet to be reaped.
      *
      * When this process exits, all zombie children will be reaped!
-     * (Or maybe given to a kernel structure which reaps whe appropriate)
+     * (Or maybe given to a kernel structure which reaps when appropriate)
      */
     list_t *zombie_children;
 
     /**
-     * This is a table of all threads under this process.
+     * This is a table of all threads under this process. (Maximum of 32 threads)
      */
     id_table_t *thread_table;
+
+    /**
+     * When a thread quits, its ID will be sent through this queue to find which other threads
+     * were waiting. Remember a vector queue only supports 32 different events. So, there can
+     * only be a maximum of 32 different threads at any given time.
+     *
+     * NOTE: Might change this later.
+     */
+    vector_wait_queue_t *join_queue;
 
     /**
      * all processes have a main thread. When this thread exits, the process exits.
@@ -73,13 +82,13 @@ struct _process_t {
      * to this queue, you may want to check the signal vector first to see if no waiting is 
      * necessary.
      */
-    sig_wait_queue_t *swq;
+    vector_wait_queue_t *signal_queue;
 
     /**
      * Conditions will be local to each process. A thread from one process can NEVER wait on a 
      * condition from another process.
      *
-     * This is essentially a map<Local Condition ID, cond_wait_queue_t *>
+     * This is essentially a map<Local Condition ID, basic_wait_queue_t *>
      *
      * If a condition is deleted while threads are waiting, all threads should be woken up with 
      * some sort of status code.
