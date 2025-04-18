@@ -407,7 +407,7 @@ static bool test_vwq_notify_types(void) {
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         TEST_EQUAL_INT(i, res);
-        TEST_EQUAL_INT(i, 0);
+        TEST_EQUAL_INT(0, ready_id);
     }
 
     // Waiitng: [1:(1), 3:(3)... 9:(9)] Ready: []
