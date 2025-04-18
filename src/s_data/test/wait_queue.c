@@ -533,6 +533,49 @@ static bool test_vwq_remove(void) {
     TEST_SUCCEED();
 }
 
+static bool test_vwq_remove_seq(void) {
+    fernos_error_t err;
+
+    vector_wait_queue_t *vwq = new_da_vector_wait_queue();
+    TEST_TRUE(vwq != NULL);
+
+    for (int i = 1; i <= 5; i++) {
+        for (int j = 0; j < 3; j++) {
+            err = vwq_enqueue(vwq, (void *)i, 1 << 0);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        }
+    }
+
+    // Waiting: [1, 1, 1, 2, 2, 2... 5, 5, 5:0] Ready: []
+
+    err = vwq_notify(vwq, 0, VWQ_NOTIFY_FIRST);
+    TEST_EQUAL_HEX(err, FOS_SUCCESS);
+
+    wq_remove((wait_queue_t *)vwq, (void *)1);
+    wq_remove((wait_queue_t *)vwq, (void *)2);
+
+    err = vwq_notify(vwq, 0, VWQ_NOTIFY_ALL);
+    TEST_EQUAL_HEX(err, FOS_SUCCESS);
+
+    // Waiting [] Ready [333,444,555]
+
+    wq_remove((wait_queue_t *)vwq, (void *)5);
+
+    intptr_t res;
+    uint8_t ready_id;
+    for (int i = 3; i <= 4; i++) {
+        for (int j = 0; j < 3; j++) {
+            err = vwq_pop(vwq, (void **)&res, &ready_id);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_INT(i, res);
+            TEST_EQUAL_UINT(0, ready_id);
+        }
+    }
+
+    delete_wait_queue((wait_queue_t *)vwq);
+    TEST_SUCCEED();
+}
+
 // Hmmm, what else, test remove maybe?? That could be cool ig...
 
 bool test_vector_wait_queue(void) {
@@ -543,6 +586,7 @@ bool test_vector_wait_queue(void) {
     RUN_TEST(test_vwq_notify_types);
     RUN_TEST(test_vwq_big);
     RUN_TEST(test_vwq_remove);
+    RUN_TEST(test_vwq_remove_seq);
 
     return END_SUITE();
 }
