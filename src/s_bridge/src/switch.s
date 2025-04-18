@@ -27,6 +27,36 @@ switch_k2u_with_ret:
     popal
     iret
 
+.global syscall_handler
+syscall_handler:
+    pushal
+
+    // It shouldn't actually return!
+
+
+
 .global syscall
 syscall:
+    pushl %ebp
+    movl %esp %ebp
+
+    pushl %ebx
+
+    // The arguments.
+    movl 8(%ebp), %eax
+    movl 12(%ebp), %ebx // Must be restored!
+    movl 16(%ebp), %ecx
+    movl 20(%ebp), %edx
+    
+    // Perform Syscall!
+    int $48
+
+    // It is expected that when we return to this position, 
+    // eax has been loaded with a return value.
+
+    // Restore important registers.
+    popl %ebx
+    popl %ebp
+
+    ret
 
