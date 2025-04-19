@@ -17,7 +17,7 @@
 #include "s_mem/test/simple_heap.h"
 
 void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
-    term_put_fmt_s("Syscall (%u, %u)\n", id, arg);
+    term_put_fmt_s("Syscall: %u Arg: %u\n", id, arg);
     context_return_value(pd, esp, 0);
 }
 

@@ -1,7 +1,9 @@
 
 #include "u_startup/main.h"
-#include "k_sys/intr.h"
+#include "s_bridge/intr.h"
+
 
 void user_main(void) {
-    while (1);
+    while (1) {
+    }
 }

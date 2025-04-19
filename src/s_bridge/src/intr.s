@@ -157,13 +157,22 @@ timer_handler:
     pushal
     call enter_intr_ctx
 
+    /*
+    pushl shared_val
+    pushl $_fmt_str
+    call term_put_fmt_s
+    popl %eax
+    popl %eax
+    */
+    /*
     pushl $msg
     call term_put_s
     popl %eax 
+    */
 
     call pic_send_master_eoi
 
     call leave_intr_ctx
     popal
     iret
-msg: .ascii "Hello from timer\n\0"
+_fmt_str: .ascii "Shared Val: %u\n\0"
