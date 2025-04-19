@@ -9,6 +9,7 @@
 #include "s_util/misc.h"
 #include "s_util/err.h"
 #include "s_util/str.h"
+#include "s_bridge/intr.h"
 #include <stdbool.h>
 
 /*
@@ -383,6 +384,8 @@ fernos_error_t init_paging(void) {
 
     set_page_directory(kernel_pd);
     enable_paging();
+
+    set_intr_ctx(kernel_pd, (const uint32_t *)_init_kstack_end);
 
     return FOS_SUCCESS;
 }

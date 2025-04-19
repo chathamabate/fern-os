@@ -33,6 +33,12 @@ syscall_handler:
 
     // It shouldn't actually return!
 
+    // Are you telling me the IDT must be where exactly??
+    // In the bridge directory???
+    // Well, I don't think that's true necessarily???
+    // I think it should be though tbh...
+    // UGH!!!! These handlers must be able to switch to kernel mode???
+    // This is lowkey very challenging!!!!
 
 
 .global syscall

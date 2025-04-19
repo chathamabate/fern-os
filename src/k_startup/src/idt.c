@@ -6,11 +6,12 @@
 #include "s_util/err.h"
 #include "k_sys/debug.h"
 #include "k_bios_term/term.h"
+#include "s_bridge/intr.h"
 
 seg_desc_t idt[NUM_IDT_ENTRIES] __attribute__ ((aligned(8)));
 
-static void dflt_intr_handler(void) {
-    disable_intrs();
+static void dflt_lockup_action(void) {
+    disable_intrs(); 
 
     out_bios_vga(
         vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK),
@@ -20,18 +21,15 @@ static void dflt_intr_handler(void) {
     lock_up();
 }
 
-/**
- * This sets up the IDT to hold valid default values.
- *
- * For normal interrupts, this will Print out an error message on the BIOS terminal.
- * For the pic interrupts, this will do nothing.
- */
-static void init_idt_defaults(void) {
+fernos_error_t init_idt(void) {
+
+    set_lock_up_action(dflt_lockup_action);
+
     intr_gate_desc_t gd = intr_gate_desc();
 
     gd_set_selector(&gd, 0x8);
     gd_set_privilege(&gd, 0);
-    igd_set_base(&gd, dflt_intr_handler);
+    igd_set_base(&gd, lock_up_handler);
 
     // First, all nops.
     for (uint32_t i = 0; i < NUM_IDT_ENTRIES; i++) {
@@ -82,6 +80,8 @@ static void init_idt_defaults(void) {
 
     idt[47] = slave_irq15_gd;
 
+    // Ok now for the syytem call 
+
     dtr_val_t dtv = dtr_val();
     dtv_set_base(&dtv, idt);
     dtv_set_num_entries(&dtv, NUM_IDT_ENTRIES);
@@ -89,15 +89,6 @@ static void init_idt_defaults(void) {
     load_idtr(dtv);
 
     pic_remap(32, 40);
-}
-
-fernos_error_t init_idt(void) {
-    init_idt_defaults();
-
-    // We need a system call interrupt handler?
-
-
-    // Ok, now we load operating system specific handlers.
     
     return FOS_SUCCESS;
 }

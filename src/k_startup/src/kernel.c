@@ -112,12 +112,6 @@ void kernel_init(void) {
     */
 }
 
-// I think if there is a page fault exception... that's bad.
-// Not my problem right now tho I guess...
-// So we need a task set???
-// Task sets like od something???
-// IG...?
-
 int counter = 0;
 
 int task0_main(void) {
@@ -133,7 +127,8 @@ int task0_main(void) {
     //test_linked_list();
     //test_basic_wait_queue();
     //test_vector_wait_queue();
-    term_put_s("Made it to the kernel main\n");
+    
+    term_put_s("HEllo\nAYE YO\n");
 
     return 0;
 }

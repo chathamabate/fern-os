@@ -93,6 +93,14 @@ _start:
 
 	call task0_main
 
+    pushl $msg 
+    call term_put_s
+
+    int $2
+
+    pushl $msg 
+    call term_put_s
+
     call lock_up
 
 

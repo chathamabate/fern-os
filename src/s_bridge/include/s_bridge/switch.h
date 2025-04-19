@@ -2,6 +2,23 @@
 #include "k_sys/page.h"
 
 /**
+ * The difficult part here is that all handlers must switch into kernel space.
+ * I don't really know how to best organize this at this point...
+ *
+ * The handler must exist in the shared space, but must have access to the kernel 
+ * structures. Kinda tricky tbh..
+ *
+ * This is allow for some cyclic feeling stuff...
+ * Maybe I can give some more contextual stuff that the handlers use??
+ *
+ * Not a bad idea tbh...
+ * The behavoir is given dynamically by the kernel at initializiation time??
+ * Not a terrible idea IMO.
+ * 
+ * Lot's of things to think about here though tbh...
+ */
+
+/**
  * When going from user to kernel space, we must switch into a new context for working in the
  * kernel. Since this module is somewhat decoupled from everything else. It will not directly
  * access kernel fields. 
