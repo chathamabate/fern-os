@@ -1,6 +1,7 @@
 
 #include "k_startup/idt.h"
 #include "k_sys/dt.h"
+#include "k_sys/gdt.h"
 #include "k_sys/idt.h"
 #include "k_sys/intr.h"
 #include "s_util/err.h"
@@ -8,9 +9,11 @@
 #include "k_bios_term/term.h"
 #include "s_bridge/intr.h"
 
-seg_desc_t idt[NUM_IDT_ENTRIES] __attribute__ ((aligned(8)));
+gate_desc_t *idt = NULL;
 
 fernos_error_t init_idt(void) {
+    idt = (gate_desc_t *)_idt_start;
+
     intr_gate_desc_t gd = intr_gate_desc();
 
     gd_set_selector(&gd, 0x8);

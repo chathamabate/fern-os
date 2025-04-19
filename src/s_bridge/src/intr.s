@@ -123,10 +123,17 @@ context_return:
     movl %eax, %cr3
     movl %ebx, %esp
 
+    // An interrupt is occuring, but why??
+    // Somethin
+    int $4
+
+    hlt
+
     // Ok, we are getting somewhere!!
 
     popal
     iret
+m: .ascii "Hello\n\0"
 
 .global context_return_value
 context_return_value:

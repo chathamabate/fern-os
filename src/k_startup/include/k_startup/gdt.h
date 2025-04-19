@@ -6,10 +6,8 @@
 
 #define NUM_GDT_ENTRIES 0x10
 
-/**
- * The Global descriptor table.
- */
-extern seg_desc_t gdt[NUM_GDT_ENTRIES];
+extern uint8_t _gdt_start[];
+extern uint8_t _gdt_end[];
 
 /**
  * Initialize and load the GDT.

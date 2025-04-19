@@ -16,6 +16,9 @@
  * The ends is os_defs are INCLUSIVE!
  */
 
+extern uint8_t _sys_tables_start[];
+extern uint8_t _sys_tables_end[];
+
 extern uint8_t _ro_shared_start[]; 
 extern uint8_t _ro_shared_end[]; 
 

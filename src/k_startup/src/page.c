@@ -214,6 +214,9 @@ static fernos_error_t _init_kernel_pd(void) {
     clear_page_table(pd);
 
     PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_IDENTITY | _R_WRITEABLE));    
+
+    PROP_ERR(_place_range(pd, _sys_tables_start, _sys_tables_end, _R_WRITEABLE | _R_IDENTITY));
+
     PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_IDENTITY));
     PROP_ERR(_place_range(pd, _ro_kernel_start, _ro_kernel_end, _R_IDENTITY));
 
@@ -316,6 +319,9 @@ static fernos_error_t _init_first_user_pd(void) {
     // First, 0 out the whole area.
     pt_entry_t *pd = (pt_entry_t *)upd;
     clear_page_table(pd);
+
+    // Everyone must have access to the system tables!
+    PROP_ERR(_place_range(pd, _sys_tables_start, _sys_tables_end, _R_IDENTITY));
 
     PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_IDENTITY));
     PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_IDENTITY));

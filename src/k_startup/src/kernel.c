@@ -78,16 +78,13 @@ void kernel_init(void) {
         lock_up();
     }
 
-    // Well the page table could be incorrect...
-    // Also the context return could be wrong??
-
-
     term_put_fmt_s("Shared: %X, %X\n", _ro_shared_start, _ro_shared_end);
     term_put_fmt_s("User:   %X, %X\n", _ro_user_start, _ro_user_end);
     term_put_fmt_s("Kernel: %X, %X\n", _ro_kernel_start, _ro_kernel_end);
     term_put_fmt_s("Context Ret: %X\n", context_return);
     term_put_fmt_s("User PD: %X\n", first_user_pd);
 
+    // Here we are in kernel space btw...
     context_return(first_user_pd, first_user_esp);
 }
 

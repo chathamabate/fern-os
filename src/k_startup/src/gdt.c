@@ -1,10 +1,13 @@
 
 #include "k_startup/gdt.h"
+#include "k_sys/gdt.h"
 #include <stdint.h>
 
-seg_desc_t gdt[NUM_GDT_ENTRIES] __attribute__((aligned(0x8)));
+seg_desc_t *gdt = NULL;
 
 fernos_error_t init_gdt(void) {
+    gdt = (seg_desc_t *)_gdt_start;
+
     for (uint32_t i = 0; i < NUM_GDT_ENTRIES; i++) {
         gdt[i] = not_present_seg_desc();
     }

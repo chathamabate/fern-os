@@ -52,10 +52,29 @@ SECTIONS
 {
 
     /*
+     * There will be one identity mapped area for the IDT/GDT
+     * which should exist in all processes.
+     *
+     * Each table gets one full page, which should be more than enough!
+     */
+    
+    .sys_tables : {
+        . = ALIGN(4K);
+        _sys_tables_start = .;
+        _gdt_start = .;
+        . += 4K;
+        _gdt_end = .;
+        _idt_start = .;
+        . += 4K;
+        _idt_end = .;
+        . = ALIGN(4K);
+        _sys_tables_end = .;
+    } > fernos_area_0
+
+    /*
      * Three types of areas (shared, kernel, and user)
      * Five parts per area (text, rodata, data, common, bss)
      */
-
 
     /* Read Only Sections text + rodata */
 
