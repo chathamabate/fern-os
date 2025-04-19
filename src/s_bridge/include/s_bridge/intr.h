@@ -21,9 +21,8 @@ void set_intr_ctx(phys_addr_t pd, const uint32_t *esp);
  * If we are already in the interrupt context, nbd, just keep going from the current
  * stack position!
  */
-void enter_intr_ctx(phys_addr_t *old_pd, const uint32_t **old_esp);
-
-void leave_intr_ctx(phys_addr_t pd);
+void enter_intr_ctx(void);
+void leave_intr_ctx(void);
 
 void lock_up_handler(void);
 
@@ -34,3 +33,4 @@ void nop_slave_irq_handler(void);
 void nop_slave_irq15_handler(void); // For spurious.
 
 
+void timer_handler(void);

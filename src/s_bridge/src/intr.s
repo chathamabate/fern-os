@@ -3,56 +3,52 @@
 
 .global enter_intr_ctx
 enter_intr_ctx:
+    // We must move our return address to the new stack.
+    popl %edx
 
-    movl %esp, %eax
-    movl %cr3, %ecx
-
-    movl intr_pd, %edx
-    cmpl %ecx, %edx
-    jne 2f
-
-1: // Equal Case
-    
-2: // Not Equal Case
-3:
-
-    // Write out current page directory.
-    movl 4(%esp), %eax
-    movl %cr3, %ecx
-    movl %ecx, (%eax)
-
-    // Write out stack location to return to.
-    movl 8(%esp), %eax
-    movl %esp, %ecx
-    movl %ecx, (%eax)
-
-    popl %edx // Since we will be switching stacks, let's save our return
-              // address for later.
-
-    // We need to compare the current page directory with the interrupt context
-    // page directory.
     movl %cr3, %eax
     movl intr_pd, %ecx
     cmpl %eax, %ecx
     jne 2f
 
-1: // Not equal Case.
+1: // Equal Case
+    movl %esp, %eax // Save current stack.
+    pushl intr_pd   
+    pushl %eax
+    jmp 3f
 
-    // Go to the interrupt context location!
-    movl intr_pd, %eax
-    movl %eax, %cr3
+2: // Not Equal Case
+    movl %cr3, %eax
+    movl %esp, %ecx
+
+    // Kinda hacky, but I'm using esp as a general purpose register here real quick.
+    movl intr_pd, %esp
+    movl %esp, %cr3
+
     movl intr_esp, %esp
+
+    pushl %eax // Save old context.
+    pushl %ebx
 
     jmp 3f
 
-2:  // Equal case.
-    
-    // Do we even do anything here??
-
 3:
+    pushl %edx // Push return address onto the stack and return.
+    ret
+
+.global leave_intr_ctx
+leave_intr_ctx:
+    popl %edx // Save return address.
+
+    popl %eax // Old ESP
+    popl %ecx // Old cr3
+
+    movl %ecx, %cr3
+    movl %eax, %esp
+
+    pushl %edx
+    ret
     
-
-
 .global lock_up_handler
 lock_up_handler:
     movl intr_esp, %esp
@@ -64,36 +60,55 @@ lock_up_handler:
     
 
 
-    /*
 .global nop_master_irq_handler
 nop_master_irq_handler:
-    pushal 
-
-    // Push current page directory.
-    //pushl %cr3
-
-    // Load kernel page directory.
-    movl intr_esp, %esp
-    movl intr_pd, %eax
-    movl %eax, %cr3
-
+    pushal
+    call enter_intr_ctx
     call pic_send_master_eoi
-
-    // Go back to other page directory.
-    //popl %cr3
-    
+    call leave_intr_ctx
     popal
     iret
 
 .global nop_master_irq7_handler
 nop_master_irq7_handler:
+    pushal
+    call enter_intr_ctx
+    call _nop_master_irq7_handler
+    call leave_intr_ctx
+    popal
     iret
 
 .global nop_slave_irq_handler
 nop_slave_irq_handler:
+    pushal
+    call enter_intr_ctx
+    call pic_send_slave_eoi
+    call pic_send_master_eoi
+    call leave_intr_ctx
+    popal
     iret
 
 .global nop_slave_irq15_handler
 nop_slave_irq15_handler:
+    pushal
+    call enter_intr_ctx
+    call _nop_slave_irq15_handler
+    call leave_intr_ctx
+    popal
     iret
-    */
+
+.global timer_handler
+timer_handler:
+    pushal
+    call enter_intr_ctx
+
+    pushl $msg
+    call term_put_s
+    popl %eax 
+
+    call pic_send_master_eoi
+
+    call leave_intr_ctx
+    popal
+    iret
+msg: .ascii "Hello from timer\n\0"

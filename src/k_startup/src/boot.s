@@ -91,34 +91,8 @@ _start:
 	*/
     sti
 
-    movl $6, %eax
-    movl $6, %ebx
-    cmpl %eax, %ebx
-
-    je 2f
-1:
-    pushl $neq_msg
-    jmp 3f
-2:
-    pushl $eq_msg
-    jmp 3f
-3:
-    call term_put_s
-
-    // Damn this assembly stuff isn't so bad actually!
-
-
-    /*
 	call task0_main
 
-    pushl $msg 
-    call term_put_s
-
-    int $2
-
-    pushl $msg 
-    call term_put_s
-    */
 
     call lock_up
 
@@ -131,6 +105,7 @@ neq_msg: .ascii "Not Equal!\n\0"
 // Same as when an exception occurs?
 // The timer will be blocked, but not necessarily an exception!
 
+    /*
 .global timer_handler
 timer_handler:
     pushal
@@ -145,6 +120,7 @@ timer_handler:
     iret
 
 msg: .ascii "Switching\n\0"
+    */
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.

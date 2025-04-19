@@ -130,6 +130,8 @@ int task0_main(void) {
     
     term_put_s("HEllo\nAYE YO\n");
 
+    while (1);
+
     return 0;
 }
 

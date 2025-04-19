@@ -52,10 +52,4 @@ void pic_send_slave_eoi(void);
 // This will send an eoi to master AND to slave if necessary
 void pic_send_eoi(uint8_t irq);
 
-void nop_master_irq_handler(void);
-void nop_master_irq7_handler(void); // For spurious.
-
-void nop_slave_irq_handler(void);
-void nop_slave_irq15_handler(void); // For spurious.
-
 
