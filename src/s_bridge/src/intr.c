@@ -12,13 +12,6 @@ void set_intr_ctx(phys_addr_t pd, const uint32_t *esp) {
     *(const uint32_t **)&intr_esp = esp;
 }
 
-uint32_t enter_intr_ctx(phys_addr_t curr_pd) {
-    if (curr_pd != intr_pd) {
-        
-    }
-    return 0;
-}
-
 void _lock_up_handler(void) {
     disable_intrs(); 
 

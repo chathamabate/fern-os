@@ -12,7 +12,18 @@
  */
 void set_intr_ctx(phys_addr_t pd, const uint32_t *esp);
 
-uint32_t enter_intr_ctx(phys_addr_t curr_pd);
+/**
+ * This should switch to the intr_pd and stack.
+ *
+ * It should write the previous pd and esp to the given pointers.
+ * hmmm... 
+ *
+ * If we are already in the interrupt context, nbd, just keep going from the current
+ * stack position!
+ */
+void enter_intr_ctx(phys_addr_t *old_pd, const uint32_t **old_esp);
+
+void leave_intr_ctx(phys_addr_t pd);
 
 void lock_up_handler(void);
 
