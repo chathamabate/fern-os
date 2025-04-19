@@ -315,9 +315,7 @@ static fernos_error_t _init_first_user_pd(void) {
 
     // First, 0 out the whole area.
     pt_entry_t *pd = (pt_entry_t *)upd;
-    for (uint32_t pdi = 0; pdi < 1024; pdi++) {
-        pd[pdi] = not_present_pt_entry();
-    }
+    clear_page_table(pd);
 
     PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_IDENTITY));
     PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_IDENTITY));
@@ -364,10 +362,10 @@ static fernos_error_t _init_first_user_pd(void) {
     init_stack_frame[10] = read_eflags() | (1 << 9); // enable interrupts.
     init_stack_frame[9] = 0x8;
     init_stack_frame[8] = (uint32_t)user_main; 
-    init_stack_frame[4] = (uint32_t)(init_stack_frame + 8);
+    init_stack_frame[3] = (uint32_t)(init_stack_frame + 8);
 
     first_user_pd = upd;
-    first_user_esp = init_stack_frame;
+    first_user_esp = (uint32_t *)stack_end - 11;
 
     return FOS_SUCCESS;
 }
@@ -396,7 +394,7 @@ phys_addr_t get_kernel_pd(void) {
     return kernel_pd;    
 }
 
-fernos_error_t pop_initial_user_info(phys_addr_t *upd, uint32_t **uesp) {
+fernos_error_t pop_initial_user_info(phys_addr_t *upd, const uint32_t **uesp) {
     if (first_user_pd == NULL_PHYS_ADDR) {
         return FOS_UNKNWON_ERROR;
     }

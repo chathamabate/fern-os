@@ -67,17 +67,14 @@ fernos_error_t init_idt(void) {
     idt[47] = slave_irq15_gd;
 
     // For timer.
-    /*
-    intr_gate_desc_t timer_gd = intr_gate_desc();
-    gd_set_selector(&timer_gd, 0x8);
-    gd_set_privilege(&timer_gd, 0);
-    igd_set_base(&timer_gd, timer_handler);
 
-    idt[32] = timer_gd;
-    */
+    // System call handler.
+    intr_gate_desc_t syscall_gd = intr_gate_desc();
+    gd_set_selector(&syscall_gd, 0x8);
+    gd_set_privilege(&syscall_gd, 0);
+    igd_set_base(&syscall_gd, syscall_enter_handler);
 
-    // Ok now for the syytem call 
-
+    idt[48] = syscall_gd;
 
     dtr_val_t dtv = dtr_val();
     dtv_set_base(&dtv, idt);

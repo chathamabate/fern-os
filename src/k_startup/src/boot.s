@@ -91,36 +91,12 @@ _start:
 	*/
     sti
 
-	call task0_main
-
-
     call lock_up
 
 
 eq_msg: .ascii "Equal!\n\0"
 neq_msg: .ascii "Not Equal!\n\0"
 
-// I think it is safe to say that when an interrupt gate runs
-// all other external interrupts are blocked..
-// Same as when an exception occurs?
-// The timer will be blocked, but not necessarily an exception!
-
-    /*
-.global timer_handler
-timer_handler:
-    pushal
-
-    movl alt_task_esp, %eax
-    movl %esp, alt_task_esp
-    mov %eax, %esp
-
-    call pic_send_master_eoi
-
-    popal
-    iret
-
-msg: .ascii "Switching\n\0"
-    */
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.

@@ -57,8 +57,6 @@ lock_up_handler:
 
     call _lock_up_handler // NEVER RETURNS!
 
-    
-
 
 .global nop_master_irq_handler
 nop_master_irq_handler:
@@ -96,6 +94,65 @@ nop_slave_irq15_handler:
     call leave_intr_ctx
     popal
     iret
+
+.global syscall_enter_handler
+syscall_enter_handler:
+    pushal
+
+    // %eax - id
+    // %ecx - arg
+    movl %cr3, %ebx  // old pd.
+    movl %esp, %edx  // old esp.
+    
+    movl intr_pd, %edi
+    movl %edi, %cr3
+    movl intr_esp, %esp
+
+    pushl %ecx
+    pushl %eax
+    pushl %edx
+    pushl %ebx
+
+    call *syscall_action // SHOULD NOT RETURN DIRECTLY!
+
+.global context_return
+context_return:
+    movl 4(%esp), %eax // The PD
+    movl 8(%esp), %ebx // The stack pointer.
+
+    movl %eax, %cr3
+    movl %ebx, %esp
+
+    // Ok, we are getting somewhere!!
+
+    popal
+    iret
+
+.global context_return_value
+context_return_value:
+    movl 4(%esp), %eax // The PD
+    movl 8(%esp), %ebx // The stack pointer.
+    movl 12(%esp), %ecx // The return value.
+
+    movl %eax, %cr3
+    movl %ebx, %esp
+
+    movl %ecx, 28(%esp) // Write in return value!
+
+    popal
+    iret
+
+.global trigger_syscall
+trigger_syscall:
+    movl 4(%esp), %eax
+    movl 8(%esp), %ecx
+    int $48
+
+    // When the kernel returns here, %eax should be loaded with
+    // the appropriate return value.
+
+    ret
+
 
 .global timer_handler
 timer_handler:

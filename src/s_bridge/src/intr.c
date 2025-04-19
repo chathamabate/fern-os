@@ -4,8 +4,8 @@
 #include "k_sys/page.h"
 #include "k_sys/intr.h"
 
-const phys_addr_t intr_pd;
-const uint32_t * const intr_esp;
+const phys_addr_t intr_pd = NULL_PHYS_ADDR;
+const uint32_t * const intr_esp = NULL;
 
 void set_intr_ctx(phys_addr_t pd, const uint32_t *esp) {
     *(phys_addr_t *)&intr_pd = pd;
@@ -23,9 +23,10 @@ void _lock_up_handler(void) {
     lock_up();
 }
 
-void nop_master_irq_handler(void);
-void nop_master_irq7_handler(void); // For spurious.
+const syscall_action_t syscall_action = NULL;
 
-void nop_slave_irq_handler(void);
-void nop_slave_irq15_handler(void); // For spurious.
+void set_syscall_action(syscall_action_t sa) {
+    *(syscall_action_t *)&syscall_action = sa;
+}
+
 

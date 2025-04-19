@@ -141,9 +141,10 @@ phys_addr_t get_kernel_pd(void);
  *
  * This function gives those. 
  *
- * NOTE: This function is only meant to be used once.
+ * NOTE: This function is only meant to be used once. An error will be returned if you try to
+ * call this function two times.
  */
-fernos_error_t pop_initial_user_info(phys_addr_t *upd, uint32_t **uesp);
+fernos_error_t pop_initial_user_info(phys_addr_t *upd, const uint32_t **uesp);
 
 /**
  * The number of free kernel pages exposed. MUST BE A POWER OF 2.

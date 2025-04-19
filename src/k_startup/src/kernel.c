@@ -2,6 +2,7 @@
 #include "k_startup/page.h"
 #include "k_startup/test/page.h"
 #include "k_sys/idt.h"
+#include "k_sys/page.h"
 #include "s_util/err.h"
 #include "s_util/test/str.h"
 #include "k_sys/debug.h"
@@ -9,27 +10,17 @@
 #include "k_startup/idt.h"
 #include "k_bios_term/term.h"
 #include "s_mem/simple_heap.h"
+#include "s_bridge/intr.h"
 
 #include "s_data/test/id_table.h"
 #include "s_data/test/list.h"
 #include "s_mem/test/simple_heap.h"
 
-void timer_handler(void);
-
-uint32_t *alt_task_esp;
-int task0_main(void);
-int task1_main(void);
-
-static uint32_t *initialize_task_stack(uint32_t *stack_end, void *entry_point) {
-    uint32_t *base = stack_end - 11;
-
-    base[10] = read_eflags() | (1 << 9);
-    base[9] = 0x8; // Kernel code segment.
-    base[8] = (uint32_t)entry_point;
-    base[4] = (uint32_t)(base + 8);
-
-    return base;
+void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
+    term_put_fmt_s("Syscall (%u, %u)\n", id, arg);
+    context_return_value(pd, esp, 0);
 }
+
 
 void kernel_init(void) {
     uint8_t init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
@@ -77,70 +68,27 @@ void kernel_init(void) {
 
     set_default_allocator(k_al);
 
-    // Ok now for expiremental multi tasking.
+    set_syscall_action(fos_syscall_action);
 
-    /*
-    intr_gate_desc_t timer_gd = intr_gate_desc();
+    phys_addr_t first_user_pd;
+    const uint32_t *first_user_esp;
 
-    gd_set_selector(&timer_gd, 0x8);
-    gd_set_privilege(&timer_gd, 0);
-    igd_set_base(&timer_gd, timer_handler);
-
-    set_gd(32, timer_gd);
-
-    // Timer interrupt pushes 3 double words (32-bits)
-    // pushal pushes 8 double words (32-bits)
-    //
-    // In total 11, dwords.
-    // It'd be cool if we had like a stack copy function?
-    // Do we really need that tho??
-    // Context can just be left on the stack right??
-    // Maybe we can have a secondary task??
-
-    uint32_t alt_stack_size = M_4K * 4;
-
-    uint8_t *alt_stack_start = da_malloc(alt_stack_size); 
-    if (!alt_stack_start) {
-        out_bios_vga(init_err_style, "Couldn't create alt stack");
+    if (pop_initial_user_info(&first_user_pd, &first_user_esp) != FOS_SUCCESS) {
+        out_bios_vga(init_err_style, "Failed to pop user proc info");
+        lock_up();
     }
 
-    uint8_t *alt_stack_end = alt_stack_start + alt_stack_size;
+    // Well the page table could be incorrect...
+    // Also the context return could be wrong??
 
-    // Oop, we gotta create the inital stack frame...
 
-    alt_task_esp = initialize_task_stack((uint32_t *)alt_stack_end, (void *)task1_main);
-    */
-}
+    term_put_fmt_s("Shared: %X, %X\n", _ro_shared_start, _ro_shared_end);
+    term_put_fmt_s("User:   %X, %X\n", _ro_user_start, _ro_user_end);
+    term_put_fmt_s("Kernel: %X, %X\n", _ro_kernel_start, _ro_kernel_end);
+    term_put_fmt_s("Context Ret: %X\n", context_return);
+    term_put_fmt_s("User PD: %X\n", first_user_pd);
 
-int counter = 0;
-
-int task0_main(void) {
-    /*
-    test_shal(
-        (mem_manage_pair_t) {
-            .request_mem = alloc_pages,
-            .return_mem = free_pages
-        }
-    );
-    */
-
-    //test_linked_list();
-    //test_basic_wait_queue();
-    //test_vector_wait_queue();
-    
-    term_put_s("HEllo\nAYE YO\n");
-
-    while (1);
-
-    return 0;
-}
-
-int task1_main(void) {
-    while (1) {
-        term_put_fmt_s("Counter: %d\n", counter);
-    }
-
-    return 0;
+    context_return(first_user_pd, first_user_esp);
 }
 
 
