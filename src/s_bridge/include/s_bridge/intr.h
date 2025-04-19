@@ -60,3 +60,8 @@ void context_return_value(phys_addr_t pd, const uint32_t *esp, int32_t retval);
  * Trigger a system call from userspace!
  */
 int32_t trigger_syscall(uint32_t id, uint32_t arg);
+
+/**
+ * I THINK I KNOW!!
+ */
+void timer_handler(void);

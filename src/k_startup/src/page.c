@@ -326,6 +326,12 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_IDENTITY));
     PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_IDENTITY));
 
+    // Let's just get the whole kernel for debug purposes!
+    PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_IDENTITY | _R_WRITEABLE));    
+    PROP_ERR(_place_range(pd, _ro_kernel_start, _ro_kernel_end, _R_IDENTITY));
+    PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _data_kernel_start, _data_kernel_end, _R_WRITEABLE));
+
     // Here, both the kernel and user pds will need their own indepent copies of the shared data
     // and shared bss. So, when making the user space, we allocate new pages in this area.
     // Then, we copy over what is contained in the kernel pages!
@@ -358,17 +364,18 @@ static fernos_error_t _init_first_user_pd(void) {
     //
     // This will in total be 11 dwords.
 
-    uint32_t *init_stack_frame = phys_stack_end - 11;
+    uint32_t *iret_frame = phys_stack_end - 3;
+    iret_frame[2] = read_eflags() | (1 << 9);
+    iret_frame[1] = 0x8;
+    iret_frame[0] = (uint32_t)user_main;
 
-    // Zero out the inital stack frame.
-    for (uint32_t i = 0; i < 11; i++) {
-        init_stack_frame[i] = 0;
+    uint32_t *popa_frame = iret_frame - 8;
+
+    for (uint32_t i = 0; i < 8; i++) {
+        popa_frame[i] = 0;
     }
 
-    init_stack_frame[10] = read_eflags() | (1 << 9); // enable interrupts.
-    init_stack_frame[9] = 0x8;
-    init_stack_frame[8] = (uint32_t)user_main; 
-    init_stack_frame[3] = (uint32_t)(init_stack_frame + 8);
+    popa_frame[3] = (uint32_t)((uint32_t *)stack_end - 3);
 
     first_user_pd = upd;
     first_user_esp = (uint32_t *)stack_end - 11;
