@@ -10,21 +10,7 @@
 
 seg_desc_t idt[NUM_IDT_ENTRIES] __attribute__ ((aligned(8)));
 
-static void dflt_lockup_action(void) {
-    disable_intrs(); 
-
-    out_bios_vga(
-        vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK),
-        "Interrupt occured with no handler!"
-    );
-
-    lock_up();
-}
-
 fernos_error_t init_idt(void) {
-
-    set_lock_up_action(dflt_lockup_action);
-
     intr_gate_desc_t gd = intr_gate_desc();
 
     gd_set_selector(&gd, 0x8);

@@ -91,6 +91,24 @@ _start:
 	*/
     sti
 
+    movl $6, %eax
+    movl $6, %ebx
+    cmpl %eax, %ebx
+
+    je 2f
+1:
+    pushl $neq_msg
+    jmp 3f
+2:
+    pushl $eq_msg
+    jmp 3f
+3:
+    call term_put_s
+
+    // Damn this assembly stuff isn't so bad actually!
+
+
+    /*
 	call task0_main
 
     pushl $msg 
@@ -100,10 +118,13 @@ _start:
 
     pushl $msg 
     call term_put_s
+    */
 
     call lock_up
 
 
+eq_msg: .ascii "Equal!\n\0"
+neq_msg: .ascii "Not Equal!\n\0"
 
 // I think it is safe to say that when an interrupt gate runs
 // all other external interrupts are blocked..
