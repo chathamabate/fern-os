@@ -255,6 +255,11 @@ fernos_error_t mem_cpy_from_user(void *dest, phys_addr_t user_pd, const void *us
 /**
  * Copy the contents of a buffer in this memory space to a buffer in a different memory space.
  *
- * This assumes both the dest and src buffers are fully mapped in their respective spaces.
+ * Returns an error if the user dest buffer is not entirely mapped.
+ * Returns an error if args are bad.
+ *
+ * If `copied` is given, writes the number of successfully copied bytes to *copied.
+ * On Success, *copied will always equal bytes.
  */
-void mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void *src, uint32_t bytes);
+fernos_error_t mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void *src, 
+        uint32_t bytes, uint32_t *copied);

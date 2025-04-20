@@ -784,47 +784,66 @@ phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr) {
     return ret;
 }
 
-fernos_error_t mem_cpy_from_user(void *dest, phys_addr_t user_pd, const void *user_src, 
-        uint32_t bytes, uint32_t *copied) {
-    if (!dest || !user_src) {
+/**
+ * Copy bytes to or from another memory space.
+ *
+ * When direction is true, copy to the memory space.
+ * When false, copy from the memory space.
+ */
+static fernos_error_t mem_cpy_user(void *kbuf, phys_addr_t user_pd, void *ubuf, 
+        uint32_t bytes, uint32_t *copied, bool direction) {
+    
+    if (!kbuf || user_pd == NULL_PHYS_ADDR || !ubuf) {
         return FOS_BAD_ARGS;
     }
 
-    const uint8_t *limit = (uint8_t *)user_src + bytes;
+    const uint8_t *limit = (uint8_t *)kbuf + bytes;
 
-    uint32_t readden = 0;
+    uint32_t bytes_copied = 0;
 
-    while (readden < bytes) {
-        const uint8_t *tsrc = (uint8_t *)user_src + readden;
-
-        phys_addr_t src_page = get_underlying_page(user_pd, tsrc);
-        if (src_page == NULL_PHYS_ADDR) {
+    while (bytes_copied < bytes) {
+        const uint8_t *tbuf = (uint8_t *)ubuf + bytes_copied;
+        phys_addr_t upage = get_underlying_page(user_pd, tbuf);
+        if (upage == NULL_PHYS_ADDR) {
             break;
         }
 
-        const uint8_t *nb = (uint8_t *)ALIGN(tsrc + M_4K, M_4K);
+        const uint8_t *nb = (uint8_t *)ALIGN(tbuf + M_4K, M_4K);
         if (nb > limit) {
             nb = limit;
         }
 
-        uint32_t bytes_to_read = (uint32_t)nb - (uint32_t)tsrc;
-        
-        phys_addr_t old0 = assign_free_page(0, src_page);
+        uint32_t bytes_to_copy = (uint32_t)nb - (uint32_t)tbuf;
 
-        uint32_t offset = (uint32_t)tsrc % M_4K;
+        phys_addr_t old0 = assign_free_page(0, upage);
 
-        mem_cpy((uint8_t *)dest + readden, free_kernel_pages[0] + offset, bytes_to_read);
-        readden += bytes_to_read;
+        uint32_t offset = (uint32_t)tbuf % M_4K;
+
+        if (direction) {
+            mem_cpy(free_kernel_pages[0] + offset, (uint8_t *)kbuf + bytes_copied, bytes_to_copy); 
+        } else {
+            mem_cpy((uint8_t *)kbuf + bytes_copied, free_kernel_pages[0] + offset, bytes_to_copy);
+        }
+
+        bytes_copied += bytes_to_copy;
 
         assign_free_page(0, old0);
     }
 
     if (copied) {
-        *copied = readden;
+        *copied = bytes_copied;
     }
 
-    return readden == bytes ? FOS_SUCCESS : FOS_NO_MEM;
+    return bytes_copied == bytes ? FOS_SUCCESS : FOS_NO_MEM;
+
 }
 
-void mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void *src, uint32_t bytes) {
+fernos_error_t mem_cpy_from_user(void *dest, phys_addr_t user_pd, const void *user_src, 
+        uint32_t bytes, uint32_t *copied) {
+    return mem_cpy_user(dest, user_pd, (void *)user_src, bytes, copied, false);
+}
+
+fernos_error_t mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void *src, 
+        uint32_t bytes, uint32_t *copied) {
+    return mem_cpy_user((void *)src, user_pd, user_dest, bytes, copied, true);
 }
