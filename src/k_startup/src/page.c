@@ -436,7 +436,8 @@ phys_addr_t assign_free_page(uint32_t slot, phys_addr_t p) {
         ret = pte_get_base(*free_kernel_page_pte); 
     }
 
-    *free_kernel_page_pte = fos_unique_pt_entry(p, true);
+    *free_kernel_page_pte = p == NULL_PHYS_ADDR 
+        ? not_present_pt_entry() : fos_unique_pt_entry(p, true);
 
     flush_page_cache();
 
@@ -754,3 +755,76 @@ void page_copy(phys_addr_t dest, phys_addr_t src) {
     assign_free_page(1, old1);
 }
 
+phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr) {
+    phys_addr_t old0 = assign_free_page(0, pd);
+
+    uint32_t pi = (uint32_t)ptr / M_4K;
+    uint32_t pdi = pi / 1024;
+    uint32_t pti = pi % 1024;
+
+    pt_entry_t *pdir = (pt_entry_t *)(free_kernel_pages[0]);
+    pt_entry_t *pde = pdir + pdi;
+
+    phys_addr_t ret = NULL_PHYS_ADDR;
+    
+    if (pte_get_present(*pde)) {
+        phys_addr_t phys_pt = pte_get_base(*pde);
+        assign_free_page(0, phys_pt);
+
+        pt_entry_t *ptab = (pt_entry_t *)(free_kernel_pages[0]);
+        pt_entry_t *pte = ptab + pti;
+
+        if (pte_get_present(*pte)) {
+            ret = pte_get_base(*pte);
+        }
+    }
+
+    assign_free_page(0, old0);
+
+    return ret;
+}
+
+fernos_error_t mem_cpy_from_user(void *dest, phys_addr_t user_pd, const void *user_src, 
+        uint32_t bytes, uint32_t *copied) {
+    if (!dest || !user_src) {
+        return FOS_BAD_ARGS;
+    }
+
+    const uint8_t *limit = (uint8_t *)user_src + bytes;
+
+    uint32_t readden = 0;
+
+    while (readden < bytes) {
+        const uint8_t *tsrc = (uint8_t *)user_src + readden;
+
+        phys_addr_t src_page = get_underlying_page(user_pd, tsrc);
+        if (src_page == NULL_PHYS_ADDR) {
+            break;
+        }
+
+        const uint8_t *nb = (uint8_t *)ALIGN(tsrc + M_4K, M_4K);
+        if (nb > limit) {
+            nb = limit;
+        }
+
+        uint32_t bytes_to_read = (uint32_t)nb - (uint32_t)tsrc;
+        
+        phys_addr_t old0 = assign_free_page(0, src_page);
+
+        uint32_t offset = (uint32_t)tsrc % M_4K;
+
+        mem_cpy((uint8_t *)dest + readden, free_kernel_pages[0] + offset, bytes_to_read);
+        readden += bytes_to_read;
+
+        assign_free_page(0, old0);
+    }
+
+    if (copied) {
+        *copied = readden;
+    }
+
+    return readden == bytes ? FOS_SUCCESS : FOS_NO_MEM;
+}
+
+void mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void *src, uint32_t bytes) {
+}

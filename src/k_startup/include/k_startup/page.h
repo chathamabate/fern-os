@@ -230,3 +230,31 @@ static inline void free_pages(void *s, const void *e) {
  * Copy the contents of physical page at source, to physical page at dest.
  */
 void page_copy(phys_addr_t dest, phys_addr_t src);
+
+/**
+ * ptr is an address into a memory space described by pd.
+ *
+ * This returns the physical address of the page referenced by pointer.
+ *
+ * NOTE: If ptr is not allocated in the memory space, NULL_PHYS_ADDR is returned.
+ */
+phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr);
+
+/**
+ * Copy the contents from a buffer in a different memory space, to a buffer in this memory space.
+ *
+ * Returns an error if the user src buffer is not entirely mapped.
+ * Returns an error if arguments are bad.
+ *
+ * If `copied` is given, writes the number of successfully copied bytes to *copied.
+ * On Success, *copied will always equal bytes.
+ */
+fernos_error_t mem_cpy_from_user(void *dest, phys_addr_t user_pd, const void *user_src, 
+        uint32_t bytes, uint32_t *copied);
+
+/**
+ * Copy the contents of a buffer in this memory space to a buffer in a different memory space.
+ *
+ * This assumes both the dest and src buffers are fully mapped in their respective spaces.
+ */
+void mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void *src, uint32_t bytes);

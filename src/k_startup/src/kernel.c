@@ -17,7 +17,7 @@
 #include "s_mem/test/simple_heap.h"
 
 void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
-    term_put_fmt_s("Syscall: %u Arg: %u\n", id, arg);
+    term_put_fmt_s("Vaddr: %X Paddr: %X", arg, get_underlying_page(pd, (void *)arg));
     context_return_value(pd, esp, 0);
 }
 
@@ -77,12 +77,6 @@ void kernel_init(void) {
         out_bios_vga(init_err_style, "Failed to pop user proc info");
         lock_up();
     }
-
-    term_put_fmt_s("Shared: %X, %X\n", _ro_shared_start, _ro_shared_end);
-    term_put_fmt_s("User:   %X, %X\n", _ro_user_start, _ro_user_end);
-    term_put_fmt_s("Kernel: %X, %X\n", _ro_kernel_start, _ro_kernel_end);
-    term_put_fmt_s("Context Ret: %X\n", context_return);
-    term_put_fmt_s("User PD: %X\n", first_user_pd);
 
     // Here we are in kernel space btw...
     context_return(first_user_pd, first_user_esp);
