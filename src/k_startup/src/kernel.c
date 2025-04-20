@@ -16,8 +16,26 @@
 #include "s_data/test/list.h"
 #include "s_mem/test/simple_heap.h"
 
+char more_data[16*M_4K + 2];
 void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
-    term_put_fmt_s("Vaddr: %X Paddr: %X", arg, get_underlying_page(pd, (void *)arg));
+    uint32_t len = sizeof(more_data);
+
+    uint32_t copied = 0;
+    fernos_error_t err = mem_cpy_from_user(more_data, pd, (void *)arg, len, &copied);
+    more_data[len - 1] = '\0'; 
+
+
+    if (err == FOS_SUCCESS) {
+        term_put_s(more_data);
+        for (uint32_t i = 0; i < len - 2; i++) {
+            if (more_data[i] != 'a' + (i % 26)) {
+                term_put_s("\nAHHHHH");
+                break;
+            }
+        }
+    }
+    term_put_fmt_s("\nTotal Copied: %u\n", copied);
+
     context_return_value(pd, esp, 0);
 }
 
