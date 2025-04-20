@@ -794,10 +794,13 @@ static fernos_error_t mem_cpy_user(void *kbuf, phys_addr_t user_pd, void *ubuf,
         uint32_t bytes, uint32_t *copied, bool direction) {
     
     if (!kbuf || user_pd == NULL_PHYS_ADDR || !ubuf) {
+        if (copied) {
+            *copied = 0;
+        }
         return FOS_BAD_ARGS;
     }
 
-    const uint8_t *limit = (uint8_t *)kbuf + bytes;
+    const uint8_t *limit = (uint8_t *)ubuf + bytes;
 
     uint32_t bytes_copied = 0;
 
