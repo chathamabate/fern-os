@@ -187,6 +187,16 @@ phys_addr_t pop_free_page(void);
 phys_addr_t new_page_directory(void);
 
 /**
+ * Create a deep copy of a page directory.
+ *
+ * Returns NULL_PHYS_ADDR if there is insufficient memory.
+ *
+ * Remember, when a page is marked Identity or Shared, said page is not copied. Just the reference
+ * to the page is copied. When a page is marked unique, than a full copy is done.
+ */
+phys_addr_t copy_page_directory(phys_addr_t pd);
+
+/**
  * Add pages (and page table if necessary) to a page directory.
  * The pages will always be marked as writeable.
  *

@@ -478,6 +478,9 @@ phys_addr_t pop_free_page(void) {
     return ret;
 }
 
+static fernos_error_t pt_alloc_range(phys_addr_t pt, uint32_t s, uint32_t e, uint32_t *true_e);
+static void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e);
+
 static phys_addr_t new_page_table(void) {
     phys_addr_t pt = pop_free_page();
 
@@ -488,6 +491,74 @@ static phys_addr_t new_page_table(void) {
     }
 
     return pt;
+}
+
+static void delete_page_table(phys_addr_t pt) {
+    if (pt != NULL_PHYS_ADDR) {
+        pt_free_range(pt, 0, 1024); 
+        push_free_page(pt);
+    }
+}
+
+/**
+ * Returns NULL_PHYS_ADDR on error.
+ */
+static phys_addr_t copy_page_table(phys_addr_t pt) {
+    if (pt == NULL_PHYS_ADDR) {
+        return NULL_PHYS_ADDR; // Can't copy the NULL page.
+    }
+
+    phys_addr_t pt_copy = new_page_table();
+
+    if (pt_copy == NULL_PHYS_ADDR) {
+        return NULL_PHYS_ADDR;
+    }
+
+    fernos_error_t status = FOS_SUCCESS;
+    
+    phys_addr_t old0 = assign_free_page(0, pt);
+    phys_addr_t old1 = assign_free_page(1, pt_copy);
+
+    pt_entry_t *og_pt = (pt_entry_t *)(free_kernel_pages[0]);
+    pt_entry_t *new_pt = (pt_entry_t *)(free_kernel_pages[1]);
+
+    for (uint32_t i = 0; status == FOS_SUCCESS && i < 1024; i++) {
+        pt_entry_t pte = og_pt[i];
+
+        // Skip all empty entries.
+        if (!pte_get_present(pte)) {
+            continue;  
+        }
+
+        uint8_t avail = pte_get_avail(pte);
+
+        if (avail == UNIQUE_ENTRY) {
+            // deep copy required!
+            phys_addr_t og_base  = pte_get_base(pte);
+            phys_addr_t new_base =  pop_free_page();
+
+            if (new_base == NULL_PHYS_ADDR) {
+                status = FOS_NO_MEM; // We failed :(
+            } else {
+                page_copy(new_base, og_base); 
+
+                new_pt[i] = fos_unique_pt_entry(new_base, pte_get_writable(pte));
+            }
+        } else {
+            // shallow copy just fine.
+            new_pt[i] = pte;
+        }
+    }
+
+    assign_free_page(1, old1);
+    assign_free_page(0, old0);
+
+    if (status != FOS_SUCCESS) {
+        delete_page_table(pt_copy);
+        pt_copy = NULL_PHYS_ADDR;
+    }
+
+    return pt_copy;
 }
 
 static fernos_error_t pt_alloc_range(phys_addr_t pt, uint32_t s, uint32_t e, uint32_t *true_e) {
@@ -570,6 +641,56 @@ static void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e) {
 
 phys_addr_t new_page_directory(void) {
     return new_page_table();
+}
+
+phys_addr_t copy_page_directory(phys_addr_t pd) {
+    if (pd == NULL_PHYS_ADDR) {
+        return NULL_PHYS_ADDR;
+    }
+
+    phys_addr_t pd_copy = new_page_directory();
+
+    if (pd_copy == NULL_PHYS_ADDR) {
+        return NULL_PHYS_ADDR;
+    }
+
+    fernos_error_t status = FOS_SUCCESS;
+
+    phys_addr_t old0 = assign_free_page(0, pd);
+    phys_addr_t old1 = assign_free_page(1, pd_copy);
+
+    pt_entry_t *og_pd = (pt_entry_t *)(free_kernel_pages[0]);
+    pt_entry_t *new_pd = (pt_entry_t *)(free_kernel_pages[1]);
+
+    for (uint32_t i = 0; status == FOS_SUCCESS && i < 1024; i++) {
+        pt_entry_t pte = og_pd[i];
+
+        // Skip empty entries.
+        if (!pte_get_present(pte)) {
+            continue;
+        }
+
+        phys_addr_t og_pt = pte_get_base(pte);
+
+        phys_addr_t pt_copy = copy_page_table(og_pt);
+        if (pt_copy == NULL_PHYS_ADDR) {
+            status = FOS_NO_MEM; // We failed :(
+        } else {
+            // Page tables are always unique and writeable.
+            new_pd[i] = fos_unique_pt_entry(pt_copy, true);
+        }
+    }
+
+    assign_free_page(1, old1);
+    assign_free_page(0, old0);
+
+    if (status != FOS_SUCCESS) {
+        delete_page_directory(pd_copy);
+        pd_copy = NULL_PHYS_ADDR;
+    }
+
+    return pd_copy;
+
 }
 
 fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, const void *e, const void **true_e) {
@@ -732,8 +853,7 @@ void delete_page_directory(phys_addr_t pd) {
             phys_addr_t pt = pte_get_base(pde);
 
             // Remember, page tables are NEVER shared.
-            pt_free_range(pt, 0, 1024); 
-            push_free_page(pt);
+            delete_page_table(pt);
         }
     }
 
