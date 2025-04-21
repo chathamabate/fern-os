@@ -79,9 +79,9 @@ void kernel_init(void) {
         lock_up();
     }
 
-    // Kinda hard to know what to do here tbh...
-    // UGH... I don't really want to do this right now...
-    // Maybe I could watch a movie or something, IDK...
+    test_id_table();
+    lock_up();
+
 
     // Enter Userspace!
     context_return(first_user_pd, first_user_esp);

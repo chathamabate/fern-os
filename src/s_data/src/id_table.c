@@ -65,6 +65,58 @@ void delete_id_table(id_table_t *idtb) {
     al_free(al, idtb);
 }
 
+/**
+ * Resize an ID Table to a given new capacity.
+ *
+ * (This can be called regardless of whether or not the free list is currently empty)
+ *
+ * Fails if the the capacity is invalid OR if there are insufficient resources.
+ *
+ * In case of failure, the table is left in its original state.
+ */
+static fernos_error_t idtb_resize(id_table_t *idtb, uint32_t new_cap) {
+    if (new_cap <= idtb->cap) {
+        return FOS_SUCCESS;
+    }
+
+    if (new_cap > idtb->max_cap) {
+        return FOS_BAD_ARGS;
+    }
+
+    id_table_entry_t *new_tbl = al_realloc(idtb->al, idtb->tbl,
+            new_cap * sizeof(id_table_entry_t));
+
+    if (!new_tbl) {
+        return FOS_NO_MEM;
+    }
+
+    const id_t NULL_ID = idtb_null_id(idtb);
+
+    for (id_t new_id = idtb->cap; new_id < new_cap; new_id++) {
+        new_tbl[new_id].allocated = false;
+
+        new_tbl[new_id].next = new_id + 1;
+        new_tbl[new_id].prev = new_id - 1;
+        
+        new_tbl[new_id].data = NULL;
+    }
+
+    new_tbl[idtb->cap].prev = NULL_ID;
+
+    new_tbl[new_cap - 1].next = idtb->fl_head;
+    if (idtb->fl_head != NULL_ID) {
+        new_tbl[idtb->fl_head].prev = new_cap - 1;
+    }
+
+    idtb->fl_head = idtb->cap;
+
+    idtb->cap = new_cap;
+    idtb->tbl = new_tbl;
+
+    return FOS_SUCCESS;
+
+}
+
 id_t idtb_pop_id(id_table_t *idtb) {
     const id_t NULL_ID = idtb_null_id(idtb);
 
@@ -77,34 +129,11 @@ id_t idtb_pop_id(id_table_t *idtb) {
             new_cap = idtb->max_cap;
         }
 
+
         // I believe if we make it here, it is gauranteed that new_cap > cap.
+        idtb_resize(idtb, new_cap);
 
-        id_table_entry_t *new_tbl = al_realloc(idtb->al, idtb->tbl,
-                new_cap * sizeof(id_table_entry_t));
-
-        // Did our realloc succeed?
-        if (new_tbl) {
-            // Remeber, there is a gaurantee that our free list is empty if we are reallocing!
-            
-            for (id_t new_id = idtb->cap; new_id < new_cap; new_id++) {
-                new_tbl[new_id].allocated = false;
-
-                new_tbl[new_id].next = new_id + 1;
-                new_tbl[new_id].prev = new_id - 1;
-                
-                new_tbl[new_id].data = NULL;
-            }
-
-            new_tbl[idtb->cap].prev = NULL_ID;
-            new_tbl[new_cap - 1].next = NULL_ID;
-
-            idtb->fl_head = idtb->cap;
-
-            idtb->cap = new_cap;
-            idtb->tbl = new_tbl;
-        }     
-
-        // Remember if the realloc fails, that's OK. 
+        // Remember if the resize fails, that's OK. 
         // The original table should be left untouched.
     }
 
@@ -180,6 +209,10 @@ void idtb_push_id(id_table_t *idtb, id_t id) {
     idtb->tbl[id].data = NULL;
 
     idtb->fl_head = id;
+}
+
+fernos_error_t idtb_request_id(id_table_t *idtb, id_t id, void *dp) {
+    return FOS_SUCCESS;
 }
 
 void idtb_reset_iterator(id_table_t *idtb) {

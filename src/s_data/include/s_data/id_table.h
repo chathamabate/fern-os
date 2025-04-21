@@ -146,6 +146,13 @@ static inline void idtb_set(id_table_t *idtb, id_t id, void *dp) {
 }
 
 /**
+ * This is used in the case where you must place a pointer at a specific ID.
+ *
+ * An error is returned if that id is invalid or already in use!
+ */
+fernos_error_t idtb_request_id(id_table_t *idtb, id_t id, void *dp);
+
+/**
  * An ID Table will expose an iterator which allows for efficient iterating over all allocated
  * IDs.
  *

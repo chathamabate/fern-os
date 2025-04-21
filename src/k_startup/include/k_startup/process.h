@@ -33,7 +33,7 @@ struct _process_t {
     //list_t *zombie_children;
 
     /**
-     * This is a table of all threads under this process. (Maximum of 32 threads)
+     * This is a table of all threads under this process. 
      */
     id_table_t *thread_table;
 
@@ -95,3 +95,11 @@ struct _process_t {
      */
     //id_table_t *conds;
 };
+
+/**
+ * Allocate a new process!
+ *
+ * When allocating a new process, a thread
+ */
+process_t *new_proccess(allocator_t *al, proc_id_t pid, process_t *parent, phys_addr_t pd, 
+        thread_id_t tid, const uint32_t *esp);
