@@ -114,58 +114,89 @@ static fernos_error_t idtb_resize(id_table_t *idtb, uint32_t new_cap) {
     idtb->tbl = new_tbl;
 
     return FOS_SUCCESS;
-
 }
 
-id_t idtb_pop_id(id_table_t *idtb) {
+fernos_error_t idtb_request_id(id_table_t *idtb, id_t id) {
     const id_t NULL_ID = idtb_null_id(idtb);
 
-    if (idtb->fl_head == NULL_ID && idtb->cap < idtb->max_cap) {
-        // In this case we attempt a resize.
-        
-        // We need a resize!
-        uint32_t new_cap = idtb->cap * 2;  
+    if (id >= idtb->max_cap) {
+        return FOS_INVALID_INDEX;
+    }
+
+    if (id >= idtb->cap) {
+        uint32_t new_cap = idtb->cap * 2;
         if (new_cap <= idtb->cap || new_cap > idtb->max_cap) {
             new_cap = idtb->max_cap;
         }
 
+        // If doubling the size is still not enough, Just set the new cap to the id + 1 directly.
+        if (id >= new_cap) {
+            new_cap = id + 1;
+        }
 
-        // I believe if we make it here, it is gauranteed that new_cap > cap.
-        idtb_resize(idtb, new_cap);
+        // Do we need to resize??
+        fernos_error_t err = idtb_resize(idtb, new_cap);
 
-        // Remember if the resize fails, that's OK. 
-        // The original table should be left untouched.
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
     }
 
-    if (idtb->fl_head == NULL_ID) {
-        return NULL_ID;
-    }
-
-    /*
-     * Somewhat confusing, but we need to take the head of the free list, and move it to the 
-     * allocated list.
-     */
+    // If we make it here, we know id < cap.
     
-    id_t new_al_head = idtb->fl_head; // Gauranteed NOT-NULL.
-    id_t new_fl_head = idtb->tbl[new_al_head].next;
-    id_t old_al_head = idtb->al_head;
-
-    // Set up our new allocated cell.
-    idtb->tbl[new_al_head].allocated = true;
-    idtb->tbl[new_al_head].next = old_al_head;
-    // Prev and data are gauranteed to already be NULL.
-
-    if (old_al_head != NULL_ID) {
-        idtb->tbl[old_al_head].prev = new_al_head;
+    if (idtb->tbl[id].allocated) {
+        return FOS_ALREADY_ALLOCATED;
     }
-    idtb->al_head = new_al_head;
 
-    if (new_fl_head != NULL_ID) {
-        idtb->tbl[new_fl_head].prev = NULL_ID;
+    // Ok, now we know we can pop the id!
+    // First let's remove it from the free list!
+   
+    id_t next = idtb->tbl[id].next;
+    id_t prev = idtb->tbl[id].prev;
+
+    if (next != NULL_ID) {
+        idtb->tbl[next].prev = prev;
     }
-    idtb->fl_head = new_fl_head;
 
-    return new_al_head;
+    if (prev != NULL_ID) {
+        idtb->tbl[prev].next = next;
+    } else {
+        idtb->fl_head = next;
+    }
+
+    // Now place the id in the allocated list!
+    
+    id_t al_head = idtb->al_head;
+
+    if (al_head != NULL_ID) {
+        idtb->tbl[al_head].prev = id;
+    }
+
+    idtb->tbl[id].next = al_head;
+    idtb->al_head = id;
+
+    // Finally set as allocated!
+
+    idtb->tbl[id].allocated = true;
+
+    return FOS_SUCCESS;
+}
+
+id_t idtb_pop_id(id_table_t *idtb) {
+    const id_t NULL_ID = idtb_null_id(idtb);
+    id_t id = NULL_ID;
+
+    if (idtb->fl_head != NULL_ID) {
+        id = idtb->fl_head;
+    } else {
+        id = idtb->cap;
+    }
+
+    if (idtb_request_id(idtb, id) != FOS_SUCCESS) {
+        id = NULL_ID;
+    }
+
+    return id;
 }
 
 void idtb_push_id(id_table_t *idtb, id_t id) {
@@ -209,10 +240,6 @@ void idtb_push_id(id_table_t *idtb, id_t id) {
     idtb->tbl[id].data = NULL;
 
     idtb->fl_head = id;
-}
-
-fernos_error_t idtb_request_id(id_table_t *idtb, id_t id, void *dp) {
-    return FOS_SUCCESS;
 }
 
 void idtb_reset_iterator(id_table_t *idtb) {

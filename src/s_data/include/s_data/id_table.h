@@ -110,6 +110,13 @@ static inline id_t idtb_null_id(id_table_t *idtb) {
 }
 
 /**
+ * This is used in the case where you must place a pointer at a specific ID.
+ *
+ * An error is returned if that id is invalid or already in use!
+ */
+fernos_error_t idtb_request_id(id_table_t *idtb, id_t id);
+
+/**
  * This pops an ID from the free list and marks its cell as allocated.
  */
 id_t idtb_pop_id(id_table_t *idtb);
@@ -144,13 +151,6 @@ static inline void idtb_set(id_table_t *idtb, id_t id, void *dp) {
         idtb->tbl[id].data = dp;
     }
 }
-
-/**
- * This is used in the case where you must place a pointer at a specific ID.
- *
- * An error is returned if that id is invalid or already in use!
- */
-fernos_error_t idtb_request_id(id_table_t *idtb, id_t id, void *dp);
 
 /**
  * An ID Table will expose an iterator which allows for efficient iterating over all allocated
