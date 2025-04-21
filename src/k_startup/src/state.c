@@ -1,8 +1,11 @@
 
 #include "k_startup/page.h"
 #include "k_startup/test/page.h"
+#include "s_util/constraints.h"
 #include "k_sys/idt.h"
 #include "k_sys/page.h"
+#include "s_data/id_table.h"
+#include "s_mem/allocator.h"
 #include "s_util/err.h"
 #include "s_util/test/str.h"
 #include "k_sys/debug.h"
@@ -18,7 +21,7 @@
 
 #include "k_startup/state.h"
 
-static kernel_state_t * const kernel = NULL;
+static kernel_state_t *kernel = NULL;
 
 void start_kernel(void) {
     uint8_t init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
@@ -69,6 +72,27 @@ void start_kernel(void) {
     // TODO: Yeah syscall action would be cool to ngl...
     // set_syscall_action(fos_syscall_action);
 
+
+    // Initialize kernel state.
+
+    kernel = da_malloc(sizeof(kernel_state_t));
+    if (!kernel) {
+        out_bios_vga(init_err_style, "Failed to allocate kernel state structure");
+        lock_up();
+    }
+
+    kernel->al = get_default_allocator();
+    kernel->curr_thread = NULL; // No thread yet.
+    kernel->proc_table = new_da_id_table(FOS_MAX_PROCS);
+    kernel->root_proc = NULL;
+
+    if (!(kernel->proc_table)) {
+        out_bios_vga(init_err_style, "Failed to create initial process table");
+        lock_up();
+    }
+
+    // Ok, now we need to setup the first process.
+    
     phys_addr_t first_user_pd;
     const uint32_t *first_user_esp;
 
@@ -76,6 +100,8 @@ void start_kernel(void) {
         out_bios_vga(init_err_style, "Failed to pop user proc info");
         lock_up();
     }
+
+
 
     test_id_table();
     lock_up();

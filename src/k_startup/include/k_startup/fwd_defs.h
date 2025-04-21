@@ -1,7 +1,6 @@
 
 #pragma once
 
-#include "k_startup/kernel.h"
 #include "s_data/id_table.h"
 
 /*
@@ -74,14 +73,13 @@
  * 
  */
 
-typedef struct _schedule_node_t schedule_node_t;
-typedef struct _kernel_state_t kernel_state_t;
-
 typedef id_t proc_id_t;
 typedef id_t thread_id_t;
 
-typedef struct _process_t process_t;
 typedef struct _thread_t thread_t;
+typedef struct _process_t process_t;
+typedef struct _kernel_state_t kernel_state_t;
+
 
 
 
