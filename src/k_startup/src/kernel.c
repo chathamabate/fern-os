@@ -16,13 +16,10 @@
 #include "s_data/test/list.h"
 #include "s_mem/test/simple_heap.h"
 
-typedef struct _kernel_state_t {
-
-} kernel_state_t;
-
 void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
     (void)id;
     (void)arg;
+    term_put_s("SYSCALL\n");
     context_return_value(pd, esp, 0);
 }
 
@@ -82,9 +79,12 @@ void kernel_init(void) {
         lock_up();
     }
 
+    // Kinda hard to know what to do here tbh...
+    // UGH... I don't really want to do this right now...
+    // Maybe I could watch a movie or something, IDK...
+
     // Enter Userspace!
     context_return(first_user_pd, first_user_esp);
 }
-
 
 

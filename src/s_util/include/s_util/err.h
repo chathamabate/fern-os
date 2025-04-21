@@ -48,6 +48,11 @@ typedef uint16_t fernos_error_t;
  */
 #define FOS_EMPTY              (9)
 
+/**
+ * An operation expects one state, but finds another.
+ */
+#define FOS_STATE_MISMATCH     (10)
+
 
 
 
