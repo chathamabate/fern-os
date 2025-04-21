@@ -79,7 +79,7 @@ _start:
 	runtime support to work as well.
 	*/
 
-    call kernel_init
+    call start_kernel
 
 	/*
 	Enter the high-level kernel. The ABI requires the stack is 16-byte
