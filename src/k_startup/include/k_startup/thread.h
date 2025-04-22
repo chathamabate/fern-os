@@ -70,7 +70,11 @@ struct _thread_t {
 /**
  * Allocate a new thread with basically no details.
  */
-thread_t *new_blank_thread(allocator_t *al);
+thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, const uint32_t *esp);
+
+static inline thread_t *new_da_thread(thread_id_t tid, process_t *proc, const uint32_t *esp) {
+    return new_thread(get_default_allocator(), tid, proc, esp);
+}
 
 
 

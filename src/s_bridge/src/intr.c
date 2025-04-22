@@ -29,4 +29,10 @@ void set_syscall_action(syscall_action_t sa) {
     *(syscall_action_t *)&syscall_action = sa;
 }
 
+const timer_action_t timer_action = NULL;
+
+void set_timer_action(timer_action_t ta) {
+    *(timer_action_t *)&timer_action = ta; 
+}
+
 

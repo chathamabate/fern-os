@@ -1,6 +1,31 @@
 
 .section .text
 
+.global context_return
+context_return:
+    movl 4(%esp), %eax // The PD
+    movl 8(%esp), %ebx // The stack pointer.
+
+    movl %eax, %cr3
+    movl %ebx, %esp
+
+    popal
+    iret
+
+.global context_return_value
+context_return_value:
+    movl 4(%esp), %eax // The PD
+    movl 8(%esp), %ebx // The stack pointer.
+    movl 12(%esp), %ecx // The return value.
+
+    movl %eax, %cr3
+    movl %ebx, %esp
+
+    movl %ecx, 28(%esp) // Write in return value!
+
+    popal
+    iret
+
 .global enter_intr_ctx
 enter_intr_ctx:
     // We must move our return address to the new stack.
@@ -115,30 +140,6 @@ syscall_enter_handler:
 
     call *syscall_action // SHOULD NOT RETURN DIRECTLY!
 
-.global context_return
-context_return:
-    movl 4(%esp), %eax // The PD
-    movl 8(%esp), %ebx // The stack pointer.
-
-    movl %eax, %cr3
-    movl %ebx, %esp
-
-    popal
-    iret
-
-.global context_return_value
-context_return_value:
-    movl 4(%esp), %eax // The PD
-    movl 8(%esp), %ebx // The stack pointer.
-    movl 12(%esp), %ecx // The return value.
-
-    movl %eax, %cr3
-    movl %ebx, %esp
-
-    movl %ecx, 28(%esp) // Write in return value!
-
-    popal
-    iret
 
 .global trigger_syscall
 trigger_syscall:
@@ -151,28 +152,23 @@ trigger_syscall:
 
     ret
 
-
 .global timer_handler
 timer_handler:
     pushal
-    call enter_intr_ctx
 
-    /*
-    pushl shared_val
-    pushl $_fmt_str
-    call term_put_fmt_s
-    popl %eax
-    popl %eax
-    */
-    /*
-    pushl $msg
-    call term_put_s
-    popl %eax 
-    */
+    movl %cr3, %ebx  // old pd.
+    movl %esp, %edx  // old esp.
 
+    movl intr_pd, %edi
+    movl %edi, %cr3
+    movl intr_esp, %esp
+
+    pushl %edx
+    pushl %ebx
+
+    // Notify the pic. (Must be done from kernel space)
     call pic_send_master_eoi
 
-    call leave_intr_ctx
-    popal
-    iret
-_fmt_str: .ascii "Shared Val: %u\n\0"
+    call *timer_action
+
+

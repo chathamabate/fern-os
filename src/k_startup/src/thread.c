@@ -6,7 +6,7 @@
 #include "s_util/constraints.h"
 #include "s_util/err.h"
 
-thread_t *new_blank_thread(allocator_t *al) {
+thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, const uint32_t *esp) {
     thread_t *thr = al_malloc(al, sizeof(thread_t));
     if (!thr) {
         return NULL;
@@ -18,11 +18,11 @@ thread_t *new_blank_thread(allocator_t *al) {
     thr->next_thread = NULL;
     thr->prev_thread = NULL;
 
-    thr->tid = FOS_MAX_THREADS_PER_PROC;
+    thr->tid = tid;
 
-    thr->proc = NULL;
+    thr->proc = proc;
     thr->wq = NULL;
-    thr->esp = NULL;
+    thr->esp = esp;
 
     return thr;
 }

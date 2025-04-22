@@ -1,8 +1,12 @@
 
+#include "k_startup/fwd_defs.h"
 #include "k_startup/page.h"
+#include "k_startup/process.h"
 #include "k_startup/test/page.h"
+#include "k_startup/thread.h"
 #include "k_sys/idt.h"
 #include "k_sys/page.h"
+#include "s_mem/allocator.h"
 #include "s_util/err.h"
 #include "s_util/test/str.h"
 #include "k_sys/debug.h"
@@ -15,39 +19,34 @@
 #include "s_data/test/id_table.h"
 #include "s_data/test/list.h"
 #include "s_mem/test/simple_heap.h"
+#include "k_startup/state.h"
 
 void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
     (void)id;
     (void)arg;
-    term_put_s("SYSCALL\n");
     context_return_value(pd, esp, 0);
 }
 
-void kernel_init(void) {
-    uint8_t init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+void fos_timer_action(phys_addr_t pd, const uint32_t *esp) {
+    context_return(pd, esp);
+}
 
-    if (init_gdt() != FOS_SUCCESS) {
-        out_bios_vga(init_err_style, "Failed to set up GDT");
-        lock_up();
+static kernel_state_t *kernel = NULL;
+
+static uint8_t init_err_style;
+
+static inline void setup_fatal(const char *msg) {
+    out_bios_vga(init_err_style, msg);
+    lock_up();
+}
+
+static inline void try_setup_step(fernos_error_t err, const char *msg) {
+    if (err != FOS_SUCCESS) {
+        setup_fatal(msg);
     }
+}
 
-    if (init_idt() != FOS_SUCCESS) {
-        out_bios_vga(init_err_style, "Failed to set up IDT");
-        lock_up();
-    }
-
-    if (init_term() != FOS_SUCCESS) {
-        out_bios_vga(init_err_style, "Failed to set up Terminal");
-        lock_up();
-    }
-
-    if (init_paging() != FOS_SUCCESS) {
-        out_bios_vga(init_err_style, "Failed to set up Paging");
-        lock_up();
-    }
-
-    // Ok, now setup kernel heap.
-
+static fernos_error_t init_kernel_heap(void) {
     simple_heap_attrs_t shal_attrs = {
         .start = (void *)(_static_area_end + M_4K),
         .end =   (const void *)(_static_area_end + M_4K + M_4M),
@@ -63,28 +62,76 @@ void kernel_init(void) {
     allocator_t *k_al = new_simple_heap_allocator(shal_attrs);
 
     if (!k_al) {
-        out_bios_vga(init_err_style, "Failed to set up Kernel Heap");
-        lock_up();
+        return FOS_NO_MEM;
     }
 
     set_default_allocator(k_al);
 
-    set_syscall_action(fos_syscall_action);
+    return FOS_SUCCESS;
+}
 
+/**
+ * On error this call does no cleanup. Errors at this point are seen as fatal.
+ */
+static fernos_error_t init_kernel_state(void) {
+    // Initialize kernel state.
+
+    kernel = new_da_blank_kernel_state();
+    if (!kernel) {
+        return FOS_NO_MEM;
+    }
+
+    // Ok, now we need to setup the first process.
+    
     phys_addr_t first_user_pd;
     const uint32_t *first_user_esp;
 
-    if (pop_initial_user_info(&first_user_pd, &first_user_esp) != FOS_SUCCESS) {
-        out_bios_vga(init_err_style, "Failed to pop user proc info");
-        lock_up();
+    PROP_ERR(pop_initial_user_info(&first_user_pd, &first_user_esp));
+
+    // Reserve 0 for the root process. 
+    PROP_ERR(idtb_request_id(kernel->proc_table, 0)); 
+
+    process_t *root = new_da_process(0, first_user_pd, NULL);
+    if (!root) {
+        return FOS_NO_MEM;
     }
 
-    test_id_table();
-    lock_up();
+    idtb_set(kernel->proc_table, 0, root);
 
+    // NOTE: The main thread of a process need not alway have id 0.
+    // The first thread of the first process will though.
+    PROP_ERR(idtb_request_id(root->thread_table, 0));
 
-    // Enter Userspace!
-    context_return(first_user_pd, first_user_esp);
+    thread_t *root_thr = new_da_thread(0, root, first_user_esp);
+    idtb_set(root->thread_table, 0, root_thr);
+
+    root->main_thread = root_thr;
+
+    // Schedule the root thread.
+    root_thr->next_thread = root_thr;
+    root_thr->prev_thread = root_thr;
+
+    kernel->curr_thread = root_thr;
+    root_thr->state = THREAD_STATE_SCHEDULED;
+
+    return FOS_SUCCESS;
 }
 
+void start_kernel(void) {
+    init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
+    try_setup_step(init_gdt(), "Failed to initialize GDT");
+    try_setup_step(init_idt(), "Failed to initialize IDT");
+    try_setup_step(init_term(), "Failed to initialize Terminal");
+    try_setup_step(init_paging(), "Failed to setup paging");
+    try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
+    try_setup_step(init_kernel_state(), "Failed to setup kernel state");
+
+    set_syscall_action(fos_syscall_action);
+    set_timer_action(fos_timer_action);
+
+    // Enter first process!
+    process_t *root_proc = (process_t *)idtb_get(kernel->proc_table, 0);
+
+    context_return(root_proc->pd, root_proc->main_thread->esp);
+}

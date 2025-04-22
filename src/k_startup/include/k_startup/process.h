@@ -17,6 +17,11 @@ struct _process_t {
     proc_id_t pid;
 
     /**
+     * Physical address of this process's page directory.
+     */
+    phys_addr_t pd;
+
+    /**
      * A pointer to the parent process, NULL if the root process.
      */
     process_t *parent;
@@ -56,10 +61,6 @@ struct _process_t {
      */
     thread_t *main_thread;
 
-    /**
-     * Physical address of this process's page directory.
-     */
-    phys_addr_t pd;
 
     /**
      * Like in linux, signals will be one form of IPC.
@@ -104,4 +105,8 @@ struct _process_t {
  *
  * If any allocation fails, NULL is returned.
  */
-process_t *new_blank_process(allocator_t *al);
+process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent);
+
+static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent) {
+    return new_process(get_default_allocator(), pid, pd, parent);
+}

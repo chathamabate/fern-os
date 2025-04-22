@@ -13,6 +13,16 @@
 void set_intr_ctx(phys_addr_t pd, const uint32_t *esp);
 
 /**
+ * Return to an arbitrary thread.
+ */
+void context_return(phys_addr_t pd, const uint32_t *esp);
+
+/**
+ * Return to an arbitrary thread with a return value! (Like from a syscall)
+ */
+void context_return_value(phys_addr_t pd, const uint32_t *esp, int32_t retval);
+
+/**
  * These two functions are really just a proof of concept. Might take them out later.
  */
 void enter_intr_ctx(void);
@@ -46,22 +56,21 @@ void set_syscall_action(syscall_action_t sa);
  */
 void syscall_enter_handler(void);
 
-/**
- * Return to an arbitrary thread.
- */
-void context_return(phys_addr_t pd, const uint32_t *esp);
-
-/**
- * Return to an arbitrary thread with a return value! (Like from a syscall)
- */
-void context_return_value(phys_addr_t pd, const uint32_t *esp, int32_t retval);
 
 /**
  * Trigger a system call from userspace!
  */
 int32_t trigger_syscall(uint32_t id, uint32_t arg);
 
+
 /**
- * I THINK I KNOW!!
+ * Just like syscall action, this SHOULD NOT RETURN EVER. 
+ *
+ * When the timer action is invoked, power is given over to the kernel.
+ * The kernel can return to a user context using the context return endpoints above.
  */
+typedef void (*timer_action_t)(phys_addr_t pd, const uint32_t *esp);
+
+void set_timer_action(timer_action_t ta);
+
 void timer_handler(void);

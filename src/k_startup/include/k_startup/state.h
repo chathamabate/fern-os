@@ -26,17 +26,19 @@ struct _kernel_state_t {
 
     /**
      * Every process will have a globally unique ID!
+     *
+     * NOTE: IT IS GAURANTEED that the root process has pid 0.
      */
     id_table_t *proc_table;
-
-    /**
-     * The root process. If this process exits, the kernel shutsdown??
-     */
-    process_t *root_proc;
 };
 
 /**
- * This either succeeds, or locks up.
+ * Create a kernel state with basically no details.
+ *
+ * Returns NULL on error.
  */
-void start_kernel(void);
+kernel_state_t *new_blank_kernel_state(allocator_t *al);
 
+static inline kernel_state_t *new_da_blank_kernel_state(void) {
+    return new_blank_kernel_state(get_default_allocator());
+}
