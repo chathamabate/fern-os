@@ -40,4 +40,3 @@ struct _kernel_state_t {
  */
 void start_kernel(void);
 
-fernos_error_t ks_fork(void);

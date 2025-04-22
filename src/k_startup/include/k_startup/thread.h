@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include "k_startup/fwd_defs.h"
+#include "s_mem/allocator.h"
+#include "s_data/wait_queue.h"
 
 typedef uint32_t thread_state_t;
 
@@ -25,7 +27,7 @@ struct _thread_t {
     /**
      * The allocator used to create this thread!
      */
-    allocator_t * const al;
+    allocator_t *al;
 
     /**
      * The state of this thread.
@@ -41,12 +43,12 @@ struct _thread_t {
     /**
      * The process local id of this thread.
      */
-    const thread_id_t tid;
+    thread_id_t tid;
 
     /**
      * The process this thread executes out of.
      */
-    process_t * const proc;
+    process_t *proc;
 
     /**
      * If this thread is in a executing state, this field will be NULL.
@@ -64,4 +66,11 @@ struct _thread_t {
      */
     const uint32_t *esp;
 };
+
+/**
+ * Allocate a new thread with basically no details.
+ */
+thread_t *new_blank_thread(allocator_t *al);
+
+
 

@@ -3,8 +3,31 @@
 #include "k_startup/fwd_defs.h"
 #include "s_data/wait_queue.h"
 #include "s_mem/allocator.h"
+#include "s_util/constraints.h"
 #include "s_util/err.h"
 
+thread_t *new_blank_thread(allocator_t *al) {
+    thread_t *thr = al_malloc(al, sizeof(thread_t));
+    if (!thr) {
+        return NULL;
+    }
+
+    thr->al = al;
+    thr->state = THREAD_STATE_DETATCHED;
+
+    thr->next_thread = NULL;
+    thr->prev_thread = NULL;
+
+    thr->tid = FOS_MAX_THREADS_PER_PROC;
+
+    thr->proc = NULL;
+    thr->wq = NULL;
+    thr->esp = NULL;
+
+    return thr;
+}
+
+/*
 thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc,  const uint32_t *esp) {
     thread_t *thr = al_malloc(al, sizeof(thread_t));
     if (!thr) {
@@ -84,3 +107,4 @@ void thr_detatch(thread_t *thr) {
 
     thr->state = THREAD_STATE_DETATCHED;
 }
+*/
