@@ -1,4 +1,5 @@
 
+#include "k_startup/fwd_defs.h"
 #include "k_startup/page.h"
 #include "k_startup/test/page.h"
 #include "s_util/constraints.h"
@@ -22,6 +23,29 @@
 #include "k_startup/state.h"
 
 static kernel_state_t *kernel = NULL;
+
+/**
+ * Creates a new kernel state with basically no fleshed out details.
+ */
+static kernel_state_t *new_blank_kernel_state(allocator_t *al) {
+    kernel_state_t *ks = al_malloc(al, sizeof(kernel_state_t));
+    if (!ks) {
+        return NULL;
+    }
+
+    id_table_t *pt = new_id_table(al, FOS_MAX_PROCS);
+    if (!pt) {
+        al_free(al, ks);
+        return NULL;
+    }
+
+    ks->al = al;
+    ks->curr_thread = NULL;
+    ks->proc_table = pt;
+    ks->root_proc = NULL;
+
+    return ks;
+}
 
 void start_kernel(void) {
     uint8_t init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
@@ -75,19 +99,9 @@ void start_kernel(void) {
 
     // Initialize kernel state.
 
-    kernel = da_malloc(sizeof(kernel_state_t));
+    kernel = new_blank_kernel_state(k_al);
     if (!kernel) {
-        out_bios_vga(init_err_style, "Failed to allocate kernel state structure");
-        lock_up();
-    }
-
-    kernel->al = get_default_allocator();
-    kernel->curr_thread = NULL; // No thread yet.
-    kernel->proc_table = new_da_id_table(FOS_MAX_PROCS);
-    kernel->root_proc = NULL;
-
-    if (!(kernel->proc_table)) {
-        out_bios_vga(init_err_style, "Failed to create initial process table");
+        out_bios_vga(init_err_style, "Failed to allocate kernel structure");
         lock_up();
     }
 

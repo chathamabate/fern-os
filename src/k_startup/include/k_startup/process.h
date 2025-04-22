@@ -3,8 +3,14 @@
 
 #include "k_startup/fwd_defs.h"
 #include "k_sys/page.h"
+#include "s_mem/allocator.h"
 
 struct _process_t {
+    /**
+     * Allocator used to alloc this process.
+     */
+    allocator_t *al;
+
     /**
      * This process's global process id!
      */
@@ -92,3 +98,10 @@ struct _process_t {
      */
     //id_table_t *conds;
 };
+
+/**
+ * This allocates a process with basically no information.
+ *
+ * If any allocation fails, NULL is returned.
+ */
+process_t *new_blank_process(allocator_t *al);
