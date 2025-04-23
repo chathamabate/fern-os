@@ -7,7 +7,5 @@
 uint8_t __tmp_stack[0x1000];
 extern void tryout(void);
 void user_main(void) {
-    tryout();
-    term_put_s("HELLO FROM USER MAIN\n");
     while (1);
 }

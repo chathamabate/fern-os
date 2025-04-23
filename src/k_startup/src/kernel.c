@@ -151,9 +151,11 @@ void start_kernel(void) {
         .cs = USER_CODE_SELECTOR,
         .eflags = read_eflags(),
 
-        .esp = (uint32_t)user_esp - 4,
+        .esp = (uint32_t)user_esp,
         .ss = USER_DATA_SELECTOR
     };
+
+    // I honestly have no fucking idea...
 
     enter_user_ctx(&ctx);
 }

@@ -108,7 +108,7 @@ enter_user_ctx:
 
     // Load page directory.
     popl %eax
-    movl %eax, %cr3 // Not working as expected...
+    movl %eax, %cr3 
 
     // Load general purpose registers.
     popal
