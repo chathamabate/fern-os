@@ -110,6 +110,7 @@ static phys_addr_t _pop_free_page(void) {
 #define _R_IDENTITY  (1 << 0)
 #define _R_ALLOCATE  (1 << 1)
 #define _R_WRITEABLE (1 << 2)
+#define _R_USER (1 << 3)
 
 /**
  * Make a certain range available within a page table.
@@ -157,8 +158,8 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
                 pt_entry_t *new_pt = (pt_entry_t *)new_page;
                 clear_page_table(new_pt);
 
-                // Page tables are always writeable.
-                *pde = fos_unique_pt_entry((phys_addr_t)new_pt, true);
+                // Page tables are always writeable. (And never user)
+                *pde = fos_unique_pt_entry((phys_addr_t)new_pt, false, true);
             }
             
             curr_pdi = pdi;
@@ -189,9 +190,11 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
             }
         }
 
+        bool user = (flags & _R_USER) == _R_USER;
+
         pt[pti] = (flags & _R_IDENTITY) 
-            ? fos_identity_pt_entry(page_addr, writeable) 
-            : fos_unique_pt_entry(page_addr, writeable);
+            ? fos_identity_pt_entry(page_addr, user, writeable) 
+            : fos_unique_pt_entry(page_addr, user, writeable);
     }
 
     return FOS_SUCCESS;
@@ -259,7 +262,7 @@ static fernos_error_t _init_kernel_pd(void) {
     }
 
     pt_entry_t *fkp_pt_alias_pt = (pt_entry_t *)pte_get_base(*pte);
-    fkp_pt_alias_pt[fkp_pt_alias_pti] = fos_unique_pt_entry((phys_addr_t)fkp_pt, true);
+    fkp_pt_alias_pt[fkp_pt_alias_pti] = fos_unique_pt_entry((phys_addr_t)fkp_pt, false, true);
 
     for (uint32_t pti = 0; pti < NUM_FREE_KERNEL_PAGES; pti++) {
         // Set all kernel pages at not present to start.
@@ -321,10 +324,10 @@ static fernos_error_t _init_first_user_pd(void) {
     clear_page_table(pd);
 
     // Everyone must have access to the system tables!
-    PROP_ERR(_place_range(pd, _sys_tables_start, _sys_tables_end, _R_IDENTITY));
+    PROP_ERR(_place_range(pd, _sys_tables_start, _sys_tables_end, _R_USER | _R_IDENTITY));
 
-    PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_IDENTITY));
-    PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_IDENTITY));
+    PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_USER | _R_IDENTITY));
+    PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_USER | _R_IDENTITY));
 
     // You get insert the kernel into the user space here for debugging purposes.
     /*
@@ -337,14 +340,14 @@ static fernos_error_t _init_first_user_pd(void) {
     // Here, both the kernel and user pds will need their own indepent copies of the shared data
     // and shared bss. So, when making the user space, we allocate new pages in this area.
     // Then, we copy over what is contained in the kernel pages!
-    PROP_ERR(_place_range(pd, _bss_shared_start, _bss_shared_end, _R_WRITEABLE | _R_ALLOCATE));
+    PROP_ERR(_place_range(pd, _bss_shared_start, _bss_shared_end, _R_USER | _R_WRITEABLE | _R_ALLOCATE));
     PROP_ERR(_copy_range(pd, kpd, _bss_shared_start, _bss_shared_end));
 
-    PROP_ERR(_place_range(pd, _data_shared_start, _data_shared_end, _R_WRITEABLE | _R_ALLOCATE));
+    PROP_ERR(_place_range(pd, _data_shared_start, _data_shared_end, _R_USER | _R_WRITEABLE | _R_ALLOCATE));
     PROP_ERR(_copy_range(pd, kpd, _data_shared_start, _data_shared_end));
 
-    PROP_ERR(_place_range(pd, _bss_user_start, _bss_user_end, _R_WRITEABLE));
-    PROP_ERR(_place_range(pd, _data_user_start, _data_user_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _bss_user_start, _bss_user_end, _R_USER | _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _data_user_start, _data_user_end, _R_USER | _R_WRITEABLE));
 
     // NOTE: that stack start is just initial, It will be able to grow.
     const uint8_t *stack_end = _init_kstack_end;
@@ -437,7 +440,7 @@ phys_addr_t assign_free_page(uint32_t slot, phys_addr_t p) {
     }
 
     *free_kernel_page_pte = p == NULL_PHYS_ADDR 
-        ? not_present_pt_entry() : fos_unique_pt_entry(p, true);
+        ? not_present_pt_entry() : fos_unique_pt_entry(p, false, true);
 
     flush_page_cache();
 
@@ -478,7 +481,7 @@ phys_addr_t pop_free_page(void) {
     return ret;
 }
 
-static fernos_error_t pt_alloc_range(phys_addr_t pt, uint32_t s, uint32_t e, uint32_t *true_e);
+static fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e, uint32_t *true_e);
 static void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e);
 
 static phys_addr_t new_page_table(void) {
@@ -542,7 +545,9 @@ static phys_addr_t copy_page_table(phys_addr_t pt) {
             } else {
                 page_copy(new_base, og_base); 
 
-                new_pt[i] = fos_unique_pt_entry(new_base, pte_get_writable(pte));
+                new_pt[i] = fos_unique_pt_entry(new_base, 
+                        pte_get_user(pte) == 3,
+                        pte_get_writable(pte));
             }
         } else {
             // shallow copy just fine.
@@ -561,7 +566,7 @@ static phys_addr_t copy_page_table(phys_addr_t pt) {
     return pt_copy;
 }
 
-static fernos_error_t pt_alloc_range(phys_addr_t pt, uint32_t s, uint32_t e, uint32_t *true_e) {
+static fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e, uint32_t *true_e) {
     CHECK_ALIGN(pt, M_4K);
 
     if (!true_e) {
@@ -598,7 +603,7 @@ static fernos_error_t pt_alloc_range(phys_addr_t pt, uint32_t s, uint32_t e, uin
             break;
         }
 
-        *pte = fos_unique_pt_entry(new_page, true);
+        *pte = fos_unique_pt_entry(new_page, user, true);
     }
 
     assign_free_page(0, old);
@@ -676,8 +681,8 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
         if (pt_copy == NULL_PHYS_ADDR) {
             status = FOS_NO_MEM; // We failed :(
         } else {
-            // Page tables are always unique and writeable.
-            new_pd[i] = fos_unique_pt_entry(pt_copy, true);
+            // Page tables are always unique and writeable. (Non user)
+            new_pd[i] = fos_unique_pt_entry(pt_copy, false, true);
         }
     }
 
@@ -693,7 +698,7 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
 
 }
 
-fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, const void *e, const void **true_e) {
+fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e, const void **true_e) {
     CHECK_ALIGN(pd, M_4K);
     CHECK_ALIGN(s, M_4K);
     CHECK_ALIGN(e, M_4K);
@@ -738,7 +743,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, const void *e, const void
                 break;
             }
 
-            *pde = fos_unique_pt_entry(new_pt, true);
+            *pde = fos_unique_pt_entry(new_pt, false, true);
         }
 
         phys_addr_t pt = pte_get_base(*pde);
@@ -754,7 +759,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, const void *e, const void
         }
 
         uint32_t true_pti_e;
-        err = pt_alloc_range(pt, pti, pti_e, &true_pti_e);
+        err = pt_alloc_range(pt, user, pti, pti_e, &true_pti_e);
 
         pi += (true_pti_e - pti);
     }

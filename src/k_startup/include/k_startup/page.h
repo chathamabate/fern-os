@@ -198,14 +198,14 @@ phys_addr_t copy_page_directory(phys_addr_t pd);
 
 /**
  * Add pages (and page table if necessary) to a page directory.
- * The pages will always be marked as writeable.
+ * The pages will always be marked as writeable. 
  *
  * If we run out of memory, FOS_NO_MEM is returned.
  * If we run into an already page, FOS_ALREADY_ALLOCATED is returned.
  *
  * Use true_e to determine how many pages were actually allocated in case of error.
  */
-fernos_error_t pd_alloc_pages(phys_addr_t pd, void *s, const void *e, const void **true_e);
+fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e, const void **true_e);
 
 /*
  * NOTE neither pd_free_pages nor delete_page_directory clean up shared pages.
@@ -229,7 +229,8 @@ void pd_free_pages(phys_addr_t pd, void *s, const void *e);
 void delete_page_directory(phys_addr_t pd);
 
 static inline fernos_error_t alloc_pages(void *s, const void *e, const void **true_e) {
-    return pd_alloc_pages(get_page_directory(), s, e, true_e); 
+    // NOTE: this is only accesibly in kernel mode, so always allocate as supervisor only.
+    return pd_alloc_pages(get_page_directory(), false, s, e, true_e); 
 }
 
 static inline void free_pages(void *s, const void *e) {

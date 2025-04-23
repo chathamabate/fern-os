@@ -150,7 +150,7 @@ static bool test_pd_alloc(void) {
         init_pages = get_num_free_pages();
 
         const void *true_e;
-        fernos_error_t err = pd_alloc_pages(pd, c.s, c.e, &true_e);
+        fernos_error_t err = pd_alloc_pages(pd, false, c.s, c.e, &true_e);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         // Always assume a full allocation.
@@ -186,22 +186,22 @@ static bool test_pd_overlapping_alloc(void) {
     fernos_error_t err;
     const void *true_e;
 
-    err = pd_alloc_pages(pd, S + (2*M_4K), S + (8*M_4K), &true_e);
+    err = pd_alloc_pages(pd, false, S + (2*M_4K), S + (8*M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
     TEST_EQUAL_HEX(S + (8*M_4K), true_e);
 
     pd_free_pages(pd, S, S + (6*M_4K));
 
-    err = pd_alloc_pages(pd, S, S + (3*M_4K), &true_e);
+    err = pd_alloc_pages(pd, false, S, S + (3*M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
     TEST_EQUAL_HEX(S + (3*M_4K), true_e);
 
     // 3, 4, and 5 should all be free.
-    err = pd_alloc_pages(pd, S + (3*M_4K), S + (7*M_4K), &true_e);
+    err = pd_alloc_pages(pd, false, S + (3*M_4K), S + (7*M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_ALREADY_ALLOCATED, err);
     TEST_EQUAL_HEX(S + (6*M_4K), true_e);
 
-    err = pd_alloc_pages(pd, S + (3*M_4K), S + (7*M_4K), &true_e);
+    err = pd_alloc_pages(pd, false, S + (3*M_4K), S + (7*M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_ALREADY_ALLOCATED, err);
     TEST_EQUAL_HEX(S + (3*M_4K), true_e);
 
@@ -221,7 +221,7 @@ static bool test_pd_free(void) {
 
     /* This test isn't really that rigorous tbh */
 
-    err = pd_alloc_pages(pd, S, S + (5 * M_4K), &true_e);
+    err = pd_alloc_pages(pd, false, S, S + (5 * M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     num_fps = get_num_free_pages();
@@ -231,7 +231,7 @@ static bool test_pd_free(void) {
 
     /* Test a larger and weirder range */
 
-    err = pd_alloc_pages(pd, S + (7 * M_4K), S + (3012 * M_4K), &true_e);
+    err = pd_alloc_pages(pd, false, S + (7 * M_4K), S + (3012 * M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     num_fps = get_num_free_pages();
@@ -255,7 +255,7 @@ static bool test_pd_free_dangerous(void) {
     fernos_error_t err;
     const void *true_e;
 
-    err = pd_alloc_pages(pd, S, S + (4 * M_4K), &true_e);
+    err = pd_alloc_pages(pd, false, S, S + (4 * M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     *(uint32_t *)S = 1234;
@@ -277,10 +277,10 @@ static bool test_delete_page_directory(void) {
 
     const void *true_e;
 
-    err = pd_alloc_pages(pd, (void *)M_4K, (void *)M_4M, &true_e); 
+    err = pd_alloc_pages(pd, false, (void *)M_4K, (void *)M_4M, &true_e); 
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    err = pd_alloc_pages(pd, (void *)(4 * M_4M), (void *)(6*M_4M + 12*M_4K), &true_e); 
+    err = pd_alloc_pages(pd, false, (void *)(4 * M_4M), (void *)(6*M_4M + 12*M_4K), &true_e); 
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     delete_page_directory(pd);
