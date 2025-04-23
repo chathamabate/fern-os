@@ -407,8 +407,8 @@ static inline exec_seg_desc_t exec_seg_desc(void) {
     return esd;
 }
 
-static inline void esd_set_accessed(data_seg_desc_t *esd, uint8_t accessed) {
-    data_seg_desc_t d = *esd;
+static inline void esd_set_accessed(exec_seg_desc_t *esd, uint8_t accessed) {
+    exec_seg_desc_t d = *esd;
 
     d &= ~(ESD_ACCESSED_MASK);
     d |= (ESD_ACCESSED_WID_MASK & accessed) << ESD_ACCESSED_OFF;
@@ -416,12 +416,12 @@ static inline void esd_set_accessed(data_seg_desc_t *esd, uint8_t accessed) {
     *esd = d;
 }
 
-static inline uint8_t esd_get_accessed(data_seg_desc_t esd) {
+static inline uint8_t esd_get_accessed(exec_seg_desc_t esd) {
     return (ESD_ACCESSED_MASK & esd) >> ESD_ACCESSED_OFF;
 }
 
-static inline void esd_set_readable(data_seg_desc_t *esd, uint8_t readable) {
-    data_seg_desc_t d = *esd;
+static inline void esd_set_readable(exec_seg_desc_t *esd, uint8_t readable) {
+    exec_seg_desc_t d = *esd;
 
     d &= ~(ESD_READABLE_MASK);
     d |= (ESD_READABLE_WID_MASK & readable) << ESD_READABLE_OFF;
@@ -429,12 +429,12 @@ static inline void esd_set_readable(data_seg_desc_t *esd, uint8_t readable) {
     *esd = d;
 }
 
-static inline uint8_t esd_get_readable(data_seg_desc_t esd) {
+static inline uint8_t esd_get_readable(exec_seg_desc_t esd) {
     return (ESD_READABLE_MASK & esd) >> ESD_READABLE_OFF;
 }
 
-static inline void esd_set_conforming(data_seg_desc_t *esd, uint8_t conforming) {
-    data_seg_desc_t d = *esd;
+static inline void esd_set_conforming(exec_seg_desc_t *esd, uint8_t conforming) {
+    exec_seg_desc_t d = *esd;
 
     d &= ~(ESD_CONFORMING_MASK);
     d |= (ESD_CONFORMING_WID_MASK & conforming) << ESD_CONFORMING_OFF;
@@ -442,12 +442,12 @@ static inline void esd_set_conforming(data_seg_desc_t *esd, uint8_t conforming) 
     *esd = d;
 }
 
-static inline uint8_t esd_get_conforming(data_seg_desc_t esd) {
+static inline uint8_t esd_get_conforming(exec_seg_desc_t esd) {
     return (ESD_CONFORMING_MASK & esd) >> ESD_CONFORMING_OFF;
 }
 
-static inline void esd_set_def(data_seg_desc_t *esd, uint8_t def) {
-    data_seg_desc_t d = *esd;
+static inline void esd_set_def(exec_seg_desc_t *esd, uint8_t def) {
+    exec_seg_desc_t d = *esd;
 
     d &= ~(ESD_DEFAULT_MASK);
     d |= (ESD_DEFAULT_WID_MASK & def) << ESD_DEFAULT_OFF;
@@ -455,8 +455,50 @@ static inline void esd_set_def(data_seg_desc_t *esd, uint8_t def) {
     *esd = d;
 }
 
-static inline uint8_t esd_get_def(data_seg_desc_t esd) {
+static inline uint8_t esd_get_def(exec_seg_desc_t esd) {
     return (ESD_DEFAULT_MASK & esd) >> ESD_DEFAULT_OFF;
+}
+
+typedef seg_desc_t task_seg_desc_t;
+
+// task Descriptor Format :
+// ...
+// type        [40 : 44] 
+//    one         [40 : 40]
+//    busy        [41 : 41]
+//    zero        [42 : 42]
+//    one         [43 : 43]
+//    zero        [44 : 44]
+// ...
+// zero        [54 : 54] 
+// ...
+
+// busy    [41 : 41]
+#define TSD_BUSY_OFF (41)
+#define TSD_BUSY_WID (1)  
+#define TSD_BUSY_WID_MASK TO_MASK64(TSD_BUSY_WID)
+#define TSD_BUSY_MASK (TSD_BUSY_WID_MASK << TSD_BUSY_OFF)       
+
+static inline task_seg_desc_t task_seg_desc(void) {
+    task_seg_desc_t tsd = not_present_seg_desc();
+
+    sd_set_type(&tsd, 0x09); // 0b01001 For not busy task seg.
+    sd_set_present(&tsd, 1); // Set as present.
+
+    return tsd;
+}
+
+static inline void tsd_set_busy(task_seg_desc_t *tsd, uint8_t busy) {
+    task_seg_desc_t d = *tsd;
+
+    d &= ~(TSD_BUSY_MASK);
+    d |= (TSD_BUSY_WID_MASK & busy) << TSD_BUSY_OFF;
+
+    *tsd = d;
+}
+
+static inline uint8_t tsd_get_busy(task_seg_desc_t tsd) {
+    return (TSD_BUSY_MASK & tsd) >> TSD_BUSY_OFF;
 }
 
 // Accessing / modifying the gdtr register.

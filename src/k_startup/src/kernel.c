@@ -135,3 +135,5 @@ void start_kernel(void) {
 
     context_return(root_proc->pd, root_proc->main_thread->esp);
 }
+
+// We need the page fault handler...  That's the primary road block right now.
