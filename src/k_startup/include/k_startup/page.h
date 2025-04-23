@@ -79,38 +79,38 @@ extern uint8_t _init_kstack_end[];
  * (This is one page which is referenced by multiple page tables)
  */
 
-static inline pt_entry_t fos_present_pt_entry(phys_addr_t base, bool writeable) {
+static inline pt_entry_t fos_present_pt_entry(phys_addr_t base, bool user, bool writeable) {
     pt_entry_t pte;
 
     // I consider this FOS specific because FOS doesn't use privilege levels.
-    // All pages are ring 0.
+    // All pages are ring 0. (UGH, now this must change???) MID!!!
 
     pte_set_present(&pte, 1);
     pte_set_base(&pte, base);
-    pte_set_user(&pte, 0);
+    pte_set_user(&pte, user ? 3 : 0);
     pte_set_writable(&pte, writeable ? 1 : 0);
 
     return pte;
 }
 
-static inline pt_entry_t fos_identity_pt_entry(phys_addr_t base, bool writeable) {
-    pt_entry_t pte = fos_present_pt_entry(base, writeable);
+static inline pt_entry_t fos_identity_pt_entry(phys_addr_t base, bool user, bool writeable) {
+    pt_entry_t pte = fos_present_pt_entry(base, user, writeable);
 
     pte_set_avail(&pte, IDENTITY_ENTRY);
 
     return pte;
 }
 
-static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base, bool writeable) {
-    pt_entry_t pte = fos_present_pt_entry(base, writeable);
+static inline pt_entry_t fos_unique_pt_entry(phys_addr_t base, bool user, bool writeable) {
+    pt_entry_t pte = fos_present_pt_entry(base, user, writeable);
 
     pte_set_avail(&pte, UNIQUE_ENTRY);
 
     return pte;
 }
 
-static inline pt_entry_t fos_shared_pt_entry(phys_addr_t base, bool writeable) {
-    pt_entry_t pte = fos_present_pt_entry(base, writeable);
+static inline pt_entry_t fos_shared_pt_entry(phys_addr_t base, bool user, bool writeable) {
+    pt_entry_t pte = fos_present_pt_entry(base, user, writeable);
 
     pte_set_avail(&pte, SHARED_ENTRY);
 

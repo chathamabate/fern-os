@@ -171,4 +171,10 @@ timer_handler:
 
     call *timer_action
 
+.global random_handler
+random_handler:
+    pushl $aaa
+    call term_put_s
+    call lock_up
 
+aaa: .ascii "Hello from random handler\n\0"

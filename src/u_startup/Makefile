@@ -7,7 +7,7 @@ MOD_NAME 	?= u_startup
 _SRCS 		?= main.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
-_ASMS		?= 
+_ASMS		?= main.s
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= test.c

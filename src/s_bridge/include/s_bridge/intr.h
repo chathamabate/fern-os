@@ -74,3 +74,8 @@ typedef void (*timer_action_t)(phys_addr_t pd, const uint32_t *esp);
 void set_timer_action(timer_action_t ta);
 
 void timer_handler(void);
+
+
+
+void random_handler(void);
+

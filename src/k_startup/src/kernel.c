@@ -130,6 +130,8 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
+    term_put_s("HELLLO\n");
+
     // Enter first process!
     process_t *root_proc = (process_t *)idtb_get(kernel->proc_table, 0);
 

@@ -79,12 +79,20 @@ fernos_error_t init_idt(void) {
     idt[32] = timer_gd;
 
     // System call handler.
+
     intr_gate_desc_t syscall_gd = intr_gate_desc();
     gd_set_selector(&syscall_gd, 0x8);
     gd_set_privilege(&syscall_gd, 0);
     igd_set_base(&syscall_gd, syscall_enter_handler);
 
     idt[48] = syscall_gd;
+
+    intr_gate_desc_t test_gd = intr_gate_desc();
+    gd_set_selector(&test_gd, 0x28);
+    gd_set_privilege(&test_gd, 0);
+    igd_set_base(&test_gd, random_handler);
+
+    idt[49] = test_gd;
 
     dtr_val_t dtv = dtr_val();
     dtv_set_base(&dtv, idt);

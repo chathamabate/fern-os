@@ -9,6 +9,10 @@
 extern uint8_t _gdt_start[];
 extern uint8_t _gdt_end[];
 
+/* Needs these for creating the task segment descriptor */
+extern uint8_t _tss_start[];
+extern uint8_t _tss_end[];
+
 /**
  * Initialize and load the GDT.
  */

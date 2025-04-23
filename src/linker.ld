@@ -67,6 +67,9 @@ SECTIONS
         _idt_start = .;
         . += 4K;
         _idt_end = .;
+        _tss_start = .;
+        . += 4K;
+        _tss_end = .;
         . = ALIGN(4K);
         _sys_tables_end = .;
     } > fernos_area_0
