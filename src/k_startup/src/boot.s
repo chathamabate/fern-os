@@ -56,15 +56,10 @@ _start:
 	stack (as it grows downwards on x86 systems). This is necessarily done
 	in assembly as languages such as C cannot function without a stack.
 	*/
-	movl $FERNOS_END+1, %esp
+	movl $(FERNOS_END+1), %esp
     movl %esp, %ebp
 
     call start_kernel
-
-    int $49
-
-    pushl $ms
-    call term_put_s
 
     /* start_kernel should never return */
 

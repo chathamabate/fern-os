@@ -6,6 +6,17 @@
 
 #define NUM_GDT_ENTRIES 0x10
 
+/*
+ * NOTE: IT IS GAURANTEED that the created GDT follows the following simple
+ * structure.
+ */
+
+#define KERNEL_CODE_SELECTOR  ( 0x8 | ROOT_PRVLG)
+#define KERNEL_DATA_SELECTOR  (0x10 | ROOT_PRVLG)
+#define USER_CODE_SELECTOR    (0x18 | USER_PRVLG)
+#define USER_DATA_SELECTOR    (0x20 | USER_PRVLG)
+#define TSS_SELECTOR           0x28
+
 extern uint8_t _gdt_start[];
 extern uint8_t _gdt_end[];
 

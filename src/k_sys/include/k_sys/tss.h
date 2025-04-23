@@ -10,20 +10,16 @@
 typedef struct _task_state_segment_t task_state_segment_t;
 
 struct _task_state_segment_t {
-    uint16_t link;
-    uint16_t zeros0;
+    uint32_t link;
 
     uint32_t esp0;
-    uint16_t ss0;
-    uint16_t zeros1;
+    uint32_t ss0;
 
     uint32_t esp1;
-    uint16_t ss1;
-    uint16_t zeros2;
+    uint32_t ss1;
 
     uint32_t esp2;
-    uint16_t ss2;
-    uint16_t zeros3;
+    uint32_t ss2;
 
     uint32_t cr3;
 
@@ -40,26 +36,14 @@ struct _task_state_segment_t {
     uint32_t esi;
     uint32_t edi;
 
-    uint16_t es;
-    uint16_t zeros4;
+    uint32_t es;
+    uint32_t cs;
+    uint32_t ss;
+    uint32_t ds;
+    uint32_t fs;
+    uint32_t gs;
 
-    uint16_t cs;
-    uint16_t zeros5;
-
-    uint16_t ss;
-    uint16_t zeros6;
-
-    uint16_t ds;
-    uint16_t zeros7;
-
-    uint16_t fs;
-    uint16_t zeros8;
-
-    uint16_t gs;
-    uint16_t zeros9;
-
-    uint16_t ldt;
-    uint16_t zeros10;
+    uint32_t ldt;
 
     uint16_t t;
 

@@ -5,6 +5,10 @@
 #include "s_util/misc.h"
 #include "k_sys/dt.h"
 
+#define ROOT_PRVLG (0x0)
+#define USER_PRVLG (0x3)
+
+
 // Segment Selector stuff: 
 
 typedef uint16_t seg_selector_t;

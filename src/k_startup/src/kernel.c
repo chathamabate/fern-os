@@ -17,6 +17,7 @@
 #include "k_bios_term/term.h"
 #include "s_mem/simple_heap.h"
 #include "s_bridge/intr.h"
+#include "s_bridge/ctx.h"
 
 #include "s_data/test/id_table.h"
 #include "s_data/test/list.h"
@@ -128,7 +129,22 @@ void start_kernel(void) {
     try_setup_step(init_term(), "Failed to initialize Terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
-    try_setup_step(init_kernel_state(), "Failed to setup kernel state");
+    //try_setup_step(init_kernel_state(), "Failed to setup kernel state");
+    
+    uint32_t user_pd;
+    const uint32_t *user_esp;
+
+    try_setup_step(pop_initial_user_info(&user_pd, &user_esp), "Failed to pop user info");
+
+    user_ctx_t ctx = { 
+        .cr3 = user_pd,
+
+        .err = 0xFEFE,
+    };
+    ctx.edi = 0x10;
+    enter_user_ctx(&ctx);
+    
+    lock_up();
 
     //set_syscall_action(fos_syscall_action);
     //set_timer_action(fos_timer_action);

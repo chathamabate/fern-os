@@ -368,7 +368,7 @@ static fernos_error_t _init_first_user_pd(void) {
      * System calls and interrupts should always trigger a privelege change, doing so will
      * automatically switch to the kernel stack BEFORE a page directory switch.
      */
-    PROP_ERR(_place_range(pd, (uint8_t *)KERNEL_STACK_START, (uint8_t *)KERNEL_STACK_END, _R_WRITEABLE | _R_IDENTITY));
+    PROP_ERR(_place_range(pd, kstack_start, kstack_end, _R_WRITEABLE | _R_IDENTITY));
 
     // Using a basic 1 page user stack for now!
     const uint8_t *ustack_end = kstack_start - M_4K;
@@ -376,44 +376,8 @@ static fernos_error_t _init_first_user_pd(void) {
 
     PROP_ERR(_place_range(pd, ustack_start, ustack_end, _R_USER | _R_ALLOCATE | _R_WRITEABLE));
 
-    // If information is always pushed on the kernel stack???
-    // Must we do more for kernel context switching??
-    // We can no longer save our contexts on the user's stack.
-    // We must push to the kernel stack, switch page directories, then iret.
-    // This is the only way!
-    // During a switch, maybe just push the segment flags??
-
-    /*
-    uint32_t stack_pi = (uint32_t)kstack_start / M_4K; 
-    uint32_t stack_pdi = stack_pi / 1024;
-    uint32_t stack_pti = stack_pi % 1024;
-
-    // Let's get the underlying physical page of where the stack was placed.
-    pt_entry_t stack_pde = pd[stack_pdi];
-    pt_entry_t stack_pte = ((pt_entry_t *)pte_get_base(stack_pde))[stack_pti];
-    uint32_t *phys_stack_end = (uint32_t *)((uint8_t *)pte_get_base(stack_pte) + M_4K);
-
-    // Now, we need to set up the stack such that it can be switched into.
-    // We need to be able to call `popad` followed by `iret`.
-    //
-    // This will in total be 11 dwords.
-
-    uint32_t *iret_frame = phys_stack_end - 3;
-    iret_frame[2] = read_eflags() | (1 << 9);
-    iret_frame[1] = 0x8;
-    iret_frame[0] = (uint32_t)user_main;
-
-    uint32_t *popa_frame = iret_frame - 8;
-
-    for (uint32_t i = 0; i < 8; i++) {
-        popa_frame[i] = 0;
-    }
-
-    popa_frame[3] = (uint32_t)((uint32_t *)stack_end - 3);
-
     first_user_pd = upd;
-    first_user_esp = (uint32_t *)stack_end - 11;
-    */
+    first_user_esp = (uint32_t *)ustack_end;
 
     return FOS_SUCCESS;
 }
