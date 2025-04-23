@@ -6,6 +6,7 @@
 #include "k_startup/thread.h"
 #include "k_startup/tss.h"
 #include "k_sys/idt.h"
+#include "k_sys/intr.h"
 #include "k_sys/page.h"
 #include "k_sys/tss.h"
 #include "s_mem/allocator.h"
@@ -16,7 +17,6 @@
 #include "k_startup/idt.h"
 #include "k_bios_term/term.h"
 #include "s_mem/simple_heap.h"
-#include "s_bridge/intr.h"
 #include "s_bridge/ctx.h"
 
 #include "s_data/test/id_table.h"

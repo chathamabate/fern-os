@@ -7,8 +7,8 @@
 #include "s_util/err.h"
 #include "k_sys/debug.h"
 #include "k_bios_term/term.h"
-#include "s_bridge/intr.h"
 #include "k_startup/gdt.h"
+#include "s_bridge/ctx.h"
 
 gate_desc_t *idt = NULL;
 
