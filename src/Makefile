@@ -28,11 +28,6 @@ $(INCLUDE_DIR) $(INSTALL_DIR):
 
 # Layout Header and LD script generation.
 
-# On startup FernOS will have 4 Linker Script specified areas.
-# Each area must have an offset and size which are both multiples of 4MB.
-#
-# Ends are exlusive here...
-
 PROLOGUE_START  :=       0x0
 PROLOGUE_END    :=  0x3FFFFF
 
@@ -48,6 +43,7 @@ SECT_DEFS := PROLOGUE_START PROLOGUE_END \
 
 C_MACRO_GEN = echo "\#define $1 $($1)" >> $@;
 LD_DEF_GEN = echo "$1 = ($($1));" >> $@; 
+S_DEF_GEN = echo ".equ $1, $($1)" >> $@; 
 
 OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
 $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
@@ -59,6 +55,11 @@ $(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
 	rm $@; touch $@;
 	$(foreach def,$(SECT_DEFS),$(call LD_DEF_GEN,$(def)))
 
+OS_DEFS_S := $(INCLUDE_DIR)/os_defs.s
+$(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
+	rm $@; touch $@;
+	$(foreach def,$(SECT_DEFS),$(call S_DEF_GEN,$(def)))
+
 ####################################################################################################
 
 # Install Headers
@@ -66,7 +67,7 @@ $(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
 HDRS_INSTALL_TARS := $(addprefix hdrs.install.,$(MODS))
 
 .PHONY: hdrs.install $(HDRS_INSTALL_TARS)
-hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H)
+hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
 
 $(HDRS_INSTALL_TARS): hdrs.install.%:
 	make -C $(MODS_DIR)/$* hdrs.install test_hdrs.install

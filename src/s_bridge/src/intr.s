@@ -173,8 +173,11 @@ timer_handler:
 
 .global random_handler
 random_handler:
-    pushl $aaa
-    call term_put_s
+    
+    pushl $4
+    pushl %esp
+    pushl $1
+    call term_put_trace
     call lock_up
 
 aaa: .ascii "Hello from random handler\n\0"

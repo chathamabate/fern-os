@@ -54,12 +54,20 @@ static pt_entry_t free_kernel_page_pt[1024] __attribute__((aligned(M_4K)));
 static pt_entry_t *free_kernel_page_ptes[NUM_FREE_KERNEL_PAGES];
 
 /**
+ * For now, there will be one, and only one kernel stack.
+ * It will have a fixed size.
+ */
+#define KERNEL_STACK_SIZE (8 * M_4K)
+#define KERNEL_STACK_END (FERNOS_END + 1)
+#define KERNEL_STACK_START (KERNEL_STACK_END - KERNEL_STACK_SIZE) 
+
+/**
  * This is just the range to use to set up the initial free list.
  * After initialization, pages outside this range can be added to the free list
  * without consequence. (Just be careful)
  */
 #define INITIAL_FREE_AREA_START ((phys_addr_t)_static_area_end) 
-#define INITIAL_FREE_AREA_END  ((phys_addr_t)_init_kstack_start) // Exclusive end.
+#define INITIAL_FREE_AREA_END  ((phys_addr_t)KERNEL_STACK_START) // Exclusive end.
 
 static phys_addr_t free_list_head = NULL_PHYS_ADDR;
 static uint32_t free_list_len = 0;
@@ -229,7 +237,7 @@ static fernos_error_t _init_kernel_pd(void) {
     PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_WRITEABLE));
     PROP_ERR(_place_range(pd, _data_kernel_start, _data_kernel_end, _R_WRITEABLE));
 
-    PROP_ERR(_place_range(pd, _init_kstack_start, _init_kstack_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, (uint8_t *)KERNEL_STACK_START, (uint8_t *)KERNEL_STACK_END, _R_WRITEABLE));
 
     // Now setup up the free kernel pages!
     // THIS IS VERY CONFUSING SADLY!
@@ -350,10 +358,10 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, _data_user_start, _data_user_end, _R_USER | _R_WRITEABLE));
 
     // NOTE: that stack start is just initial, It will be able to grow.
-    const uint8_t *stack_end = _init_kstack_end;
+    const uint8_t *stack_end = (uint8_t *)KERNEL_STACK_END;
     uint8_t *stack_start = (uint8_t *)(stack_end - M_4K);
 
-    PROP_ERR(_place_range(pd, stack_start, stack_end, _R_WRITEABLE | _R_ALLOCATE));
+    PROP_ERR(_place_range(pd, stack_start, stack_end, _R_USER | _R_WRITEABLE | _R_ALLOCATE));
 
     uint32_t stack_pi = (uint32_t)stack_start / M_4K; 
     uint32_t stack_pdi = stack_pi / 1024;
@@ -401,7 +409,8 @@ fernos_error_t init_paging(void) {
     set_page_directory(kernel_pd);
     enable_paging();
 
-    set_intr_ctx(kernel_pd, (const uint32_t *)_init_kstack_end);
+    // TODO: Fix all this interrupt bullshit.
+    // set_intr_ctx(kernel_pd, (const uint32_t *)_init_kstack_end);
 
     return FOS_SUCCESS;
 }

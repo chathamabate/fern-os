@@ -49,6 +49,7 @@ TEST_HDRS	 := $(wildcard $(INC_DIR)/$(MOD_NAME)/test/*.h)
 SRC_DIR 	 := $(MOD_DIR)/src
 SRC_INC_DIRS := $(SRC_DIR) $(INC_DIR) $(INSTALL_INC_DIR)
 SRC_INC_FLAGS:= $(addprefix -I,$(SRC_INC_DIRS))
+ASM_INC_FLAGS:= $(addprefix -I ,$(SRC_INC_DIRS))
 SRCS 		 := $(addprefix $(SRC_DIR)/,$(_SRCS))
 ASMS		 := $(addprefix $(SRC_DIR)/,$(_ASMS))
 
@@ -92,7 +93,7 @@ $(C_OBJS): $(BUILD_DIR)/c_%.o: $(SRC_DIR)/%.c $(HDRS) | $(BUILD_DIR)
 	$(C_COMPILER) -c $(CFLAGS) $(SRC_INC_FLAGS) -o $@ $<
 
 $(S_OBJS): $(BUILD_DIR)/s_%.o: $(SRC_DIR)/%.s | $(BUILD_DIR)
-	$(ASSEMBLER) -o $@ $<
+	$(ASSEMBLER) $(SRC_INC_FLAGS) -o $@ $<
 
 lib.build: $(BUILD_LIB)
 $(BUILD_LIB): $(C_OBJS) $(S_OBJS) | $(BUILD_DIR)

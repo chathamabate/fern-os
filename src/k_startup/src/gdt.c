@@ -68,8 +68,8 @@ fernos_error_t init_gdt(void) {
     *task_desc = task_seg_desc();
 
     sd_set_base(task_desc, (uint32_t)_tss_start);
-    sd_set_limit(task_desc, sizeof(task_state_segment_t) - 1);
-    sd_set_gran(task_desc, 0x1);
+    sd_set_limit(task_desc, sizeof(task_state_segment_t));
+    sd_set_gran(task_desc, 0x0);
     sd_set_privilege(task_desc, 0x0);
 
     tsd_set_busy(task_desc, 0);

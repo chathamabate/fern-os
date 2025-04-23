@@ -4,8 +4,10 @@
 #include "k_startup/process.h"
 #include "k_startup/test/page.h"
 #include "k_startup/thread.h"
+#include "k_startup/tss.h"
 #include "k_sys/idt.h"
 #include "k_sys/page.h"
+#include "k_sys/tss.h"
 #include "s_mem/allocator.h"
 #include "s_util/err.h"
 #include "s_util/test/str.h"
@@ -122,20 +124,26 @@ void start_kernel(void) {
 
     try_setup_step(init_gdt(), "Failed to initialize GDT");
     try_setup_step(init_idt(), "Failed to initialize IDT");
+    try_setup_step(init_global_tss(), "Failed to initialize TSS");
     try_setup_step(init_term(), "Failed to initialize Terminal");
-    try_setup_step(init_paging(), "Failed to setup paging");
-    try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
-    try_setup_step(init_kernel_state(), "Failed to setup kernel state");
+    //try_setup_step(init_paging(), "Failed to setup paging");
+    //try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
+    //try_setup_step(init_kernel_state(), "Failed to setup kernel state");
 
-    set_syscall_action(fos_syscall_action);
-    set_timer_action(fos_timer_action);
+    //set_syscall_action(fos_syscall_action);
+    //set_timer_action(fos_timer_action);
 
+    return;
+
+    /*
     term_put_s("HELLLO\n");
+    lock_up();
 
     // Enter first process!
     process_t *root_proc = (process_t *)idtb_get(kernel->proc_table, 0);
 
     context_return(root_proc->pd, root_proc->main_thread->esp);
+    */
 }
 
 // We need the page fault handler...  That's the primary road block right now.

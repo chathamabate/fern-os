@@ -45,10 +45,6 @@ extern uint8_t _data_user_end[];
 
 extern uint8_t _static_area_end[];
 
-extern uint8_t _init_kstack_start[];
-extern uint8_t _init_kstack_end[];
-
-
 /**
  * These values are used in the available bits of a page table entry. NOTE: They have
  * no meaning for entries in page directories. Other than the kernel page tables, 

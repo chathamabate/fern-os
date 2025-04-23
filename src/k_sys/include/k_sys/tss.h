@@ -67,5 +67,6 @@ struct _task_state_segment_t {
 } __attribute__ ((packed));
 
 void init_tss(task_state_segment_t *tss);
+void flush_tss(uint32_t tss_index);
 
 
