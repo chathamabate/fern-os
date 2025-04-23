@@ -5,11 +5,6 @@
 
 extern void tryout(void);
 void user_main(void) {
-
-    tryout();
-
-    //trigger_syscall(0, 0);
-
     while (1) {
     }
 }

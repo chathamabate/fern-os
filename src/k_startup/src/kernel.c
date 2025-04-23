@@ -23,6 +23,7 @@
 #include "s_data/test/list.h"
 #include "s_mem/test/simple_heap.h"
 #include "k_startup/state.h"
+#include "u_startup/main.h"
 
 void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
     (void)id;
@@ -139,27 +140,14 @@ void start_kernel(void) {
     user_ctx_t ctx = { 
         .cr3 = user_pd,
 
-        .err = 0xFEFE,
+        .eip = (uint32_t)user_main,
+        .cs = USER_CODE_SELECTOR,
+        .eflags = read_eflags(),
+        .esp = (uint32_t)user_esp,
+        .ss = USER_DATA_SELECTOR
     };
-    ctx.edi = 0x10;
+
     enter_user_ctx(&ctx);
-    
-    lock_up();
-
-    //set_syscall_action(fos_syscall_action);
-    //set_timer_action(fos_timer_action);
-
-    return;
-
-    /*
-    term_put_s("HELLLO\n");
-    lock_up();
-
-    // Enter first process!
-    process_t *root_proc = (process_t *)idtb_get(kernel->proc_table, 0);
-
-    context_return(root_proc->pd, root_proc->main_thread->esp);
-    */
 }
 
 // We need the page fault handler...  That's the primary road block right now.

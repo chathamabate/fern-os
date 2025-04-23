@@ -4,7 +4,7 @@
 MOD_NAME 	?= s_bridge
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= intr.c
+_SRCS 		?= intr.c ctx.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= intr.s ctx.s

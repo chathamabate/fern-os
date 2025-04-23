@@ -26,16 +26,26 @@ enter_user_ctx:
 
     movl %esi, (%edi)
 
-    pushl %esp
-    pushl $16
-    call term_put_trace
-    call lock_up
+    // Load page directory.
+    popl %eax
+    movl %eax, %cr3 // Not working as expected...
 
+    // Load general purpose registers.
+    popal
 
-    // Load the page directory.
-    movl (%esp), %eax
-    movl %eax, %cr3
-    add $4, %esp
+    // Skip error value.
+    addl $4, %esp
+
+    // We assume that the context uses the same selector for data segments
+    // and stack segments.
+    movl 16(%esp), %eax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+
+    // Finally RETURN!
+    iret
 
 
 
