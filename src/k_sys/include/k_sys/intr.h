@@ -52,4 +52,8 @@ void pic_send_slave_eoi(void);
 // This will send an eoi to master AND to slave if necessary
 void pic_send_eoi(uint8_t irq);
 
-
+/**
+ * These can be nested in interrupt handlers.
+ */
+void _nop_master_irq7_handler(void);
+void _nop_slave_irq15_handler(void);

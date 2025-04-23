@@ -1,9 +1,29 @@
 
 #pragma once
 
+#include "k_sys/page.h"
 #include <stdint.h>
 
 typedef struct _user_ctx_t user_ctx_t;
+
+/**
+ * When an interrupt occurs, we will switch page tables.
+ *
+ * Make sure to set the intr ctx pd before enabling interrupts!
+ */
+void set_intr_ctx_pd(phys_addr_t pd);
+
+/**
+ * Some no-op handlers.
+ */
+
+void lock_up_handler(void);
+
+void nop_master_irq_handler(void);
+void nop_master_irq7_handler(void); // For spurious.
+
+void nop_slave_irq_handler(void);
+void nop_slave_irq15_handler(void); // For spurious.
 
 /**
  * This structure resembles EXACTLY what should be pushed onto the stack during a
@@ -43,3 +63,7 @@ struct _user_ctx_t {
  * This function does not return.
  */
 void enter_user_ctx(user_ctx_t *ctx);
+
+
+
+

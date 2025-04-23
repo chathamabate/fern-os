@@ -17,6 +17,8 @@ fernos_error_t init_idt(void) {
 
     intr_gate_desc_t gd = intr_gate_desc();
 
+    // I think these handlers are mostly unusable now??
+
     gd_set_selector(&gd, KERNEL_CODE_SELECTOR);
     gd_set_privilege(&gd, ROOT_PRVLG);
     igd_set_base(&gd, lock_up_handler);
@@ -72,21 +74,25 @@ fernos_error_t init_idt(void) {
 
     // For timer.
     
+    /*
     intr_gate_desc_t timer_gd = intr_gate_desc();
     gd_set_selector(&timer_gd, KERNEL_CODE_SELECTOR);
     gd_set_privilege(&timer_gd, ROOT_PRVLG);
     igd_set_base(&timer_gd, timer_handler);
 
     idt[32] = timer_gd;
+    */
 
     // System call handler.
 
+    /* 
     intr_gate_desc_t syscall_gd = intr_gate_desc();
     gd_set_selector(&syscall_gd, KERNEL_CODE_SELECTOR);
     gd_set_privilege(&syscall_gd, USER_PRVLG); // Users can invoke syscalls.
     igd_set_base(&syscall_gd, syscall_enter_handler);
 
     idt[48] = syscall_gd;
+    */
 
     /*
     intr_gate_desc_t test_gd = intr_gate_desc();

@@ -2,6 +2,86 @@
 
 .section .text
 
+.global lock_up_handler
+lock_up_handler:
+    movl intr_ctx_pd, %eax
+    movl %eax, %cr3
+
+    call _lock_up_handler // NEVER RETURNS!
+
+.global nop_master_irq_handler
+nop_master_irq_handler:
+    pushal
+
+    movl %cr3, %eax
+    pushl %eax
+
+    movl intr_ctx_pd, %eax
+    movl %eax, %cr3
+
+    call pic_send_master_eoi
+
+    popl %eax
+    movl %eax, %cr3
+
+    popal
+    iret
+
+.global nop_master_irq7_handler
+nop_master_irq7_handler:
+    pushal
+
+    movl %cr3, %eax
+    pushl %eax
+
+    movl intr_ctx_pd, %eax
+    movl %eax, %cr3
+
+    call _nop_master_irq7_handler
+
+    popl %eax
+    movl %eax, %cr3
+
+    popal
+    iret
+
+.global nop_slave_irq_handler
+nop_slave_irq_handler:
+    pushal
+
+    movl %cr3, %eax
+    pushl %eax
+
+    movl intr_ctx_pd, %eax
+    movl %eax, %cr3
+
+    call pic_send_slave_eoi
+    call pic_send_master_eoi
+
+    popl %eax
+    movl %eax, %cr3
+
+    popal
+    iret
+
+.global nop_slave_irq15_handler
+nop_slave_irq15_handler:
+    pushal
+
+    movl %cr3, %eax
+    pushl %eax
+
+    movl intr_ctx_pd, %eax
+    movl %eax, %cr3
+
+    call _nop_slave_irq15_handler
+
+    popl %eax
+    movl %eax, %cr3
+
+    popal
+    iret
+
 .global enter_user_ctx
 enter_user_ctx:
     movl 4(%esp), %edi // Store the context address.

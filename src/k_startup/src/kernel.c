@@ -25,6 +25,7 @@
 #include "k_startup/state.h"
 #include "u_startup/main.h"
 
+/*
 void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
     (void)id;
     (void)arg;
@@ -34,6 +35,7 @@ void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32
 void fos_timer_action(phys_addr_t pd, const uint32_t *esp) {
     context_return(pd, esp);
 }
+*/
 
 static kernel_state_t *kernel = NULL;
 

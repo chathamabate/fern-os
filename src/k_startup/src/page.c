@@ -9,8 +9,8 @@
 #include "s_util/misc.h"
 #include "s_util/err.h"
 #include "s_util/str.h"
-#include "s_bridge/intr.h"
 #include <stdbool.h>
+#include "s_bridge/ctx.h"
 
 /*
  * NOTE: Functions starting with `_` in this file denote functions which can only be
@@ -338,11 +338,13 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_USER | _R_IDENTITY));
     PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_USER | _R_IDENTITY));
 
+    /*
     // You get insert the kernel into the user space here for debugging purposes.
-    PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_IDENTITY | _R_WRITEABLE));    
-    PROP_ERR(_place_range(pd, _ro_kernel_start, _ro_kernel_end, _R_IDENTITY));
-    PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_WRITEABLE));
-    PROP_ERR(_place_range(pd, _data_kernel_start, _data_kernel_end, _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_USER | _R_IDENTITY | _R_WRITEABLE));    
+    PROP_ERR(_place_range(pd, _ro_kernel_start, _ro_kernel_end, _R_USER | _R_IDENTITY));
+    PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_USER | _R_WRITEABLE));
+    PROP_ERR(_place_range(pd, _data_kernel_start, _data_kernel_end, _R_USER | _R_WRITEABLE));
+    */
 
     // Here, both the kernel and user pds will need their own indepent copies of the shared data
     // and shared bss. So, when making the user space, we allocate new pages in this area.
@@ -393,8 +395,8 @@ fernos_error_t init_paging(void) {
     set_page_directory(kernel_pd);
     enable_paging();
 
-    // TODO: Fix all this interrupt bullshit.
-    // set_intr_ctx(kernel_pd, (const uint32_t *)_init_kstack_end);
+    // Store the kernel page table as the interrupt ctx pd.
+    set_intr_ctx_pd(kernel_pd);
 
     return FOS_SUCCESS;
 }
