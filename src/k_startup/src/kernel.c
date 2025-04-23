@@ -126,9 +126,9 @@ void start_kernel(void) {
     try_setup_step(init_idt(), "Failed to initialize IDT");
     try_setup_step(init_global_tss(), "Failed to initialize TSS");
     try_setup_step(init_term(), "Failed to initialize Terminal");
-    //try_setup_step(init_paging(), "Failed to setup paging");
-    //try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
-    //try_setup_step(init_kernel_state(), "Failed to setup kernel state");
+    try_setup_step(init_paging(), "Failed to setup paging");
+    try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
+    try_setup_step(init_kernel_state(), "Failed to setup kernel state");
 
     //set_syscall_action(fos_syscall_action);
     //set_timer_action(fos_timer_action);

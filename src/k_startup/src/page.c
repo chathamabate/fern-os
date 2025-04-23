@@ -143,6 +143,7 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
     }
 
     const bool writeable = (flags & _R_WRITEABLE) == _R_WRITEABLE;
+    const bool user = (flags & _R_USER) == _R_USER;
 
     uint32_t curr_pdi = 1024;
     pt_entry_t *pt = NULL;
@@ -198,8 +199,6 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
             }
         }
 
-        bool user = (flags & _R_USER) == _R_USER;
-
         pt[pti] = (flags & _R_IDENTITY) 
             ? fos_identity_pt_entry(page_addr, user, writeable) 
             : fos_unique_pt_entry(page_addr, user, writeable);
@@ -237,7 +236,9 @@ static fernos_error_t _init_kernel_pd(void) {
     PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_WRITEABLE));
     PROP_ERR(_place_range(pd, _data_kernel_start, _data_kernel_end, _R_WRITEABLE));
 
-    PROP_ERR(_place_range(pd, (uint8_t *)KERNEL_STACK_START, (uint8_t *)KERNEL_STACK_END, _R_WRITEABLE));
+    // The kernel stack will be marked identity because it should only exist once and always in
+    // the same place!
+    PROP_ERR(_place_range(pd, (uint8_t *)KERNEL_STACK_START, (uint8_t *)KERNEL_STACK_END, _R_WRITEABLE | _R_IDENTITY));
 
     // Now setup up the free kernel pages!
     // THIS IS VERY CONFUSING SADLY!
@@ -357,13 +358,33 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, _bss_user_start, _bss_user_end, _R_USER | _R_WRITEABLE));
     PROP_ERR(_place_range(pd, _data_user_start, _data_user_end, _R_USER | _R_WRITEABLE));
 
-    // NOTE: that stack start is just initial, It will be able to grow.
-    const uint8_t *stack_end = (uint8_t *)KERNEL_STACK_END;
-    uint8_t *stack_start = (uint8_t *)(stack_end - M_4K);
 
-    PROP_ERR(_place_range(pd, stack_start, stack_end, _R_USER | _R_WRITEABLE | _R_ALLOCATE));
+    const uint8_t *kstack_end = (uint8_t *)KERNEL_STACK_END;
+    uint8_t *kstack_start = (uint8_t *)KERNEL_STACK_START;
 
-    uint32_t stack_pi = (uint32_t)stack_start / M_4K; 
+    /*
+     * NOTE: The kernel stack MUST MUST MUST be in the page table of all processes!
+     *
+     * System calls and interrupts should always trigger a privelege change, doing so will
+     * automatically switch to the kernel stack BEFORE a page directory switch.
+     */
+    PROP_ERR(_place_range(pd, (uint8_t *)KERNEL_STACK_START, (uint8_t *)KERNEL_STACK_END, _R_WRITEABLE | _R_IDENTITY));
+
+    // Using a basic 1 page user stack for now!
+    const uint8_t *ustack_end = kstack_start - M_4K;
+    uint8_t *ustack_start = (uint8_t *)(ustack_end - M_4K);
+
+    PROP_ERR(_place_range(pd, ustack_start, ustack_end, _R_USER | _R_ALLOCATE | _R_WRITEABLE));
+
+    // If information is always pushed on the kernel stack???
+    // Must we do more for kernel context switching??
+    // We can no longer save our contexts on the user's stack.
+    // We must push to the kernel stack, switch page directories, then iret.
+    // This is the only way!
+    // During a switch, maybe just push the segment flags??
+
+    /*
+    uint32_t stack_pi = (uint32_t)kstack_start / M_4K; 
     uint32_t stack_pdi = stack_pi / 1024;
     uint32_t stack_pti = stack_pi % 1024;
 
@@ -392,6 +413,7 @@ static fernos_error_t _init_first_user_pd(void) {
 
     first_user_pd = upd;
     first_user_esp = (uint32_t *)stack_end - 11;
+    */
 
     return FOS_SUCCESS;
 }
@@ -555,8 +577,8 @@ static phys_addr_t copy_page_table(phys_addr_t pt) {
                 page_copy(new_base, og_base); 
 
                 new_pt[i] = fos_unique_pt_entry(new_base, 
-                        pte_get_user(pte) == 3,
-                        pte_get_writable(pte));
+                        pte_get_user(pte) == 1,
+                        pte_get_writable(pte) == 1);
             }
         } else {
             // shallow copy just fine.

@@ -83,7 +83,7 @@ static inline pt_entry_t fos_present_pt_entry(phys_addr_t base, bool user, bool 
 
     pte_set_present(&pte, 1);
     pte_set_base(&pte, base);
-    pte_set_user(&pte, user ? 3 : 0);
+    pte_set_user(&pte, user ? 1 : 0);
     pte_set_writable(&pte, writeable ? 1 : 0);
 
     return pte;
