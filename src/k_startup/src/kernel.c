@@ -123,6 +123,11 @@ static fernos_error_t init_kernel_state(void) {
     return FOS_SUCCESS;
 }
 
+void thingy(void) {
+    term_put_s("HELLO\n");
+    while (1);
+}
+
 void start_kernel(void) {
     init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
@@ -145,6 +150,7 @@ void start_kernel(void) {
         .eip = (uint32_t)user_main,
         .cs = USER_CODE_SELECTOR,
         .eflags = read_eflags(),
+
         .esp = (uint32_t)user_esp,
         .ss = USER_DATA_SELECTOR
     };

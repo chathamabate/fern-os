@@ -46,6 +46,14 @@ extern uint8_t _data_user_end[];
 extern uint8_t _static_area_end[];
 
 /**
+ * For now, there will be one, and only one kernel stack.
+ * It will have a fixed size.
+ */
+#define KERNEL_STACK_SIZE (8 * M_4K)
+#define KERNEL_STACK_END (FERNOS_END + 1)
+#define KERNEL_STACK_START (KERNEL_STACK_END - KERNEL_STACK_SIZE) 
+
+/**
  * These values are used in the available bits of a page table entry. NOTE: They have
  * no meaning for entries in page directories. Other than the kernel page tables, 
  * all page tables will be placed in arbitrary pages! (Not shared or strictly identity)

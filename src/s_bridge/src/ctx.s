@@ -119,6 +119,7 @@ enter_user_ctx:
     // We assume that the context uses the same selector for data segments
     // and stack segments.
     movl 16(%esp), %eax
+
     movw %ax, %ds
     movw %ax, %es
     movw %ax, %fs

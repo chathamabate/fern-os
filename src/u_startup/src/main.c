@@ -1,9 +1,12 @@
 
 #include "u_startup/main.h"
+#include "k_bios_term/term.h"
+#include "k_sys/intr.h"
 #include "s_util/misc.h"
 
 extern void tryout(void);
 void user_main(void) {
-    while (1) {
-    }
+    tryout();
+    term_put_s("HELLO FROM USER MAIN\n");
+    while (1);
 }

@@ -61,9 +61,11 @@ _start:
 
     call start_kernel
 
-    /* start_kernel should never return */
-
     call lock_up
+
+d: 
+    .word 0x10
+    .long FERNOS_END + 1
 
 ms: .ascii "Here\n\0"
 /*

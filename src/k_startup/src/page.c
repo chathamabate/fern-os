@@ -53,13 +53,6 @@ uint8_t free_kernel_pages[NUM_FREE_KERNEL_PAGES][M_4K] __attribute__((aligned(NU
 static pt_entry_t free_kernel_page_pt[1024] __attribute__((aligned(M_4K)));
 static pt_entry_t *free_kernel_page_ptes[NUM_FREE_KERNEL_PAGES];
 
-/**
- * For now, there will be one, and only one kernel stack.
- * It will have a fixed size.
- */
-#define KERNEL_STACK_SIZE (8 * M_4K)
-#define KERNEL_STACK_END (FERNOS_END + 1)
-#define KERNEL_STACK_START (KERNEL_STACK_END - KERNEL_STACK_SIZE) 
 
 /**
  * This is just the range to use to set up the initial free list.

@@ -43,7 +43,6 @@ _load_gdtr:
     movw %ax, %gs
     movw %ax, %ss
 
-
     movl %ebp, %esp
     popl %ebp
     ret
