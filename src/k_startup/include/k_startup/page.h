@@ -84,7 +84,7 @@ extern uint8_t _static_area_end[];
  */
 
 static inline pt_entry_t fos_present_pt_entry(phys_addr_t base, bool user, bool writeable) {
-    pt_entry_t pte;
+    pt_entry_t pte = not_present_pt_entry();
 
     // I consider this FOS specific because FOS doesn't use privilege levels.
     // All pages are ring 0. (UGH, now this must change???) MID!!!

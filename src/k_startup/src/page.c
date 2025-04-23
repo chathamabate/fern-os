@@ -11,6 +11,7 @@
 #include "s_util/str.h"
 #include <stdbool.h>
 #include "s_bridge/ctx.h"
+#include "k_bios_term/term_sys_helpers.h"
 
 /*
  * NOTE: Functions starting with `_` in this file denote functions which can only be
@@ -160,8 +161,9 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
                 pt_entry_t *new_pt = (pt_entry_t *)new_page;
                 clear_page_table(new_pt);
 
-                // Page tables are always writeable. (And never user)
-                *pde = fos_unique_pt_entry((phys_addr_t)new_pt, false, true);
+                // NOTE: I recently learned that page table entries in a page directory must
+                // be marked user too if the user would like to access.
+                *pde = fos_unique_pt_entry((phys_addr_t)new_pt, true, true);
             }
             
             curr_pdi = pdi;
@@ -669,8 +671,8 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
         if (pt_copy == NULL_PHYS_ADDR) {
             status = FOS_NO_MEM; // We failed :(
         } else {
-            // Page tables are always unique and writeable. (Non user)
-            new_pd[i] = fos_unique_pt_entry(pt_copy, false, true);
+            // Page tables are always unique and writeable. 
+            new_pd[i] = fos_unique_pt_entry(pt_copy, true, true);
         }
     }
 
@@ -731,7 +733,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e,
                 break;
             }
 
-            *pde = fos_unique_pt_entry(new_pt, false, true);
+            *pde = fos_unique_pt_entry(new_pt, true, true);
         }
 
         phys_addr_t pt = pte_get_base(*pde);

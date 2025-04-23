@@ -151,7 +151,7 @@ void start_kernel(void) {
         .cs = USER_CODE_SELECTOR,
         .eflags = read_eflags(),
 
-        .esp = (uint32_t)user_esp,
+        .esp = (uint32_t)user_esp - 4,
         .ss = USER_DATA_SELECTOR
     };
 
