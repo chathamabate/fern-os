@@ -35,8 +35,8 @@ void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32
 */
 
 void fos_timer_action(user_ctx_t *ctx) {
-    term_put_s("Hello from timer\n");
-    while (1);
+    term_put_fmt_s("CTX %X\n", ctx);
+
     enter_user_ctx(ctx);
 }
 
@@ -147,7 +147,9 @@ void start_kernel(void) {
     uint32_t user_pd;
     const uint32_t *user_esp;
 
+
     try_setup_step(pop_initial_user_info(&user_pd, &user_esp), "Failed to pop user info");
+    term_put_fmt_s("USER MAIN: %X\n", user_main);
 
     set_timer_action(fos_timer_action);
 

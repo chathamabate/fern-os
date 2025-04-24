@@ -149,8 +149,9 @@ timer_handler:
     pushl %eax
 
     movl 15*4(%esp), %eax // retrieve its value
-    pushl %eax
     movl %eax, %cr3
+
+    call pic_send_master_eoi
 
     pushl %esp
     call *timer_action
