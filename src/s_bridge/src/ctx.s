@@ -128,6 +128,29 @@ enter_user_ctx:
     // Finally RETURN!
     iret
 
+.global timer_handler
+timer_handler:
+    pushl $0 // Timer has no error.
 
+    pushal 
 
+    // Switch to kernel data segment.
+    xor %eax, %eax
 
+    movw $0x18, %ax
+
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+
+    // Switch to interrupt context page table.
+    movl %cr3, %eax
+    pushl %eax
+
+    movl 15*4(%esp), %eax // retrieve its value
+    pushl %eax
+    movl %eax, %cr3
+
+    pushl %esp
+    call *timer_action

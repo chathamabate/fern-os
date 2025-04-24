@@ -10,8 +10,13 @@ typedef struct _user_ctx_t user_ctx_t;
  * When an interrupt occurs, we will switch page tables.
  *
  * Make sure to set the intr ctx pd before enabling interrupts!
+ *
+ * This is deprecated! 
+ *
+ * NOTE: Now we assume that the very first value of the kernel stack
+ * holds the kernel page table.
  */
-void set_intr_ctx_pd(phys_addr_t pd);
+// void set_intr_ctx_pd(phys_addr_t pd);
 
 /**
  * Some no-op handlers.
@@ -63,6 +68,27 @@ struct _user_ctx_t {
  * This function does not return.
  */
 void enter_user_ctx(user_ctx_t *ctx);
+
+/**
+ * When the timer handler is invoked by an interrupt, it saves the
+ * current context on the interrupt stack, then calls a custom action
+ * with a pointer to the context.
+ *
+ * The timer actions should NEVER EVER return.
+ *
+ * To return to a user context, use `enter_user_ctx` above.
+ */
+typedef void (*timer_action_t)(user_ctx_t *ctx);
+
+void set_timer_action(timer_action_t ta);
+
+/**
+ * NOTE: The timer handler assumes that a privilege change occured when entering
+ * the handler.
+ *
+ * If I ever decided to introduce kernel space concurrency, this will have to change.
+ */
+void timer_handler(void);
 
 
 

@@ -277,6 +277,9 @@ static fernos_error_t _init_kernel_pd(void) {
     }
 
     kernel_pd = kpd;
+
+    uint32_t *kpd_entry = (uint32_t *)KERNEL_STACK_END - 1;
+    *kpd_entry = kernel_pd;
     
     return FOS_SUCCESS;
 }
@@ -333,8 +336,8 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_USER | _R_IDENTITY));
     PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_USER | _R_IDENTITY));
 
-    // You get insert the kernel into the user space here for debugging purposes.
     /*
+    // You get insert the kernel into the user space here for debugging purposes.
     PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_USER | _R_IDENTITY | _R_WRITEABLE));    
     PROP_ERR(_place_range(pd, _ro_kernel_start, _ro_kernel_end, _R_USER | _R_IDENTITY));
     PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_USER | _R_WRITEABLE));
@@ -352,7 +355,6 @@ static fernos_error_t _init_first_user_pd(void) {
 
     PROP_ERR(_place_range(pd, _bss_user_start, _bss_user_end, _R_USER | _R_WRITEABLE));
     PROP_ERR(_place_range(pd, _data_user_start, _data_user_end, _R_USER | _R_WRITEABLE));
-
 
     const uint8_t *kstack_end = (uint8_t *)KERNEL_STACK_END;
     uint8_t *kstack_start = (uint8_t *)KERNEL_STACK_START;
@@ -389,9 +391,6 @@ fernos_error_t init_paging(void) {
 
     set_page_directory(kernel_pd);
     enable_paging();
-
-    // Store the kernel page table as the interrupt ctx pd.
-    set_intr_ctx_pd(kernel_pd);
 
     return FOS_SUCCESS;
 }

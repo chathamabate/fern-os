@@ -23,7 +23,7 @@ fernos_error_t init_gdt(void) {
 
     esd_set_def(kernel_code, 0x1);
     esd_set_readable(kernel_code, 0x1);
-    esd_set_conforming(kernel_code, 0x1);
+    esd_set_conforming(kernel_code, 0x0);
 
     data_seg_desc_t *kernel_data = &(gdt[2]);  // 0x10
     *kernel_data = data_seg_desc();
@@ -47,7 +47,7 @@ fernos_error_t init_gdt(void) {
 
     esd_set_def(user_code, 0x1);
     esd_set_readable(user_code, 0x1);
-    esd_set_conforming(user_code, 0x1);
+    esd_set_conforming(user_code, 0x0);
 
     data_seg_desc_t *user_data = &(gdt[4]);  // 0x20
     *user_data = data_seg_desc();

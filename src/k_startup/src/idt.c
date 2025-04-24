@@ -74,14 +74,12 @@ fernos_error_t init_idt(void) {
 
     // For timer.
     
-    /*
     intr_gate_desc_t timer_gd = intr_gate_desc();
     gd_set_selector(&timer_gd, KERNEL_CODE_SELECTOR);
     gd_set_privilege(&timer_gd, ROOT_PRVLG);
     igd_set_base(&timer_gd, timer_handler);
 
     idt[32] = timer_gd;
-    */
 
     // System call handler.
 

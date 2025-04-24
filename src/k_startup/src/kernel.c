@@ -1,4 +1,5 @@
 
+#include "k_bios_term/term_sys_helpers.h"
 #include "k_startup/fwd_defs.h"
 #include "k_startup/page.h"
 #include "k_startup/process.h"
@@ -31,11 +32,13 @@ void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32
     (void)arg;
     context_return_value(pd, esp, 0);
 }
-
-void fos_timer_action(phys_addr_t pd, const uint32_t *esp) {
-    context_return(pd, esp);
-}
 */
+
+void fos_timer_action(user_ctx_t *ctx) {
+    term_put_s("Hello from timer\n");
+    while (1);
+    enter_user_ctx(ctx);
+}
 
 static kernel_state_t *kernel = NULL;
 
@@ -128,6 +131,8 @@ void thingy(void) {
     while (1);
 }
 
+extern gate_desc_t *idt;
+
 void start_kernel(void) {
     init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
@@ -144,12 +149,14 @@ void start_kernel(void) {
 
     try_setup_step(pop_initial_user_info(&user_pd, &user_esp), "Failed to pop user info");
 
+    set_timer_action(fos_timer_action);
+
     user_ctx_t ctx = { 
         .cr3 = user_pd,
 
         .eip = (uint32_t)user_main,
         .cs = USER_CODE_SELECTOR,
-        .eflags = read_eflags(),
+        .eflags = read_eflags() | (1 << 9),
 
         .esp = (uint32_t)user_esp,
         .ss = USER_DATA_SELECTOR

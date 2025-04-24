@@ -11,6 +11,13 @@ void set_intr_ctx_pd(phys_addr_t pd) {
     intr_ctx_pd = pd;
 }
 
+timer_action_t timer_action = NULL;
+
+void set_timer_action(timer_action_t ta) {
+    timer_action = ta;
+}
+
+
 void _lock_up_handler(void) {
     disable_intrs(); 
 

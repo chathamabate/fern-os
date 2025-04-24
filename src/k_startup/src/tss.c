@@ -9,12 +9,12 @@ fernos_error_t init_global_tss(void) {
     task_state_segment_t *tss = (task_state_segment_t *)_tss_start;
     init_tss(tss);
     
-    tss->iobm = sizeof(task_state_segment_t);
-    tss->esp0 = KERNEL_STACK_END;
+    // NOTE: Remember, the last 4 bytes always holds the kernel page table!
+    tss->esp0 = KERNEL_STACK_END - sizeof(uint32_t);
     tss->ss0 = KERNEL_DATA_SELECTOR;
+    tss->iobm = sizeof(task_state_segment_t);
 
-    // NOTE: This expects that the tss is at 0x28 in the GDT!
-    flush_tss(0x28);
+    flush_tss(TSS_SELECTOR);
 
     return FOS_SUCCESS;
 }
