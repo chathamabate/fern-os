@@ -44,7 +44,7 @@ void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32
 
 void fos_timer_action(user_ctx_t *ctx) {
     term_put_fmt_s("Timer\n", ctx);
-    lock_up();
+    return_to_ctx(ctx);
 }
 
 void fos_lock_up_action(user_ctx_t *ctx) {

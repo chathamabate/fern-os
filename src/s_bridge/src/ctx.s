@@ -78,7 +78,6 @@ exit_intr_ctx:
     // enter context!
     iret
 
-
 .global nop_master_irq_handler
 nop_master_irq_handler:
     pushl $0 // nop error code.

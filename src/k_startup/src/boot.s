@@ -62,6 +62,8 @@ _start:
 
     call start_kernel
 
+    int $14
+
     call lock_up
 
 /*
