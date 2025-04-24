@@ -4,10 +4,12 @@
 
 .global lock_up_handler
 lock_up_handler:
-    movl intr_ctx_pd, %eax
+    movl intr_ctx_pd, %esi 
+    movl (%esi), %eax
     movl %eax, %cr3
 
-    call _lock_up_handler // NEVER RETURNS!
+    // Fixed behavior to help with debugging.
+    call _lock_up_handler 
 
 .global nop_master_irq_handler
 nop_master_irq_handler:
@@ -16,7 +18,8 @@ nop_master_irq_handler:
     movl %cr3, %eax
     pushl %eax
 
-    movl intr_ctx_pd, %eax
+    movl intr_ctx_pd, %esi 
+    movl (%esi), %eax
     movl %eax, %cr3
 
     call pic_send_master_eoi
@@ -34,7 +37,8 @@ nop_master_irq7_handler:
     movl %cr3, %eax
     pushl %eax
 
-    movl intr_ctx_pd, %eax
+    movl intr_ctx_pd, %esi 
+    movl (%esi), %eax
     movl %eax, %cr3
 
     call _nop_master_irq7_handler
@@ -52,7 +56,8 @@ nop_slave_irq_handler:
     movl %cr3, %eax
     pushl %eax
 
-    movl intr_ctx_pd, %eax
+    movl intr_ctx_pd, %esi 
+    movl (%esi), %eax
     movl %eax, %cr3
 
     call pic_send_slave_eoi
@@ -71,7 +76,8 @@ nop_slave_irq15_handler:
     movl %cr3, %eax
     pushl %eax
 
-    movl intr_ctx_pd, %eax
+    movl intr_ctx_pd, %esi 
+    movl (%esi), %eax
     movl %eax, %cr3
 
     call _nop_slave_irq15_handler
@@ -148,7 +154,8 @@ timer_handler:
     movl %cr3, %eax
     pushl %eax
 
-    movl 15*4(%esp), %eax // retrieve its value
+    movl intr_ctx_pd, %esi 
+    movl (%esi), %eax
     movl %eax, %cr3
 
     call pic_send_master_eoi

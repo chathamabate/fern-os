@@ -35,9 +35,13 @@ void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32
 */
 
 void fos_timer_action(user_ctx_t *ctx) {
-    term_put_fmt_s("CTX %X\n", ctx);
-
+    term_put_fmt_s("Timer\n", ctx);
     enter_user_ctx(ctx);
+}
+
+void fos_lock_up_action(user_ctx_t *ctx) {
+    (void)ctx;
+    lock_up();
 }
 
 static kernel_state_t *kernel = NULL;
@@ -147,9 +151,7 @@ void start_kernel(void) {
     uint32_t user_pd;
     const uint32_t *user_esp;
 
-
     try_setup_step(pop_initial_user_info(&user_pd, &user_esp), "Failed to pop user info");
-    term_put_fmt_s("USER MAIN: %X\n", user_main);
 
     set_timer_action(fos_timer_action);
 
@@ -168,5 +170,3 @@ void start_kernel(void) {
 
     enter_user_ctx(&ctx);
 }
-
-// We need the page fault handler...  That's the primary road block right now.

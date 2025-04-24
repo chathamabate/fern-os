@@ -4,7 +4,31 @@
 #include "k_sys/page.h"
 #include <stdint.h>
 
+/**
+ * When a handler is entered, it needs to know where exactly it can find the physical address of
+ * the interrupt context page directory.
+ *
+ * This address should be mapped into the user's memory space in a supervisor page.
+ * This way, the user can never alter what page directory is used when entering into the kernel!
+ */
+void set_intr_ctx_pd_addr(phys_addr_t *pd);
+
 typedef struct _user_ctx_t user_ctx_t;
+
+/**
+ * NOTE: An interrupt action receives a pointer to a context.
+ * This context lives on the kernel stack.
+ *
+ * In the case of a privilege change, the full context is useable!
+ *
+ * However, in the case where there was no privilege change,  NEVER EVER EVER access
+ * the esp and ss fields. These will be nonexistent, and thus could write over important info,
+ * or cause a page fault!
+ *
+ * To check if a privilege change occured, you can check the cs value in the context.
+ * A userspace CS means a privilege change occured!
+ */
+typedef void (*intr_action_t)(user_ctx_t *ctx);
 
 /**
  * When an interrupt occurs, we will switch page tables.
@@ -14,15 +38,19 @@ typedef struct _user_ctx_t user_ctx_t;
  * This is deprecated! 
  *
  * NOTE: Now we assume that the very first value of the kernel stack
- * holds the kernel page table.
+ * holds the kernel page table physical address.
+ *
+ * NOTE: This being said, all interrupt handlers expect to only ever
+ * trigger from user mode; interrupts should always be blocked while in
+ * the kernel.
  */
 // void set_intr_ctx_pd(phys_addr_t pd);
+
+void lock_up_handler(void);
 
 /**
  * Some no-op handlers.
  */
-
-void lock_up_handler(void);
 
 void nop_master_irq_handler(void);
 void nop_master_irq7_handler(void); // For spurious.
@@ -78,9 +106,8 @@ void enter_user_ctx(user_ctx_t *ctx);
  *
  * To return to a user context, use `enter_user_ctx` above.
  */
-typedef void (*timer_action_t)(user_ctx_t *ctx);
 
-void set_timer_action(timer_action_t ta);
+void set_timer_action(intr_action_t ta);
 
 /**
  * NOTE: The timer handler assumes that a privilege change occured when entering
