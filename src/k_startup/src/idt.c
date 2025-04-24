@@ -30,7 +30,13 @@ fernos_error_t init_idt(void) {
     gd_set_privilege(&gpf_gd, ROOT_PRVLG);
     igd_set_base(&gpf_gd, gpf_handler);
 
+    /*
+     * TODO: Fix this up when the time comes!
+     */
+
+    idt[8] = gpf_gd;
     idt[13] = gpf_gd;
+    idt[14] = gpf_gd;
 
     // 0 - 6
 

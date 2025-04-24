@@ -6,12 +6,24 @@
 #include "s_bridge/ctx.h"
 
 extern void tryout(void);
+
+
+/*
+void other_func(void) {
+    uint32_t t[1024];
+    term_put_s("HELLO\n");
+}
+*/
+
 void user_main(void) {
     tryout();
-    term_put_s("Hello from user\n");
-    uint32_t ret = trigger_syscall(3, (void *)4);
-    term_put_fmt_s("RetVal: %u\n", ret);
-    while (1);
+    /*
+    uint32_t x = 0;
+    while (1) {
+        x += 2;
+        other_func();
+    }
+    */
 }
 
 
