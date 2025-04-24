@@ -17,3 +17,9 @@ intr_action_t timer_action = NULL;
 void set_timer_action(intr_action_t ta) {
     timer_action = ta;
 }
+
+syscall_action_t syscall_action = NULL;
+
+void set_syscall_action(syscall_action_t sa) {
+    syscall_action = sa;
+}

@@ -339,13 +339,11 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_USER | _R_IDENTITY));
     PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_USER | _R_IDENTITY));
 
-    /*
     // You get insert the kernel into the user space here for debugging purposes.
     PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_USER | _R_IDENTITY | _R_WRITEABLE));    
     PROP_ERR(_place_range(pd, _ro_kernel_start, _ro_kernel_end, _R_USER | _R_IDENTITY));
     PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_USER | _R_WRITEABLE));
     PROP_ERR(_place_range(pd, _data_kernel_start, _data_kernel_end, _R_USER | _R_WRITEABLE));
-    */
 
     // Here, both the kernel and user pds will need their own indepent copies of the shared data
     // and shared bss. So, when making the user space, we allocate new pages in this area.

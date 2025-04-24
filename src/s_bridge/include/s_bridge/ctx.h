@@ -99,6 +99,14 @@ struct _user_ctx_t {
 void return_to_ctx(user_ctx_t *ctx);
 
 /**
+ * NOTE: This helper modifies the given context to simulate returning from a C function.
+ */
+static inline void return_to_ctx_with_value(user_ctx_t *ctx, uint32_t val) {
+    ctx->eax = val;
+    return_to_ctx(ctx);
+}
+
+/**
  * Set the general protection fault action.
  */
 void set_gpf_action(intr_action_t ia);
@@ -127,6 +135,29 @@ void set_timer_action(intr_action_t ta);
  * If I ever decided to introduce kernel space concurrency, this will have to change.
  */
 void timer_handler(void);
+
+/**
+ * A syscall takes two arguments, the first one should always be the id of the syscall be invoked.
+ * The second argument is arbitrary and specific to the syscall.
+ */
+typedef void (*syscall_action_t)(user_ctx_t *ctx, uint32_t id, void *arg);
+
+/**
+ * Trigger a system call from user space.
+ *
+ * NOTE: This assumes syscalls are mapped as interrupt 48.
+ */
+uint32_t trigger_syscall(uint32_t id, void *arg);
+
+/**
+ * Set what should happen on a syscall.
+ */
+void set_syscall_action(syscall_action_t sa);
+
+/**
+ * syscall handler.
+ */
+void syscall_handler(void);
 
 
 

@@ -62,7 +62,10 @@ _start:
 
     call start_kernel
 
-    int $14
+    /*
+    start_kernel should never return.
+    Thus, we should never make it here.
+    */
 
     call lock_up
 

@@ -6,4 +6,3 @@
 tryout:
     ret
 
-fff: .ascii "PRIV %X\n\0"

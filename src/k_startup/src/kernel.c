@@ -34,26 +34,19 @@ void fos_gpf_action(user_ctx_t *ctx) {
     lock_up();
 }
 
-/*
-void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
-    (void)id;
-    (void)arg;
-    context_return_value(pd, esp, 0);
-}
-*/
 
 void fos_timer_action(user_ctx_t *ctx) {
-    term_put_fmt_s("Timer\n", ctx);
+    //term_put_fmt_s("Timer\n", ctx);
     return_to_ctx(ctx);
 }
 
-void fos_lock_up_action(user_ctx_t *ctx) {
-    (void)ctx;
-    lock_up();
+void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
+    term_put_fmt_s("Syscall ID: %u, Arg %u\n", id, arg);
+    return_to_ctx_with_value(ctx, 10);
 }
 
-static kernel_state_t *kernel = NULL;
 
+static kernel_state_t *kernel = NULL;
 
 static inline void setup_fatal(const char *msg) {
     out_bios_vga(init_err_style, msg);
@@ -165,6 +158,7 @@ void start_kernel(void) {
     try_setup_step(pop_initial_user_info(&user_pd, &user_esp), "Failed to pop user info");
 
     set_timer_action(fos_timer_action);
+    set_syscall_action(fos_syscall_action);
 
     user_ctx_t ctx = { 
         .ds = USER_DATA_SELECTOR,

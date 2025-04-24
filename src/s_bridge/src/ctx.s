@@ -148,3 +148,30 @@ timer_handler:
 
     pushl %esp
     call *timer_action
+
+.global trigger_syscall
+trigger_syscall:
+    movl 8(%esp), %ecx // arg
+    movl 4(%esp), %eax // id
+
+    int $48
+    
+    // This syscall should return right here with %eax loaded
+    // with the correct return value.
+
+    ret
+
+.global syscall_handler
+syscall_handler:
+    pushl $0 // Noop error code.
+    call enter_intr_ctx
+    
+    movl 8 * 4(%esp), %ecx // Arg
+    movl 9 * 4(%esp), %eax // ID
+    movl %esp, %esi        // Context pointer
+
+    pushl %ecx
+    pushl %eax
+    pushl %esi
+
+    call *syscall_action
