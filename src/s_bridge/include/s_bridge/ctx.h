@@ -4,15 +4,6 @@
 #include "k_sys/page.h"
 #include <stdint.h>
 
-/**
- * When a handler is entered, it needs to know where exactly it can find the physical address of
- * the interrupt context page directory.
- *
- * This address should be mapped into the user's memory space in a supervisor page.
- * This way, the user can never alter what page directory is used when entering into the kernel!
- */
-void set_intr_ctx_pd_addr(phys_addr_t *pd);
-
 typedef struct _user_ctx_t user_ctx_t;
 
 /**
@@ -67,6 +58,14 @@ void nop_slave_irq15_handler(void); // For spurious.
 struct _user_ctx_t {
     // The below values are ALL expected to be pushed explicitly.
    
+    /**
+     * We expect that the given context uses the same data segment in all segment
+     * registers. Having this stored in the context here makes my life a lot easier.
+     *
+     * Remember, the `ss` field below only exists when switching from user to kernel!
+     */
+    uint32_t ds;
+
     uint32_t cr3;
 
     uint32_t edi;
@@ -77,6 +76,10 @@ struct _user_ctx_t {
     uint32_t edx;
     uint32_t ecx;
     uint32_t eax; 
+
+    // A space holder used to help when context switching.
+    
+    uint32_t reserved;
 
     // Error is only pushed autmatically when an error occurs.
     // It'll be ignored when returning to the user context from the kernel.

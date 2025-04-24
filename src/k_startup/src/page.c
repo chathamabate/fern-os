@@ -278,10 +278,11 @@ static fernos_error_t _init_kernel_pd(void) {
 
     kernel_pd = kpd;
 
+    // Always store the physical address of the kernel page table at the very end
+    // of the kernel stack area.
+
     uint32_t *kpd_entry = (uint32_t *)KERNEL_STACK_END - 1;
     *kpd_entry = kernel_pd;
-
-    set_intr_ctx_pd_addr(kpd_entry);
     
     return FOS_SUCCESS;
 }

@@ -51,23 +51,19 @@ doesn't make sense to return from this function as the bootloader is gone.
 .type _start, @function
 _start:
 
-	/*
-	To set up a stack, we set the esp register to point to the top of the
-	stack (as it grows downwards on x86 systems). This is necessarily done
-	in assembly as languages such as C cannot function without a stack.
-	*/
-	movl $(FERNOS_END+1), %esp
+    /*
+    The kernel stack will start at the end of the FERNOS Area.
+    Remeber though that FERNOS_END is inclusive (We must +1)
+    Also, the last 4 bytes of the stack area will always be reserved for the kernel 
+    page directory (We must -4)
+    */
+	movl $(FERNOS_END+1-4), %esp
     movl %esp, %ebp
 
     call start_kernel
 
     call lock_up
 
-d: 
-    .word 0x10
-    .long FERNOS_END + 1
-
-ms: .ascii "Here\n\0"
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.

@@ -2,6 +2,79 @@
 
 .section .text
 
+.include "os_defs.s"
+
+/*
+This is a Non-C style function. It expects to be called right after 
+the interrupt handler is entered. It expects the very top of the stack
+at the time of call to hold the error value pushed by the hardware.
+
+If the interrupt being serviced does not push an error value, make sure
+to push some dummy value anyway before calling this function!
+
+After return, the interrupt context page table will be loaded (the kernel pd).
+Also, the top of the stack will point to a valid user_ctx_t structure.
+*/
+.local enter_intr_ctx
+enter_intr_ctx:
+    // Save general purpose registers.
+    pushal
+
+    // Store the return address of this function.
+    movl 8*4(%esp), %ecx
+
+    // Save page table.
+    movl %cr3, %eax
+    pushl %eax
+
+    // Save data segment.
+    movl $0, %eax
+    movw %ds, %eax
+    pushl %eax 
+
+    // Load kernel page table.
+    movl FERNOS_END + 1 - 4, %eax
+    movl %eax, %cr3
+
+    // Switch to kernel data segments.
+    movw $0x10, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+
+    pushl %ecx
+    ret
+
+/*
+Similar to `enter_intr_ctx` above, this function is not C-Like,
+It expects the top of the stack holds a valid user_ctx_t.
+
+It restores the context and calls iret!
+*/
+.local exit_intr_ctx
+exit_intr_ctx:
+    // Restore context data segment registers.
+    popl %eax 
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+
+    // Restore context page directory.
+    popl %eax
+    movl %eax, %cr3
+
+    // Restore general purpose registers.
+    popal
+
+    // Skip over reserved and error code fields.
+    addl $8, %esp
+
+    // enter context!
+    iret
+    
+
 .global lock_up_handler
 lock_up_handler:
     movl intr_ctx_pd, %esi 
@@ -10,6 +83,7 @@ lock_up_handler:
 
     // Fixed behavior to help with debugging.
     call _lock_up_handler 
+
 
 .global nop_master_irq_handler
 nop_master_irq_handler:

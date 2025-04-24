@@ -166,7 +166,5 @@ void start_kernel(void) {
         .ss = USER_DATA_SELECTOR
     };
 
-    // I honestly have no fucking idea...
-
     enter_user_ctx(&ctx);
 }
