@@ -37,8 +37,6 @@ typedef void (*intr_action_t)(user_ctx_t *ctx);
  */
 // void set_intr_ctx_pd(phys_addr_t pd);
 
-void lock_up_handler(void);
-
 /**
  * Some no-op handlers.
  */
@@ -98,7 +96,17 @@ struct _user_ctx_t {
 /**
  * This function does not return.
  */
-void enter_user_ctx(user_ctx_t *ctx);
+void return_to_ctx(user_ctx_t *ctx);
+
+/**
+ * Set the general protection fault action.
+ */
+void set_gpf_action(intr_action_t ia);
+
+/**
+ * General protextion fault handler.
+ */
+void gpf_handler(void);
 
 /**
  * When the timer handler is invoked by an interrupt, it saves the

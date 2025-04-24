@@ -15,18 +15,22 @@ gate_desc_t *idt = NULL;
 fernos_error_t init_idt(void) {
     idt = (gate_desc_t *)_idt_start;
 
-    intr_gate_desc_t gd = intr_gate_desc();
+    intr_gate_desc_t gd = not_present_gate_desc();
 
-    // I think these handlers are mostly unusable now??
-
-    gd_set_selector(&gd, KERNEL_CODE_SELECTOR);
-    gd_set_privilege(&gd, ROOT_PRVLG);
-    igd_set_base(&gd, lock_up_handler);
-
-    // First, all nops.
+    // First, all not present!
     for (uint32_t i = 0; i < NUM_IDT_ENTRIES; i++) {
         idt[i] = gd;    
     }
+
+    // GPF
+
+    intr_gate_desc_t gpf_gd = intr_gate_desc();
+
+    gd_set_selector(&gpf_gd, KERNEL_CODE_SELECTOR);
+    gd_set_privilege(&gpf_gd, ROOT_PRVLG);
+    igd_set_base(&gpf_gd, gpf_handler);
+
+    idt[13] = gpf_gd;
 
     // 0 - 6
 

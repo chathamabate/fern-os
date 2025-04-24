@@ -26,6 +26,14 @@
 #include "k_startup/state.h"
 #include "u_startup/main.h"
 
+static uint8_t init_err_style;
+
+void fos_gpf_action(user_ctx_t *ctx) {
+    (void)ctx;
+    out_bios_vga(init_err_style, "GPF/Interrupt with no handler");
+    lock_up();
+}
+
 /*
 void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32_t arg) {
     (void)id;
@@ -36,7 +44,7 @@ void fos_syscall_action(phys_addr_t pd, const uint32_t *esp, uint32_t id, uint32
 
 void fos_timer_action(user_ctx_t *ctx) {
     term_put_fmt_s("Timer\n", ctx);
-    enter_user_ctx(ctx);
+    lock_up();
 }
 
 void fos_lock_up_action(user_ctx_t *ctx) {
@@ -46,7 +54,6 @@ void fos_lock_up_action(user_ctx_t *ctx) {
 
 static kernel_state_t *kernel = NULL;
 
-static uint8_t init_err_style;
 
 static inline void setup_fatal(const char *msg) {
     out_bios_vga(init_err_style, msg);
@@ -140,9 +147,13 @@ extern gate_desc_t *idt;
 void start_kernel(void) {
     init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
+
     try_setup_step(init_gdt(), "Failed to initialize GDT");
     try_setup_step(init_idt(), "Failed to initialize IDT");
     try_setup_step(init_global_tss(), "Failed to initialize TSS");
+
+    set_gpf_action(fos_gpf_action);
+
     try_setup_step(init_term(), "Failed to initialize Terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
@@ -156,6 +167,7 @@ void start_kernel(void) {
     set_timer_action(fos_timer_action);
 
     user_ctx_t ctx = { 
+        .ds = USER_DATA_SELECTOR,
         .cr3 = user_pd,
 
         .eip = (uint32_t)user_main,
@@ -166,5 +178,5 @@ void start_kernel(void) {
         .ss = USER_DATA_SELECTOR
     };
 
-    enter_user_ctx(&ctx);
+    return_to_ctx(&ctx);
 }

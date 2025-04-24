@@ -29,7 +29,7 @@ enter_intr_ctx:
 
     // Save data segment.
     movl $0, %eax
-    movw %ds, %eax
+    movw %ds, %ax
     pushl %eax 
 
     // Load kernel page table.
@@ -54,8 +54,12 @@ It restores the context and calls iret!
 */
 .local exit_intr_ctx
 exit_intr_ctx:
+    // Skip return value
+    add $4, %esp
+
     // Restore context data segment registers.
     popl %eax 
+
     movw %ax, %ds
     movw %ax, %es
     movw %ax, %fs
@@ -73,104 +77,46 @@ exit_intr_ctx:
 
     // enter context!
     iret
-    
-
-.global lock_up_handler
-lock_up_handler:
-    movl intr_ctx_pd, %esi 
-    movl (%esi), %eax
-    movl %eax, %cr3
-
-    // Fixed behavior to help with debugging.
-    call _lock_up_handler 
 
 
 .global nop_master_irq_handler
 nop_master_irq_handler:
-    pushal
-
-    movl %cr3, %eax
-    pushl %eax
-
-    movl intr_ctx_pd, %esi 
-    movl (%esi), %eax
-    movl %eax, %cr3
-
+    pushl $0 // nop error code.
+    call enter_intr_ctx
     call pic_send_master_eoi
-
-    popl %eax
-    movl %eax, %cr3
-
-    popal
-    iret
+    call exit_intr_ctx
 
 .global nop_master_irq7_handler
 nop_master_irq7_handler:
-    pushal
-
-    movl %cr3, %eax
-    pushl %eax
-
-    movl intr_ctx_pd, %esi 
-    movl (%esi), %eax
-    movl %eax, %cr3
-
+    pushl $0 // nop error code.
+    call enter_intr_ctx
     call _nop_master_irq7_handler
-
-    popl %eax
-    movl %eax, %cr3
-
-    popal
-    iret
+    call exit_intr_ctx
 
 .global nop_slave_irq_handler
 nop_slave_irq_handler:
-    pushal
-
-    movl %cr3, %eax
-    pushl %eax
-
-    movl intr_ctx_pd, %esi 
-    movl (%esi), %eax
-    movl %eax, %cr3
-
+    pushl $0 // nop error code.
+    call enter_intr_ctx
     call pic_send_slave_eoi
     call pic_send_master_eoi
-
-    popl %eax
-    movl %eax, %cr3
-
-    popal
-    iret
+    call exit_intr_ctx
 
 .global nop_slave_irq15_handler
 nop_slave_irq15_handler:
-    pushal
-
-    movl %cr3, %eax
-    pushl %eax
-
-    movl intr_ctx_pd, %esi 
-    movl (%esi), %eax
-    movl %eax, %cr3
-
+    pushl $0 // nop error code.
+    call enter_intr_ctx
     call _nop_slave_irq15_handler
+    call exit_intr_ctx
 
-    popl %eax
-    movl %eax, %cr3
-
-    popal
-    iret
-
-.global enter_user_ctx
-enter_user_ctx:
+.global return_to_ctx
+return_to_ctx:
     movl 4(%esp), %edi // Store the context address.
 
-    subl $(15 * 4), %esp // reserve room for the context.
+    subl $(17 * 4), %esp // reserve room for the context.
     movl %esp, %esi     // Store the top of context.
 
     movl %esp, %ebp
-    pushl $(15 * 4)  // n
+    pushl $(17 * 4)  // n
     pushl %edi       // src
     pushl %esi       // dest
     call mem_cpy
@@ -179,59 +125,26 @@ enter_user_ctx:
     // One last thing, we need to modify the temp_esp value in the context
     // so that popal works correctly.
     movl %esp, %esi
-    addl $(9 * 4), %esi
+    addl $(10 * 4), %esi // index of `uint32_t reserved`
 
     movl %esp, %edi
-    addl $(4 * 4), %edi
+    addl $(5 * 4), %edi // index of `uint32_t temp_esp`
 
     movl %esi, (%edi)
 
-    // Load page directory.
-    popl %eax
-    movl %eax, %cr3 
+    call exit_intr_ctx
 
-    // Load general purpose registers.
-    popal
-
-    // Skip error value.
-    addl $4, %esp
-
-    // We assume that the context uses the same selector for data segments
-    // and stack segments.
-    movl 16(%esp), %eax
-
-    movw %ax, %ds
-    movw %ax, %es
-    movw %ax, %fs
-    movw %ax, %gs
-
-    // Finally RETURN!
-    iret
+.global gpf_handler
+gpf_handler:
+    // No need to push 0 here, gpf has a build in error code.
+    call enter_intr_ctx
+    pushl %esp
+    call *gpf_action
 
 .global timer_handler
 timer_handler:
     pushl $0 // Timer has no error.
-
-    pushal 
-
-    // Switch to kernel data segment.
-    xor %eax, %eax
-
-    movw $0x18, %ax
-
-    movw %ax, %ds
-    movw %ax, %es
-    movw %ax, %fs
-    movw %ax, %gs
-
-    // Switch to interrupt context page table.
-    movl %cr3, %eax
-    pushl %eax
-
-    movl intr_ctx_pd, %esi 
-    movl (%esi), %eax
-    movl %eax, %cr3
-
+    call enter_intr_ctx
     call pic_send_master_eoi
 
     pushl %esp
