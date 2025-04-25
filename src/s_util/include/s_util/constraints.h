@@ -89,7 +89,7 @@
  * The indexes go down. i.e. thread stack 0, will be just below the kernel stack.
  */
 #define FOS_THREAD_STACK_END(i)     (FOS_KERNEL_STACK_START - ((i) * FOS_THREAD_STACK_SIZE))
-#define FOS_THREAD_STACK_START(i)   (FOS_THREAD_STACK_END(i) - M_4K) 
+#define FOS_THREAD_STACK_START(i)   (FOS_THREAD_STACK_END(i) - FOS_THREAD_STACK_SIZE) 
 
 /**
  * The "stack area" includes all thread stacks and the kernel stack.

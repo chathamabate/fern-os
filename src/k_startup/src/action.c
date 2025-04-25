@@ -13,7 +13,7 @@ void fos_gpf_action(user_ctx_t *ctx) {
 }
 
 void fos_timer_action(user_ctx_t *ctx) {
-    term_put_fmt_s("Timer\n", ctx);
+    //term_put_fmt_s("Timer\n", ctx);
     return_to_ctx(ctx);
 }
 

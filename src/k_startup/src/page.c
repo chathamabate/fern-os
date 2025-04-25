@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include "s_bridge/ctx.h"
 #include "k_bios_term/term_sys_helpers.h"
+#include "s_util/constraints.h"
 
 /*
  * NOTE: Functions starting with `_` in this file denote functions which can only be
@@ -61,7 +62,7 @@ static pt_entry_t *free_kernel_page_ptes[NUM_FREE_KERNEL_PAGES];
  * without consequence. (Just be careful)
  */
 #define INITIAL_FREE_AREA_START ((phys_addr_t)_static_area_end) 
-#define INITIAL_FREE_AREA_END  ((phys_addr_t)KERNEL_STACK_START) // Exclusive end.
+#define INITIAL_FREE_AREA_END  ((phys_addr_t)FOS_KERNEL_STACK_START) // Exclusive end.
 
 static phys_addr_t free_list_head = NULL_PHYS_ADDR;
 static uint32_t free_list_len = 0;
@@ -233,7 +234,7 @@ static fernos_error_t _init_kernel_pd(void) {
 
     // The kernel stack will be marked identity because it should only exist once and always in
     // the same place!
-    PROP_ERR(_place_range(pd, (uint8_t *)KERNEL_STACK_START, (uint8_t *)KERNEL_STACK_END, _R_WRITEABLE | _R_IDENTITY));
+    PROP_ERR(_place_range(pd, (uint8_t *)(FOS_KERNEL_STACK_START + M_4K), (uint8_t *)FOS_KERNEL_STACK_END, _R_WRITEABLE | _R_IDENTITY));
 
     // Now setup up the free kernel pages!
     // THIS IS VERY CONFUSING SADLY!
@@ -281,7 +282,7 @@ static fernos_error_t _init_kernel_pd(void) {
     // Always store the physical address of the kernel page table at the very end
     // of the kernel stack area.
 
-    uint32_t *kpd_entry = (uint32_t *)KERNEL_STACK_END - 1;
+    uint32_t *kpd_entry = (uint32_t *)FOS_KERNEL_STACK_END - 1;
     *kpd_entry = kernel_pd;
     
     return FOS_SUCCESS;
@@ -339,11 +340,13 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, _ro_shared_start, _ro_shared_end, _R_USER | _R_IDENTITY));
     PROP_ERR(_place_range(pd, _ro_user_start, _ro_user_end, _R_USER | _R_IDENTITY));
 
+    /*
     // You get insert the kernel into the user space here for debugging purposes.
     PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_USER | _R_IDENTITY | _R_WRITEABLE));    
     PROP_ERR(_place_range(pd, _ro_kernel_start, _ro_kernel_end, _R_USER | _R_IDENTITY));
     PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_USER | _R_WRITEABLE));
     PROP_ERR(_place_range(pd, _data_kernel_start, _data_kernel_end, _R_USER | _R_WRITEABLE));
+    */
 
     // Here, both the kernel and user pds will need their own indepent copies of the shared data
     // and shared bss. So, when making the user space, we allocate new pages in this area.
@@ -357,8 +360,8 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, _bss_user_start, _bss_user_end, _R_USER | _R_WRITEABLE));
     PROP_ERR(_place_range(pd, _data_user_start, _data_user_end, _R_USER | _R_WRITEABLE));
 
-    const uint8_t *kstack_end = (uint8_t *)KERNEL_STACK_END;
-    uint8_t *kstack_start = (uint8_t *)KERNEL_STACK_START;
+    const uint8_t *kstack_end = (uint8_t *)FOS_KERNEL_STACK_END;
+    uint8_t *kstack_start = (uint8_t *)(FOS_KERNEL_STACK_START + M_4K);
 
     /*
      * NOTE: The kernel stack MUST MUST MUST be in the page table of all processes!
@@ -369,7 +372,7 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, kstack_start, kstack_end, _R_WRITEABLE | _R_IDENTITY));
 
     // Using a basic 1 page user stack for now!
-    const uint8_t *ustack_end = kstack_start - M_4K;
+    const uint8_t *ustack_end = (uint8_t *)FOS_THREAD_STACK_END(0);
     uint8_t *ustack_start = (uint8_t *)(ustack_end - M_4K);
 
     PROP_ERR(_place_range(pd, ustack_start, ustack_end, _R_USER | _R_ALLOCATE | _R_WRITEABLE));

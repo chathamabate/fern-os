@@ -12,6 +12,7 @@
 #include "u_startup/main.h"
 #include "s_mem/simple_heap.h"
 #include "s_bridge/ctx.h"
+#include "s_util/constraints.h"
 #include <stdint.h>
 
 static uint8_t init_err_style;
@@ -31,8 +32,8 @@ static inline void try_setup_step(fernos_error_t err, const char *msg) {
 
 static fernos_error_t init_kernel_heap(void) {
     simple_heap_attrs_t shal_attrs = {
-        .start = (void *)(_static_area_end + M_4K),
-        .end =   (const void *)(_static_area_end + M_4K + M_4M),
+        .start = (void *)FOS_FREE_AREA_START,
+        .end =   (void *)FOS_FREE_AREA_END,
         .mmp = (mem_manage_pair_t) {
             .request_mem = alloc_pages,
             .return_mem = free_pages
@@ -100,16 +101,10 @@ static fernos_error_t init_kernel_state(void) {
     return FOS_SUCCESS;
 }
 
-void thingy(void) {
-    term_put_s("HELLO\n");
-    while (1);
-}
-
-extern gate_desc_t *idt;
-
 void start_kernel(void) {
     init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
+    try_setup_step(validate_constraints(), "Failed to validate memory areas");
 
     try_setup_step(init_gdt(), "Failed to initialize GDT");
     try_setup_step(init_idt(), "Failed to initialize IDT");
@@ -141,6 +136,11 @@ void start_kernel(void) {
         .esp = (uint32_t)user_esp,
         .ss = USER_DATA_SELECTOR
     };
+
+    term_put_fmt_s("K: %X, %X\n", FOS_KERNEL_STACK_START, FOS_KERNEL_STACK_END);
+    for (uint32_t i = 0; i < FOS_MAX_THREADS_PER_PROC; i++) {
+        term_put_fmt_s("%u: %X, %X\n", i, FOS_THREAD_STACK_START(i), FOS_THREAD_STACK_END(i));
+    }
 
     return_to_ctx(&ctx);
 }
