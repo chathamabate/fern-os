@@ -45,13 +45,6 @@ extern uint8_t _data_user_end[];
 
 extern uint8_t _static_area_end[];
 
-/**
- * For now, there will be one, and only one kernel stack.
- * It will have a fixed size.
- */
-#define KERNEL_STACK_SIZE (8 * M_4K)
-#define KERNEL_STACK_END (FERNOS_END + 1)
-#define KERNEL_STACK_START (KERNEL_STACK_END - KERNEL_STACK_SIZE) 
 
 /**
  * These values are used in the available bits of a page table entry. NOTE: They have
@@ -131,6 +124,8 @@ static inline pt_entry_t fos_shared_pt_entry(phys_addr_t base, bool user, bool w
 
 /**
  * Initialize all structures required for paging, and enable paging.
+ *
+ * This function assumes that all values in constraints.h area valid.
  *
  * NOTE: The first page directory used will be `kernel_pd`.
  */

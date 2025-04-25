@@ -1,50 +1,20 @@
 
-#include "k_bios_term/term_sys_helpers.h"
-#include "k_startup/fwd_defs.h"
+#include "k_startup/kernel.h"
+#include "k_bios_term/term.h"
 #include "k_startup/page.h"
-#include "k_startup/process.h"
-#include "k_startup/test/page.h"
-#include "k_startup/thread.h"
-#include "k_startup/tss.h"
-#include "k_sys/idt.h"
-#include "k_sys/intr.h"
-#include "k_sys/page.h"
-#include "k_sys/tss.h"
-#include "s_mem/allocator.h"
-#include "s_util/err.h"
-#include "s_util/test/str.h"
-#include "k_sys/debug.h"
 #include "k_startup/gdt.h"
 #include "k_startup/idt.h"
-#include "k_bios_term/term.h"
+#include "k_startup/state.h"
+#include "k_startup/process.h"
+#include "k_startup/thread.h"
+#include "k_startup/tss.h"
+#include "k_startup/action.h"
+#include "u_startup/main.h"
 #include "s_mem/simple_heap.h"
 #include "s_bridge/ctx.h"
-
-#include "s_data/test/id_table.h"
-#include "s_data/test/list.h"
-#include "s_mem/test/simple_heap.h"
-#include "k_startup/state.h"
-#include "u_startup/main.h"
+#include <stdint.h>
 
 static uint8_t init_err_style;
-
-void fos_gpf_action(user_ctx_t *ctx) {
-    (void)ctx;
-    out_bios_vga(init_err_style, "GPF/Interrupt with no handler");
-    lock_up();
-}
-
-
-void fos_timer_action(user_ctx_t *ctx) {
-    //term_put_fmt_s("Timer\n", ctx);
-    return_to_ctx(ctx);
-}
-
-void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
-    term_put_fmt_s("Syscall ID: %u, Arg %u\n", id, arg);
-    return_to_ctx_with_value(ctx, 10);
-}
-
 
 static kernel_state_t *kernel = NULL;
 

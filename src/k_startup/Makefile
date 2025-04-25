@@ -7,6 +7,7 @@ _SRCS 		?= kernel.c \
 			   thread.c \
 			   process.c \
 			   state.c \
+			   action.c \
 			   tss.c \
 			   gdt.c \
 			   idt.c \
