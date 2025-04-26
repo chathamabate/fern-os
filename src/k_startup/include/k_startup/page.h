@@ -178,21 +178,42 @@ void push_free_page(phys_addr_t page_addr);
 phys_addr_t pop_free_page(void);
 
 /**
+ * Create a new page table. Returns NULL_PHYS_ADDR on error.
+ */
+phys_addr_t new_page_table(void);
+
+/**
+ * Delete a page table.
+ *
+ * This returns all UNIQUE pages pointed to by the table to the free list.
+ */
+void delete_page_table(phys_addr_t pt);
+
+/**
+ * Allocate a range within a page table.
+ *
+ * Returns FOS_ALREADY_ALLOCATED if we hit an entry which is already allocated.
+ * Returns FOS_NO_MEM if we run out of physical pages.
+ *
+ * e is the exlusive end of the range. (0 <= s < 1024), (0 <= e <= 1024)
+ * The final index reached during allocation is always written to *true_e.
+ * On success, *true_e will always equal e.
+ */
+fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e, uint32_t *true_e);
+
+/**
+ * Free a range within a page table.
+ * Pages marked UNIQUE are returned to the free list.
+ * s and e follow the same rules as described in pt_alloc_range.
+ */
+void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e);
+
+/**
  * Create a new page directory. Returns NULL_PHYS_ADDR on error.
  *
  * NOTE: This just a page directory with no filled entries.
  */
 phys_addr_t new_page_directory(void);
-
-/**
- * Create a deep copy of a page directory.
- *
- * Returns NULL_PHYS_ADDR if there is insufficient memory.
- *
- * Remember, when a page is marked Identity or Shared, said page is not copied. Just the reference
- * to the page is copied. When a page is marked unique, than a full copy is done.
- */
-phys_addr_t copy_page_directory(phys_addr_t pd);
 
 /**
  * Add pages (and page table if necessary) to a page directory.
@@ -235,40 +256,3 @@ static inline void free_pages(void *s, const void *e) {
     pd_free_pages(get_page_directory(), s, e);
 }
 
-/**
- * Copy the contents of physical page at source, to physical page at dest.
- */
-void page_copy(phys_addr_t dest, phys_addr_t src);
-
-/**
- * ptr is an address into a memory space described by pd.
- *
- * This returns the physical address of the page referenced by pointer.
- *
- * NOTE: If ptr is not allocated in the memory space, NULL_PHYS_ADDR is returned.
- */
-phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr);
-
-/**
- * Copy the contents from a buffer in a different memory space, to a buffer in this memory space.
- *
- * Returns an error if the user src buffer is not entirely mapped.
- * Returns an error if arguments are bad.
- *
- * If `copied` is given, writes the number of successfully copied bytes to *copied.
- * On Success, *copied will always equal bytes.
- */
-fernos_error_t mem_cpy_from_user(void *dest, phys_addr_t user_pd, const void *user_src, 
-        uint32_t bytes, uint32_t *copied);
-
-/**
- * Copy the contents of a buffer in this memory space to a buffer in a different memory space.
- *
- * Returns an error if the user dest buffer is not entirely mapped.
- * Returns an error if args are bad.
- *
- * If `copied` is given, writes the number of successfully copied bytes to *copied.
- * On Success, *copied will always equal bytes.
- */
-fernos_error_t mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void *src, 
-        uint32_t bytes, uint32_t *copied);

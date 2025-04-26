@@ -9,7 +9,8 @@
 void *user_main(void *arg) {
     //term_put_fmt_s("Arg Given: %X\n", arg);
 
-    sc_term_put_s("hello\n");
+    while (1) {
+    }
     return (void *)5;
 }
 

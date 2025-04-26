@@ -288,30 +288,6 @@ static bool test_delete_page_directory(void) {
     TEST_SUCCEED();
 }
 
-static bool test_page_copy(void) {
-    enable_loss_check();
-
-    phys_addr_t p0 = pop_free_page();
-    TEST_TRUE(p0 != NULL_PHYS_ADDR);
-    assign_free_page(0, p0);
-
-    for (uint32_t i = 0; i < M_4K; i++) {
-        free_kernel_pages[0][i] = (i + 13) * (i + 3);
-    }
-
-    phys_addr_t p1 = pop_free_page();
-    TEST_TRUE(p1 != NULL_PHYS_ADDR);
-
-    page_copy(p1, p0);
-    assign_free_page(1, p1);
-
-    TEST_TRUE(mem_cmp(free_kernel_pages[0], free_kernel_pages[1], M_4K));
-
-    push_free_page(p1);
-    push_free_page(p0);
-
-    TEST_SUCCEED();
-}
 
 bool test_page(void) {
     BEGIN_SUITE("Paging");
@@ -327,7 +303,6 @@ bool test_page(void) {
     (void)test_pd_free_dangerous;
 
     RUN_TEST(test_delete_page_directory);
-    RUN_TEST(test_page_copy);
 
     return END_SUITE();
 }

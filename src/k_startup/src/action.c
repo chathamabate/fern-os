@@ -10,6 +10,7 @@
 #include "s_bridge/syscall.h"
 #include "s_mem/allocator.h"
 #include "k_startup/page.h"
+#include "k_startup/page_helpers.h"
 
 void fos_gpf_action(user_ctx_t *ctx) {
     (void)ctx;
@@ -38,6 +39,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
         }
         
         // Pretty cool this works!
+        // No error checking though at the moment :,(
         mem_cpy_from_user(&buf_arg, ctx->cr3, arg, sizeof(buffer_arg_t), NULL);
         char *buf = da_malloc(buf_arg.buf_size);
         mem_cpy_from_user(buf, ctx->cr3, buf_arg.buf, buf_arg.buf_size, NULL);

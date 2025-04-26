@@ -6,6 +6,7 @@
 #include "k_startup/idt.h"
 #include "k_startup/state.h"
 #include "k_startup/process.h"
+#include "k_startup/test/page.h"
 #include "k_startup/thread.h"
 #include "k_startup/tss.h"
 #include "k_startup/action.h"
@@ -14,6 +15,8 @@
 #include "s_mem/simple_heap.h"
 #include "s_bridge/ctx.h"
 #include "s_util/constraints.h"
+#include "k_startup/test/page.h"
+#include "k_startup/test/page_helpers.h"
 #include <stdint.h>
 
 static uint8_t init_err_style;
@@ -74,6 +77,10 @@ void start_kernel(void) {
     if (user_pd == NULL_PHYS_ADDR) {
         setup_fatal("Failed to get first user PD");
     }
+
+    test_page_helpers();
+
+    lock_up();
 
     // Let's assume we are using thread 0.
 
