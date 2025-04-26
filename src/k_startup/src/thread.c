@@ -1,14 +1,19 @@
 
 #include "k_startup/thread.h"
 #include "k_startup/fwd_defs.h"
+#include "k_startup/gdt.h"
 #include "s_data/wait_queue.h"
 #include "s_mem/allocator.h"
 #include "s_util/constraints.h"
 #include "s_util/err.h"
 
-thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, const uint32_t *esp) {
+thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_entry_t entry) {
     thread_t *thr = al_malloc(al, sizeof(thread_t));
     if (!thr) {
+        return NULL;
+    }
+
+    if (tid >= FOS_MAX_THREADS_PER_PROC) {
         return NULL;
     }
 
@@ -22,7 +27,10 @@ thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, const ui
 
     thr->proc = proc;
     thr->wq = NULL;
-    thr->esp = esp;
+
+
+    thr->ctx.ds = USER_DATA_SELECTOR;
+    //thr->esp = esp;
 
     return thr;
 }

@@ -4,12 +4,13 @@
 #include "k_sys/intr.h"
 #include "s_util/misc.h"
 #include "s_bridge/ctx.h"
+#include "s_bridge/syscall.h"
 
-void tryout(void);
+void *user_main(void *arg) {
+    //term_put_fmt_s("Arg Given: %X\n", arg);
 
-
-void user_main(void) {
-    while (1);
+    sc_term_put_s("hello\n");
+    return (void *)5;
 }
 
 

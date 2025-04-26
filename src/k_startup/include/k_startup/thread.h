@@ -5,6 +5,12 @@
 #include "k_startup/fwd_defs.h"
 #include "s_mem/allocator.h"
 #include "s_data/wait_queue.h"
+#include "s_bridge/ctx.h"
+
+/**
+ * When a new thread is created, its entry point must follow this interface.
+ */
+typedef void *(*thread_entry_t)(void *arg);
 
 typedef uint32_t thread_state_t;
 
@@ -59,18 +65,15 @@ struct _thread_t {
     wait_queue_t *wq;
 
     /**
-     * ESP to use when switching back to this thread.
-     *
-     * When a thread is switched out of, it is expected that `pushad` is called.
-     * When we switch back into a thread, we will call `popad` followed by `iret`.
+     * The context to use when switching back to this thread.
      */
-    const uint32_t *esp;
+    user_ctx_t ctx;
 };
 
-thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, const uint32_t *esp);
+thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_entry_t entry);
 
-static inline thread_t *new_da_thread(thread_id_t tid, process_t *proc, const uint32_t *esp) {
-    return new_thread(get_default_allocator(), tid, proc, esp);
+static inline thread_t *new_da_thread(thread_id_t tid, process_t *proc, thread_entry_t entry) {
+    return new_thread(get_default_allocator(), tid, proc, entry);
 }
 
 

@@ -27,6 +27,17 @@ fernos_error_t validate_constraints(void) {
     CHECK_ALIGN(FOS_STACK_AREA_START, M_4K);
     CHECK_ALIGN(FOS_STACK_AREA_MAX_SIZE, M_4K);
 
+    // All stack sizes must be at least 2 pages.
+    // (Since all stacks require at least one redzone page!)
+
+    if (FOS_KERNEL_STACK_SIZE < 2 * M_4K) {
+        return FOS_INVALID_RANGE;
+    }
+
+    if (FOS_THREAD_STACK_SIZE < 2 * M_4K) {
+        return FOS_INVALID_RANGE;
+    }
+
     if ((uint32_t)_static_area_end > FOS_CODE_AND_DATA_AREA_END) {
         return FOS_INVALID_RANGE;
     }

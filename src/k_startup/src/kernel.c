@@ -9,6 +9,7 @@
 #include "k_startup/thread.h"
 #include "k_startup/tss.h"
 #include "k_startup/action.h"
+#include "k_sys/page.h"
 #include "u_startup/main.h"
 #include "s_mem/simple_heap.h"
 #include "s_bridge/ctx.h"
@@ -54,53 +55,6 @@ static fernos_error_t init_kernel_heap(void) {
     return FOS_SUCCESS;
 }
 
-/**
- * On error this call does no cleanup. Errors at this point are seen as fatal.
- */
-static fernos_error_t init_kernel_state(void) {
-    // Initialize kernel state.
-
-    kernel = new_da_blank_kernel_state();
-    if (!kernel) {
-        return FOS_NO_MEM;
-    }
-
-    // Ok, now we need to setup the first process.
-    
-    phys_addr_t first_user_pd;
-    const uint32_t *first_user_esp;
-
-    PROP_ERR(pop_initial_user_info(&first_user_pd, &first_user_esp));
-
-    // Reserve 0 for the root process. 
-    PROP_ERR(idtb_request_id(kernel->proc_table, 0)); 
-
-    process_t *root = new_da_process(0, first_user_pd, NULL);
-    if (!root) {
-        return FOS_NO_MEM;
-    }
-
-    idtb_set(kernel->proc_table, 0, root);
-
-    // NOTE: The main thread of a process need not alway have id 0.
-    // The first thread of the first process will though.
-    PROP_ERR(idtb_request_id(root->thread_table, 0));
-
-    thread_t *root_thr = new_da_thread(0, root, first_user_esp);
-    idtb_set(root->thread_table, 0, root_thr);
-
-    root->main_thread = root_thr;
-
-    // Schedule the root thread.
-    root_thr->next_thread = root_thr;
-    root_thr->prev_thread = root_thr;
-
-    kernel->curr_thread = root_thr;
-    root_thr->state = THREAD_STATE_SCHEDULED;
-
-    return FOS_SUCCESS;
-}
-
 void start_kernel(void) {
     init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
@@ -115,12 +69,20 @@ void start_kernel(void) {
     try_setup_step(init_term(), "Failed to initialize Terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
-    //try_setup_step(init_kernel_state(), "Failed to setup kernel state");
     
-    uint32_t user_pd;
-    const uint32_t *user_esp;
+    uint32_t user_pd = pop_initial_user_info();
+    if (user_pd == NULL_PHYS_ADDR) {
+        setup_fatal("Failed to get first user PD");
+    }
 
-    try_setup_step(pop_initial_user_info(&user_pd, &user_esp), "Failed to pop user info");
+    // Let's assume we are using thread 0.
+
+    uint8_t *ustack_end = (uint8_t *)FOS_THREAD_STACK_END(0);
+    uint8_t *ustack_start = ustack_end - M_4K;
+
+    const void *true_e;
+    try_setup_step(pd_alloc_pages(user_pd, true, ustack_start, ustack_end, &true_e), 
+            "Failed to allocated first stack");
 
     set_timer_action(fos_timer_action);
     set_syscall_action(fos_syscall_action);
@@ -129,18 +91,16 @@ void start_kernel(void) {
         .ds = USER_DATA_SELECTOR,
         .cr3 = user_pd,
 
-        .eip = (uint32_t)user_main,
+        .eax = (uint32_t)user_main,
+        .ecx = (uint32_t)4,
+
+        .eip = (uint32_t)thread_entry_routine,
         .cs = USER_CODE_SELECTOR,
         .eflags = read_eflags() | (1 << 9),
 
-        .esp = (uint32_t)user_esp,
+        .esp = (uint32_t)ustack_end,
         .ss = USER_DATA_SELECTOR
     };
-
-    term_put_fmt_s("K: %X, %X\n", FOS_KERNEL_STACK_START, FOS_KERNEL_STACK_END);
-    for (uint32_t i = 0; i < FOS_MAX_THREADS_PER_PROC; i++) {
-        term_put_fmt_s("%u: %X, %X\n", i, FOS_THREAD_STACK_START(i), FOS_THREAD_STACK_END(i));
-    }
 
     return_to_ctx(&ctx);
 }

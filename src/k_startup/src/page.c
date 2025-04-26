@@ -32,7 +32,6 @@ static phys_addr_t kernel_pd = NULL_PHYS_ADDR;
  * Once consumed by the first user task, this field should be set back to NULL.
  */
 static phys_addr_t first_user_pd = NULL_PHYS_ADDR;
-static uint32_t *first_user_esp  = NULL;
 
 /**
  * A set of reserved pages in the kernel to be used for page table editing.
@@ -371,14 +370,7 @@ static fernos_error_t _init_first_user_pd(void) {
      */
     PROP_ERR(_place_range(pd, kstack_start, kstack_end, _R_WRITEABLE | _R_IDENTITY));
 
-    // Using a basic 1 page user stack for now!
-    const uint8_t *ustack_end = (uint8_t *)FOS_THREAD_STACK_END(0);
-    uint8_t *ustack_start = (uint8_t *)(ustack_end - M_4K);
-
-    PROP_ERR(_place_range(pd, ustack_start, ustack_end, _R_USER | _R_ALLOCATE | _R_WRITEABLE));
-
     first_user_pd = upd;
-    first_user_esp = (uint32_t *)ustack_end;
 
     return FOS_SUCCESS;
 }
@@ -405,22 +397,14 @@ phys_addr_t get_kernel_pd(void) {
     return kernel_pd;    
 }
 
-fernos_error_t pop_initial_user_info(phys_addr_t *upd, const uint32_t **uesp) {
-    if (first_user_pd == NULL_PHYS_ADDR) {
-        return FOS_UNKNWON_ERROR;
+phys_addr_t pop_initial_user_info(void) {
+    phys_addr_t ret_addr = first_user_pd;
+
+    if (first_user_pd != NULL_PHYS_ADDR) {
+        first_user_pd = NULL_PHYS_ADDR;
     }
 
-    if (!upd || !uesp) {
-        return FOS_BAD_ARGS;
-    }
-
-    *upd = first_user_pd;
-    *uesp = first_user_esp;
-
-    first_user_pd = NULL_PHYS_ADDR;
-    first_user_esp = NULL;
-    
-    return FOS_SUCCESS;
+    return ret_addr;
 }
 
 phys_addr_t assign_free_page(uint32_t slot, phys_addr_t p) {

@@ -147,7 +147,7 @@ typedef void (*syscall_action_t)(user_ctx_t *ctx, uint32_t id, void *arg);
  *
  * NOTE: This assumes syscalls are mapped as interrupt 48.
  */
-uint32_t trigger_syscall(uint32_t id, void *arg);
+int32_t trigger_syscall(uint32_t id, void *arg);
 
 /**
  * Set what should happen on a syscall.
