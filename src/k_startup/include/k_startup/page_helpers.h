@@ -23,6 +23,13 @@ void page_copy(phys_addr_t dest, phys_addr_t src);
 phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr);
 
 /**
+ * Create a deep copy of a page table.
+ *
+ * Returns NULL_PHYS_ADDR if there is insufficient memory.
+ */
+phys_addr_t copy_page_table(phys_addr_t pt);
+
+/**
  * Create a deep copy of a page directory.
  *
  * Returns NULL_PHYS_ADDR if there is insufficient memory.

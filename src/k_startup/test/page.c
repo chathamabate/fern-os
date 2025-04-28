@@ -118,6 +118,61 @@ static bool test_push_and_pop(void) {
     TEST_SUCCEED();
 }
 
+static bool test_new_pt(void) {
+    enable_loss_check();
+
+    phys_addr_t pt = new_page_table();
+
+    phys_addr_t old = assign_free_page(0, pt);
+
+    pt_entry_t *pt_arr = (pt_entry_t *)(free_kernel_pages[0]);
+
+    for (size_t i = 0; i < 1024; i++) {
+        TEST_EQUAL_HEX(0x0, pte_get_present(pt_arr[i]));
+    }
+
+    assign_free_page(0, old);
+
+    delete_page_table(pt);
+
+    TEST_SUCCEED();
+}
+
+/**
+ * Helper subtest. 
+ *
+ * Confirm the given range matches the given properties.
+ *
+ * present - The range must contain all present and allocated entries.
+ * user - if present, the range must contain all user entries.
+ */
+static bool check_pt_range(pt_entry_t *pt, uint32_t s, uint32_t e, bool present, bool user) {
+
+}
+
+static bool test_pt_alloc(void) {
+    enable_loss_check();
+    uint32_t true_e;
+
+    
+    phys_addr_t pt = new_page_table();
+
+    phys_addr_t old = assign_free_page(0, pt);
+
+    pt_entry_t *vpt = (pt_entry_t *)(free_kernel_pages[0]);
+
+    TEST_EQUAL_HEX(FOS_SUCCESS, pt_alloc_range(pt, false, 0, 1, &true_e));
+    TEST_EQUAL_UINT(1, true_e);
+    TEST_EQUAL_UINT(1, pte_get_present(vpt[0]));
+
+    assign_free_page(0, old);
+
+    delete_page_table(pt);
+
+    TEST_SUCCEED();
+}
+
+
 static bool test_pd_alloc(void) {
     uint8_t * const S = (uint8_t *)_static_area_end;
 
@@ -294,6 +349,8 @@ bool test_page(void) {
 
     RUN_TEST(test_assign_free_page);
     RUN_TEST(test_push_and_pop);
+    RUN_TEST(test_new_pt);
+    RUN_TEST(test_pt_alloc);
     RUN_TEST(test_pd_alloc);
     RUN_TEST(test_pd_overlapping_alloc);
     RUN_TEST(test_pd_free);

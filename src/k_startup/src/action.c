@@ -1,6 +1,5 @@
 
 
-#include "k_startup/action.h"
 #include "k_sys/debug.h"
 #include "s_bridge/ctx.h"
 #include "k_bios_term/term.h"
@@ -11,6 +10,7 @@
 #include "s_mem/allocator.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
+#include <stdint.h>
 
 void fos_gpf_action(user_ctx_t *ctx) {
     (void)ctx;

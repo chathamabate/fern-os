@@ -48,7 +48,7 @@ phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr) {
 /**
  * Returns NULL_PHYS_ADDR on error.
  */
-static phys_addr_t copy_page_table(phys_addr_t pt) {
+phys_addr_t copy_page_table(phys_addr_t pt) {
     if (pt == NULL_PHYS_ADDR) {
         return NULL_PHYS_ADDR; // Can't copy the NULL page.
     }

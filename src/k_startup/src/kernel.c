@@ -78,7 +78,8 @@ void start_kernel(void) {
         setup_fatal("Failed to get first user PD");
     }
 
-    test_page_helpers();
+    test_page();
+    //test_page_helpers();
 
     lock_up();
 
