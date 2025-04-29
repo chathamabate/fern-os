@@ -107,7 +107,7 @@ static bool pt_randomize_alloc(phys_addr_t pt, bool user, uint32_t s, uint32_t e
     
     pt_entry_t *vpt = (pt_entry_t *)(free_kernel_pages[0]);
 
-    for (uint32_t i = 0; i < s; i++) {
+    for (uint32_t i = s; i < e; i++) {
         phys_addr_t base = pte_get_base(vpt[i]);
         randomize_page(base, base / M_4K);
     }
@@ -187,7 +187,27 @@ static bool test_copy_page_table(void) {
     phys_addr_t pt = new_page_table();
     TEST_TRUE(NULL_PHYS_ADDR != pt);
 
-    pt_randomize_alloc(pt, true, 0, 1024);
+    pt_randomize_alloc(pt, true, 0, 10);
+    pt_randomize_alloc(pt, false, 10, 20);
+
+    // Now manually place some shared pages.
+    phys_addr_t old0 = assign_free_page(0, pt);
+
+    pt_entry_t *vpt = (pt_entry_t *)(free_kernel_pages[0]);
+    for (uint32_t i = 20; i < 100; i++) {
+        vpt[i] = fos_identity_pt_entry(i, false, false);
+    }
+
+    for (uint32_t i = 200; i < 250; i++) {
+        vpt[i] = fos_identity_pt_entry(i, true, true);
+    }
+
+    assign_free_page(0, old0);
+
+    // Finally some big alloc at the end.
+    pt_randomize_alloc(pt, true, 400, 500);
+
+    // Now copy and compare.
 
     phys_addr_t pt_copy = copy_page_table(pt);
     TEST_TRUE(NULL_PHYS_ADDR != pt_copy);
@@ -196,6 +216,7 @@ static bool test_copy_page_table(void) {
 
     delete_page_table(pt);
     delete_page_table(pt_copy);
+
     TEST_SUCCEED();
 }
 
