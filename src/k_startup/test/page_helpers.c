@@ -220,11 +220,115 @@ static bool test_copy_page_table(void) {
     TEST_SUCCEED();
 }
 
+/**
+ * Confirm two page directories have equivelant structure!
+ */
+static bool check_equiv_pd(phys_addr_t pd0, phys_addr_t pd1) {
+    phys_addr_t old0 = assign_free_page(0, pd0);
+    phys_addr_t old1 = assign_free_page(1, pd1);
+
+    pt_entry_t *vpd0 = (pt_entry_t *)(free_kernel_pages[0]);
+    pt_entry_t *vpd1 = (pt_entry_t *)(free_kernel_pages[1]);
+
+    for (uint32_t i = 0; i < 1024; i++) {
+        pt_entry_t pde0 = vpd0[i];
+        pt_entry_t pde1 = vpd1[i];
+
+        TEST_EQUAL_UINT(pte_get_present(pde0), pte_get_present(pde1));
+
+        if (pte_get_present(pde0)) {
+            // Entries in page directories are always marked USER/UNIQUE
+            TEST_EQUAL_UINT(1, pte_get_user(pde0)); 
+            TEST_EQUAL_HEX(UNIQUE_ENTRY, pte_get_avail(pde0));
+
+            TEST_EQUAL_UINT(1, pte_get_user(pde1)); 
+            TEST_EQUAL_HEX(UNIQUE_ENTRY, pte_get_avail(pde1));
+
+            phys_addr_t base0 = pte_get_base(pde0);
+            phys_addr_t base1 = pte_get_base(pde1);
+
+            TEST_TRUE(base0 != base1);
+
+            TEST_TRUE(check_equiv_pt(base0, base1));
+        }
+    }
+
+    assign_free_page(1, old1);
+    assign_free_page(0, old0);
+
+    TEST_SUCCEED();
+}
+
+static pt_entry_t copy_pt_entry(phys_addr_t pt) {
+    phys_addr_t pt_copy = copy_page_table(pt);
+
+    if (pt_copy == NULL_PHYS_ADDR) {
+        return not_present_pt_entry();
+    } 
+
+    return fos_unique_pt_entry(pt_copy, true, true);
+}
+
+/**
+ * Most of the work of copy page directory is done by copy page table.
+ *
+ * This test will be somewhat simple.
+ */
+static bool test_copy_page_directory(void) {
+    enable_loss_check();
+
+    // For this test, we are going to make two simple but different page tables,
+    // then place them at random indeces in the page directory.
+
+    phys_addr_t pd = new_page_directory();
+    TEST_TRUE(pd != NULL_PHYS_ADDR);
+
+    phys_addr_t old = assign_free_page(0, pd);
+    pt_entry_t *vpd = (pt_entry_t *)(free_kernel_pages[0]);
+
+    phys_addr_t pt_a = new_page_table();
+    TEST_TRUE(pt_a != NULL_PHYS_ADDR);
+    pt_randomize_alloc(pt_a, true, 0, 1);
+
+    phys_addr_t pt_b = new_page_table();
+    TEST_TRUE(pt_b != NULL_PHYS_ADDR);
+    pt_randomize_alloc(pt_b, true, 0, 1);
+
+    vpd[0] = copy_pt_entry(pt_a);
+    vpd[1] = copy_pt_entry(pt_b);
+
+    for (uint32_t i = 10; i < 20; i++) {
+        vpd[i] = copy_pt_entry(pt_a);
+    }
+
+    for (uint32_t i = 100; i < 200; i++) {
+        vpd[i] = copy_pt_entry((i & 1) ? pt_a : pt_b);
+    }
+
+    vpd[1023] = copy_pt_entry(pt_b);
+
+    // These are no longer needed after this point.
+    delete_page_table(pt_a);
+    delete_page_table(pt_b);
+
+    assign_free_page(0, old);
+
+    phys_addr_t pd_copy = copy_page_directory(pd);
+
+    TEST_TRUE(check_equiv_pd(pd, pd_copy));
+
+    delete_page_directory(pd_copy);
+    delete_page_directory(pd);
+
+    TEST_SUCCEED();
+}
+
 bool test_page_helpers(void) {
     BEGIN_SUITE("Page Helpers");
 
     RUN_TEST(test_page_copy);
     RUN_TEST(test_copy_page_table);
+    RUN_TEST(test_copy_page_directory);
 
     return END_SUITE();
 }
