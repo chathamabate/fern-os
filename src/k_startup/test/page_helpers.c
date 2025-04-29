@@ -7,6 +7,7 @@
 #include "k_bios_term/term.h"
 #include "k_sys/debug.h"
 #include "s_util/err.h"
+#include "s_util/constraints.h"
 #include "s_util/str.h"
 #include <stdint.h>
 
@@ -323,12 +324,86 @@ static bool test_copy_page_directory(void) {
     TEST_SUCCEED();
 }
 
+static bool try_mem_cpy_from_user(void) {
+    // Need to check none before and none after...
+
+}
+
+/**
+ * NOTE: This test copies the current page directory!
+ */
+static bool test_mem_cpy_from_user(void) {
+    enable_loss_check();
+    uint8_t *S = (uint8_t *)FOS_FREE_AREA_START;
+    const void *true_e;
+    uint32_t copied;
+
+    phys_addr_t pd_a = get_page_directory();
+    phys_addr_t pd_b = copy_page_directory(pd_a);
+
+    uint32_t alloc_size = 3*M_4K;
+
+    // Allocate pages in the "user" page directory.
+    TEST_EQUAL_HEX(FOS_SUCCESS, pd_alloc_pages(pd_b, true, S, S + alloc_size, &true_e));
+
+    set_page_directory(pd_b); // Switch to "user" space.
+    for (uint32_t i = 0; i < alloc_size; i++) {
+        S[i] = (uint8_t)i;
+    }
+
+    // Switch back to original directory.
+    set_page_directory(pd_a);
+
+    uint8_t dbuf[256];
+    const uint32_t dbuf_size = sizeof(dbuf) / sizeof(uint8_t);
+    mem_set(dbuf, 0xFF, dbuf_size);
+
+    uint32_t copy_size = 16;
+    TEST_EQUAL_HEX(FOS_SUCCESS,
+            mem_cpy_from_user(dbuf, pd_b, S, copy_size, &copied));
+    TEST_EQUAL_UINT(copy_size, copied);
+
+    for (uint32_t i = 0; i < copy_size; i++) {
+        TEST_EQUAL_UINT(i, dbuf[i]);
+    }
+
+    for (uint32_t i = copy_size; i < dbuf_size; i++) {
+        TEST_EQUAL_UINT(0xFF, dbuf[i]);
+    }
+
+    set_page_directory(pd_a);
+    delete_page_directory(pd_b);
+
+    TEST_SUCCEED();
+}
+
+/**
+ * NOTE: This test copies the current page directory!
+ */
+static bool test_mem_cpy_to_user(void) {
+    const void *S = (void *)FOS_FREE_AREA_START;
+
+    phys_addr_t pd_a = get_page_directory();
+    phys_addr_t pd_b = copy_page_directory(pd_a);
+
+
+
+    // We need to test copying to and from a different page directory!!
+
+    set_page_directory(pd_a);
+    delete_page_directory(pd_b);
+
+    TEST_SUCCEED();
+}
+
 bool test_page_helpers(void) {
     BEGIN_SUITE("Page Helpers");
 
     RUN_TEST(test_page_copy);
     RUN_TEST(test_copy_page_table);
     RUN_TEST(test_copy_page_directory);
+    RUN_TEST(test_mem_cpy_from_user);
+    RUN_TEST(test_mem_cpy_to_user);
 
     return END_SUITE();
 }

@@ -6,6 +6,7 @@
 #include "k_bios_term/term.h"
 #include "k_sys/debug.h"
 #include "s_util/err.h"
+#include "s_util/constraints.h"
 #include "s_util/str.h"
 #include <stdint.h>
 
@@ -21,7 +22,8 @@ static bool posttest(void);
 #include "s_util/test.h"
 
 /*
- * NOTE: These tests assume that virtual addresses after _static_area_end are available.
+ * NOTE: These tests assume that virtual addresses after FOS_FREE_AREA_START are available.
+ * If you have already set up some sort of heap in the FOS Free Area, these tests will fail!
  * 
  * Basically, we are testing just basic paging setup operations.
  */
@@ -207,7 +209,7 @@ static bool test_pt_alloc(void) {
 }
 
 static bool test_pd_alloc(void) {
-    uint8_t * const S = (uint8_t *)_static_area_end;
+    uint8_t * const S = (uint8_t *)FOS_FREE_AREA_START;
 
     typedef struct {
         uint8_t *s;
@@ -268,7 +270,7 @@ static bool test_pd_alloc(void) {
 }
 
 static bool test_pd_overlapping_alloc(void) {
-    uint8_t * const S = (uint8_t *)_static_area_end;
+    uint8_t * const S = (uint8_t *)FOS_FREE_AREA_START;
     phys_addr_t pd = get_kernel_pd();
 
     fernos_error_t err;
@@ -299,7 +301,7 @@ static bool test_pd_overlapping_alloc(void) {
 }
 
 static bool test_pd_free(void) {
-    uint8_t * const S = (uint8_t *)_static_area_end;
+    uint8_t * const S = (uint8_t *)FOS_FREE_AREA_START;
     phys_addr_t pd = get_kernel_pd();
 
     fernos_error_t err;
@@ -337,7 +339,7 @@ static bool test_pd_free(void) {
 static bool test_pd_free_dangerous(void) {
     LOGF_PREFIXED("Running Dangerous Test\n");
 
-    uint8_t * const S = (uint8_t *)_static_area_end;
+    uint8_t * const S = (uint8_t *)FOS_FREE_AREA_START;
     phys_addr_t pd = get_kernel_pd();
 
     fernos_error_t err;

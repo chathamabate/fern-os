@@ -71,6 +71,11 @@ void start_kernel(void) {
 
     try_setup_step(init_term(), "Failed to initialize Terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
+
+    //test_page();
+    test_page_helpers();
+    lock_up();
+
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     
     uint32_t user_pd = pop_initial_user_info();
@@ -78,10 +83,6 @@ void start_kernel(void) {
         setup_fatal("Failed to get first user PD");
     }
 
-    //test_page();
-    test_page_helpers();
-
-    lock_up();
 
     // Let's assume we are using thread 0.
 
