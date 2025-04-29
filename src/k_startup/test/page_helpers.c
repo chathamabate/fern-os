@@ -324,74 +324,132 @@ static bool test_copy_page_directory(void) {
     TEST_SUCCEED();
 }
 
-static bool try_mem_cpy_from_user(void) {
-    // Need to check none before and none after...
-
-}
-
 /**
  * NOTE: This test copies the current page directory!
  */
-static bool test_mem_cpy_from_user(void) {
-    enable_loss_check();
-    uint8_t *S = (uint8_t *)FOS_FREE_AREA_START;
+#define MEM_CPY_AREA_SIZE  (4 * M_4K)
+#define MEM_CPY_AREA_START ((uint8_t *)FOS_FREE_AREA_START)
+#define MEM_CPY_AREA_END   (MEM_CPY_AREA_START + MEM_CPY_AREA_SIZE)
+static bool test_mem_cpy_user(void) {
     const void *true_e;
-    uint32_t copied;
 
-    phys_addr_t pd_a = get_page_directory();
-    phys_addr_t pd_b = copy_page_directory(pd_a);
+    phys_addr_t kpd = get_page_directory();
+    TEST_EQUAL_HEX(FOS_SUCCESS, 
+            pd_alloc_pages(kpd, true, MEM_CPY_AREA_START, MEM_CPY_AREA_END, &true_e));
 
-    uint32_t alloc_size = 3*M_4K;
+    phys_addr_t upd = copy_page_directory(kpd);
+    TEST_TRUE(upd != NULL_PHYS_ADDR);
 
-    // Allocate pages in the "user" page directory.
-    TEST_EQUAL_HEX(FOS_SUCCESS, pd_alloc_pages(pd_b, true, S, S + alloc_size, &true_e));
-
-    set_page_directory(pd_b); // Switch to "user" space.
-    for (uint32_t i = 0; i < alloc_size; i++) {
-        S[i] = (uint8_t)i;
+    // Kernel pages will have lower case abc's.
+    for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
+        MEM_CPY_AREA_START[i] = 'a' + (i % 26);
     }
 
-    // Switch back to original directory.
-    set_page_directory(pd_a);
-
-    uint8_t dbuf[256];
-    const uint32_t dbuf_size = sizeof(dbuf) / sizeof(uint8_t);
-    mem_set(dbuf, 0xFF, dbuf_size);
-
-    uint32_t copy_size = 16;
-    TEST_EQUAL_HEX(FOS_SUCCESS,
-            mem_cpy_from_user(dbuf, pd_b, S, copy_size, &copied));
-    TEST_EQUAL_UINT(copy_size, copied);
-
-    for (uint32_t i = 0; i < copy_size; i++) {
-        TEST_EQUAL_UINT(i, dbuf[i]);
+    // User pages will have upper case abc's.
+    set_page_directory(upd);
+    for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
+        MEM_CPY_AREA_START[i] = 'A' + (i % 26);
     }
 
-    for (uint32_t i = copy_size; i < dbuf_size; i++) {
-        TEST_EQUAL_UINT(0xFF, dbuf[i]);
+    set_page_directory(kpd);
+
+    typedef struct {
+        uint32_t ki; 
+        uint32_t ui;
+        uint32_t bytes;
+    } case_t;
+
+    const case_t CASES[] = {
+        (case_t) {
+            .ui = 0,
+            .ki = 0,
+            .bytes = 100
+        },
+        (case_t) {
+            .ui = 0,
+            .ki = 10,
+            .bytes = 100
+        },
+        (case_t) {
+            .ui = 10,
+            .ki = 0,
+            .bytes = 100
+        },
+        (case_t) {
+            .ui = M_4K,
+            .ki = 0,
+            .bytes = M_4K 
+        },
+        (case_t) {
+            .ui = 100,
+            .ki = 50,
+            .bytes = 3*M_4K 
+        },
+        (case_t) {
+            .ui = 100,
+            .ki = 50,
+            .bytes = MEM_CPY_AREA_SIZE - 100
+        },
+        (case_t) {
+            .ui = 0,
+            .ki = 0,
+            .bytes = MEM_CPY_AREA_SIZE
+        }
+    };
+    const uint32_t NUM_CASES = sizeof(CASES) / sizeof(case_t);
+
+    for (uint32_t ci = 0; ci < NUM_CASES; ci++) {
+        case_t c = CASES[ci];
+
+        // First we copy in the to user direction.
+        
+        uint32_t copied;
+
+        TEST_EQUAL_HEX(FOS_SUCCESS, mem_cpy_to_user(upd, MEM_CPY_AREA_START + c.ui, 
+                    MEM_CPY_AREA_START + c.ki, c.bytes, &copied));
+        TEST_EQUAL_UINT(c.bytes, copied);
+
+        // Ok, so was the copy successful. (We look over the whole area btw!)
+        set_page_directory(upd);
+        for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
+            if (c.ui <= i && i < c.ui + c.bytes) {
+                uint32_t ki = c.ki + (i - c.ui);
+                TEST_EQUAL_UINT('a' + (ki % 26), MEM_CPY_AREA_START[i]);
+                MEM_CPY_AREA_START[i] = 'A' + (i % 26);
+            } else {
+                TEST_EQUAL_UINT('A' + (i % 26), MEM_CPY_AREA_START[i]);
+            }
+        }
+
+        // Now we copy in the from user direciton!
+
+        set_page_directory(kpd);
+        TEST_EQUAL_HEX(FOS_SUCCESS, mem_cpy_from_user(MEM_CPY_AREA_START + c.ki, 
+                    upd, MEM_CPY_AREA_START + c.ui, c.bytes, &copied));
+        TEST_EQUAL_UINT(c.bytes, copied);
+
+        for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
+            if (c.ki <= i && i < c.ki + c.bytes) {
+                uint32_t ui = c.ui + (i - c.ki);
+                TEST_EQUAL_UINT('A' + (ui % 26), MEM_CPY_AREA_START[i]);
+                MEM_CPY_AREA_START[i] = 'a' + (i % 26);
+            } else {
+                TEST_EQUAL_UINT('a' + (i % 26), MEM_CPY_AREA_START[i]);
+            }
+        }
     }
 
-    set_page_directory(pd_a);
-    delete_page_directory(pd_b);
+    pd_free_pages(kpd, MEM_CPY_AREA_START, MEM_CPY_AREA_END);
+    delete_page_directory(upd);
 
     TEST_SUCCEED();
 }
 
 /**
- * NOTE: This test copies the current page directory!
+ * This tests out mem copying when the source/dest areas may not be fully available!
  */
-static bool test_mem_cpy_to_user(void) {
-    const void *S = (void *)FOS_FREE_AREA_START;
+static bool test_bad_mem_cpy(void) {
 
-    phys_addr_t pd_a = get_page_directory();
-    phys_addr_t pd_b = copy_page_directory(pd_a);
-
-
-
-    // We need to test copying to and from a different page directory!!
-
-    set_page_directory(pd_a);
-    delete_page_directory(pd_b);
 
     TEST_SUCCEED();
 }
@@ -402,8 +460,8 @@ bool test_page_helpers(void) {
     RUN_TEST(test_page_copy);
     RUN_TEST(test_copy_page_table);
     RUN_TEST(test_copy_page_directory);
-    RUN_TEST(test_mem_cpy_from_user);
-    RUN_TEST(test_mem_cpy_to_user);
+    RUN_TEST(test_mem_cpy_user);
+    RUN_TEST(test_bad_mem_cpy);
 
     return END_SUITE();
 }
