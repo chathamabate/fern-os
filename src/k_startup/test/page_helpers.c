@@ -449,7 +449,56 @@ static bool test_mem_cpy_user(void) {
  * This tests out mem copying when the source/dest areas may not be fully available!
  */
 static bool test_bad_mem_cpy(void) {
+    const void *true_e;
 
+    fernos_error_t err;
+    uint32_t copied;
+
+    phys_addr_t kpd = get_page_directory();
+    TEST_EQUAL_HEX(FOS_SUCCESS, 
+            pd_alloc_pages(kpd, true, MEM_CPY_AREA_START, MEM_CPY_AREA_END, &true_e));
+
+    phys_addr_t upd = copy_page_directory(kpd);
+    TEST_TRUE(upd != NULL_PHYS_ADDR);
+
+    for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
+        MEM_CPY_AREA_START[i] = 0xAA;
+    }
+
+    set_page_directory(upd);
+    for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
+        MEM_CPY_AREA_START[i] = 0xBB;
+    }
+    set_page_directory(kpd);
+
+    err = mem_cpy_to_user(upd, MEM_CPY_AREA_END - M_4K, 
+            MEM_CPY_AREA_START, 2 * M_4K, &copied);
+
+    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_EQUAL_HEX(M_4K, copied);
+
+    set_page_directory(upd);
+    for (uint32_t i = MEM_CPY_AREA_SIZE - M_4K; i < MEM_CPY_AREA_SIZE; i++) {
+        // CHeck isn't really as rigorous, but whatevs.
+        TEST_EQUAL_HEX(0xAA, MEM_CPY_AREA_START[i]);
+        MEM_CPY_AREA_START[i] = 0xBB;
+    }
+    set_page_directory(kpd);
+
+    // Now in the from direction.
+    err = mem_cpy_from_user(MEM_CPY_AREA_START, upd, 
+            MEM_CPY_AREA_END - M_4K, 2*M_4K, &copied);
+    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_EQUAL_HEX(M_4K, copied);
+
+    for (uint32_t i = 0; i < M_4K; i++) {
+        // CHeck isn't really as rigorous, but whatevs.
+        TEST_EQUAL_HEX(0xBB, MEM_CPY_AREA_START[i]);
+        MEM_CPY_AREA_START[i] = 0xAA;
+    }
+
+    pd_free_pages(kpd, MEM_CPY_AREA_START, MEM_CPY_AREA_END);
+    delete_page_directory(upd);
 
     TEST_SUCCEED();
 }
