@@ -147,23 +147,57 @@ static bool test_new_pt(void) {
  * user - if present, the range must contain all user entries.
  */
 static bool check_pt_range(pt_entry_t *pt, uint32_t s, uint32_t e, bool present, bool user) {
+    for (uint32_t i = s; i < e; i++) {
+        pt_entry_t pte = pt[i];
+        
+        if (present) {
+            TEST_EQUAL_UINT(1, pte_get_present(pte));
+            TEST_EQUAL_UINT(user ? 1 : 0, pte_get_user(pte));
+            TEST_TRUE(NULL_PHYS_ADDR != pte_get_base(pte));
+        } else {
+            TEST_EQUAL_UINT(0, pte_get_present(pte));
+            TEST_EQUAL_HEX(NULL_PHYS_ADDR, pte_get_base(pte));
+        }
+    }
 
+    TEST_SUCCEED();
 }
 
+/**
+ * I added in this very simple pt test, probably could be expanded on.
+ */
 static bool test_pt_alloc(void) {
     enable_loss_check();
     uint32_t true_e;
 
-    
     phys_addr_t pt = new_page_table();
 
     phys_addr_t old = assign_free_page(0, pt);
 
     pt_entry_t *vpt = (pt_entry_t *)(free_kernel_pages[0]);
 
-    TEST_EQUAL_HEX(FOS_SUCCESS, pt_alloc_range(pt, false, 0, 1, &true_e));
-    TEST_EQUAL_UINT(1, true_e);
-    TEST_EQUAL_UINT(1, pte_get_present(vpt[0]));
+    // Should start as all free.
+    check_pt_range(vpt, 0, 1024, false, false);
+
+    TEST_EQUAL_HEX(FOS_SUCCESS, pt_alloc_range(pt, true, 0, 100, &true_e));
+    TEST_EQUAL_UINT(100, true_e);
+    check_pt_range(vpt, 0, 100, true, true);
+
+    pt_free_range(pt, 10, 20);
+    check_pt_range(vpt, 0, 10, true, true);
+    check_pt_range(vpt, 10, 20, false, false);
+    check_pt_range(vpt, 20, 100, true, true);
+
+    // Overlapping alloc.
+    TEST_EQUAL_HEX(FOS_ALREADY_ALLOCATED, pt_alloc_range(pt, false, 15, 25, &true_e));
+    TEST_EQUAL_UINT(20, true_e);
+    check_pt_range(vpt, 15, 20, true, false);
+    check_pt_range(vpt, 20, 100, true, true);
+
+    // Test some bad ranges.
+    TEST_TRUE(FOS_SUCCESS != pt_alloc_range(pt, false, 200, 1025, &true_e));
+    TEST_TRUE(FOS_SUCCESS != pt_alloc_range(pt, false, 1024, 1024, &true_e));
+    TEST_TRUE(FOS_SUCCESS != pt_alloc_range(pt, false, 1020, 1000, &true_e));
 
     assign_free_page(0, old);
 
@@ -171,7 +205,6 @@ static bool test_pt_alloc(void) {
 
     TEST_SUCCEED();
 }
-
 
 static bool test_pd_alloc(void) {
     uint8_t * const S = (uint8_t *)_static_area_end;

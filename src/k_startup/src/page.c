@@ -485,13 +485,13 @@ fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e,
         return FOS_BAD_ARGS;
     }
 
+    if (s > 1023 || e > 1024 || e < s) {
+        return FOS_INVALID_RANGE;
+    }
+
     if (s == e) {
         *true_e = e;
         return FOS_SUCCESS;
-    }
-
-    if (s > 1023 || e > 1024 || e < s) {
-        return FOS_INVALID_RANGE;
     }
 
     fernos_error_t err = FOS_SUCCESS;
