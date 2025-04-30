@@ -104,6 +104,8 @@ static fernos_error_t init_kernel_state(void) {
     // Finally, schedule our first thread!
     ks_schedule_thread(kernel, thr);
 
+    // Now we are actually getting somewhere, we should be able to add the sleep queue now!
+
     return FOS_SUCCESS;
 }
 

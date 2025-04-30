@@ -599,14 +599,37 @@ static bool test_twq_create_and_delete(void) {
     TEST_SUCCEED();
 }
 
+/**
+ * Try to enqueue all elements from s to e EXCLUSIVE using step size 'step'
+ *
+ * NOTE: e MUST be reached exactly be the step!
+ */
+static bool try_twq_enqueue_range(timed_wait_queue_t *twq, uint32_t s, uint32_t e, uint32_t step) {
+    for (uint32_t i = s; i != e; i += step) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, 
+                twq_enqueue(twq, (void *)i, i));
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool try_twq_pop_range(timed_wait_queue_t *twq, uint32_t s, uint32_t e, uint32_t step) {
+    void *p;
+
+    for (uint32_t i = s; i != e; i += step) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, 
+                twq_pop(twq, &p));
+        TEST_EQUAL_HEX((void *)i, p);
+    }
+
+    TEST_SUCCEED();
+}
+
 static bool test_twq_simple0(void) {
     timed_wait_queue_t *twq = new_da_timed_wait_queue();
     TEST_TRUE(twq != NULL);
 
-    for (uint32_t i = 1; i <= 10; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, 
-                twq_enqueue(twq, (void *)i, i));
-    }
+    TEST_TRUE(try_twq_enqueue_range(twq, 1, 11, 1));
 
     for (uint32_t i = 1; i <= 10; i++) {
         TEST_EQUAL_HEX(FOS_SUCCESS,
@@ -632,21 +655,12 @@ static bool test_twq_simple1(void) {
     timed_wait_queue_t *twq = new_da_timed_wait_queue();
     TEST_TRUE(twq != NULL);
 
-    for (uint32_t i = 10; i >= 1; i--) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, 
-                twq_enqueue(twq, (void *)i, i));
-    }
+    TEST_TRUE(try_twq_enqueue_range(twq, 10, 0, -1));
 
     TEST_EQUAL_HEX(FOS_SUCCESS, 
             twq_notify(twq, 12));
 
-    for (uint32_t i = 1; i <= 10; i++) {
-        void *p;
-        TEST_EQUAL_HEX(FOS_SUCCESS, 
-                twq_pop(twq, &p));
-
-        TEST_EQUAL_HEX((void *)i, p);
-    }
+    TEST_TRUE(try_twq_pop_range(twq, 1, 11, 1));
 
     TEST_EQUAL_HEX(FOS_EMPTY,
             twq_pop(twq, NULL));
@@ -663,26 +677,12 @@ static bool test_twq_wrap(void) {
     TEST_EQUAL_HEX(FOS_SUCCESS,
             twq_notify(twq, UINT32_MAX - 9));
 
-    for (uint32_t i = UINT32_MAX - 9; i != 0; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS,
-                twq_enqueue(twq, (void *)i, i));
-    }
-
-    for (uint32_t i = 0; i < 10; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS,
-                twq_enqueue(twq, (void *)i, i));
-    }
+    TEST_TRUE(try_twq_enqueue_range(twq, UINT32_MAX - 9, 11, 1));
 
     TEST_EQUAL_HEX(FOS_SUCCESS, 
             twq_notify(twq, 3));
 
-    void *p;
-
-    for (uint32_t i = UINT32_MAX - 9; i != 4; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS,
-                twq_pop(twq, &p));
-        TEST_EQUAL_HEX((void *)i, p);
-    }
+    TEST_TRUE(try_twq_pop_range(twq, UINT32_MAX - 9, 4, 1));
 
     // There should be some left over, and that's OK!
 
@@ -697,10 +697,7 @@ static bool test_twq_complex0(void) {
 
     void *p;
 
-    for (uint32_t i = 0; i <= 20; i += 2) {
-        TEST_EQUAL_HEX(FOS_SUCCESS,
-                twq_enqueue(twq, (void *)i, i));
-    }
+    TEST_TRUE(try_twq_enqueue_range(twq, 0, 22, 2));
 
     // 0 should immediately be moved to the ready queue.
 
@@ -712,18 +709,12 @@ static bool test_twq_complex0(void) {
 
     TEST_EQUAL_HEX(FOS_SUCCESS, twq_notify(twq, 8));
 
-    for (uint32_t i = 2; i <= 4; i += 2) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, twq_pop(twq, &p));
-        TEST_EQUAL_HEX((void *)i, p);
-    }
+    TEST_TRUE(try_twq_pop_range(twq, 2, 6, 2));
 
     // W: 10,12 ... 20
     // R: 6,8
-    
-    for (uint32_t i = 19; i >= 9; i -= 2) {
-        TEST_EQUAL_HEX(FOS_SUCCESS,
-                twq_enqueue(twq, (void *)i, i));
-    }
+
+    TEST_TRUE(try_twq_enqueue_range(twq, 19, 7, -2));
 
     // W: 9,10,11 ... 20
     // R: 6,8
@@ -745,14 +736,46 @@ static bool test_twq_complex0(void) {
 
     // R: 11,12,13 ... 20, 0
 
-    for (uint32_t i = 11; i <= 20; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS,
-                twq_pop(twq, &p));
-        TEST_EQUAL_HEX((void *)i, p);
-    }
+    TEST_TRUE(try_twq_pop_range(twq, 11, 21, 1));
 
     TEST_EQUAL_HEX(FOS_SUCCESS, twq_pop(twq, &p));
     TEST_EQUAL_HEX((void *)0, p);
+
+    delete_wait_queue((wait_queue_t *)twq);
+
+    TEST_SUCCEED();
+}
+
+static bool test_twq_remove(void) {
+    timed_wait_queue_t *twq = new_da_timed_wait_queue();
+    TEST_TRUE(twq != NULL);
+
+
+    TEST_TRUE(try_twq_enqueue_range(twq, 1, 4, 1));
+
+    // W: 1 2 3 R:
+
+    TEST_EQUAL_HEX(FOS_SUCCESS, twq_enqueue(twq, (void *)2, 2));
+
+    TEST_EQUAL_HEX(FOS_SUCCESS, twq_notify(twq, 3));
+
+    // W:  R: 1 2 2 3
+
+    TEST_TRUE(try_twq_enqueue_range(twq, 1, 3, 1));
+
+    // W:1 2  R: 1 2 2 3
+
+    wq_remove((wait_queue_t *)twq, (void *)2);
+
+    // W: 1 R: 1 3
+    
+    TEST_TRUE(try_twq_pop_range(twq, 1, 5, 2));
+
+    TEST_EQUAL_HEX(FOS_SUCCESS, twq_notify(twq, 1));
+
+    void *p;
+    TEST_EQUAL_HEX(FOS_SUCCESS, twq_pop(twq, &p));
+    TEST_EQUAL_HEX((void *)1, p);
 
     delete_wait_queue((wait_queue_t *)twq);
 
@@ -767,6 +790,7 @@ bool test_timed_wait_queue(void) {
     RUN_TEST(test_twq_simple1);
     RUN_TEST(test_twq_wrap);
     RUN_TEST(test_twq_complex0);
+    RUN_TEST(test_twq_remove);
 
     return END_SUITE();
 }
