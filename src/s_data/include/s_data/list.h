@@ -27,6 +27,8 @@ typedef struct _list_impl_t {
     void (*l_reset_iter)(list_t *l);
     void *(*l_get_iter)(list_t *l);
     void *(*l_next_iter)(list_t *l);
+
+    fernos_error_t (*l_push_before_iter)(list_t *l, const void *src);
     fernos_error_t (*l_push_after_iter)(list_t *l, const void *src);
     fernos_error_t (*l_pop_iter)(list_t *l, void *dest);
 
@@ -143,6 +145,16 @@ static inline void *l_get_iter(list_t *l) {
  */
 static inline void *l_next_iter(list_t *l) {
     return l->impl->l_next_iter(l);
+}
+
+/**
+ * Push an element into the position directly before the current iterator position. 
+ *
+ * Returns an error if src is NULL or if insufficient resources. Returns an error if the iterator is
+ * NULL!
+ */
+static inline fernos_error_t l_push_before_iter(list_t *l, const void *src) {
+    return l->impl->l_push_before_iter(l, src);
 }
 
 /**

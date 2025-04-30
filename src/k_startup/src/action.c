@@ -10,7 +10,12 @@
 #include "s_mem/allocator.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
+#include "k_startup/kernel.h"
 #include <stdint.h>
+#include "k_startup/state.h"
+
+// A lot more to build up here, although, tbh, we aren't that far from
+// being done...
 
 void fos_gpf_action(user_ctx_t *ctx) {
     (void)ctx;

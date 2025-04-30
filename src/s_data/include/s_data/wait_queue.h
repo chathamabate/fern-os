@@ -278,3 +278,86 @@ static inline fernos_error_t vwq_notify_all(vector_wait_queue_t *vwq, uint8_t re
  * If ready_id is given, the ready_id which readied the popped item will be written at *ready_id.
  */
 fernos_error_t vwq_pop(vector_wait_queue_t *vwq, void **item, uint8_t *ready_id);
+
+typedef struct _twq_wait_entry_t {
+    void *item;
+
+    /**
+     * At what tick this entry started waiting.
+     */
+    uint32_t start;
+
+    /**
+     * At what tick this entry expects to end waiting.
+     *
+     * NOTE: This CAN be less than start!
+     *
+     * end CANNOT equal start. (Somewhat arbitrary choice)
+     */
+    uint32_t end;
+} twq_wait_pair_t;
+
+/**
+ * Yeah, and how do we deal with wrap??
+ */
+typedef struct _timed_wait_queue_t {
+    /**
+     * The allocator used for this wait queue.
+     */
+    allocator_t *al;
+
+    /**
+     * Sorted list of waiting items.
+     *
+     * List<twq_wait_pair_t *>
+     */
+    list_t *wait_q;
+
+    /**
+     * Items ready to be popped.
+     *
+     * List<void *>
+     */
+    list_t *ready_q;
+} timed_wait_queue_t;
+
+timed_wait_queue_t *new_timed_wait_queue(allocator_t *al);
+
+static inline timed_wait_queue_t *new_da_timed_wait_queue(void) {
+    return new_timed_wait_queue(get_default_allocator());
+}
+
+/**
+ * Enqueue an item in the timed wait queue.
+ *
+ * s Should be at what tick this item started waiting (i.e. Now)
+ * e Should be at what tick this item should stop waiting
+ *
+ * e can be less than s to account for wrap.
+ *
+ * Returns an error if insufficient resources.
+ * Returns an error if s == e, this situation is kinda ambiguous.
+ */
+fernos_error_t twq_enqueue(timed_wait_queue_t *twq, void *item, uint32_t s, uint32_t e);
+
+/**
+ * Notify all waiting items who have waited long enough.
+ *
+ * tick represents the current time.
+ *
+ * Items will be notified in order of their precedence. This means, the items which were
+ * the longest will be placed on the ready queue first!
+ *
+ * Returns on error if insufficient resources.
+ */
+fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t tick);
+
+/**
+ * Pop an item of the ready queue.
+ *
+ * Returns FOS_EMPTY if there are no ready items. NULL will be written to item (if it's given)
+ *
+ * Returns FOS_SUCCESS if an item was successfully popped. If item is given, the popped item
+ * will be written to *item.
+ */
+fernos_error_t twq_pop(vector_wait_queue_t *vwq, void **item);

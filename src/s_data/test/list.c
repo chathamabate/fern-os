@@ -284,6 +284,40 @@ static bool test_mutate_iter(void) {
     
     TEST_EQUAL_INT(1, *(int *)l_get_iter(l));
 
+    val = 3;
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_before_iter(l, &val));
+
+    // 3 [1] 4
+
+    ptr = (int *)l_next_iter(l);
+    TEST_TRUE(NULL != ptr);
+    TEST_EQUAL_INT(4, *ptr);
+
+    // 3 1 [4]
+    
+    val = 2;
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_before_iter(l, &val));
+
+    // 3 1 2 [4]
+    
+    ptr = (int *)l_next_iter(l);
+    TEST_EQUAL_HEX(NULL, ptr);
+    TEST_TRUE(FOS_SUCCESS != l_push_before_iter(l, &val));
+
+    l_reset_iter(l);
+
+    // [3] 1 2 4
+    
+    int expected[4] = {
+        3, 1, 2, 4
+    };
+
+    uint32_t count = 0;
+    for (int *ptr = l_get_iter(l); ptr != NULL; ptr = (int *)l_next_iter(l)) {
+        TEST_EQUAL_INT(expected[count], *ptr);
+        count++;
+    }
+
     delete_list(l);
     TEST_SUCCEED();
 }
