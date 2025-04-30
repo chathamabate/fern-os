@@ -32,6 +32,11 @@ static inline void intr_section_exit(uint32_t en) {
 // It will NOT work for situations where an error code is pushed onto the stack.
 void nop_handler(void);
 
+/**
+ * This function just calls the halt machine instruction.
+ */
+void halt_cpu(void);
+
 // PIC Stuff...
 
 void pic_remap(int offset1, int offset2);

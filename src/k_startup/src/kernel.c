@@ -125,9 +125,6 @@ void start_kernel(void) {
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     try_setup_step(init_kernel_state(), "Failed to setup kernel state");
 
-    test_timed_wait_queue();
-    lock_up();
-
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
     

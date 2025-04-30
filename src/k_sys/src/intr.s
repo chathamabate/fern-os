@@ -15,4 +15,8 @@ disable_intrs:
 nop_handler:
     iret
 
+.global halt_cpu
+halt_cpu:
+    hlt
+    ret
 

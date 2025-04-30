@@ -33,6 +33,17 @@ struct _kernel_state_t {
      * When the root proecess exits, the whole kernel should exit!
      */
     process_t *root_proc;
+
+    /**
+     * This counter is initialized as 0 and incremented every time the
+     * timer interrupt handler is entered.
+     */
+    uint32_t curr_tick;
+
+    /**
+     * Threads that call the sleep system call will be placed in this queue.
+     */
+    timed_wait_queue_t *sleep_q;
 };
 
 /**

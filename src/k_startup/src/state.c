@@ -9,19 +9,23 @@
  */
 kernel_state_t *new_kernel_state(allocator_t *al) {
     kernel_state_t *ks = al_malloc(al, sizeof(kernel_state_t));
-    if (!ks) {
-        return NULL;
-    }
-
     id_table_t *pt = new_id_table(al, FOS_MAX_PROCS);
-    if (!pt) {
+    timed_wait_queue_t *twq = new_timed_wait_queue(al);
+
+    if (!ks || !pt || !twq) {
         al_free(al, ks);
+        delete_id_table(pt);
+        delete_wait_queue((wait_queue_t *)twq);
         return NULL;
     }
 
     ks->al = al;
     ks->curr_thread = NULL;
     ks->proc_table = pt;
+    ks->root_proc = NULL;
+
+    ks->curr_tick = 0;
+    ks->sleep_q = twq;
 
     return ks;
 }
