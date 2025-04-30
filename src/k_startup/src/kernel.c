@@ -17,6 +17,7 @@
 #include "s_util/constraints.h"
 #include "k_startup/test/page.h"
 #include "k_startup/test/page_helpers.h"
+#include "s_data/test/list.h"
 #include <stdint.h>
 
 static uint8_t init_err_style;
@@ -56,7 +57,7 @@ static fernos_error_t init_kernel_heap(void) {
     return FOS_SUCCESS;
 }
 
-static kernel_state_t *kernel = NULL;
+kernel_state_t *kernel = NULL;
 
 static fernos_error_t init_kernel_state(void) {
     kernel = new_da_kernel_state();
@@ -118,6 +119,9 @@ void start_kernel(void) {
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     try_setup_step(init_kernel_state(), "Failed to setup kernel state");
+
+    test_linked_list();
+    lock_up();
 
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
