@@ -396,7 +396,7 @@ fernos_error_t twq_enqueue(timed_wait_queue_t *twq, void *item, uint32_t wt) {
     }
 
     if (!iter) { 
-        err = l_push_before_iter(twq->wait_q, &new_pair);
+        err = l_push_back(twq->wait_q, &new_pair);
     }
 
     return err;

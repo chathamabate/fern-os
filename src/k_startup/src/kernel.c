@@ -17,7 +17,10 @@
 #include "s_util/constraints.h"
 #include "k_startup/test/page.h"
 #include "k_startup/test/page_helpers.h"
+
 #include "s_data/test/list.h"
+#include "s_data/test/wait_queue.h"
+
 #include <stdint.h>
 
 static uint8_t init_err_style;
@@ -120,7 +123,7 @@ void start_kernel(void) {
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     try_setup_step(init_kernel_state(), "Failed to setup kernel state");
 
-    test_linked_list();
+    test_timed_wait_queue();
     lock_up();
 
     set_syscall_action(fos_syscall_action);
