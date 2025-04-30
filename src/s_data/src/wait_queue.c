@@ -306,3 +306,66 @@ static void vwq_remove(wait_queue_t *wq, void *item) {
         }
     }
 }
+
+/*
+ * Timed Wait Queue!
+ */
+
+static void delete_timed_wait_queue(wait_queue_t *wq);
+static void twq_remove(wait_queue_t *wq, void *item);
+
+static const wait_queue_impl_t TWQ_IMPL = {
+    .delete_wait_queue = delete_timed_wait_queue,
+    .wq_remove = twq_remove,
+    .wq_dump = NULL // Maybe implement one day.
+};
+
+timed_wait_queue_t *new_timed_wait_queue(allocator_t *al) {
+    timed_wait_queue_t *twq = al_malloc(al, sizeof(timed_wait_queue_t));
+
+    list_t *wait_q = new_linked_list(al, sizeof(twq_wait_pair_t));
+    list_t *ready_q = new_linked_list(al, sizeof(void *));
+
+    if (!twq || !wait_q || !ready_q) {
+        al_free(al, twq);
+        delete_list(wait_q);
+        delete_list(ready_q);
+
+        return NULL;
+    }
+
+    *(const wait_queue_impl_t **)&(twq->super.impl) = &TWQ_IMPL;
+
+    twq->al = al;
+    twq->time = 0;
+    twq->wait_q = wait_q;
+    twq->ready_q = ready_q;
+
+    return twq;
+}
+
+static void delete_timed_wait_queue(wait_queue_t *wq) {
+    timed_wait_queue_t *twq = (timed_wait_queue_t *)wq;
+
+    delete_list(twq->wait_q);
+    delete_list(twq->ready_q);
+    al_free(twq->al, twq);
+}
+
+fernos_error_t twq_enqueue(timed_wait_queue_t *twq, void *item, uint32_t wt) {
+    // Chatham, just do what you enjoy! That's what matters!
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t curr_time) {
+    return FOS_SUCCESS;
+}
+
+fernos_error_t twq_pop(vector_wait_queue_t *vwq, void **item) {
+    return FOS_SUCCESS;
+}
+
+static void twq_remove(wait_queue_t *wq, void *item) {
+
+}

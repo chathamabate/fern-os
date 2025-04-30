@@ -279,32 +279,31 @@ static inline fernos_error_t vwq_notify_all(vector_wait_queue_t *vwq, uint8_t re
  */
 fernos_error_t vwq_pop(vector_wait_queue_t *vwq, void **item, uint8_t *ready_id);
 
-typedef struct _twq_wait_entry_t {
+typedef struct _twq_wait_pair_t {
     void *item;
 
-    /**
-     * At what tick this entry started waiting.
-     */
-    uint32_t start;
-
-    /**
-     * At what tick this entry expects to end waiting.
-     *
-     * NOTE: This CAN be less than start!
-     *
-     * end CANNOT equal start. (Somewhat arbitrary choice)
-     */
-    uint32_t end;
+    uint32_t wake_time;
 } twq_wait_pair_t;
 
 /**
- * Yeah, and how do we deal with wrap??
+ * A "timed" wait queue is really just a sorted list of items which all
+ * hold a wake up time. Items are notified by providing a current time to the queue.
+ * The queue then will move items to the ready queue if their wake up times have passed.
  */
 typedef struct _timed_wait_queue_t {
+    wait_queue_t super;
+
     /**
      * The allocator used for this wait queue.
      */
     allocator_t *al;
+
+    /**
+     * The current "time"
+     *
+     * Always starts as 0.
+     */
+    uint32_t time;
 
     /**
      * Sorted list of waiting items.
@@ -330,27 +329,23 @@ static inline timed_wait_queue_t *new_da_timed_wait_queue(void) {
 /**
  * Enqueue an item in the timed wait queue.
  *
- * s Should be at what tick this item started waiting (i.e. Now)
- * e Should be at what tick this item should stop waiting
- *
- * e can be less than s to account for wrap.
+ * wt is the time to wake up. (Which can be less than the current time)
+ * If wt = the current time, the item is moved to the ready queue immediately.
  *
  * Returns an error if insufficient resources.
- * Returns an error if s == e, this situation is kinda ambiguous.
  */
-fernos_error_t twq_enqueue(timed_wait_queue_t *twq, void *item, uint32_t s, uint32_t e);
+fernos_error_t twq_enqueue(timed_wait_queue_t *twq, void *item, uint32_t wt);
 
 /**
  * Notify all waiting items who have waited long enough.
  *
- * tick represents the current time.
+ * curr_time represents the current time.
  *
- * Items will be notified in order of their precedence. This means, the items which were
- * the longest will be placed on the ready queue first!
+ * Items will be moved to the ready queue in order of their wake up times.
  *
  * Returns on error if insufficient resources.
  */
-fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t tick);
+fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t curr_time);
 
 /**
  * Pop an item of the ready queue.
