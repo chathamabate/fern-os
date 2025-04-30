@@ -59,11 +59,48 @@ static fernos_error_t init_kernel_heap(void) {
 static kernel_state_t *kernel = NULL;
 
 static fernos_error_t init_kernel_state(void) {
-    kernel = new_da_blank_kernel_state();
+    kernel = new_da_kernel_state();
     if (!kernel) {
         return FOS_NO_MEM;
     }
 
+    proc_id_t pid = idtb_pop_id(kernel->proc_table);
+    if (pid == idtb_null_id(kernel->proc_table)) {
+        return FOS_NO_MEM;
+    }
+
+    uint32_t user_pd = pop_initial_user_info();
+    if (user_pd == NULL_PHYS_ADDR) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    process_t *proc = new_da_process(pid, user_pd, NULL);
+    if (!proc) {
+        return FOS_NO_MEM;
+    }
+
+    kernel->root_proc = proc;
+    idtb_set(kernel->proc_table, pid, proc);
+
+    // Now create our first thread!
+
+    thread_id_t tid = idtb_pop_id(proc->thread_table);
+    if (tid == idtb_null_id(proc->thread_table)) {
+        return FOS_NO_MEM;
+    }
+
+    thread_t *thr = new_da_thread(tid, proc, user_main, NULL);
+    if (!thr) {
+        return FOS_NO_MEM;
+    }
+
+    proc->main_thread = thr;
+    idtb_set(proc->thread_table, tid, thr);
+
+    // Finally, schedule our first thread!
+    ks_schedule_thread(kernel, thr);
+
+    return FOS_SUCCESS;
 }
 
 void start_kernel(void) {
@@ -81,39 +118,9 @@ void start_kernel(void) {
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     try_setup_step(init_kernel_state(), "Failed to setup kernel state");
-    
-    uint32_t user_pd = pop_initial_user_info();
-    if (user_pd == NULL_PHYS_ADDR) {
-        setup_fatal("Failed to get first user PD");
-    }
 
-
-    // Let's assume we are using thread 0.
-
-    uint8_t *ustack_end = (uint8_t *)FOS_THREAD_STACK_END(0);
-    uint8_t *ustack_start = ustack_end - M_4K;
-
-    const void *true_e;
-    try_setup_step(pd_alloc_pages(user_pd, true, ustack_start, ustack_end, &true_e), 
-            "Failed to allocated first stack");
-
-    set_timer_action(fos_timer_action);
     set_syscall_action(fos_syscall_action);
-
-    user_ctx_t ctx = { 
-        .ds = USER_DATA_SELECTOR,
-        .cr3 = user_pd,
-
-        .eax = (uint32_t)user_main,
-        .ecx = (uint32_t)4,
-
-        .eip = (uint32_t)thread_entry_routine,
-        .cs = USER_CODE_SELECTOR,
-        .eflags = read_eflags() | (1 << 9),
-
-        .esp = (uint32_t)ustack_end,
-        .ss = USER_DATA_SELECTOR
-    };
-
-    return_to_ctx(&ctx);
+    set_timer_action(fos_timer_action);
+    
+    return_to_ctx(&(kernel->curr_thread->ctx));
 }

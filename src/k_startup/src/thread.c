@@ -10,6 +10,7 @@
 #include "s_util/str.h"
 #include "u_startup/main.h"
 #include "k_startup/page.h"
+#include "k_bios_term/term.h"
 
 thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_entry_t entry, void *arg) {
     if (tid >= FOS_MAX_THREADS_PER_PROC) {
@@ -30,7 +31,8 @@ thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_e
 
     const void *true_e;
     uint8_t *tstack_end = (uint8_t *)FOS_THREAD_STACK_END(tid);
-    fernos_error_t err = pd_alloc_pages(proc->pd, true, tstack_end, tstack_end - M_4K, &true_e);
+    fernos_error_t err = pd_alloc_pages(proc->pd, true, tstack_end - (2*M_4K), tstack_end, &true_e);
+
     if (err != FOS_SUCCESS && err != FOS_ALREADY_ALLOCATED) {
         al_free(al, thr);
         return NULL;

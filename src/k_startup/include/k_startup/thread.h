@@ -92,6 +92,7 @@ static inline thread_t *new_da_thread(thread_id_t tid, process_t *proc, thread_e
 }
 
 /**
+ * TBH, might end up deleting this endpoint... Thread deletion will involve a lot of kernel specific things.
  * Delete a thread!
  *
  * If this thread is in a wait queue, it is removed from that wait queue.

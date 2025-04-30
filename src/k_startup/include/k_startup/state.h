@@ -40,8 +40,27 @@ struct _kernel_state_t {
  *
  * Returns NULL on error.
  */
-kernel_state_t *new_blank_kernel_state(allocator_t *al);
+kernel_state_t *new_kernel_state(allocator_t *al);
 
-static inline kernel_state_t *new_da_blank_kernel_state(void) {
-    return new_blank_kernel_state(get_default_allocator());
+static inline kernel_state_t *new_da_kernel_state(void) {
+    return new_kernel_state(get_default_allocator());
 }
+
+/**
+ * Takes a thread and adds it to the schedule!
+ *
+ * We expect the given thread to be in a detatched state.
+ * (However, this is not checked, so be careful!)
+ *
+ * Undefined behavoir will occur if the same thread appears twice
+ * in the schedule! So make sure this never happens!
+ */
+void ks_schedule_thread(kernel_state_t *ks, thread_t *thr);
+
+/**
+ * Remove a scheduled thread from the schedule!
+ *
+ * Like above, we don't actually check if the given thread is scheduled
+ * or not, we just assume it is! (SO BE CAREFUL)
+ */
+void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr);

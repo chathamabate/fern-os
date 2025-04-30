@@ -7,11 +7,9 @@
 #include "s_bridge/syscall.h"
 
 void *user_main(void *arg) {
-    //term_put_fmt_s("Arg Given: %X\n", arg);
-
+    (void)arg;
     while (1) {
     }
-    return (void *)5;
 }
 
 

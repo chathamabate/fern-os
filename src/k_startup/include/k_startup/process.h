@@ -103,6 +103,8 @@ struct _process_t {
 /**
  * This allocates a process with basically no information.
  *
+ * The main thread will start as NULL.
+ *
  * If any allocation fails, NULL is returned.
  */
 process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent);
