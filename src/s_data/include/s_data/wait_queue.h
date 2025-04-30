@@ -355,4 +355,4 @@ fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t curr_time);
  * Returns FOS_SUCCESS if an item was successfully popped. If item is given, the popped item
  * will be written to *item.
  */
-fernos_error_t twq_pop(vector_wait_queue_t *vwq, void **item);
+fernos_error_t twq_pop(timed_wait_queue_t *twq, void **item);

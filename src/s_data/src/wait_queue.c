@@ -352,20 +352,127 @@ static void delete_timed_wait_queue(wait_queue_t *wq) {
     al_free(twq->al, twq);
 }
 
-fernos_error_t twq_enqueue(timed_wait_queue_t *twq, void *item, uint32_t wt) {
-    // Chatham, just do what you enjoy! That's what matters!
+/**
+ * This returns the number of ticks which must be waited from the current time until the wake time
+ * is reached!
+ */
+static uint32_t abs_wait_time(uint32_t curr_time, uint32_t wake_time) {
+    if (curr_time <= wake_time) { // No wrap!
+        return wake_time - curr_time;
+    }
 
-    return FOS_SUCCESS;
+    // Since the wake time < curr time, we will need to wait until after the wrap to wake up!
+
+    // This is ok because we know curr_time > 0 here.
+    return (UINT32_MAX - curr_time) + 1 + wake_time;
+}
+
+fernos_error_t twq_enqueue(timed_wait_queue_t *twq, void *item, uint32_t wt) {
+    // If wake time is current time, move to the ready queue immediately.
+    if (wt == twq->time) {
+        return l_push_back(twq->ready_q, &item);
+    }
+
+    fernos_error_t err;
+
+    twq_wait_pair_t new_pair = {
+        .item = item,
+        .wake_time = wt
+    };
+
+    // Number of ticks until our new pair wakes up!
+    uint32_t np_abs_wait = abs_wait_time(twq->time, new_pair.wake_time);
+
+    l_reset_iter(twq->wait_q);
+    twq_wait_pair_t *iter;
+    for (iter = (twq_wait_pair_t *)l_get_iter(twq->wait_q); iter; 
+            iter = (twq_wait_pair_t *)l_next_iter(twq->wait_q)) {
+        uint32_t iter_abs_wait = abs_wait_time(twq->time, iter->wake_time);
+
+        if (np_abs_wait < iter_abs_wait) {
+            err = l_push_before_iter(twq->wait_q, &new_pair);
+            break;
+        }
+    }
+
+    if (!iter) { 
+        err = l_push_before_iter(twq->wait_q, &new_pair);
+    }
+
+    return err;
 }
 
 fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t curr_time) {
-    return FOS_SUCCESS;
+    fernos_error_t err = FOS_SUCCESS;
+
+    uint32_t ticks_passed = abs_wait_time(twq->time, curr_time);
+
+    while (l_get_len(twq->wait_q) > 0) {
+        twq_wait_pair_t *head = (twq_wait_pair_t *)l_get_ptr(twq->wait_q, 0);
+        
+        uint32_t ticks_needed = abs_wait_time(twq->time, head->wake_time);
+
+        // If we've waited long enough, we can move our item to the ready queue!
+        if (ticks_needed <= ticks_passed) {
+            err = l_push_back(twq->ready_q, &(head->item));
+
+            // If the push fails, just error out where we are.
+            if (err != FOS_SUCCESS) {
+                break;
+            }
+
+            // If our push succeeded, then do the pop. (Which will always succeed.)
+            l_pop_front(twq->wait_q, NULL);
+        } else {
+            // If we've reached an item which must still sleep, we know all remaining 
+            // items must also still sleep. We can exit the loop early.
+            break;
+        }
+    }
+
+    // Right now, we always set the time, even in case of error.
+    // So, just know that when a memory error occurs, the state of the queue could be slightly
+    // funky. In this case, you should really just dispose of the queue.
+    twq->time = curr_time;
+
+    return err;
 }
 
-fernos_error_t twq_pop(vector_wait_queue_t *vwq, void **item) {
+fernos_error_t twq_pop(timed_wait_queue_t *twq, void **item) {
+    if (l_get_len(twq->ready_q) == 0) {
+        return FOS_EMPTY;
+    }
+
+    l_pop_front(twq->ready_q, item);                
     return FOS_SUCCESS;
 }
 
 static void twq_remove(wait_queue_t *wq, void *item) {
+    timed_wait_queue_t *twq = (timed_wait_queue_t *)wq;
 
+    twq_wait_pair_t *p;
+
+    l_reset_iter(twq->wait_q);
+    p = (twq_wait_pair_t *)l_get_iter(twq->wait_q);
+    while (p) {
+        if (p->item == item) {
+            l_pop_iter(twq->wait_q, NULL);
+            p = (twq_wait_pair_t *)l_get_iter(twq->wait_q);
+        } else {
+            p = (twq_wait_pair_t *)l_next_iter(twq->wait_q);
+        }
+    }
+
+    void **i;
+
+    l_reset_iter(twq->ready_q);
+    i = (void **)l_get_iter(twq->ready_q);
+    while (i) {
+        if (*i == item) {
+            l_pop_iter(twq->ready_q, NULL);
+            i = (void **)l_get_iter(twq->ready_q);
+        } else {
+            i = (void **)l_next_iter(twq->ready_q);
+        }
+    }
 }
