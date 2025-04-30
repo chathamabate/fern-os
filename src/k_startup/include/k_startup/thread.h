@@ -42,6 +42,9 @@ struct _thread_t {
 
     /**
      * These are used for scheduling only.
+     *
+     * We expect when threads are scheduled, that they belong to a cyclic
+     * doubly linked list. (i.e. these two pointers should never be NULL when scheduled)
      */
     thread_t *next_thread;
     thread_t *prev_thread;
@@ -70,11 +73,35 @@ struct _thread_t {
     user_ctx_t ctx;
 };
 
-thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_entry_t entry);
+/**
+ * Create a new thread!
+ *
+ * Returns NULL if we have insufficient memory to create the thread. Or if arguments are invalid.
+ *
+ * This function will also allocate the initial stack page for the created thread in the parent proc's
+ * page directory. NOTE: This function does NOT fail if the stack area is already allocated.
+ * So be careful! Make sure one thread is only ever using one stack area!
+ *
+ * Also, this function does not edit the parent process in anyway. It it your responsibility
+ * to actually place the created thread into the process's thread table!
+ */
+thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_entry_t entry, void *arg);
 
-static inline thread_t *new_da_thread(thread_id_t tid, process_t *proc, thread_entry_t entry) {
-    return new_thread(get_default_allocator(), tid, proc, entry);
+static inline thread_t *new_da_thread(thread_id_t tid, process_t *proc, thread_entry_t entry, void *arg) {
+    return new_thread(get_default_allocator(), tid, proc, entry, arg);
 }
+
+/**
+ * Delete a thread!
+ *
+ * If this thread is in a wait queue, it is removed from that wait queue.
+ * If this thread is scheduled, it is removed from the schedule list.
+ * NOTE: When cleaning up a thread, you will likely need to perform some kernel specific
+ * operations before calling this function!
+ *
+ * This DOES NOT edit the parent process or the overall kernel.
+ */
+void delete_thread(thread_t *thr);
 
 
 

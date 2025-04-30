@@ -21,8 +21,6 @@
 
 static uint8_t init_err_style;
 
-static kernel_state_t *kernel = NULL;
-
 static inline void setup_fatal(const char *msg) {
     out_bios_vga(init_err_style, msg);
     lock_up();
@@ -58,6 +56,16 @@ static fernos_error_t init_kernel_heap(void) {
     return FOS_SUCCESS;
 }
 
+static kernel_state_t *kernel = NULL;
+
+static fernos_error_t init_kernel_state(void) {
+    kernel = new_da_blank_kernel_state();
+    if (!kernel) {
+        return FOS_NO_MEM;
+    }
+
+}
+
 void start_kernel(void) {
     init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
@@ -71,12 +79,8 @@ void start_kernel(void) {
 
     try_setup_step(init_term(), "Failed to initialize Terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
-
-    //test_page();
-    test_page_helpers();
-    lock_up();
-
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
+    try_setup_step(init_kernel_state(), "Failed to setup kernel state");
     
     uint32_t user_pd = pop_initial_user_info();
     if (user_pd == NULL_PHYS_ADDR) {

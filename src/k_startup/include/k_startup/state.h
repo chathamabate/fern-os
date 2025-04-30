@@ -26,10 +26,13 @@ struct _kernel_state_t {
 
     /**
      * Every process will have a globally unique ID!
-     *
-     * NOTE: IT IS GAURANTEED that the root process has pid 0.
      */
     id_table_t *proc_table;
+
+    /**
+     * When the root proecess exits, the whole kernel should exit!
+     */
+    process_t *root_proc;
 };
 
 /**
