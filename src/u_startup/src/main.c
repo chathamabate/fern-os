@@ -7,8 +7,9 @@
 #include "s_bridge/syscall.h"
 
 void *user_main(void *arg) {
-    (void)arg;
     while (1) {
+        sc_term_put_s("Hello\n");
+        sc_thread_sleep(100);
     }
 }
 

@@ -9,6 +9,10 @@ void sc_thread_exit(void *retval) {
     // Does not make it here.
 }
 
+void sc_thread_sleep(uint32_t ticks) {
+    (void)trigger_syscall(SCID_THREAD_SLEEP, (void *)ticks);
+}
+
 void sc_term_put_s(const char *s) {
     buffer_arg_t arg = {
         .buf_size = str_len(s) + 1,
@@ -17,3 +21,4 @@ void sc_term_put_s(const char *s) {
 
     (void)trigger_syscall(SCID_TERM_PUT_S, &arg);
 }
+

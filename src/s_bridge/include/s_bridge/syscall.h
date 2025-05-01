@@ -2,6 +2,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 /*
  * In this file, SCID is short for SYSCALL ID.
@@ -29,6 +30,15 @@ typedef struct _buffer_arg_t {
  */
 #define SCID_THREAD_EXIT (0x100U)
 void sc_thread_exit(void *retval);
+
+/**
+ * Have the current thread sleep for at least `ticks` timer interrupts.
+ *
+ * Remember, this only sleeps the calling thread. Other threads in the parent process will be 
+ * left untouched.
+ */
+#define SCID_THREAD_SLEEP (0x101U)
+void sc_thread_sleep(uint32_t ticks);
 
 /**
  * Output a string to the BIOS terminal.

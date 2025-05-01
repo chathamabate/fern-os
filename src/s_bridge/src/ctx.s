@@ -54,7 +54,7 @@ It restores the context and calls iret!
 */
 .local exit_intr_ctx
 exit_intr_ctx:
-    // Skip return value
+    // Skip return address
     add $4, %esp
 
     // Restore context data segment registers.

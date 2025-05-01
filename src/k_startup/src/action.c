@@ -6,6 +6,7 @@
 #include "s_util/err.h"
 #include "s_util/misc.h"
 #include "s_util/ansii.h"
+#include "s_util/str.h"
 #include "s_bridge/syscall.h"
 #include "s_mem/allocator.h"
 #include "k_startup/page.h"
@@ -13,6 +14,46 @@
 #include "k_startup/kernel.h"
 #include <stdint.h>
 #include "k_startup/state.h"
+#include "s_data/wait_queue.h"
+#include "k_startup/thread.h"
+#include "k_startup/gdt.h"
+#include "k_sys/intr.h"
+#include "s_util/constraints.h"
+
+/**
+ * This function remains in kernel mode, but enables interrupts and resets the kernel stack!
+ * Should be used when there are no threads to schedule!
+ */
+static void return_to_halt_context(void) {
+    user_ctx_t halt_ctx = {
+        .ds = KERNEL_DATA_SELECTOR,
+        .cr3 = get_kernel_pd(),
+
+        .eip = (uint32_t)halt_cpu,
+        .cs = KERNEL_CODE_SELECTOR,
+        .eflags = read_eflags() | (1 << 9),
+
+        .esp = FOS_KERNEL_STACK_END - sizeof(uint32_t),
+        .ss = KERNEL_DATA_SELECTOR
+    };
+
+    return_to_ctx(&halt_ctx);
+}
+
+/**
+ * This enters the context of the current thread.
+ *
+ * If there is no current thread, enter the halt context.
+ */
+static void return_to_curr_thread(void) {
+    if (kernel->curr_thread) {
+        return_to_ctx(&(kernel->curr_thread->ctx));
+    }
+
+    // If we make it here, we have no thread to schedule :,(
+
+    return_to_halt_context();
+}
 
 // A lot more to build up here, although, tbh, we aren't that far from
 // being done...
@@ -24,18 +65,69 @@ void fos_gpf_action(user_ctx_t *ctx) {
 }
 
 void fos_timer_action(user_ctx_t *ctx) {
-    term_put_fmt_s("Timer\n", ctx);
-    return_to_ctx(ctx);
+    // When a timer interrupt is received, we must notify the sleep
+    // queue with the current time!
+
+    fernos_error_t err;
+
+    // First things first, if we were executing a real thread, save its state!
+    if (kernel->curr_thread) {
+        kernel->curr_thread->ctx = *ctx; 
+    };
+
+    kernel->curr_tick++;
+
+    twq_notify(kernel->sleep_q, kernel->curr_tick);
+
+    thread_t *woken_thread;
+    while ((err = twq_pop(kernel->sleep_q, (void **)&woken_thread)) == FOS_SUCCESS) {
+        // Prepare to be scheduled!
+        woken_thread->next_thread = NULL;
+        woken_thread->prev_thread = NULL;
+        woken_thread->state = THREAD_STATE_DETATCHED;
+
+        ks_schedule_thread(kernel, woken_thread);
+    }
+
+    term_put_fmt_s("ADDR: %X\n", &woken_thread);
+
+    if (err != FOS_EMPTY) {
+        // TODO Do something here...
+        term_put_s("Error waking up threads?\n");
+        lock_up();
+    }
+
+    if (kernel->curr_thread) {
+        kernel->curr_thread = kernel->curr_thread->next_thread;
+    }
+
+    return_to_curr_thread();
 }
 
 void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
     fernos_error_t err;
     buffer_arg_t buf_arg;
+    thread_t *thr;
 
     switch (id) {
     case SCID_THREAD_EXIT:
         term_put_fmt_s("Thread Exited with arg %u\n", arg);
         lock_up();
+
+    case SCID_THREAD_SLEEP:
+        thr = kernel->curr_thread; // Gauranteed non-null.
+        thr->ctx = *ctx;           // Save context
+
+        ks_deschedule_thread(kernel, thr);
+        err = twq_enqueue(kernel->sleep_q, (void *)thr, 
+                kernel->curr_tick + (uint32_t)arg);
+
+        if (err != FOS_SUCCESS) {
+            term_put_s("BAD SLEEP CALL\n");
+            lock_up();
+        }
+
+        return_to_curr_thread();
 
     case SCID_TERM_PUT_S:
         if (!arg) {
@@ -52,7 +144,6 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
         da_free(buf);
 
         return_to_ctx(ctx);
-        break;
 
     default:
         term_put_s("Unknown syscall!\n");
