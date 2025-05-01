@@ -130,6 +130,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
     buffer_arg_t buf_arg;
     thread_t *thr;
     process_t *proc;
+    thread_spawn_arg_t ts_arg;
 
     switch (id) {
     case SCID_THREAD_EXIT:
@@ -137,12 +138,8 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
         lock_up();
 
     case SCID_THREAD_SLEEP:
-        thr = kernel->curr_thread; // Gauranteed non-null.
-        thr->ctx = *ctx;           // Save context
-
-        ks_deschedule_thread(kernel, thr);
-        err = twq_enqueue(kernel->sleep_q, (void *)thr, 
-                kernel->curr_tick + (uint32_t)arg);
+        ks_save_curr_thread_ctx(kernel, ctx);
+        err = ks_sleep_curr_thread(kernel, (uint32_t)arg);
 
         if (err != FOS_SUCCESS) {
             term_put_s("BAD SLEEP CALL\n");
@@ -152,23 +149,14 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
         return_to_curr_thread();
 
     case SCID_THREAD_SPAWN:
-
-        thr = kernel->curr_thread;
-        proc = thr->proc;
-
-        thread_spawn_arg_t ts_arg;
-
         mem_cpy_from_user(&ts_arg, ctx->cr3, arg, sizeof(thread_spawn_arg_t), NULL);
 
-        thread_t *new_thr;
+        err = ks_branch_curr_thread(kernel, NULL, ts_arg.entry, ts_arg.arg);
 
-        err = proc_create_thread(proc, &new_thr, ts_arg.entry, ts_arg.arg);
         if (err != FOS_SUCCESS) {
             term_put_s("Bad Thread Creation\n");
             lock_up();
         }
-
-        ks_schedule_thread(kernel, new_thr);
 
         return_to_ctx_with_value(ctx, err);
 

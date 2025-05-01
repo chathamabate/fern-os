@@ -3,6 +3,7 @@
 #include "s_util/constraints.h"
 #include "k_startup/state.h"
 #include "k_startup/thread.h"
+#include "k_startup/process.h"
 
 /**
  * Creates a new kernel state with basically no fleshed out details.
@@ -28,6 +29,10 @@ kernel_state_t *new_kernel_state(allocator_t *al) {
     ks->sleep_q = twq;
 
     return ks;
+}
+
+void ks_save_curr_thread_ctx(kernel_state_t *ks, user_ctx_t *ctx) {
+    ks->curr_thread->ctx = *ctx;
 }
 
 void ks_schedule_thread(kernel_state_t *ks, thread_t *thr) {
@@ -66,5 +71,56 @@ void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr) {
     thr->prev_thread = NULL;
 
     thr->state = THREAD_STATE_DETATCHED;
+}
+
+fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks) {
+    fernos_error_t err;
+
+    thread_t *thr = ks->curr_thread;
+
+    err = twq_enqueue(ks->sleep_q, (void *)thr, 
+            ks->curr_tick + ticks);
+
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    // Only deschedule one we know our thread was added successfully to the wait queue!
+    ks_deschedule_thread(ks, thr);
+    thr->wq = (wait_queue_t *)(ks->sleep_q);
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t ks_branch_curr_thread(kernel_state_t *ks, thread_id_t *tid,
+        thread_entry_t entry, void *arg) {
+    if (!entry) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    process_t *curr_proc = ks->curr_thread->proc;
+
+    thread_t *new_thr;
+
+    err = proc_create_thread(curr_proc, &new_thr, entry, arg);
+
+    if (err != FOS_SUCCESS) {
+        if (tid) {
+            *tid = idtb_null_id(curr_proc->thread_table);
+        }
+
+        return err;
+    }
+
+    // Schedule our new thread!
+    ks_schedule_thread(ks, new_thr);
+
+    if (tid) {
+        *tid = new_thr->tid;
+    }
+
+    return FOS_SUCCESS;
 }
 

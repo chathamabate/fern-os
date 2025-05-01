@@ -6,6 +6,7 @@
 #include "k_sys/page.h"
 #include "s_mem/allocator.h"
 #include "k_startup/fwd_defs.h"
+#include "s_bridge/ctx.h"
 
 struct _kernel_state_t {
     /**
@@ -58,6 +59,13 @@ static inline kernel_state_t *new_da_kernel_state(void) {
 }
 
 /**
+ * This function saves the given context into the current thread.
+ *
+ * Undefined behavior if there is no current thread.
+ */
+void ks_save_curr_thread_ctx(kernel_state_t *ks, user_ctx_t *ctx);
+
+/**
  * Takes a thread and adds it to the schedule!
  *
  * We expect the given thread to be in a detatched state.
@@ -75,3 +83,27 @@ void ks_schedule_thread(kernel_state_t *ks, thread_t *thr);
  * or not, we just assume it is! (SO BE CAREFUL)
  */
 void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr);
+
+/**
+ * Take the current thread, deschedule it, and add it it to the sleep wait queue.
+ *
+ * (Undefined behavior if there is no current thread)
+ *
+ * Returns an error if there are insufficient resources. In this case the thread will 
+ * remain scheduled.
+ */
+fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks);
+
+/**
+ * Spawn new thread in the current process using entry and arg.
+ *
+ * On success, if tid is given, the new thread's id is writen to *tid.
+ * On error, if tid is given, the null thread id is written to tid.
+ *
+ * The created thread is added to the schedule!
+ *
+ * Undefined behavior if no current thread.
+ */
+fernos_error_t ks_branch_curr_thread(kernel_state_t *ks, thread_id_t *tid, 
+        thread_entry_t entry, void *arg);
+
