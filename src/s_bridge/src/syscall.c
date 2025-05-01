@@ -13,8 +13,10 @@ void sc_thread_sleep(uint32_t ticks) {
     (void)trigger_syscall(SCID_THREAD_SLEEP, (void *)ticks);
 }
 
-fernos_error_t sc_thread_spawn(void *(*entry)(void *arg), void *arg) {
+fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void *arg) {
     thread_spawn_arg_t ts_arg = {
+        .tid = tid,
+
         .entry = entry,
         .arg = arg
     };

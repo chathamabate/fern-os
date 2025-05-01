@@ -4,6 +4,7 @@
 #include "k_startup/fwd_defs.h"
 #include "k_sys/page.h"
 #include "s_mem/allocator.h"
+#include "s_data/wait_queue.h"
 
 struct _process_t {
     /**
@@ -46,13 +47,14 @@ struct _process_t {
     id_table_t *thread_table;
 
     /**
-     * When a thread quits, its ID will be sent through this queue to find which other threads
-     * were waiting. Remember a vector queue only supports 32 different events. So, there can
+     * When a thread quits, its ID will be sent through this queue to find if another
+     * thread was waiting. Remember a vector queue only supports 32 different events. So, there can
      * only be a maximum of 32 different threads at any given time.
      *
-     * NOTE: Might change this later.
+     * NOTE: 1 thread can wait on multiple threads, however 1 thread cannot be waited
+     * on by multiple threads.
      */
-    //vector_wait_queue_t *join_queue;
+    vector_wait_queue_t *join_queue;
 
     /**
      * all processes have a main thread. When this thread exits, the process exits.

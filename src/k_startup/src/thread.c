@@ -24,6 +24,8 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
 
     allocator_t *al = proc->al;
 
+    // Many, many things to think about here tbh....
+
     thread_t *thr = al_malloc(al, sizeof(thread_t));
     if (!thr) {
         return NULL;

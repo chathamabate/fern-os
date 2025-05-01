@@ -31,8 +31,10 @@ kernel_state_t *new_kernel_state(allocator_t *al) {
     return ks;
 }
 
-void ks_save_curr_thread_ctx(kernel_state_t *ks, user_ctx_t *ctx) {
-    ks->curr_thread->ctx = *ctx;
+void ks_save_ctx(kernel_state_t *ks, user_ctx_t *ctx) {
+    if (ks->curr_thread) {
+        ks->curr_thread->ctx = *ctx;
+    }
 }
 
 void ks_schedule_thread(kernel_state_t *ks, thread_t *thr) {
@@ -71,6 +73,42 @@ void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr) {
     thr->prev_thread = NULL;
 
     thr->state = THREAD_STATE_DETATCHED;
+}
+
+fernos_error_t ks_tick(kernel_state_t *ks) {
+    fernos_error_t err;
+
+    bool not_halted = ks->curr_thread != NULL;
+
+    ks->curr_tick++;
+
+    twq_notify(ks->sleep_q, ks->curr_tick);
+
+    thread_t *woken_thread;
+    while ((err = twq_pop(ks->sleep_q, (void **)&woken_thread)) == FOS_SUCCESS) {
+        // Prepare to be scheduled!
+        woken_thread->next_thread = NULL;
+        woken_thread->prev_thread = NULL;
+        woken_thread->state = THREAD_STATE_DETATCHED;
+
+        ks_schedule_thread(ks, woken_thread);
+    }
+
+    if (err != FOS_EMPTY) {
+        return err;
+    }
+
+    /*
+     * We only advance the schedule if we weren't halted when we entered this handler.
+     *
+     * Otherwise, the order threads are woken up doesn't always match when they execute.
+     * (This doesn't really matter that much, but makes execution behavior more predictable)
+     */
+    if (not_halted) {
+        ks->curr_thread = ks->curr_thread->next_thread;
+    }
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks) {

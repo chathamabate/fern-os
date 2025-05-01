@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "s_util/err.h"
+#include "s_bridge/shared_defs.h"
 
 /*
  * In this file, SCID is short for SYSCALL ID.
@@ -43,6 +44,8 @@ void sc_thread_exit(void *retval);
 void sc_thread_sleep(uint32_t ticks);
 
 typedef struct _thread_spawn_arg_t {
+    thread_id_t *tid;
+
     void *(*entry)(void *arg);
     void *arg;
 } thread_spawn_arg_t;
@@ -53,9 +56,12 @@ typedef struct _thread_spawn_arg_t {
  * Returns FOS_SUCCESS on success.
  *
  * Returns an error otherwise. (The thread is not spawned in this case)
+ *
+ * If tid is given, the created thread's id is written to tid.
+ * On error, the null tid is written, (FOS_MAX_THREADS_PER_PROC)
  */
 #define SCID_THREAD_SPAWN (0x102U)
-fernos_error_t sc_thread_spawn(void *(*entry)(void *arg), void *arg);
+fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void *arg);
 
 /**
  * Output a string to the BIOS terminal.

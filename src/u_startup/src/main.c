@@ -10,20 +10,25 @@
 void *other_main(void *arg);
 
 void *user_main(void *arg) {
-    sc_thread_spawn(other_main, (void *)2);
-    //sc_thread_spawn(other_main, (void *)1);
+    char S[32];
+    thread_id_t tid;
+    
+    fernos_error_t err = sc_thread_spawn(&tid, other_main, (void *)2);
+    if (err != FOS_SUCCESS) {
+        sc_term_put_s("Failed to spawn thread\n");
+    } else {
+        str_fmt(S, "Spawned ID: %X\n", tid);
+        sc_term_put_s(S);
+    }
+
     while (1) {
-        sc_term_put_s("Hello from OG\n");
         sc_thread_sleep(0);
     }
 }
 
 void *other_main(void *arg) {
-    char S[32];
-    str_fmt(S, "Hello from: %X\n", (uint32_t)arg);
 
     while (1) {
-        sc_term_put_s(S);
         sc_thread_sleep(0);
     }
 }

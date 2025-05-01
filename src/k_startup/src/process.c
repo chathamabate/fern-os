@@ -8,7 +8,14 @@
 
 process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent) {
     process_t *proc = al_malloc(al, sizeof(process_t));
-    if (!proc) {
+    id_table_t *thread_table = new_id_table(al, FOS_MAX_THREADS_PER_PROC);
+    vector_wait_queue_t *join_queue = new_vector_wait_queue(al);
+
+    if (!proc || !thread_table || !join_queue) {
+        al_free(al, proc);
+        delete_id_table(thread_table);
+        delete_wait_queue((wait_queue_t *)join_queue);
+
         return NULL;
     }
 
@@ -16,11 +23,8 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     proc->pid = pid;
     proc->parent = parent;
 
-    proc->thread_table = new_id_table(al, FOS_MAX_THREADS_PER_PROC);
-    if (!(proc->thread_table)) {
-        al_free(al, proc);
-        return NULL;
-    }
+    proc->thread_table = thread_table;
+    proc->join_queue = join_queue;
 
     proc->main_thread = NULL;
     proc->pd = pd;
@@ -62,3 +66,9 @@ fernos_error_t proc_create_thread(process_t *proc, thread_t **thr,
     return FOS_SUCCESS;
 }
 
+
+// Maybe we defer the process deletion stuff out to the kernel state??
+// That's def an idea...
+//
+// When a process thread exits??
+// OK, god only knows how this is all going to work tbh...

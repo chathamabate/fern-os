@@ -80,46 +80,12 @@ void fos_gpf_action(user_ctx_t *ctx) {
 }
 
 void fos_timer_action(user_ctx_t *ctx) {
-    // When a timer interrupt is received, we must notify the sleep
-    // queue with the current time!
-
-    fernos_error_t err;
-
-    bool not_halted = kernel->curr_thread != NULL;
-
-    // First things first, if we were executing a real thread, save its state!
-    if (not_halted) {
-        kernel->curr_thread->ctx = *ctx; 
-    };
-
-    kernel->curr_tick++;
-
-    twq_notify(kernel->sleep_q, kernel->curr_tick);
-
-    thread_t *woken_thread;
-    while ((err = twq_pop(kernel->sleep_q, (void **)&woken_thread)) == FOS_SUCCESS) {
-        // Prepare to be scheduled!
-        woken_thread->next_thread = NULL;
-        woken_thread->prev_thread = NULL;
-        woken_thread->state = THREAD_STATE_DETATCHED;
-
-        ks_schedule_thread(kernel, woken_thread);
-    }
-
-    if (err != FOS_EMPTY) {
-        // TODO Do something here...
-        term_put_s("Error waking up threads?\n");
+    ks_save_ctx(kernel, ctx);
+    
+    fernos_error_t err = ks_tick(kernel);
+    if (err != FOS_SUCCESS) {
+        term_put_s("AHHHH\n");
         lock_up();
-    }
-
-    /*
-     * We only advance the schedule if we weren't halted when we entered this handler.
-     *
-     * Otherwise, the order threads are woken up doesn't always match when they execute.
-     * (This doesn't really matter that much, but makes execution behavior more predictable)
-     */
-    if (not_halted) {
-        kernel->curr_thread = kernel->curr_thread->next_thread;
     }
 
     return_to_curr_thread();
@@ -138,7 +104,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
         lock_up();
 
     case SCID_THREAD_SLEEP:
-        ks_save_curr_thread_ctx(kernel, ctx);
+        ks_save_ctx(kernel, ctx);
         err = ks_sleep_curr_thread(kernel, (uint32_t)arg);
 
         if (err != FOS_SUCCESS) {
@@ -151,11 +117,17 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
     case SCID_THREAD_SPAWN:
         mem_cpy_from_user(&ts_arg, ctx->cr3, arg, sizeof(thread_spawn_arg_t), NULL);
 
-        err = ks_branch_curr_thread(kernel, NULL, ts_arg.entry, ts_arg.arg);
+        thread_id_t tid;
+
+        err = ks_branch_curr_thread(kernel, &tid, ts_arg.entry, ts_arg.arg);
 
         if (err != FOS_SUCCESS) {
             term_put_s("Bad Thread Creation\n");
             lock_up();
+        }
+
+        if (ts_arg.tid) {
+            mem_cpy_to_user(ctx->cr3, ts_arg.tid, &tid, sizeof(thread_id_t), NULL);
         }
 
         return_to_ctx_with_value(ctx, err);
