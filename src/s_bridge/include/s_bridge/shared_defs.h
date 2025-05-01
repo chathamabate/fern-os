@@ -21,3 +21,24 @@ typedef id_t thread_id_t;
  * Created threads must be entered via a function conforming to this siganture!
  */
 typedef void *(*thread_entry_t)(void *arg);
+
+/**
+ * A vector for specifying which 
+ */
+typedef uint32_t join_vector_t;
+
+static inline join_vector_t empty_join_vector(void) {
+    return 0;
+}
+
+static inline void jv_add_tid(join_vector_t *jv, thread_id_t tid) {
+    if (tid < 32) {
+        *jv |= (1 << tid);
+    }
+}
+
+static inline void jv_remove_tid(join_vector_t *jv, thread_id_t tid) {
+    if (tid < 32) {
+        *jv &= ~(1 << tid);
+    }
+}

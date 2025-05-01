@@ -24,6 +24,16 @@ fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void
     return (fernos_error_t)trigger_syscall(SCID_THREAD_SPAWN, &ts_arg);
 }
 
+fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retval) {
+    thread_join_arg_t tj_arg = {
+        .jv = jv,
+        .joined = joined,
+        .retval = retval
+    };
+
+    return (fernos_error_t)trigger_syscall(SCID_THREAD_JOIN, &tj_arg);
+}
+
 void sc_term_put_s(const char *s) {
     buffer_arg_t arg = {
         .buf_size = str_len(s) + 1,

@@ -96,8 +96,7 @@ fernos_error_t ks_tick(kernel_state_t *ks);
 /**
  * Take the current thread, deschedule it, and add it it to the sleep wait queue.
  *
- * (Undefined behavior if there is no current thread)
- *
+ * Returns an error if there is no current thread.
  * Returns an error if there are insufficient resources. In this case the thread will 
  * remain scheduled.
  */
@@ -111,21 +110,25 @@ fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks);
  *
  * The created thread is added to the schedule!
  *
- * Undefined behavior if no current thread.
+ * Returns error if there is no current thread!
  */
-fernos_error_t ks_branch_curr_thread(kernel_state_t *ks, thread_id_t *tid, 
+fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *tid, 
         thread_entry_t entry, void *arg);
-
 
 /**
  * Exits the current thread of the current process.
- * And what happens if no threads are waiting? You ever think about that one big guy??
- * 
- * Ooob this is low key hard... idk what to do here 100%.
  *
- * Undefined behavior if no current thread.
+ * This detatches the current thread from the schedule.
+ *
+ * When a non-main thread is exited, It's id is sifted through its parent's join_queue to see 
+ * if any thread was waiting on its exit. 
+ *
+ * Returns an error if there is no current thread, or if something goes wrong with the exit.
  */
 fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val);
 
-fernos_error_t ks_join
+/**
+ *
+ */
+fernos_error_t ks_join_local_thread(kernel_state_t *ks, thread_id_t tid, void **retval);
 

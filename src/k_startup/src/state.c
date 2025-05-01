@@ -116,6 +116,10 @@ fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks) {
 
     thread_t *thr = ks->curr_thread;
 
+    if (!thr) {
+        return FOS_BAD_ARGS;
+    }
+
     err = twq_enqueue(ks->sleep_q, (void *)thr, 
             ks->curr_tick + ticks);
 
@@ -130,9 +134,9 @@ fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks) {
     return FOS_SUCCESS;
 }
 
-fernos_error_t ks_branch_curr_thread(kernel_state_t *ks, thread_id_t *tid,
+fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *tid, 
         thread_entry_t entry, void *arg) {
-    if (!entry) {
+    if (!entry || !tid || !(ks->curr_thread)) {
         return FOS_BAD_ARGS;
     }
 

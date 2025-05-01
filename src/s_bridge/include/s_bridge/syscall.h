@@ -63,6 +63,29 @@ typedef struct _thread_spawn_arg_t {
 #define SCID_THREAD_SPAWN (0x102U)
 fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void *arg);
 
+typedef struct _thread_join_arg_t {
+    join_vector_t jv;
+    thread_id_t *joined;
+    void **retval;
+} thread_join_arg_t;
+
+/**
+ * This deschedules the current thread until one of threads entered in the join vector has exited.
+ *
+ * This should return an error immediately if the jv is invalid.
+ * (jv is invalid if it is 0 or depends only on the current thread)
+ *
+ * If joined is given, on error, the null id will be written, on success, the id of the joined
+ * thread will be written.
+ *
+ * If re_val is given, on error, null will be written, on success, the value returned by
+ * the joined thread will be written.
+ *
+ * Any error scenario always returns immediately to the calling thread.
+ */
+#define SCID_THREAD_JOIN (0x103U)
+fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retval);
+
 /**
  * Output a string to the BIOS terminal.
  *
