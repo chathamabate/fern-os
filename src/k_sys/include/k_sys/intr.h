@@ -37,6 +37,12 @@ void nop_handler(void);
  */
 void halt_cpu(void);
 
+static void halt_loop(void) {
+    while (1) {
+        halt_cpu();
+    }
+}
+
 // PIC Stuff...
 
 void pic_remap(int offset1, int offset2);

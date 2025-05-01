@@ -20,21 +20,35 @@
 #include "k_sys/intr.h"
 #include "s_util/constraints.h"
 
+
+/**
+ * This function is pretty special. It is for when the kernel has no threads to schedule.
+ *
+ * So, it goes into a halted state. The tricky part is that the kernel and "halted" state
+ * both have root priveleges. Without a privilege switch, the kernel stack is never reset!
+ *
+ * This call is an assembly function which resets the kernel stack, then calls 
+ * `_return_to_halt_ctx` below.
+ */
+void return_to_halt_context(void);
+
 /**
  * This function remains in kernel mode, but enables interrupts and resets the kernel stack!
  * Should be used when there are no threads to schedule!
  */
-static void return_to_halt_context(void) {
-    user_ctx_t halt_ctx = {
+void _return_to_halt_context(void) {
+    user_ctx_t halt_ctx = (user_ctx_t) {
         .ds = KERNEL_DATA_SELECTOR,
         .cr3 = get_kernel_pd(),
 
-        .eip = (uint32_t)halt_cpu,
+        .eip = (uint32_t)halt_loop,
         .cs = KERNEL_CODE_SELECTOR,
         .eflags = read_eflags() | (1 << 9),
 
-        .esp = FOS_KERNEL_STACK_END - sizeof(uint32_t),
-        .ss = KERNEL_DATA_SELECTOR
+        // Without a privilege change, the esp and ss fields aren't used :,(
+
+        // This function will be called in assembly which will first reset the 
+        // kernel stack.
     };
 
     return_to_ctx(&halt_ctx);
