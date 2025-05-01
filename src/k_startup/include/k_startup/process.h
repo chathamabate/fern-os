@@ -112,3 +112,22 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
 static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent) {
     return new_process(get_default_allocator(), pid, pd, parent);
 }
+
+/**
+ * Create a thread within a process with the given entry point and argument!
+ * The created thread will start in a detached state.
+ *
+ * If this process doesn't have a main thread yet, the created thread will be set as main.
+ *
+ * (Remember, entry and arg should both be userspace pointers!)
+ *
+ * On Success, FOS_SUCCESS is returned and the created thread is written to *thr.
+ * Returns an error if arguments are bad, or if insufficient resources.
+ *
+ * NOTE: This uses the same allocator which was used for `proc`.
+ *
+ * On error, NULL is written to *thr.
+ */
+fernos_error_t proc_create_thread(process_t *proc, thread_t **thr, 
+        thread_entry_t entry, void *arg);
+

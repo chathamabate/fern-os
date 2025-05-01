@@ -11,6 +11,7 @@
 #include "s_mem/allocator.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
+#include "k_startup/process.h"
 #include "k_startup/kernel.h"
 #include <stdint.h>
 #include "k_startup/state.h"
@@ -84,8 +85,10 @@ void fos_timer_action(user_ctx_t *ctx) {
 
     fernos_error_t err;
 
+    bool not_halted = kernel->curr_thread != NULL;
+
     // First things first, if we were executing a real thread, save its state!
-    if (kernel->curr_thread) {
+    if (not_halted) {
         kernel->curr_thread->ctx = *ctx; 
     };
 
@@ -103,15 +106,19 @@ void fos_timer_action(user_ctx_t *ctx) {
         ks_schedule_thread(kernel, woken_thread);
     }
 
-    term_put_fmt_s("ADDR: %X\n", &woken_thread);
-
     if (err != FOS_EMPTY) {
         // TODO Do something here...
         term_put_s("Error waking up threads?\n");
         lock_up();
     }
 
-    if (kernel->curr_thread) {
+    /*
+     * We only advance the schedule if we weren't halted when we entered this handler.
+     *
+     * Otherwise, the order threads are woken up doesn't always match when they execute.
+     * (This doesn't really matter that much, but makes execution behavior more predictable)
+     */
+    if (not_halted) {
         kernel->curr_thread = kernel->curr_thread->next_thread;
     }
 
@@ -122,6 +129,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
     fernos_error_t err;
     buffer_arg_t buf_arg;
     thread_t *thr;
+    process_t *proc;
 
     switch (id) {
     case SCID_THREAD_EXIT:
@@ -140,8 +148,29 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
             term_put_s("BAD SLEEP CALL\n");
             lock_up();
         }
-
+        
         return_to_curr_thread();
+
+    case SCID_THREAD_SPAWN:
+
+        thr = kernel->curr_thread;
+        proc = thr->proc;
+
+        thread_spawn_arg_t ts_arg;
+
+        mem_cpy_from_user(&ts_arg, ctx->cr3, arg, sizeof(thread_spawn_arg_t), NULL);
+
+        thread_t *new_thr;
+
+        err = proc_create_thread(proc, &new_thr, ts_arg.entry, ts_arg.arg);
+        if (err != FOS_SUCCESS) {
+            term_put_s("Bad Thread Creation\n");
+            lock_up();
+        }
+
+        ks_schedule_thread(kernel, new_thr);
+
+        return_to_ctx_with_value(ctx, err);
 
     case SCID_TERM_PUT_S:
         if (!arg) {

@@ -12,7 +12,7 @@
 #include "k_startup/page.h"
 #include "k_bios_term/term.h"
 
-thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_entry_t entry, void *arg) {
+thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg) {
     if (tid >= FOS_MAX_THREADS_PER_PROC) {
         return NULL;
     }
@@ -21,6 +21,8 @@ thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_e
     if (!proc) {
         return NULL;
     }
+
+    allocator_t *al = proc->al;
 
     thread_t *thr = al_malloc(al, sizeof(thread_t));
     if (!thr) {
@@ -38,7 +40,6 @@ thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_e
         return NULL;
     }
 
-    thr->al = al;
     thr->state = THREAD_STATE_DETATCHED;
 
     thr->next_thread = NULL;
@@ -67,6 +68,7 @@ thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_e
     return thr;
 }
 
+/*
 void delete_thread(thread_t *thr) {
     if (!thr) {
         return;
@@ -92,4 +94,4 @@ void delete_thread(thread_t *thr) {
     // Free the thread structure.
     al_free(thr->al, thr);
 }
-
+*/

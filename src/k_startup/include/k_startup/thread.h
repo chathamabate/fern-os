@@ -7,11 +7,6 @@
 #include "s_data/wait_queue.h"
 #include "s_bridge/ctx.h"
 
-/**
- * When a new thread is created, its entry point must follow this interface.
- */
-typedef void *(*thread_entry_t)(void *arg);
-
 typedef uint32_t thread_state_t;
 
 /**
@@ -31,9 +26,9 @@ typedef uint32_t thread_state_t;
 
 struct _thread_t {
     /**
-     * The allocator used to create this thread!
+     * No longer needed, inferred from parent process.
      */
-    allocator_t *al;
+    // allocator_t *al;
 
     /**
      * The state of this thread.
@@ -84,12 +79,10 @@ struct _thread_t {
  *
  * Also, this function does not edit the parent process in anyway. It it your responsibility
  * to actually place the created thread into the process's thread table!
+ *
+ * Lastly, threads assume the same allocator has the parent process.
  */
-thread_t *new_thread(allocator_t *al, thread_id_t tid, process_t *proc, thread_entry_t entry, void *arg);
-
-static inline thread_t *new_da_thread(thread_id_t tid, process_t *proc, thread_entry_t entry, void *arg) {
-    return new_thread(get_default_allocator(), tid, proc, entry, arg);
-}
+thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg);
 
 /**
  * TBH, might end up deleting this endpoint... Thread deletion will involve a lot of kernel specific things.

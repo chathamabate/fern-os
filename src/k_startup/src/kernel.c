@@ -86,20 +86,11 @@ static fernos_error_t init_kernel_state(void) {
     kernel->root_proc = proc;
     idtb_set(kernel->proc_table, pid, proc);
 
-    // Now create our first thread!
-
-    thread_id_t tid = idtb_pop_id(proc->thread_table);
-    if (tid == idtb_null_id(proc->thread_table)) {
-        return FOS_NO_MEM;
+    thread_t *thr;
+    fernos_error_t err = proc_create_thread(kernel->root_proc, &thr, user_main, NULL);
+    if (err != FOS_SUCCESS) {
+        return err;
     }
-
-    thread_t *thr = new_da_thread(tid, proc, user_main, NULL);
-    if (!thr) {
-        return FOS_NO_MEM;
-    }
-
-    proc->main_thread = thr;
-    idtb_set(proc->thread_table, tid, thr);
 
     // Finally, schedule our first thread!
     ks_schedule_thread(kernel, thr);

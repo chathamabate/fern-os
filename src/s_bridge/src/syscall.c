@@ -13,6 +13,15 @@ void sc_thread_sleep(uint32_t ticks) {
     (void)trigger_syscall(SCID_THREAD_SLEEP, (void *)ticks);
 }
 
+fernos_error_t sc_thread_spawn(void *(*entry)(void *arg), void *arg) {
+    thread_spawn_arg_t ts_arg = {
+        .entry = entry,
+        .arg = arg
+    };
+
+    return (fernos_error_t)trigger_syscall(SCID_THREAD_SPAWN, &ts_arg);
+}
+
 void sc_term_put_s(const char *s) {
     buffer_arg_t arg = {
         .buf_size = str_len(s) + 1,

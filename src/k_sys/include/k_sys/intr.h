@@ -37,7 +37,7 @@ void nop_handler(void);
  */
 void halt_cpu(void);
 
-static void halt_loop(void) {
+static inline void halt_loop(void) {
     while (1) {
         halt_cpu();
     }

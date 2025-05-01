@@ -2,6 +2,7 @@
 #pragma once
 
 #include "s_data/id_table.h"
+#include "s_bridge/shared_defs.h"
 
 /*
  * In this module, a lot of definitions will depend on each other.
@@ -72,9 +73,6 @@
  * That could be kinda cool... Like one condition could trigger another condition??
  * 
  */
-
-typedef id_t proc_id_t;
-typedef id_t thread_id_t;
 
 typedef struct _thread_t thread_t;
 typedef struct _process_t process_t;
