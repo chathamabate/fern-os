@@ -51,6 +51,8 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
 
     thr->proc = proc;
     thr->wq = NULL;
+    thr->u_wait_ctx = NULL;
+    thr->exit_ret_val = NULL;
 
     thr->ctx = (user_ctx_t) {
         .ds = USER_DATA_SELECTOR,
@@ -70,30 +72,19 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
     return thr;
 }
 
-/*
-void delete_thread(thread_t *thr) {
-    if (!thr) {
+void reap_thread(thread_t *thr, bool return_stack) {
+    if (!thr || thr->state != THREAD_STATE_EXITED) {
         return;
     }
 
-    if (thr->state == THREAD_STATE_WAITING) {
-        wq_remove(thr->wq, thr);
-    } else if (thr->state == THREAD_STATE_SCHEDULED) {
-        // Remember, cyclic!
-        thr->prev_thread->next_thread = thr->next_thread; 
-        thr->next_thread->prev_thread = thr->prev_thread;
+    if (return_stack) {
+        void *tstack_start = (void *)FOS_THREAD_STACK_START(thr->tid);
+        const void *tstack_end = (void *)FOS_THREAD_STACK_END(thr->tid);
 
-        thr->prev_thread = NULL;
-        thr->next_thread = NULL;
+        // Free the whole stack.
+        pd_free_pages(thr->proc->pd, tstack_start, tstack_end);
     }
     
-    void *tstack_start = (void *)FOS_THREAD_STACK_START(thr->tid);
-    const void *tstack_end = (void *)FOS_THREAD_STACK_END(thr->tid);
-
-    // Free the whole stack.
-    pd_free_pages(thr->proc->pd, tstack_start, tstack_end);
-
-    // Free the thread structure.
-    al_free(thr->al, thr);
+    al_free(thr->proc->al, thr);
 }
-*/
+

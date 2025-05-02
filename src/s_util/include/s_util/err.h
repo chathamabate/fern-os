@@ -58,6 +58,11 @@ typedef uint16_t fernos_error_t;
  */
 #define FOS_ABORT_SYSTEM       (11)
 
+/**
+ * A requested behavior isn't implemented yet!
+ */
+#define FOS_NOT_IMPLEMENTED    (12)
+
 
 
 

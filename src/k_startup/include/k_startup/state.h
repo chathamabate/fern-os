@@ -143,12 +143,11 @@ fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val);
  * Returns an error if the join vector is invalid.
  *
  * NOTE: VERY VERY IMPORTANT!
- * u_tid and u_retval are USERSPACE pointers!!
- * They will be saved until the joining thread wakes up. Before being rescheduled, the tid
- * and return value of the joined thread are written to userspace at these addresses!
+ * Remeber, u_join_ret is a userspace pointer. It is intended to be stored in the thread wait
+ * context field until wake up!
  *
  * This is kinda hacky, but just remember, the userspace verion of this call essentially blocks.
  * This call here though in kernel space doesn't!
  */
 fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
-        thread_id_t *u_tid, void **u_retval);
+        thread_join_ret_t *u_join_ret);

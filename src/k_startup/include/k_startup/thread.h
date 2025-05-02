@@ -5,7 +5,9 @@
 #include "k_startup/fwd_defs.h"
 #include "s_mem/allocator.h"
 #include "s_data/wait_queue.h"
+#include "s_data/destructable.h"
 #include "s_bridge/ctx.h"
+#include <stdbool.h>
 
 typedef uint32_t thread_state_t;
 
@@ -23,6 +25,11 @@ typedef uint32_t thread_state_t;
  * The thread is part of some wait queue.
  */
 #define THREAD_STATE_WAITING   (2)
+
+/**
+ * The thread has exited and is holding its resources until joined.
+ */
+#define THREAD_STATE_EXITED    (3)
 
 struct _thread_t {
     /**
@@ -61,24 +68,24 @@ struct _thread_t {
     wait_queue_t *wq;
 
     /**
-     * A wait context isn't a bad idea, but how do we make this idea safe/well-designed
+     * When a thread is woken up, you'll likely want to return write some information to its
+     * memory space. This pointer is just an arbitrary user pointer for this use.
+     *
+     * When the thread is not in a waiting state, this field should always be NULL.
      */
-
-     
-    // Might it also be cool to have some sort of wait context??
-    // Like something which should be done when waking up??
-    // That would be pretty cool ngl??
-    //
-    // Why don't we just write to the registers though?
-    // I feel like this could be more portable??
-    // Nahhh... I don't think so!
-    thread_id_t *u_joined_tid;
-    void **u_joined_retval;
+    void *u_wait_ctx;
 
     /**
      * The context to use when switching back to this thread.
      */
     user_ctx_t ctx;
+
+    /**
+     * When a thread exits, its return value is stored here.
+     *
+     * This will likely be a straight integral value or a pointer into userspace.
+     */
+    void *exit_ret_val;
 };
 
 /**
@@ -97,19 +104,14 @@ struct _thread_t {
  */
 thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg);
 
-
 /**
- * TBH, might end up deleting this endpoint... Thread deletion will involve a lot of kernel specific things.
- * Delete a thread!
+ * If the given thread is not in the exited state, this call does nothing!
  *
- * If this thread is in a wait queue, it is removed from that wait queue.
- * If this thread is scheduled, it is removed from the schedule list.
- * NOTE: When cleaning up a thread, you will likely need to perform some kernel specific
- * operations before calling this function!
+ * When in the exited state, this call simply deletes the thread's resources.
+ * This does not modify the parent process at all, that's your responsibility!
  *
- * This DOES NOT edit the parent process or the overall kernel.
+ * If you'd like to free this thread's stack pages, set return stack to true!
  */
-void delete_thread(thread_t *thr);
-
+void reap_thread(thread_t *thr, bool return_stack);
 
 

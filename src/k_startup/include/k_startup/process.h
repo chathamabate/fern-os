@@ -132,4 +132,3 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  */
 fernos_error_t proc_create_thread(process_t *proc, thread_t **thr, 
         thread_entry_t entry, void *arg);
-

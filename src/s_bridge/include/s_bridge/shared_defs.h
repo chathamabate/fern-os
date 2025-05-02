@@ -42,3 +42,12 @@ static inline void jv_remove_tid(join_vector_t *jv, thread_id_t tid) {
         *jv &= ~(1 << tid);
     }
 }
+
+/**
+ * When a thread is joined, these values should be copied back to user space.
+ */
+typedef struct _thread_join_ret_t {
+    thread_id_t joined;
+    void *retval;
+} thread_join_ret_t;
+

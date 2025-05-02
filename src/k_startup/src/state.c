@@ -1,9 +1,11 @@
 
 
+#include "k_startup/page_helpers.h"
 #include "s_util/constraints.h"
 #include "k_startup/state.h"
 #include "k_startup/thread.h"
 #include "k_startup/process.h"
+#include "k_startup/page.h"
 
 /**
  * Creates a new kernel state with basically no fleshed out details.
@@ -164,5 +166,83 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *tid,
     }
 
     return FOS_SUCCESS;
+}
+
+fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val) {
+    if (!(ks->curr_thread)) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    // First, let's deschedule our current thread.
+
+    ks_deschedule_thread(ks, thr);
+
+    thr->exit_ret_val = ret_val;
+    thr->state = THREAD_STATE_EXITED;
+
+    if (thr == ks->root_proc->main_thread) {
+        // TODO.
+        return FOS_NOT_IMPLEMENTED;
+    }
+
+    if (thr == proc->main_thread) {
+        // TODO.
+        return FOS_NOT_IMPLEMENTED;
+    }
+
+    thread_id_t tid = thr->tid;
+
+    err = vwq_notify_first(proc->join_queue, (uint8_t)tid);
+
+    // This really should never happen.
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    thread_t *joining_thread;
+
+    err = vwq_pop(proc->join_queue, (void **)&joining_thread, NULL);
+
+    // No one was waiting on our thread so we just leave here successfully.
+    if (err == FOS_EMPTY) {
+        return FOS_SUCCESS;
+    }
+
+    // Some sort of pop error?
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    // Ok, we found a joining queue, let's remove all information about its waiting state,
+    // write return values, then schedule it!
+
+    joining_thread->wq = NULL;
+
+    thread_join_ret_t *u_ret_ptr = (thread_join_ret_t *)(joining_thread->u_wait_ctx);
+    joining_thread->u_wait_ctx = NULL;
+
+    thread_join_ret_t local_ret = {
+        .retval = thr->exit_ret_val, 
+        .joined = tid
+    };
+
+    mem_cpy_to_user(proc->pd, u_ret_ptr, &local_ret, sizeof(thread_join_ret_t), NULL);
+    joining_thread->ctx.eax = FOS_SUCCESS;
+
+    ks_schedule_thread(ks, joining_thread);
+
+    // Ok finally, since our exited thread is no longer needed
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
+        thread_join_ret_t *u_join_ret) {
+    return FOS_NOT_IMPLEMENTED;
 }
 
