@@ -97,11 +97,17 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
     thread_t *thr;
     process_t *proc;
     thread_spawn_arg_t ts_arg;
+    thread_join_arg_t j_arg;
 
     switch (id) {
     case SCID_THREAD_EXIT:
-        term_put_fmt_s("Thread Exited with arg %u\n", arg);
-        lock_up();
+        err = ks_exit_curr_thread(kernel, arg);
+        if (err != FOS_SUCCESS) {
+            term_put_s("Exit Failed\n");
+            lock_up();
+        }
+
+        return_to_curr_thread();
 
     case SCID_THREAD_SLEEP:
         ks_save_ctx(kernel, ctx);
@@ -131,6 +137,21 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
         }
 
         return_to_ctx_with_value(ctx, err);
+
+    case SCID_THREAD_JOIN:
+        ks_save_ctx(kernel, ctx);
+
+        mem_cpy_from_user(&j_arg, ctx->cr3, arg, sizeof(thread_join_arg_t), NULL);
+
+        err = ks_join_local_thread(kernel, j_arg.jv, j_arg.join_ret);
+
+        if (err != FOS_SUCCESS) {
+            term_put_s("error with join\n");
+            lock_up();
+        }
+
+        return_to_curr_thread();
+
 
     case SCID_TERM_PUT_S:
         if (!arg) {

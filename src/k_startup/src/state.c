@@ -7,6 +7,8 @@
 #include "k_startup/process.h"
 #include "k_startup/page.h"
 
+#include "k_bios_term/term.h"
+
 /**
  * Creates a new kernel state with basically no fleshed out details.
  */
@@ -190,12 +192,12 @@ fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val) {
     thr->state = THREAD_STATE_EXITED;
 
     if (thr == ks->root_proc->main_thread) {
-        // TODO.
+        // TODO. (System Exit)
         return FOS_NOT_IMPLEMENTED;
     }
 
     if (thr == proc->main_thread) {
-        // TODO.
+        // TODO. (Process Exit)
         return FOS_NOT_IMPLEMENTED;
     }
 
@@ -251,6 +253,8 @@ fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val) {
 
 fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
         thread_join_ret_t *u_join_ret) {
+    fernos_error_t err;
+
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
@@ -285,6 +289,9 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
             .retval = joinable_thread->exit_ret_val
         };
 
+        // Now reap our thread!
+        proc_reap_thread(proc, joinable_thread, true);
+
         if (u_join_ret) {
             mem_cpy_to_user(proc->pd, u_join_ret, &local_ret, sizeof(thread_join_ret_t), NULL);
         }
@@ -294,9 +301,23 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
         return FOS_SUCCESS;
     }
 
+    // Here, we searched all threads and didn't find one to join on.
+    // So, The current thread must wait!
 
-    // Hmmmm, now what, what do I do now???
+    err = vwq_enqueue(proc->join_queue, thr, jv);
+    if (err != FOS_SUCCESS) {
+        thr->ctx.eax = err;
 
-    return FOS_NOT_IMPLEMENTED;
+        return FOS_SUCCESS;
+    }
+
+    // Here we successfully queued our thread!
+    // Now we can safely deschedule it!
+
+    ks_deschedule_thread(ks, thr);
+    thr->u_wait_ctx = u_join_ret; // Save where we will eventually return to!
+    thr->wq = (wait_queue_t *)(proc->join_queue);
+
+    return FOS_SUCCESS;
 }
 

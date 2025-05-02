@@ -31,6 +31,13 @@ static inline join_vector_t empty_join_vector(void) {
     return 0;
 }
 
+/**
+ * A vector which accepts any thread
+ */
+static inline join_vector_t full_join_vector(void) {
+    return ~0;
+}
+
 static inline void jv_add_tid(join_vector_t *jv, thread_id_t tid) {
     if (tid < 32) {
         *jv |= (1 << tid);

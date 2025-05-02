@@ -65,11 +65,6 @@ typedef struct _thread_spawn_arg_t {
 #define SCID_THREAD_SPAWN (0x102U)
 fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void *arg);
 
-typedef struct _thread_join_ret_t {
-    thread_id_t joined;
-    void *retval;
-} thread_join_ret_t;
-
 typedef struct _thread_join_arg_t {
     join_vector_t jv;
 
@@ -79,7 +74,6 @@ typedef struct _thread_join_arg_t {
      */
     thread_join_ret_t *join_ret;
 } thread_join_arg_t;
-
 
 /**
  * This deschedules the current thread until one of threads entered in the join vector has exited.
