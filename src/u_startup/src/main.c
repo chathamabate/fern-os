@@ -28,7 +28,7 @@ void *user_main(void *arg) {
     fernos_error_t err;
 
     for (uint32_t i = 0; i < threads; i++) {
-        err = sc_thread_spawn(&tid, other_main, (void *)i);
+        err = sc_thread_spawn(NULL, other_main, (void *)i);
         if (err != FOS_SUCCESS) {
             sc_term_put_s("Failed to spawn thread\n");
             while (1);

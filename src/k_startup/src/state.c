@@ -138,39 +138,49 @@ fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks) {
     return FOS_SUCCESS;
 }
 
-fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *tid, 
+fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 
         thread_entry_t entry, void *arg) {
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
 
-    if (!entry || !tid) {
-        return FOS_BAD_ARGS;
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
+
+    if (!entry) {
+        thr->ctx.eax = FOS_BAD_ARGS;
+
+        return FOS_SUCCESS;
     }
 
     fernos_error_t err;
 
-    process_t *curr_proc = ks->curr_thread->proc;
-
     thread_t *new_thr;
 
-    err = proc_create_thread(curr_proc, &new_thr, entry, arg);
+    err = proc_create_thread(proc, &new_thr, entry, arg);
 
     if (err != FOS_SUCCESS) {
-        if (tid) {
-            *tid = idtb_null_id(curr_proc->thread_table);
+        thr->ctx.eax = err;
+
+        if (u_tid) {
+            mem_cpy_to_user(proc->pd, u_tid, &NULL_TID, sizeof(thread_id_t), NULL);
         }
 
-        return err;
+        return FOS_SUCCESS;
     }
 
     // Schedule our new thread!
     ks_schedule_thread(ks, new_thr);
 
-    if (tid) {
-        *tid = new_thr->tid;
+    thread_id_t new_tid = new_thr->tid;
+
+    if (u_tid) {
+        mem_cpy_to_user(proc->pd, u_tid, &new_tid, sizeof(thread_id_t), NULL);
     }
 
+    thr->ctx.eax = FOS_SUCCESS;
     return FOS_SUCCESS;
 }
 
@@ -289,7 +299,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
             .retval = joinable_thread->exit_ret_val
         };
 
-        // Now reap our thread!
+        // Now reap our joinable thread!
         proc_reap_thread(proc, joinable_thread, true);
 
         if (u_join_ret) {

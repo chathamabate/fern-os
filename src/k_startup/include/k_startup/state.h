@@ -102,17 +102,28 @@ fernos_error_t ks_tick(kernel_state_t *ks);
  */
 fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks);
 
+/*
+ * Many of the below functions assume that the current thread is the one invoking the requested
+ * behavior. Thus erors will be returned here in kernel space, and also to the calling thread
+ * via the %eax register.
+ *
+ * All calls should return FOS_SUCCESS here in the kernel unless something is very very wrong.
+ * Errors for bad arguments and lack of resources should be forwarded to the user via the
+ * current threads %eac register.
+ */
+
 /**
  * Spawn new thread in the current process using entry and arg.
  *
- * On success, if tid is given, the new thread's id is writen to *tid.
- * On error, if tid is given, the null thread id is written to tid.
+ * u_tid should either be NULL or a pointer into user space.
  *
  * The created thread is added to the schedule!
  *
- * Returns error if there is no current thread!
+ * Kernel error if there is no current thread!
+ *
+ * User error if entry is NULL, or if there are insufficient resources to spawn thre thread.
  */
-fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *tid, 
+fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 
         thread_entry_t entry, void *arg);
 
 /**
@@ -127,7 +138,7 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *tid,
  * If the current thread is the "main thread" of a process, the entire process should exit.
  * If the current thread is the "main thread" of the root process, FOS_ABORT_SYSTEM is returned.
  *
- * Returns other errors if there is no current thread, or if something goes wrong with the exit.
+ * Kernel error if there is no current thread, or if something goes wrong with the exit.
  */
 fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val);
 
@@ -140,7 +151,7 @@ fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val);
  * If one of the threads listed in the join vector has already exited, but is yet to be joined,
  * the current thread will remain scheduled!
  * 
- * Returns an error if the join vector is invalid.
+ * user error if the join vector is invalid.
  *
  * NOTE: VERY VERY IMPORTANT!
  * Remeber, u_join_ret is a userspace pointer. It is intended to be stored in the thread wait

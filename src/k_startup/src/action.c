@@ -121,22 +121,18 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
         return_to_curr_thread();
 
     case SCID_THREAD_SPAWN:
+        ks_save_ctx(kernel, ctx);
+
         mem_cpy_from_user(&ts_arg, ctx->cr3, arg, sizeof(thread_spawn_arg_t), NULL);
 
-        thread_id_t tid;
-
-        err = ks_spawn_local_thread(kernel, &tid, ts_arg.entry, ts_arg.arg);
+        err = ks_spawn_local_thread(kernel, ts_arg.tid, ts_arg.entry, ts_arg.arg);
 
         if (err != FOS_SUCCESS) {
             term_put_s("Bad Thread Creation\n");
             lock_up();
         }
 
-        if (ts_arg.tid) {
-            mem_cpy_to_user(ctx->cr3, ts_arg.tid, &tid, sizeof(thread_id_t), NULL);
-        }
-
-        return_to_ctx_with_value(ctx, err);
+        return_to_curr_thread();
 
     case SCID_THREAD_JOIN:
         ks_save_ctx(kernel, ctx);
