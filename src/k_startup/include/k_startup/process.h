@@ -132,3 +132,14 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  */
 fernos_error_t proc_create_thread(process_t *proc, thread_t **thr, 
         thread_entry_t entry, void *arg);
+
+/**
+ * Given a process and one of its threads, delete the thread entirely from the process!
+ *
+ * This call does nothing if the given thread is not in an exited state!
+ *
+ * Also, this call doesn't deal with the join queue at all, that's your responsibility!
+ *
+ * If you'd like the thread's stack pages to be returned, set `return_stack` to true.
+ */
+void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack);

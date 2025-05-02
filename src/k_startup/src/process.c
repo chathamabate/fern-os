@@ -66,9 +66,15 @@ fernos_error_t proc_create_thread(process_t *proc, thread_t **thr,
     return FOS_SUCCESS;
 }
 
+void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack) {
+    if (!proc || !thr || thr->state != THREAD_STATE_EXITED) {
+        return;
+    }
 
-// Maybe we defer the process deletion stuff out to the kernel state??
-// That's def an idea...
-//
-// When a process thread exits??
-// OK, god only knows how this is all going to work tbh...
+    thread_id_t tid = thr->tid;
+
+    reap_thread(thr, return_stack);
+
+    // Return the thread id so it can be used by later threads!
+    idtb_push_id(proc->thread_table, tid);
+}

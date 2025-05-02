@@ -116,11 +116,11 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
 fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks) {
     fernos_error_t err;
 
-    thread_t *thr = ks->curr_thread;
-
-    if (!thr) {
-        return FOS_BAD_ARGS;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
     }
+
+    thread_t *thr = ks->curr_thread;
 
     err = twq_enqueue(ks->sleep_q, (void *)thr, 
             ks->curr_tick + ticks);
@@ -138,7 +138,11 @@ fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks) {
 
 fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *tid, 
         thread_entry_t entry, void *arg) {
-    if (!entry || !tid || !(ks->curr_thread)) {
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    if (!entry || !tid) {
         return FOS_BAD_ARGS;
     }
 
@@ -170,7 +174,7 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *tid,
 
 fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val) {
     if (!(ks->curr_thread)) {
-        return FOS_BAD_ARGS;
+        return FOS_STATE_MISMATCH;
     }
 
     fernos_error_t err;
@@ -209,6 +213,7 @@ fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val) {
     err = vwq_pop(proc->join_queue, (void **)&joining_thread, NULL);
 
     // No one was waiting on our thread so we just leave here successfully.
+    // Remember, we don't reap our thread until someone else joins on it!
     if (err == FOS_EMPTY) {
         return FOS_SUCCESS;
     }
@@ -218,7 +223,7 @@ fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val) {
         return err;
     }
 
-    // Ok, we found a joining queue, let's remove all information about its waiting state,
+    // Ok, we found a joining thread, let's remove all information about its waiting state,
     // write return values, then schedule it!
 
     joining_thread->wq = NULL;
@@ -226,23 +231,72 @@ fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val) {
     thread_join_ret_t *u_ret_ptr = (thread_join_ret_t *)(joining_thread->u_wait_ctx);
     joining_thread->u_wait_ctx = NULL;
 
-    thread_join_ret_t local_ret = {
-        .retval = thr->exit_ret_val, 
-        .joined = tid
-    };
+    if (u_ret_ptr) {
+        thread_join_ret_t local_ret = {
+            .retval = thr->exit_ret_val, 
+            .joined = tid
+        };
 
-    mem_cpy_to_user(proc->pd, u_ret_ptr, &local_ret, sizeof(thread_join_ret_t), NULL);
+        mem_cpy_to_user(proc->pd, u_ret_ptr, &local_ret, sizeof(thread_join_ret_t), NULL);
+    }
     joining_thread->ctx.eax = FOS_SUCCESS;
 
     ks_schedule_thread(ks, joining_thread);
 
     // Ok finally, since our exited thread is no longer needed
+    proc_reap_thread(proc, thr, true);
 
     return FOS_SUCCESS;
 }
 
 fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
         thread_join_ret_t *u_join_ret) {
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    if (jv == 0 || jv == (1 << thr->tid)) {
+        thr->ctx.eax = FOS_BAD_ARGS;
+
+        return FOS_SUCCESS;
+    }
+
+    // First we search to see if there already is an exited thread we can join on!
+
+    thread_id_t ready_tid;
+    thread_t *joinable_thread;
+    
+    for (ready_tid = 0; ready_tid < 32; ready_tid++) {
+        joinable_thread = idtb_get(proc->thread_table, ready_tid);
+        if ((jv & (1 << ready_tid)) && 
+                joinable_thread && joinable_thread->state == THREAD_STATE_EXITED) {
+            // We found a joinable thread, break!
+            break;
+        }
+    }
+
+    // Did we find such a thread?
+    if (ready_tid < 32) {
+        thread_join_ret_t local_ret = {
+            .joined = ready_tid,
+            .retval = joinable_thread->exit_ret_val
+        };
+
+        if (u_join_ret) {
+            mem_cpy_to_user(proc->pd, u_join_ret, &local_ret, sizeof(thread_join_ret_t), NULL);
+        }
+
+        thr->ctx.eax = FOS_SUCCESS;
+        
+        return FOS_SUCCESS;
+    }
+
+
+    // Hmmmm, now what, what do I do now???
+
     return FOS_NOT_IMPLEMENTED;
 }
 
