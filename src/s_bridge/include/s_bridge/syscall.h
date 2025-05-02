@@ -95,10 +95,59 @@ typedef struct _thread_join_arg_t {
 #define SCID_THREAD_JOIN (0x103U)
 fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retval);
 
+
+/**
+ * Create a new process unique condition.
+ *
+ * Returns error if insufficient resources or if cid is NULL.
+ */
+#define SCID_COND_NEW    (0x200U)
+fernos_error_t sc_cond_new(cond_id_t *cid);
+
+/**
+ * Delete a condition.
+ *
+ * All threads previously waiting on this condition will be rescheduled with return code
+ * FOS_STATE_MISMATCH.
+ *
+ * Returns error if cid is invalid.
+ */
+#define SCID_COND_DELETE (0x201U)
+fernos_error_t sc_cond_delete(cond_id_t cid);
+
+typedef struct _cond_notify_arg_t {
+    cond_id_t cid;
+    cond_notify_action_t action;
+} cond_notify_arg_t;
+
+/**
+ * Notify any or all waiting threads on a specific condition.
+ *
+ * By "any" I just mean one arbitrary thread.
+ *
+ * When a thread is notified it is added back to the schedule. Where it is added into the schedule
+ * is not gauranteed, so keep this in mind!
+ *
+ * Returns and error if cid or action are invalid.
+ */
+#define SCID_COND_NOTIFY (0x202U)
+fernos_error_t sc_cond_notify(cond_id_t cid, cond_notify_action_t action);
+
+/**
+ * Wait to be notified.
+ *
+ * When this thread is successfully notified, FOS_SUCCESS is returned from this function.
+ * FOS_STATE_MISMATCH is returned if the condition is deleted during a waiting period.
+ *
+ * Also returns an error if cid is invalid.
+ */
+#define SCID_COND_WAIT   (0x203U)
+fernos_error_t sc_cond_wait(cond_id_t cid);
+
 /**
  * Output a string to the BIOS terminal.
  *
  * (Probably will take this out later)
  */
-#define SCID_TERM_PUT_S (0x200U)
+#define SCID_TERM_PUT_S (0x400U)
 void sc_term_put_s(const char *s);

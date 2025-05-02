@@ -93,15 +93,6 @@ void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr);
  */
 fernos_error_t ks_tick(kernel_state_t *ks);
 
-/**
- * Take the current thread, deschedule it, and add it it to the sleep wait queue.
- *
- * Returns an error if there is no current thread.
- * Returns an error if there are insufficient resources. In this case the thread will 
- * remain scheduled.
- */
-fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks);
-
 /*
  * Many of the below functions assume that the current thread is the one invoking the requested
  * behavior. Thus erors will be returned here in kernel space, and also to the calling thread
@@ -111,6 +102,16 @@ fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks);
  * Errors for bad arguments and lack of resources should be forwarded to the user via the
  * current threads %eac register.
  */
+
+/**
+ * Take the current thread, deschedule it, and add it it to the sleep wait queue.
+ *
+ * Kernel error if there is no current thread.
+ *
+ * User error if there are insufficient resources. In this case the thread will 
+ * remain scheduled.
+ */
+fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks);
 
 /**
  * Spawn new thread in the current process using entry and arg.
@@ -140,7 +141,7 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
  *
  * Kernel error if there is no current thread, or if something goes wrong with the exit.
  */
-fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val);
+fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val);
 
 /**
  * Have the current thread join on a given join vector.
@@ -162,3 +163,42 @@ fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val);
  */
 fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
         thread_join_ret_t *u_join_ret);
+
+/**
+ * Create a new condition.
+ *
+ * `u_cond_id` must be a user pointer of the current process. On success the new condition's
+ * id will be written there. On user failure, the NULL ID will be written.
+ *
+ * User error if insufficient resources, or if u_cond_id is NULL.
+ */
+fernos_error_t ks_new_condition(kernel_state_t *ks, cond_id_t *u_cid);
+
+/**
+ * Delete a condition.
+ *
+ * All threads which are currently waiting on this condition will be rescheduled with return
+ * value FOS_STATE_MISMATCH.
+ */
+fernos_error_t ks_delete_condition(kernel_state_t *ks, cond_id_t cid);
+
+/**
+ * Notify threads waiting on a condition.
+ *
+ * notify ANY will notify an arbitrary waiting thread.
+ * notify ALL will notify all waiting threads.
+ *
+ * To be "notified" just means that the waiting thread gets rescheduled with the FOS_SUCCESS
+ * return value from their wait call. The waiting thread(s) is not gauranteed to be entered 
+ * immediately, in fact it likely will not.
+ *
+ * User error if given arguments are bad.
+ */
+fernos_error_t ks_notify_condition(kernel_state_t *ks, cond_id_t cid, cond_notify_action_t action);
+
+/**
+ * Have the current thread wait on a condition.
+ */
+fernos_error_t ks_wait_condition(kernel_state_t *ks, cond_id_t cid);
+
+

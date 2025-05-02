@@ -99,7 +99,7 @@ struct _process_t {
      * If a condition is deleted while threads are waiting, all threads should be woken up with 
      * some sort of status code.
      */
-    //id_table_t *conds;
+     id_table_t *conds;
 };
 
 /**

@@ -45,6 +45,27 @@ fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retv
     return err;
 }
 
+fernos_error_t sc_cond_new(cond_id_t *cid) {
+    return (fernos_error_t)trigger_syscall(SCID_COND_NEW, (void *)cid);
+}
+
+fernos_error_t sc_cond_delete(cond_id_t cid) {
+    return (fernos_error_t)trigger_syscall(SCID_COND_DELETE, (void *)cid);
+}
+
+fernos_error_t sc_cond_notify(cond_id_t cid, cond_notify_action_t action) {
+    cond_notify_arg_t local_arg = {
+        .cid = cid,
+        .action = action
+    };
+
+    return (fernos_error_t)trigger_syscall(SCID_COND_NOTIFY, &local_arg);
+}
+
+fernos_error_t sc_cond_wait(cond_id_t cid) {
+    return (fernos_error_t)trigger_syscall(SCID_COND_WAIT, (void *)cid);
+}
+
 void sc_term_put_s(const char *s) {
     buffer_arg_t arg = {
         .buf_size = str_len(s) + 1,

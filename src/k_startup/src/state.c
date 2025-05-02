@@ -115,7 +115,7 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
     return FOS_SUCCESS;
 }
 
-fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks) {
+fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
@@ -128,7 +128,9 @@ fernos_error_t ks_sleep_curr_thread(kernel_state_t *ks, uint32_t ticks) {
             ks->curr_tick + ticks);
 
     if (err != FOS_SUCCESS) {
-        return err;
+        thr->ctx.eax = err;
+
+        return FOS_SUCCESS;
     }
 
     // Only deschedule one we know our thread was added successfully to the wait queue!
@@ -184,7 +186,7 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
     return FOS_SUCCESS;
 }
 
-fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val) {
+fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
@@ -272,7 +274,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
-    if (jv == 0 || jv == (1 << thr->tid)) {
+    if (jv == 0 || jv == (1U << thr->tid)) {
         thr->ctx.eax = FOS_BAD_ARGS;
 
         return FOS_SUCCESS;
@@ -331,3 +333,15 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
     return FOS_SUCCESS;
 }
 
+fernos_error_t ks_new_condition(kernel_state_t *ks, cond_id_t *u_cond_id) {
+    return FOS_NOT_IMPLEMENTED;
+}
+fernos_error_t ks_delete_condition(kernel_state_t *ks, cond_id_t cid) {
+    return FOS_NOT_IMPLEMENTED;
+}
+fernos_error_t ks_notify_condition(kernel_state_t *ks, cond_id_t cid, cond_notify_action_t action) {
+    return FOS_NOT_IMPLEMENTED;
+}
+fernos_error_t ks_wait_condition(kernel_state_t *ks, cond_id_t cid) {
+    return FOS_NOT_IMPLEMENTED;
+}

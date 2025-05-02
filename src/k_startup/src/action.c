@@ -94,14 +94,13 @@ void fos_timer_action(user_ctx_t *ctx) {
 void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
     fernos_error_t err;
     buffer_arg_t buf_arg;
-    thread_t *thr;
-    process_t *proc;
     thread_spawn_arg_t ts_arg;
     thread_join_arg_t j_arg;
+    cond_notify_arg_t cn_arg;
 
     switch (id) {
     case SCID_THREAD_EXIT:
-        err = ks_exit_curr_thread(kernel, arg);
+        err = ks_exit_thread(kernel, arg);
         if (err != FOS_SUCCESS) {
             term_put_s("Exit Failed\n");
             lock_up();
@@ -111,7 +110,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
 
     case SCID_THREAD_SLEEP:
         ks_save_ctx(kernel, ctx);
-        err = ks_sleep_curr_thread(kernel, (uint32_t)arg);
+        err = ks_sleep_thread(kernel, (uint32_t)arg);
 
         if (err != FOS_SUCCESS) {
             term_put_s("BAD SLEEP CALL\n");
@@ -148,6 +147,43 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
 
         return_to_curr_thread();
 
+    case SCID_COND_NEW:
+        ks_save_ctx(kernel, ctx);
+        err = ks_new_condition(kernel, (cond_id_t *)arg);
+        if (err != FOS_SUCCESS) {
+            term_put_s("Fatal Error with cond creation\n");
+            lock_up();
+        }
+        return_to_curr_thread();
+
+    case SCID_COND_DELETE:
+        ks_save_ctx(kernel, ctx);
+        err = ks_delete_condition(kernel, (cond_id_t)arg);
+        if (err != FOS_SUCCESS) {
+            term_put_s("Fatal Error with cond deletion\n");
+            lock_up();
+        }
+        return_to_curr_thread();
+
+    case SCID_COND_NOTIFY:
+        ks_save_ctx(kernel, ctx);
+        mem_cpy_from_user(&cn_arg, ctx->cr3, arg, sizeof(cond_notify_arg_t), NULL);
+        err = ks_notify_condition(kernel, cn_arg.cid, cn_arg.action);
+        if (err != FOS_SUCCESS) {
+            term_put_s("Fatal Error with cond Notification\n");
+            lock_up();
+        }
+
+        return_to_curr_thread();
+
+    case SCID_COND_WAIT:
+        ks_save_ctx(kernel, ctx);
+        err = ks_wait_condition(kernel, (cond_id_t)arg);
+        if (err != FOS_SUCCESS) {
+            term_put_s("Fatal Error with cond Wait\n");
+            lock_up();
+        }
+        return_to_curr_thread();
 
     case SCID_TERM_PUT_S:
         if (!arg) {
