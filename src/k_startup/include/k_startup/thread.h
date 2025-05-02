@@ -55,12 +55,25 @@ struct _thread_t {
     process_t *proc;
 
     /**
-     * If this thread is in a executing state, this field will be NULL.
-     *
-     * Otherwise, this thread MUST belong to some waiting queue.
-     * A reference to the queue will be stored here.
+     * When a thread is in the waiting state, this field is populated.
+     * Otherwise, this field is NULL.
      */
     wait_queue_t *wq;
+
+    /**
+     * A wait context isn't a bad idea, but how do we make this idea safe/well-designed
+     */
+
+     
+    // Might it also be cool to have some sort of wait context??
+    // Like something which should be done when waking up??
+    // That would be pretty cool ngl??
+    //
+    // Why don't we just write to the registers though?
+    // I feel like this could be more portable??
+    // Nahhh... I don't think so!
+    thread_id_t *u_joined_tid;
+    void **u_joined_retval;
 
     /**
      * The context to use when switching back to this thread.
@@ -83,6 +96,7 @@ struct _thread_t {
  * Lastly, threads assume the same allocator has the parent process.
  */
 thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg);
+
 
 /**
  * TBH, might end up deleting this endpoint... Thread deletion will involve a lot of kernel specific things.

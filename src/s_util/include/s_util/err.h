@@ -53,6 +53,11 @@ typedef uint16_t fernos_error_t;
  */
 #define FOS_STATE_MISMATCH     (10)
 
+/**
+ * An extremely signficant event occured, the entire system should stop.
+ */
+#define FOS_ABORT_SYSTEM       (11)
+
 
 
 

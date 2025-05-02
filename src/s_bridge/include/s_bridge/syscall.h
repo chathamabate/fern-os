@@ -29,6 +29,8 @@ typedef struct _buffer_arg_t {
  * This function is called automatically when returning from a thread's
  * entry procedure.
  *
+ * If this thread is the "main thread" of the "root process", the entire OS should abort.
+ *
  * This call does not return in the current context.
  */
 #define SCID_THREAD_EXIT (0x100U)
@@ -75,10 +77,13 @@ typedef struct _thread_join_arg_t {
  * This should return an error immediately if the jv is invalid.
  * (jv is invalid if it is 0 or depends only on the current thread)
  *
+ * NOTE: No two threads should join on the same thread, however, this is not checked, so be
+ * careful! (If two wait on the same thread, only one will ever be woken up!)
+ *
  * If joined is given, on error, the null id will be written, on success, the id of the joined
  * thread will be written.
  *
- * If re_val is given, on error, null will be written, on success, the value returned by
+ * If ret_val is given, on error, null will be written, on success, the value returned by
  * the joined thread will be written.
  *
  * Any error scenario always returns immediately to the calling thread.

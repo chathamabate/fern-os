@@ -121,14 +121,34 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *tid,
  * This detatches the current thread from the schedule.
  *
  * When a non-main thread is exited, It's id is sifted through its parent's join_queue to see 
- * if any thread was waiting on its exit. 
+ * if any thread was waiting on its exit. If a thread was waiting, it will be removed from 
+ * the join queue and scheduled!
  *
- * Returns an error if there is no current thread, or if something goes wrong with the exit.
+ * If the current thread is the "main thread" of a process, the entire process should exit.
+ * If the current thread is the "main thread" of the root process, FOS_ABORT_SYSTEM is returned.
+ *
+ * Returns other errors if there is no current thread, or if something goes wrong with the exit.
  */
 fernos_error_t ks_exit_curr_thread(kernel_state_t *ks, void *ret_val);
 
 /**
+ * Have the current thread join on a given join vector.
  *
+ * "join'ing" means to not be scheduled again until one of the vectors outlined in jv has exited.
+ * 1 thread can wait on multiple threads, but multiple threads should never wait on the same thread!
+ *
+ * If one of the threads listed in the join vector has already exited, but is yet to be joined,
+ * the current thread will remain scheduled!
+ * 
+ * Returns an error if the join vector is invalid.
+ *
+ * NOTE: VERY VERY IMPORTANT!
+ * u_tid and u_retval are USERSPACE pointers!!
+ * They will be saved until the joining thread wakes up. Before being rescheduled, the tid
+ * and return value of the joined thread are written to userspace at these addresses!
+ *
+ * This is kinda hacky, but just remember, the userspace verion of this call essentially blocks.
+ * This call here though in kernel space doesn't!
  */
-fernos_error_t ks_join_local_thread(kernel_state_t *ks, thread_id_t tid, void **retval);
-
+fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
+        thread_id_t *u_tid, void **u_retval);
