@@ -2,6 +2,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "s_util/err.h"
 
@@ -13,6 +14,8 @@ struct _map_impl_t {
 
     void *(*mp_get)(map_t *mp, const void *key);
     fernos_error_t (*mp_put)(map_t *mp, const void *key, const void *value);
+
+    bool (*mp_remove)(map_t *mp, const void *key);
 
     size_t (*mp_len)(map_t *mp);
 
@@ -70,10 +73,26 @@ static inline void *mp_get(map_t *mp, const void *key) {
 /**
  * Place a key value pair in the map. (value can be NULL)
  *
+ * If the key is already present, this should overwrite the original value!
+ *
  * Returns an error if key is NULL, or if there are insufficient resources.
  */
 static inline fernos_error_t mp_put(map_t *mp, const void *key, const void *value) {
     return mp->impl->mp_put(mp, key, value);
+}
+
+/**
+ * Remove a key value pair from the map.
+ *
+ * Returns true if a value was actually removed.
+ *
+ * If key is NULL, false is always returned.
+ *
+ * NOTE: This doesn't return an error since this is a destructor-like call, removing should always
+ * "succeed".
+ */
+static inline bool mp_remove(map_t *mp, const void *key) {
+    return mp->impl->mp_remove(mp, key);
 }
 
 /**
