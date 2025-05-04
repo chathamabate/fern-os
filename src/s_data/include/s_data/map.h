@@ -191,6 +191,8 @@ struct _chained_hash_map_t {
 
     chm_node_header_t **table;
 
+    chm_node_header_t *iter;
+
 };
 
 /**
