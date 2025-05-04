@@ -59,19 +59,6 @@ typedef struct _thread_join_ret_t {
 } thread_join_ret_t;
 
 /**
- * The process unique ID of a condition. (Can be 0)
+ * A futex is just a 32-bit integer.
  */
-typedef id_t cond_id_t;
-
-typedef uint32_t cond_notify_action_t;
-
-/**
- * This will wake up one arbitrary thread waiting on a condition.
- */
-#define COND_NOTIFY_ANY (0)
-
-/**
- * This will wake up all threads waiting on a condition.
- */
-#define COND_NOTIFY_ALL (1)
-
+typedef int32_t futex_t;

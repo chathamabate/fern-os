@@ -67,54 +67,51 @@ fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void
 #define SCID_THREAD_JOIN (0x103U)
 fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retval);
 
+/**
+ * Register a futex with the kernel.
+ *
+ * A futex is a number, which is mapped to a wait queue in the kernel.
+ *
+ * Threads will be able to wait while the futex holds a specific value.
+ *
+ * Returns an error if there are insufficient resources, or if futex is NULL.
+ */
+#define SCID_FUTEX_REGISTER (0x200)
+fernos_error_t sc_futex_register(futex_t *futex);
 
 /**
- * Create a new process unique condition.
+ * Remove all references to a futex from the kernel.
  *
- * Returns error if insufficient resources or if cid is NULL.
+ * If the given futex exists, it's wait queue will be deleted.
+ *
+ * All threads waiting on the futex will wake up with FOS_STATE_MISMATCH returned.
  */
-#define SCID_COND_NEW    (0x200U)
-fernos_error_t sc_cond_new(cond_id_t *cid);
+#define SCID_FUTEX_DEREGISTER (0x201)
+void sc_futex_deregister(futex_t *futex);
 
 /**
- * Delete a condition.
+ * This function will check if the futex's value = exp_val from within the kernel.
  *
- * All threads previously waiting on this condition will be rescheduled with return code
- * FOS_STATE_MISMATCH.
+ * If the values match as expected, the calling thread will be put to sleep.
+ * If the values don't match, this call will return immediately with FOS_SUCCESS.
  *
- * Returns error if cid is invalid.
+ * When a thread is put to sleep it can only be rescheduled by an `sc_futex_wake` call.
+ * This will also return FOS_SUCCESS.
+ *
+ * This call returns FOS_STATE_MISMATCH if the futex is deregistered mid wait!
+ *
+ * This call return other errors if something goes wrong or if the given futex doesn't exist!
  */
-#define SCID_COND_DELETE (0x201U)
-fernos_error_t sc_cond_delete(cond_id_t cid);
-
-typedef struct _cond_notify_arg_t {
-    cond_id_t cid;
-    cond_notify_action_t action;
-} cond_notify_arg_t;
-
-/**
- * Notify any or all waiting threads on a specific condition.
- *
- * By "any" I just mean one arbitrary thread.
- *
- * When a thread is notified it is added back to the schedule. Where it is added into the schedule
- * is not gauranteed, so keep this in mind!
- *
- * Returns and error if cid or action are invalid.
- */
-#define SCID_COND_NOTIFY (0x202U)
-fernos_error_t sc_cond_notify(cond_id_t cid, cond_notify_action_t action);
+#define SCID_FUTEX_WAIT (0x202)
+fernos_error_t sc_futex_wait(futex_t *futex, futex_t exp_val);
 
 /**
- * Wait to be notified.
+ * Wake up one or all threads waiting on a futex. This does not modify the futex value at all.
  *
- * When this thread is successfully notified, FOS_SUCCESS is returned from this function.
- * FOS_STATE_MISMATCH is returned if the condition is deleted during a waiting period.
- *
- * Also returns an error if cid is invalid.
+ * Returns an error if the given futex doesn't exist.
  */
-#define SCID_COND_WAIT   (0x203U)
-fernos_error_t sc_cond_wait(cond_id_t cid);
+#define SCID_FUTEX_WAKE (0x203)
+fernos_error_t sc_futex_wake(futex_t *futex, bool all);
 
 /**
  * Output a string to the BIOS terminal.
