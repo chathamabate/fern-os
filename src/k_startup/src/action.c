@@ -99,7 +99,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     case SCID_THREAD_EXIT:
         err = ks_exit_thread(kernel, (void *)arg0);
         if (err != FOS_SUCCESS) {
-            term_put_s("Exit Failed\n");
+            term_put_fmt_s("Exit Failed %u\n", err);
             lock_up();
         }
 

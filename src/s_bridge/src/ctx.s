@@ -191,23 +191,26 @@ syscall_handler:
     pushl $0 // Noop error code.
     call enter_intr_ctx
 
-    movl %esp, %ecx
+    // No need to save %ebp because we'll never return to this function
+    // after calling the syscall action.
 
-    movl 2 * 4(%esp), %eax // %edi (arg3)
+    movl %esp, %ebp
+
+    movl 2 * 4(%ebp), %eax // %edi (arg3)
     pushl %eax
 
-    movl 3 * 4(%esp), %eax // %esi (arg2)
+    movl 3 * 4(%ebp), %eax // %esi (arg2)
     pushl %eax
 
-    movl 7 * 4(%esp), %eax // %edx (arg1)
+    movl 7 * 4(%ebp), %eax // %edx (arg1)
     pushl %eax
 
-    movl 8 * 4(%esp), %eax // %ecx (arg0)
+    movl 8 * 4(%ebp), %eax // %ecx (arg0)
     pushl %eax
 
-    movl 9 * 4(%esp), %eax // %eax (id)
+    movl 9 * 4(%ebp), %eax // %eax (id)
     pushl %eax
 
-    pushl %ecx // ctx *
+    pushl %ebp // ctx *
 
     call *syscall_action

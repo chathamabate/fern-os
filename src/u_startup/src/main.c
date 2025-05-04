@@ -21,44 +21,38 @@ static void uprintf(const char *fmt, ...) {
 
 void *other_main(void *arg);
 
-spinlock_t spl;
-uint32_t val;
 
 void *user_main(void *arg) {
     (void)arg;
 
-    uprintf("HELLO\n");
+    for (uint32_t i = 0; i < 10; i++) {
+        fernos_error_t err = sc_thread_spawn(NULL, other_main, (void *)i);
+        if (err != FOS_SUCCESS) {
+            uprintf("Failed to spawn thread %u\n", i);
+            while (1);
+        }
+    }
+
+    sc_thread_sleep(4);
+
+    for (uint32_t i = 0; i < 10; i++) {
+        fernos_error_t err = sc_thread_join(full_join_vector(), NULL, NULL);
+        if (err != FOS_SUCCESS) {
+            uprintf("Failed to join threads\n", i);
+            while (1);
+        }
+    }
+
+    uprintf("All Joined\n");
+
     while (1);
-
-    val = 0;
-    init_spinlock(&spl);
-
-    fernos_error_t err = sc_thread_spawn(NULL, other_main, NULL);
-    if (err != FOS_SUCCESS) {
-        uprintf("Failed to spawn thread\n");
-        while (1);
-    }
-
-
-    while (1) {
-        spl_lock(&spl);
-        uprintf("Hello from main thread\n");
-        spl_unlock(&spl);
-        uprintf("Hello from main thread\n");
-    }
 }
 
 void *other_main(void *arg) {
-    sc_thread_sleep(3);
-    while (1) {
-        spl_lock(&spl);
-        uprintf("Hello from other thread\n");
-        spl_unlock(&spl);
-
-        // Woo this kinda works!!
-        // Now for the "futex" bullshit.. whatever that means tbh...
-        uprintf("Hello from other thread\n");
-    }
+    uprintf("[%u] Starting Task\n", arg);
+    sc_thread_sleep(5);
+    uprintf("[%u] Ending Task\n", arg);
+    return (void *)((uint32_t)arg * 2);
 }
 
 
