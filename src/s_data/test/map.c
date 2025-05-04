@@ -239,6 +239,67 @@ static bool test_map_complex0(void) {
     TEST_SUCCEED();
 }
 
+static bool test_map_complex1(void) {
+    /*
+     * Maybe for this one, add again after removing??
+     */
+
+    map_t *mp = gen_map(sizeof(uint64_t), sizeof(uint64_t));
+    TEST_TRUE(mp != NULL);
+
+    for (uint32_t i = 0; i < 10; i++) {
+        for (uint32_t j = 0; j < 10; j++) {
+            uint64_t key = (10 * i) + j; 
+            uint64_t val = key * 2;
+
+            TEST_EQUAL_HEX(FOS_SUCCESS, 
+                    mp_put(mp, &key, &val));
+        }
+
+        // Remove odds.
+        for (uint32_t j = 1; j < 10; j += 2) {
+            uint64_t key = (10 * i) + j; 
+            TEST_TRUE(mp_remove(mp, &key)); 
+        }
+
+        // Halve evens.
+        for (uint32_t j = 0; j < 10; j += 2) {
+            uint64_t key = (10 * i) + j; 
+
+            uint64_t *val = mp_get(mp, &key);
+
+            TEST_TRUE(val != NULL);
+            TEST_EQUAL_UINT(key * 2, *val);
+
+            *val /= 2;
+        }
+    }
+
+    // Now iterate over everything to see things still make sense?
+
+    mp_reset_iter(mp);
+
+    const uint64_t *key_ptr;
+    uint64_t *val_ptr;
+
+    fernos_error_t err;
+
+    uint32_t iters = 0;
+
+    for (err = mp_get_iter(mp, (const void **)&key_ptr, (void **)&val_ptr); 
+            err == FOS_SUCCESS; err = mp_next_iter(mp, (const void **)&key_ptr, (void **)&val_ptr)) {
+        
+        TEST_EQUAL_UINT(*key_ptr, *val_ptr);
+        iters++;
+    }
+
+    TEST_EQUAL_UINT(50, iters);
+
+    delete_map(mp);
+
+    TEST_SUCCEED();
+}
+
 bool test_map(const char *name, map_t *(*gen)(size_t ks, size_t vs)) {
     gen_map = gen;
 
@@ -248,6 +309,7 @@ bool test_map(const char *name, map_t *(*gen)(size_t ks, size_t vs)) {
     RUN_TEST(test_map_simple_remove);
     RUN_TEST(test_map_simple_iter);
     RUN_TEST(test_map_complex0);
+    RUN_TEST(test_map_complex1);
     return END_SUITE();
 }
 
