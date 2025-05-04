@@ -171,7 +171,7 @@ static bool test_map_simple_iter(void) {
 
 static bool test_map_complex0(void) {
     // Keys will be strings with 4 significant characters.
-    map_t *mp = gen_map(sizeof(char) * 4, sizeof(uint64_t));
+    map_t *mp = gen_map(sizeof(char) * 5, sizeof(uint64_t));
     TEST_TRUE(mp != NULL);
 
     for (char c0 = 'a'; c0 <= 'z'; c0++) {
@@ -213,6 +213,8 @@ static bool test_map_complex0(void) {
     const char *key;
     uint64_t *val;
     fernos_error_t err;
+
+    mp_reset_iter(mp);
 
     for (err = mp_get_iter(mp, (const void **)&key, (void **)&val);
             err == FOS_SUCCESS; err = mp_next_iter(mp, (const void **)&key, (void **)&val)) {

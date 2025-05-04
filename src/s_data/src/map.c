@@ -72,6 +72,21 @@ map_t *new_chained_hash_map(allocator_t *al, size_t key_size, size_t val_size, u
 
 static void delete_chained_hash_map(map_t *mp) {
     chained_hash_map_t *chm = (chained_hash_map_t *)mp;
+
+    for (size_t i = 0; i < chm->cap; i++) {
+        chm_node_header_t *iter = chm->table[i];
+
+        while (iter) {
+            chm_node_header_t *next = iter->next;
+
+            al_free(chm->al, iter);
+
+            iter = next;
+        }
+    }
+
+    al_free(chm->al, chm->table);
+    al_free(chm->al, chm);
 }
 
 /**
@@ -112,6 +127,8 @@ static void chm_try_resize(chained_hash_map_t *chm) {
             if (new_table[new_ind]) {
                 new_table[new_ind]->prev = iter;
             }
+
+            iter->prev = NULL;
             iter->next = new_table[new_ind];
             new_table[new_ind] = iter;
 
@@ -224,6 +241,10 @@ static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {
 
 static bool chm_remove(map_t *mp, const void *key) {
     chained_hash_map_t *chm = (chained_hash_map_t *)mp;
+
+    if (!key) {
+        return false;
+    }
 
     chm_node_header_t *node = chm_get_node(chm, key);
 
