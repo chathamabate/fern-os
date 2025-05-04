@@ -22,4 +22,5 @@ void fos_timer_action(user_ctx_t *ctx);
 /**
  * What should be done in the case of a syscall.
  */
-void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg);
+void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t arg1, 
+        uint32_t arg2, uint32_t arg3);

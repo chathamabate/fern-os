@@ -27,6 +27,9 @@ uint32_t val;
 void *user_main(void *arg) {
     (void)arg;
 
+    uprintf("HELLO\n");
+    while (1);
+
     val = 0;
     init_spinlock(&spl);
 

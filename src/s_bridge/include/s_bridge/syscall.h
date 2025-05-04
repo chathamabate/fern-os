@@ -12,17 +12,6 @@
  */
 
 /**
- * A generic argument useable for any system call will takes in a buffer.
- *
- * Remember complex arguments must always be copied from userspace to kernel space
- * before being used!
- */
-typedef struct _buffer_arg_t {
-    size_t buf_size;
-    void *buf;
-} buffer_arg_t;
-
-/**
  * Exit the current thread.
  *
  * If this thread is the "main thread", the full process will exit.
@@ -44,13 +33,6 @@ void sc_thread_exit(void *retval);
  */
 #define SCID_THREAD_SLEEP (0x101U)
 void sc_thread_sleep(uint32_t ticks);
-
-typedef struct _thread_spawn_arg_t {
-    thread_id_t *tid;
-
-    void *(*entry)(void *arg);
-    void *arg;
-} thread_spawn_arg_t;
 
 /**
  * Spawn a thread with the given entry point and argument!

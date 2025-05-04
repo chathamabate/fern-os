@@ -91,16 +91,13 @@ void fos_timer_action(user_ctx_t *ctx) {
     return_to_curr_thread();
 }
 
-void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
+void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t arg1, 
+        uint32_t arg2, uint32_t arg3) {
     fernos_error_t err;
-    buffer_arg_t buf_arg;
-    thread_spawn_arg_t ts_arg;
-    thread_join_arg_t j_arg;
-    cond_notify_arg_t cn_arg;
 
     switch (id) {
     case SCID_THREAD_EXIT:
-        err = ks_exit_thread(kernel, arg);
+        err = ks_exit_thread(kernel, (void *)arg0);
         if (err != FOS_SUCCESS) {
             term_put_s("Exit Failed\n");
             lock_up();
@@ -110,7 +107,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
 
     case SCID_THREAD_SLEEP:
         ks_save_ctx(kernel, ctx);
-        err = ks_sleep_thread(kernel, (uint32_t)arg);
+        err = ks_sleep_thread(kernel, arg0);
 
         if (err != FOS_SUCCESS) {
             term_put_s("BAD SLEEP CALL\n");
@@ -122,9 +119,8 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
     case SCID_THREAD_SPAWN:
         ks_save_ctx(kernel, ctx);
 
-        mem_cpy_from_user(&ts_arg, ctx->cr3, arg, sizeof(thread_spawn_arg_t), NULL);
-
-        err = ks_spawn_local_thread(kernel, ts_arg.tid, ts_arg.entry, ts_arg.arg);
+        err = ks_spawn_local_thread(kernel, (thread_id_t *)arg0, 
+                (void *(*)(void *))arg1, (void *)arg2);
 
         if (err != FOS_SUCCESS) {
             term_put_s("Bad Thread Creation\n");
@@ -136,9 +132,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
     case SCID_THREAD_JOIN:
         ks_save_ctx(kernel, ctx);
 
-        mem_cpy_from_user(&j_arg, ctx->cr3, arg, sizeof(thread_join_arg_t), NULL);
-
-        err = ks_join_local_thread(kernel, j_arg.jv, j_arg.join_ret);
+        err = ks_join_local_thread(kernel, arg0, (thread_join_ret_t *)arg1);
 
         if (err != FOS_SUCCESS) {
             term_put_s("error with join\n");
@@ -147,6 +141,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
 
         return_to_curr_thread();
 
+        /*
     case SCID_COND_NEW:
         ks_save_ctx(kernel, ctx);
         err = ks_new_condition(kernel, (cond_id_t *)arg);
@@ -184,18 +179,16 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, void *arg) {
             lock_up();
         }
         return_to_curr_thread();
+        */
 
     case SCID_TERM_PUT_S:
-        if (!arg) {
+        if (!arg0) {
             term_put_s("NULL str\n");
             lock_up();
         }
-        
-        // Pretty cool this works!
-        // No error checking though at the moment :,(
-        mem_cpy_from_user(&buf_arg, ctx->cr3, arg, sizeof(buffer_arg_t), NULL);
-        char *buf = da_malloc(buf_arg.buf_size);
-        mem_cpy_from_user(buf, ctx->cr3, buf_arg.buf, buf_arg.buf_size, NULL);
+
+        char *buf = da_malloc(arg1);
+        mem_cpy_from_user(buf, ctx->cr3, (const void *)arg0, arg1, NULL);
         term_put_s(buf);
         da_free(buf);
 
