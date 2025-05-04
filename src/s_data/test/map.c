@@ -5,6 +5,8 @@
 #include "k_bios_term/term.h"
 #include "s_mem/allocator.h"
 
+#include "s_util/str.h"
+
 static bool pretest(void);
 static bool posttest(void);
 
@@ -245,4 +247,28 @@ bool test_map(const char *name, map_t *(*gen)(size_t ks, size_t vs)) {
     RUN_TEST(test_map_simple_iter);
     RUN_TEST(test_map_complex0);
     return END_SUITE();
+}
+
+static uint32_t simple_hash(chained_hash_map_t *chm, const void *key) {
+    uint32_t hash = 0;
+
+    const uint8_t *key_arr = (const uint8_t *)key;
+    for (size_t i = 0; i < chm->super.key_size; i++) {
+        hash += key_arr[i] * (i + 7);
+    }
+
+    return hash;
+}
+
+static bool simple_eq(chained_hash_map_t *chm, const void *k0, const void *k1) {
+    return mem_cmp(k0, k1, chm->super.key_size);
+}
+
+static map_t *chained_hash_map_gen(size_t ks, size_t vs) {
+    return new_chained_hash_map(get_default_allocator(), ks, vs, 3, 
+            simple_eq, simple_hash);
+}
+
+bool test_chained_hash_map(void) {
+    return test_map("Chained Hash Map", chained_hash_map_gen); 
 }

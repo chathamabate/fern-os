@@ -16,3 +16,5 @@
  * It's very possible this is not the case in practice, but alas, not easy to make generic tests.
  */
 bool test_map(const char *name, map_t *(*gen)(size_t ks, size_t vs));
+
+bool test_chained_hash_map(void);
