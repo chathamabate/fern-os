@@ -17,6 +17,13 @@ Also, the top of the stack will point to a valid user_ctx_t structure.
 */
 .local enter_intr_ctx
 enter_intr_ctx:
+    // I am new to this memory fence stuff, but I think adding a mem fence when I enter an 
+    // interrupt, and a mem fence when I exit an interrupt is probably a good call?
+    // 
+    // I want things done by the last executing thread to be finished up before working in the 
+    // kernel. 
+    mfence
+
     // Save general purpose registers.
     pushal
 
@@ -74,6 +81,9 @@ exit_intr_ctx:
 
     // Skip over reserved and error code fields.
     addl $8, %esp
+
+    // Make sure changes I wrote in this handler are visible to the thread I return to!
+    mfence
 
     // enter context!
     iret
