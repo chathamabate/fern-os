@@ -1,8 +1,199 @@
 
 #include "s_data/map.h"
+#include "s_util/str.h"
 
 void init_map(map_t *mp, const map_impl_t *impl, size_t ks, size_t vs) {
     *(const map_impl_t **)&(mp->impl) = impl;
     *(size_t *)&(mp->key_size) = ks;
     *(size_t *)&(mp->val_size) = vs;
 }
+
+static void delete_chained_hash_map(map_t *mp);
+static void *chm_get(map_t *mp, const void *key);
+static fernos_error_t chm_put(map_t *mp, const void *key, const void *value);
+static bool chm_remove(map_t *mp, const void *key);
+static size_t chm_len(map_t *mp);
+static void chm_reset_iter(map_t *mp);
+static fernos_error_t chm_get_iter(map_t *mp, const void **key, void **value);
+static fernos_error_t chm_next_iter(map_t *mp, const void **key, void **value);
+
+const map_impl_t CHM_IMPL = {
+    .delete_map = delete_chained_hash_map,
+
+    .mp_get = chm_get,
+    .mp_put = chm_put,
+    .mp_remove = chm_remove,
+    .mp_len = chm_len,
+    .mp_reset_iter = chm_reset_iter,
+    .mp_get_iter = chm_get_iter,
+    .mp_next_iter = chm_next_iter,
+};
+
+map_t *new_chained_hash_map(allocator_t *al, size_t key_size, size_t val_size, uint8_t rat_ind, 
+        chm_key_eq_ft k_eq, chm_key_hash_ft k_hash) {
+    if (key_size == 0 || !k_eq || !k_hash || rat_ind < 2) {
+        return NULL;
+    }
+
+    const size_t INIT_CAP = 1;
+
+    chained_hash_map_t *chm = al_malloc(al, sizeof(chained_hash_map_t));
+    chm_node_header_t **table = al_malloc(al, sizeof(chm_node_header_t *) * INIT_CAP);
+
+    if (!chm || !table) {
+        al_free(al, chm);
+        al_free(al, table);
+
+        return NULL;
+    }
+
+    init_map((map_t *)chm, &CHM_IMPL, key_size, val_size);
+    *(allocator_t **)&(chm->al) = al;
+
+    *(uint8_t *)&(chm->ratio_index) = rat_ind;
+    *(chm_key_eq_ft *)&(chm->key_eq) = k_eq;
+    *(chm_key_hash_ft *)&(chm->key_hash) = k_hash;
+
+    chm->cap = INIT_CAP;
+
+    chm->len = 0;
+
+    chm->table = table;
+
+    // NULL out table to begin with.
+    for (uint32_t i = 0; i < INIT_CAP; i++) {
+        chm->table[i] = NULL;
+    }
+
+    return (map_t *)chm;
+}
+
+static void delete_chained_hash_map(map_t *mp) {
+    chained_hash_map_t *chm = (chained_hash_map_t *)mp;
+}
+
+/**
+ *
+ */
+static void chm_try_resize(chained_hash_map_t *chm) {
+
+}
+
+/**
+ * Return a pointer to a node which matches the given key.
+ *
+ * Returns NULL if there is no match!
+ */
+static chm_node_header_t *chm_get_node(chained_hash_map_t *chm, const void *key) {
+    uint32_t hash = chm->key_hash(chm, key);
+    uint32_t table_ind = hash % chm->cap;
+
+    chm_node_header_t *iter = chm->table[table_ind];
+
+    while (iter) {
+        if (iter->hash == hash) {
+            // Remember it goes [header] [key] [value] back to back to back.
+            const void *iter_key = (const void *)(iter + 1);
+            if (chm->key_eq(chm, iter_key, key)) {
+                return iter;
+            }
+        }
+
+        iter = iter->next;
+    }
+
+    return NULL;
+}
+
+static void *chm_get(map_t *mp, const void *key) {
+    chained_hash_map_t *chm = (chained_hash_map_t *)mp;
+
+    chm_node_header_t *node = chm_get_node(chm, key);
+
+    if (!node) {
+        return NULL;
+    }
+
+    const void *key_ptr = node + 1;
+
+    return (uint8_t *)key_ptr + chm->super.key_size;
+}
+
+static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {
+    chained_hash_map_t *chm = (chained_hash_map_t *)mp;
+
+    chm_node_header_t *node = chm_get_node(chm, key);
+
+    if (node) {
+        // Easy overwrite!
+
+        const void *key_ptr = node + 1;
+        uint8_t *val_ptr = (uint8_t *)key_ptr + chm->super.key_size;
+        
+        mem_cpy(val_ptr, value, chm->super.key_size);
+
+        return FOS_SUCCESS;
+    }
+
+    // We must add a new node to the map!
+
+    chm_node_header_t *new_node = al_malloc(chm->al, 
+            sizeof(chm_node_header_t) + chm->super.key_size + chm->super.val_size);
+
+    if (!new_node) {
+        return FOS_NO_MEM;
+    }
+
+    // Redundant work here, but whatevs.
+
+    uint32_t hash = chm->key_hash(chm, key);
+    const void *new_key_ptr = new_node + 1;
+    void *new_val_ptr = (uint8_t *)new_key_ptr + chm->super.key_size;
+
+    new_node->hash = hash;
+    mem_cpy((void *)new_key_ptr, key, chm->super.key_size);
+    mem_cpy(new_val_ptr, value, chm->super.val_size);
+
+    uint32_t index = hash % chm->cap;
+
+    // Quick push front.
+
+    chm_node_header_t *old_head = chm->table[index];
+
+    new_node->prev = NULL;
+    new_node->next = old_head;
+
+    if (old_head) {
+        old_head->prev = new_node;
+    }
+
+    chm->table[index] = new_node;
+
+    chm->len++;
+
+    chm_try_resize(chm);
+
+    return FOS_SUCCESS;
+}
+
+static bool chm_remove(map_t *mp, const void *key) {
+
+}
+
+static size_t chm_len(map_t *mp) {
+
+}
+
+static void chm_reset_iter(map_t *mp) {
+
+}
+
+static fernos_error_t chm_get_iter(map_t *mp, const void **key, void **value) {
+
+}
+
+static fernos_error_t chm_next_iter(map_t *mp, const void **key, void **value) {
+
+}
+
+

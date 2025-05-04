@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "s_util/err.h"
+#include "s_mem/allocator.h"
 
 typedef struct _map_t map_t;
 typedef struct _map_impl_t map_impl_t;
@@ -136,5 +137,66 @@ static inline fernos_error_t mp_get_iter(map_t *mp, const void **key, void **val
 static inline fernos_error_t mp_next_iter(map_t *mp, const void **key, void **value) {
     return mp->impl->mp_next_iter(mp, key, value);
 }
+
+typedef struct _chm_node_header_t chm_node_header_t;
+typedef struct _chained_hash_map_t chained_hash_map_t;
+
+typedef bool (*chm_key_eq_ft)(chained_hash_map_t *chm, const void *k0, const void *k1); 
+typedef uint32_t (*chm_key_hash_ft)(chained_hash_map_t *chm, const void *k);
+
+struct _chm_node_header_t {
+
+    /*
+     * Chains form non-cyclic doubly linked lists.
+     */
+
+    chm_node_header_t *next;
+    chm_node_header_t *prev;
+
+    /**
+     * Hash of this nodes key.
+     */
+    uint32_t hash;
+};
+
+struct _chained_hash_map_t {
+    map_t super;
+
+    allocator_t * const al;
+
+    /**
+     * The hashmap resized when len > (1 - (1 / ratio_index)) * Capacity.
+     *
+     * Ratio index must be at least 2.
+     *
+     * Resizing will be a simple double for now.
+     */
+    const uint8_t ratio_index;
+
+    /**
+     * Hash and equals functions.
+     */
+    const chm_key_eq_ft key_eq;
+    const chm_key_hash_ft key_hash;
+
+    /**
+     * Number of entries in the table.
+     */
+    size_t cap;
+
+    /**
+     * Number of entries in the hash map.
+     */
+    size_t len;
+
+    chm_node_header_t **table;
+
+};
+
+/**
+ * Returns NULL if arguments are bad or if there are insufficient resources!
+ */
+map_t *new_chained_hash_map(allocator_t *al, size_t key_size, size_t val_size, uint8_t rat_ind, 
+        chm_key_eq_ft k_eq, chm_key_hash_ft k_hash);
 
 
