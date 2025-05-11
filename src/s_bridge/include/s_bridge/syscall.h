@@ -22,7 +22,6 @@
  *
  * This call does not return in the current context.
  */
-#define SCID_THREAD_EXIT (0x100U)
 void sc_thread_exit(void *retval);
 
 /**
@@ -31,7 +30,6 @@ void sc_thread_exit(void *retval);
  * Remember, this only sleeps the calling thread. Other threads in the parent process will be 
  * left untouched.
  */
-#define SCID_THREAD_SLEEP (0x101U)
 void sc_thread_sleep(uint32_t ticks);
 
 /**
@@ -44,7 +42,6 @@ void sc_thread_sleep(uint32_t ticks);
  * If tid is given, the created thread's id is written to tid.
  * On error, the null tid is written, (FOS_MAX_THREADS_PER_PROC)
  */
-#define SCID_THREAD_SPAWN (0x102U)
 fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void *arg);
 
 /**
@@ -64,7 +61,6 @@ fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void
  *
  * Any error scenario always returns immediately to the calling thread.
  */
-#define SCID_THREAD_JOIN (0x103U)
 fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retval);
 
 /**
@@ -76,7 +72,6 @@ fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retv
  *
  * Returns an error if there are insufficient resources, or if futex is NULL.
  */
-#define SCID_FUTEX_REGISTER (0x200)
 fernos_error_t sc_futex_register(futex_t *futex);
 
 /**
@@ -86,7 +81,6 @@ fernos_error_t sc_futex_register(futex_t *futex);
  *
  * All threads waiting on the futex will wake up with FOS_STATE_MISMATCH returned.
  */
-#define SCID_FUTEX_DEREGISTER (0x201)
 void sc_futex_deregister(futex_t *futex);
 
 /**
@@ -102,7 +96,6 @@ void sc_futex_deregister(futex_t *futex);
  *
  * This call return other errors if something goes wrong or if the given futex doesn't exist!
  */
-#define SCID_FUTEX_WAIT (0x202)
 fernos_error_t sc_futex_wait(futex_t *futex, futex_t exp_val);
 
 /**
@@ -110,7 +103,6 @@ fernos_error_t sc_futex_wait(futex_t *futex, futex_t exp_val);
  *
  * Returns an error if the given futex doesn't exist.
  */
-#define SCID_FUTEX_WAKE (0x203)
 fernos_error_t sc_futex_wake(futex_t *futex, bool all);
 
 /**
@@ -118,5 +110,4 @@ fernos_error_t sc_futex_wake(futex_t *futex, bool all);
  *
  * (Probably will take this out later)
  */
-#define SCID_TERM_PUT_S (0x400U)
 void sc_term_put_s(const char *s);
