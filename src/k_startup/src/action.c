@@ -93,6 +93,7 @@ void fos_timer_action(user_ctx_t *ctx) {
 
 void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t arg1, 
         uint32_t arg2, uint32_t arg3) {
+    ks_save_ctx(kernel, ctx);
     fernos_error_t err;
 
     switch (id) {
@@ -103,10 +104,9 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
             lock_up();
         }
 
-        return_to_curr_thread();
+        break;
 
     case SCID_THREAD_SLEEP:
-        ks_save_ctx(kernel, ctx);
         err = ks_sleep_thread(kernel, arg0);
 
         if (err != FOS_SUCCESS) {
@@ -114,11 +114,9 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
             lock_up();
         }
         
-        return_to_curr_thread();
+        break;
 
     case SCID_THREAD_SPAWN:
-        ks_save_ctx(kernel, ctx);
-
         err = ks_spawn_local_thread(kernel, (thread_id_t *)arg0, 
                 (void *(*)(void *))arg1, (void *)arg2);
 
@@ -127,11 +125,9 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
             lock_up();
         }
 
-        return_to_curr_thread();
+        break;
 
     case SCID_THREAD_JOIN:
-        ks_save_ctx(kernel, ctx);
-
         err = ks_join_local_thread(kernel, arg0, (thread_join_ret_t *)arg1);
 
         if (err != FOS_SUCCESS) {
@@ -139,47 +135,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
             lock_up();
         }
 
-        return_to_curr_thread();
-
-        /*
-    case SCID_COND_NEW:
-        ks_save_ctx(kernel, ctx);
-        err = ks_new_condition(kernel, (cond_id_t *)arg);
-        if (err != FOS_SUCCESS) {
-            term_put_s("Fatal Error with cond creation\n");
-            lock_up();
-        }
-        return_to_curr_thread();
-
-    case SCID_COND_DELETE:
-        ks_save_ctx(kernel, ctx);
-        err = ks_delete_condition(kernel, (cond_id_t)arg);
-        if (err != FOS_SUCCESS) {
-            term_put_s("Fatal Error with cond deletion\n");
-            lock_up();
-        }
-        return_to_curr_thread();
-
-    case SCID_COND_NOTIFY:
-        ks_save_ctx(kernel, ctx);
-        mem_cpy_from_user(&cn_arg, ctx->cr3, arg, sizeof(cond_notify_arg_t), NULL);
-        err = ks_notify_condition(kernel, cn_arg.cid, cn_arg.action);
-        if (err != FOS_SUCCESS) {
-            term_put_s("Fatal Error with cond Notification\n");
-            lock_up();
-        }
-
-        return_to_curr_thread();
-
-    case SCID_COND_WAIT:
-        ks_save_ctx(kernel, ctx);
-        err = ks_wait_condition(kernel, (cond_id_t)arg);
-        if (err != FOS_SUCCESS) {
-            term_put_s("Fatal Error with cond Wait\n");
-            lock_up();
-        }
-        return_to_curr_thread();
-        */
+        break;
 
     case SCID_TERM_PUT_S:
         if (!arg0) {
@@ -192,11 +148,14 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         term_put_s(buf);
         da_free(buf);
 
-        return_to_ctx(ctx);
+        break;
 
     default:
         term_put_s("Unknown syscall!\n");
         lock_up();
+
     }
+
+    return_to_curr_thread();
 }
 

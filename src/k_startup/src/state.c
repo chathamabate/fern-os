@@ -333,15 +333,3 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
     return FOS_SUCCESS;
 }
 
-fernos_error_t ks_new_condition(kernel_state_t *ks, cond_id_t *u_cond_id) {
-    return FOS_NOT_IMPLEMENTED;
-}
-fernos_error_t ks_delete_condition(kernel_state_t *ks, cond_id_t cid) {
-    return FOS_NOT_IMPLEMENTED;
-}
-fernos_error_t ks_notify_condition(kernel_state_t *ks, cond_id_t cid, cond_notify_action_t action) {
-    return FOS_NOT_IMPLEMENTED;
-}
-fernos_error_t ks_wait_condition(kernel_state_t *ks, cond_id_t cid) {
-    return FOS_NOT_IMPLEMENTED;
-}
