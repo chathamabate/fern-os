@@ -137,6 +137,18 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
         break;
 
+    case SCID_FUTEX_REGISTER:
+        break;
+
+    case SCID_FUTEX_DEREGISTER:
+        break;
+
+    case SCID_FUTEX_WAIT:
+        break;
+
+    case SCID_FUTEX_WAKE:
+        break;
+
     case SCID_TERM_PUT_S:
         if (!arg0) {
             term_put_s("NULL str\n");

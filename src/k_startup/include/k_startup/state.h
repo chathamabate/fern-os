@@ -164,3 +164,28 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val);
 fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
         thread_join_ret_t *u_join_ret);
 
+/**
+ * Regsiter a futex in the current process.
+ *
+ * user error if futex is null or already in use, Or if there are insufficient resources.
+ *
+ * Remember, u_futex is a pointer into userspace!
+ */
+fernos_error_t ks_futex_register(kernel_state_t *ks, futex_t *u_futex);
+
+/**
+ * Deregister a futex of the current process.
+ *
+ * Doesn't return a user error.
+ *
+ * If threads are currently waiting on this futex, they are rescheduled with return value
+ * FOS_STATE_MISMATCH.
+ *
+ * Returns an error if there is some internal kernel memory error?
+ */
+fernos_error_t ks_futex_deregister(kernel_state_t *ks, futex_t *u_futex);
+
+/* I don't really want to code rn for some reason */
+
+fernos_error_t ks_futex_wait(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val);
+fernos_error_t ks_futex_wake(kernel_state_t *ks, futex_t *u_futex, bool all);

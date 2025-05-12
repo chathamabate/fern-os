@@ -70,7 +70,8 @@ fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retv
  *
  * Threads will be able to wait while the futex holds a specific value.
  *
- * Returns an error if there are insufficient resources, or if futex is NULL.
+ * Returns an error if there are insufficient resources, if futex is NULL,
+ * or if the futex is already in use!
  */
 fernos_error_t sc_futex_register(futex_t *futex);
 
