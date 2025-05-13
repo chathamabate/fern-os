@@ -7,6 +7,7 @@
 #include "s_bridge/syscall.h"
 #include "s_util/str.h"
 #include "s_util/atomic.h"
+#include "u_concur/mutex.h"
 
 static void uprintf(const char *fmt, ...) {
     char buf[256];
@@ -21,15 +22,20 @@ static void uprintf(const char *fmt, ...) {
 
 void *other_main(void *arg);
 
-futex_t fut;
+mutex_t mut;
+
+char str[3];
 
 void *user_main(void *arg) {
     (void)arg;
 
     fernos_error_t err;
 
-    fut = 0;
-    err = sc_futex_register(&fut);
+    str[0] = 'a';
+    str[1] = 'a';
+    str[2] = '\0';
+
+    err = init_mutex(&mut);
     if (err != FOS_SUCCESS) {
         uprintf("Failed to create futex\n");
         while (1);
@@ -43,30 +49,25 @@ void *user_main(void *arg) {
         }
     }
 
-
-    sc_thread_sleep(30);
-
-    err = sc_futex_wake(&fut, true);
-    if (err != FOS_SUCCESS) {
-        uprintf("Failed to wake\n");
-        while (1);
-    }
-
     while (1);
 }
 
 void *other_main(void *arg) {
-    fernos_error_t err;
-
     uprintf("[%u] Starting Task\n", arg);
 
-    err = sc_futex_wait(&fut, 0);
-    if (err != FOS_SUCCESS) {
-        uprintf("Error waiting on futex\n");
-    }
+    mut_lock(&mut);
+
+    str[0]++;
+    str[1]++;
+    sc_thread_sleep(10);
+
+    uprintf("[%u] STR: %s\n", arg, str);
+
+    mut_unlock(&mut);
 
     uprintf("[%u] Ending Task\n", arg);
-    return (void *)((uint32_t)arg * 2);
+
+    return NULL;
 }
 
 

@@ -10,6 +10,7 @@ THIS_FILE := $(MODS_DIR)/Makefile
 
 # I like to list the modules in order of dependence.
 MODS := \
+		u_concur \
 		k_startup \
 		u_startup \
 		s_bridge \
