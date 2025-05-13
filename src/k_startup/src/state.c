@@ -111,11 +111,10 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
 
     thread_t *woken_thread;
     while ((err = twq_pop(ks->sleep_q, (void **)&woken_thread)) == FOS_SUCCESS) {
-        // Prepare to be scheduled!
-        woken_thread->next_thread = NULL;
-        woken_thread->prev_thread = NULL;
-        woken_thread->state = THREAD_STATE_DETATCHED;
+        // Remove reference to sleep queue.
+        woken_thread->wq = NULL;
 
+        // Schedule woken thread. 
         ks_schedule_thread(ks, woken_thread);
     }
 
@@ -152,7 +151,9 @@ fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
 
     // Only deschedule one we know our thread was added successfully to the wait queue!
     ks_deschedule_thread(ks, thr);
+
     thr->wq = (wait_queue_t *)(ks->sleep_q);
+    thr->state = THREAD_STATE_WAITING;
 
     return FOS_SUCCESS;
 }
@@ -253,9 +254,9 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     // write return values, then schedule it!
 
     joining_thread->wq = NULL;
-
     thread_join_ret_t *u_ret_ptr = (thread_join_ret_t *)(joining_thread->u_wait_ctx);
     joining_thread->u_wait_ctx = NULL;
+    joining_thread->state = THREAD_STATE_DETATCHED;
 
     if (u_ret_ptr) {
         thread_join_ret_t local_ret = {
@@ -332,8 +333,9 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
     // Now we can safely deschedule it!
 
     ks_deschedule_thread(ks, thr);
-    thr->u_wait_ctx = u_join_ret; // Save where we will eventually return to!
     thr->wq = (wait_queue_t *)(proc->join_queue);
+    thr->u_wait_ctx = u_join_ret; // Save where we will eventually return to!
+    thr->state = THREAD_STATE_WAITING;
 
     return FOS_SUCCESS;
 }
@@ -401,11 +403,7 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
 
     thread_t *woken_thread;
     while ((err = bwq_pop(wq, (void **)&woken_thread)) == FOS_SUCCESS) {
-        // Prepare to be scheduled!
-        woken_thread->next_thread = NULL;
-        woken_thread->prev_thread = NULL;
-        woken_thread->state = THREAD_STATE_DETATCHED;
-
+        woken_thread->wq = NULL;
         woken_thread->ctx.eax = FOS_STATE_MISMATCH;
 
         ks_schedule_thread(ks, woken_thread);
@@ -462,12 +460,49 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     ks_deschedule_thread(ks, thr);
     thr->wq = (wait_queue_t *)wq;
     thr->u_wait_ctx = NULL; // No context info needed for waiting on a futex.
+    thr->state = THREAD_STATE_WAITING;
 
     return FOS_SUCCESS;
 }
 
 fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
+    fernos_error_t err;
 
-    return FOS_NOT_IMPLEMENTED;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    // Get the wait queue.
+    basic_wait_queue_t *wq;
+
+    basic_wait_queue_t **t_wq = mp_get(proc->futexes, &u_futex);
+    DUAL_RET_COND(!t_wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
+
+    wq = *t_wq;
+
+    bwq_notify_mode_t mode = all ? BWQ_NOTIFY_ALL : BWQ_NOTIFY_NEXT;
+
+    err = bwq_notify(wq, mode);
+    if (err != FOS_SUCCESS) {
+        return err; // fatal kernel error.
+    }
+
+    thread_t *woken_thread;
+    while ((err = bwq_pop(wq, (void **)&woken_thread)) == FOS_SUCCESS) {
+        woken_thread->wq = NULL;
+
+
+    }
+
+    if (err != FOS_EMPTY) {
+        return err;
+    }
+
+    
+
+    return FOS_SUCCESS;
 }
 
