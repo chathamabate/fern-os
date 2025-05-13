@@ -133,16 +133,16 @@ fernos_error_t bwq_enqueue(basic_wait_queue_t *bwq, void *item);
  */
 fernos_error_t bwq_notify(basic_wait_queue_t *bwq, bwq_notify_mode_t mode);
 
-static inline void bwq_notify_next(basic_wait_queue_t *bwq) {
-    bwq_notify(bwq, BWQ_NOTIFY_NEXT);
+static inline fernos_error_t bwq_notify_next(basic_wait_queue_t *bwq) {
+    return bwq_notify(bwq, BWQ_NOTIFY_NEXT);
 }
 
-static inline void bwq_notify_last(basic_wait_queue_t *bwq) {
-    bwq_notify(bwq, BWQ_NOTIFY_LAST);
+static inline fernos_error_t bwq_notify_last(basic_wait_queue_t *bwq) {
+    return bwq_notify(bwq, BWQ_NOTIFY_LAST);
 }
 
-static inline void bwq_notify_all(basic_wait_queue_t *bwq) {
-    bwq_notify(bwq, BWQ_NOTIFY_ALL);
+static inline fernos_error_t bwq_notify_all(basic_wait_queue_t *bwq) {
+    return bwq_notify(bwq, BWQ_NOTIFY_ALL);
 }
 
 /**

@@ -142,3 +142,11 @@ fernos_error_t proc_create_thread(process_t *proc, thread_t **thr,
  * If you'd like the thread's stack pages to be returned, set `return_stack` to true.
  */
 void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack);
+
+/**
+ * Simple helper for get a futex's wait queue. Returns an error if the wait queue cannot be found,
+ * or if any of the given arguments are NULL.
+ *
+ * Writes the found wait queue to *bwq.
+ */
+fernos_error_t proc_get_futex_wq(process_t *proc, futex_t *u_futex, basic_wait_queue_t **bwq);

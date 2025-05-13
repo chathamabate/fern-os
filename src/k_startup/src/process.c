@@ -97,3 +97,19 @@ void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack) {
     // Return the thread id so it can be used by later threads!
     idtb_push_id(proc->thread_table, tid);
 }
+
+fernos_error_t proc_get_futex_wq(process_t *proc, futex_t *u_futex, basic_wait_queue_t **bwq) {
+    if (!proc || !u_futex || !bwq) {
+        return FOS_BAD_ARGS;
+    }
+
+    basic_wait_queue_t **t_bwq = (basic_wait_queue_t **)mp_get(proc->futexes, &u_futex);
+
+    if (!t_bwq) {
+        *bwq = NULL;
+        return FOS_INVALID_INDEX;
+    }
+
+    *bwq = *t_bwq;
+    return FOS_SUCCESS;
+}

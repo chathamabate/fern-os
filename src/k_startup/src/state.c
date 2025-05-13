@@ -380,7 +380,52 @@ fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex) {
 }
 
 fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
-    return FOS_NOT_IMPLEMENTED;
+    fernos_error_t err;
+
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    basic_wait_queue_t *wq;
+
+    err = proc_get_futex_wq(proc, u_futex, &wq);
+    if (err != FOS_SUCCESS) {
+        thr->ctx.eax = err;
+        return FOS_SUCCESS;
+    }
+
+    err = bwq_notify_all(wq);
+    if (err != FOS_SUCCESS) {
+        return err; // Failing to notify is more of a fatal kernel error tbh.
+    }
+
+    thread_t *woken_thread;
+    while ((err = bwq_pop(wq, (void **)&woken_thread)) == FOS_SUCCESS) {
+        // Prepare to be scheduled!
+        woken_thread->next_thread = NULL;
+        woken_thread->prev_thread = NULL;
+        woken_thread->state = THREAD_STATE_DETATCHED;
+
+        woken_thread->ctx.eax = FOS_STATE_MISMATCH;
+
+        ks_schedule_thread(ks, woken_thread);
+    }
+
+    // Some sort of error with the popping.
+    if (err != FOS_EMPTY) {
+        return err;
+    }
+
+    // At this point, all previously waiting thread should've been scheduled...
+    // Now just delete the wait queue and remove it from the map?
+
+    mp_remove(proc->futexes, &u_futex);
+    delete_wait_queue((wait_queue_t *)wq);
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val) {
