@@ -113,6 +113,7 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
     while ((err = twq_pop(ks->sleep_q, (void **)&woken_thread)) == FOS_SUCCESS) {
         // Remove reference to sleep queue.
         woken_thread->wq = NULL;
+        woken_thread->state = THREAD_STATE_DETATCHED;
 
         // Schedule woken thread. 
         ks_schedule_thread(ks, woken_thread);
@@ -405,6 +406,7 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
     while ((err = bwq_pop(wq, (void **)&woken_thread)) == FOS_SUCCESS) {
         woken_thread->wq = NULL;
         woken_thread->ctx.eax = FOS_STATE_MISMATCH;
+        woken_thread->state = THREAD_STATE_DETATCHED;
 
         ks_schedule_thread(ks, woken_thread);
     }
@@ -420,7 +422,7 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
     mp_remove(proc->futexes, &u_futex);
     delete_wait_queue((wait_queue_t *)wq);
 
-    return FOS_SUCCESS;
+    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
 
 fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val) {
@@ -449,6 +451,7 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     // But whatevs...
     DUAL_RET_FOS_ERR(err, thr);
 
+    // Immediate return if values don't match!
     DUAL_RET_COND(act_val != exp_val, thr, FOS_SUCCESS, FOS_SUCCESS);
 
     // Ok, here the actual and expected value match. 
@@ -490,19 +493,22 @@ fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
         return err; // fatal kernel error.
     }
 
+    // Regardless of the mode, we'll just wake up in a loop. In the case of "NOTIFY_NEXT",
+    // this loop should only iterate at most once.
+
     thread_t *woken_thread;
     while ((err = bwq_pop(wq, (void **)&woken_thread)) == FOS_SUCCESS) {
         woken_thread->wq = NULL;
+        woken_thread->ctx.eax = FOS_SUCCESS;
+        woken_thread->state = THREAD_STATE_DETATCHED;
 
-
+        ks_schedule_thread(ks, woken_thread);
     }
 
     if (err != FOS_EMPTY) {
         return err;
     }
 
-    
-
-    return FOS_SUCCESS;
+    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
 

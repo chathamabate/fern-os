@@ -21,36 +21,50 @@ static void uprintf(const char *fmt, ...) {
 
 void *other_main(void *arg);
 
+futex_t fut;
 
 void *user_main(void *arg) {
     (void)arg;
 
-    for (uint32_t i = 0; i < 10; i++) {
-        fernos_error_t err = sc_thread_spawn(NULL, other_main, (void *)i);
+    fernos_error_t err;
+
+    fut = 0;
+    err = sc_futex_register(&fut);
+    if (err != FOS_SUCCESS) {
+        uprintf("Failed to create futex\n");
+        while (1);
+    }
+
+    for (uint32_t i = 0; i < 4; i++) {
+        err = sc_thread_spawn(NULL, other_main, (void *)i); 
         if (err != FOS_SUCCESS) {
-            uprintf("Failed to spawn thread %u\n", i);
+            uprintf("Failed to spawn thread\n");
             while (1);
         }
     }
 
-    sc_thread_sleep(4);
 
-    for (uint32_t i = 0; i < 10; i++) {
-        fernos_error_t err = sc_thread_join(full_join_vector(), NULL, NULL);
-        if (err != FOS_SUCCESS) {
-            uprintf("Failed to join threads\n", i);
-            while (1);
-        }
+    sc_thread_sleep(30);
+
+    err = sc_futex_wake(&fut, true);
+    if (err != FOS_SUCCESS) {
+        uprintf("Failed to wake\n");
+        while (1);
     }
-
-    uprintf("All Joined\n");
 
     while (1);
 }
 
 void *other_main(void *arg) {
+    fernos_error_t err;
+
     uprintf("[%u] Starting Task\n", arg);
-    sc_thread_sleep(5);
+
+    err = sc_futex_wait(&fut, 0);
+    if (err != FOS_SUCCESS) {
+        uprintf("Error waiting on futex\n");
+    }
+
     uprintf("[%u] Ending Task\n", arg);
     return (void *)((uint32_t)arg * 2);
 }

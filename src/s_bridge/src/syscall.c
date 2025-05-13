@@ -46,7 +46,7 @@ fernos_error_t sc_futex_wait(futex_t *futex, futex_t exp_val) {
 }
 
 fernos_error_t sc_futex_wake(futex_t *futex, bool all) {
-    return (fernos_error_t)trigger_syscall(SCID_FUTEX_WAIT, (uint32_t)futex, all, 0, 0);
+    return (fernos_error_t)trigger_syscall(SCID_FUTEX_WAKE, (uint32_t)futex, all, 0, 0);
 }
 
 void sc_term_put_s(const char *s) {
