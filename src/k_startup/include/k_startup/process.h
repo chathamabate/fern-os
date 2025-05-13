@@ -5,6 +5,7 @@
 #include "k_sys/page.h"
 #include "s_mem/allocator.h"
 #include "s_data/wait_queue.h"
+#include "s_data/map.h"
 
 struct _process_t {
     /**
@@ -90,16 +91,14 @@ struct _process_t {
      */
     //vector_wait_queue_t *signal_queue;
 
+    
     /**
-     * Conditions will be local to each process. A thread from one process can NEVER wait on a 
-     * condition from another process.
+     * Originally conditions were stored here, however, upon learning more about synchronization
+     * mechanisms, now, futexes are stored here in the process structure.
      *
-     * This is essentially a map<Local Condition ID, basic_wait_queue_t *>
-     *
-     * If a condition is deleted while threads are waiting, all threads should be woken up with 
-     * some sort of status code.
+     * This is a map from userspace addresses (futex_t *)'s -> basic_wait_queue's
      */
-     id_table_t *conds;
+    map_t *futexes;
 };
 
 /**

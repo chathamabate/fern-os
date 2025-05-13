@@ -333,3 +333,19 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
     return FOS_SUCCESS;
 }
 
+fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
+    return FOS_NOT_IMPLEMENTED;
+}
+

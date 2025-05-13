@@ -171,7 +171,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
  *
  * Remember, u_futex is a pointer into userspace!
  */
-fernos_error_t ks_futex_register(kernel_state_t *ks, futex_t *u_futex);
+fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex);
 
 /**
  * Deregister a futex of the current process.
@@ -181,11 +181,25 @@ fernos_error_t ks_futex_register(kernel_state_t *ks, futex_t *u_futex);
  * If threads are currently waiting on this futex, they are rescheduled with return value
  * FOS_STATE_MISMATCH.
  *
- * Returns an error if there is some internal kernel memory error?
+ * Returns an error if there is some issue with the deregister.
  */
-fernos_error_t ks_futex_deregister(kernel_state_t *ks, futex_t *u_futex);
+fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex);
 
-/* I don't really want to code rn for some reason */
+/**
+ * Confirm the given value of the futex = exp_val. If not, returns user success immediately.
+ * If the value is equal, the current thread is descheduled.
+ *
+ * The descheduled thread will only be woken up with a call to wake, Or if the futex is destroyed.
+ * If the futex is destroyed, all waiting threads are rescheduled with user return value of
+ * FOS_STATE_MISMATCH.
+ *
+ * Returns user error if arguements are invalid.
+ */
+fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val);
 
-fernos_error_t ks_futex_wait(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val);
-fernos_error_t ks_futex_wake(kernel_state_t *ks, futex_t *u_futex, bool all);
+/**
+ * Wake up one or all threads waiting on a futex.
+ *
+ * Returns user error if arguements are invalid.
+ */
+fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all);

@@ -94,59 +94,40 @@ void fos_timer_action(user_ctx_t *ctx) {
 void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t arg1, 
         uint32_t arg2, uint32_t arg3) {
     ks_save_ctx(kernel, ctx);
-    fernos_error_t err;
+    fernos_error_t err = FOS_SUCCESS;
 
     switch (id) {
     case SCID_THREAD_EXIT:
         err = ks_exit_thread(kernel, (void *)arg0);
-        if (err != FOS_SUCCESS) {
-            term_put_fmt_s("Exit Failed %u\n", err);
-            lock_up();
-        }
-
         break;
 
     case SCID_THREAD_SLEEP:
         err = ks_sleep_thread(kernel, arg0);
-
-        if (err != FOS_SUCCESS) {
-            term_put_s("BAD SLEEP CALL\n");
-            lock_up();
-        }
-        
         break;
 
     case SCID_THREAD_SPAWN:
         err = ks_spawn_local_thread(kernel, (thread_id_t *)arg0, 
                 (void *(*)(void *))arg1, (void *)arg2);
-
-        if (err != FOS_SUCCESS) {
-            term_put_s("Bad Thread Creation\n");
-            lock_up();
-        }
-
         break;
 
     case SCID_THREAD_JOIN:
         err = ks_join_local_thread(kernel, arg0, (thread_join_ret_t *)arg1);
-
-        if (err != FOS_SUCCESS) {
-            term_put_s("error with join\n");
-            lock_up();
-        }
-
         break;
 
     case SCID_FUTEX_REGISTER:
+        err = ks_register_futex(kernel, (futex_t *)arg0);
         break;
 
     case SCID_FUTEX_DEREGISTER:
+        err = ks_deregister_futex(kernel, (futex_t *)arg0);
         break;
 
     case SCID_FUTEX_WAIT:
+        err = ks_wait_futex(kernel, (futex_t *)arg0, arg1);
         break;
 
     case SCID_FUTEX_WAKE:
+        err = ks_wake_futex(kernel, (futex_t *)arg0, (bool)arg1);
         break;
 
     case SCID_TERM_PUT_S:
@@ -163,9 +144,13 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         break;
 
     default:
-        term_put_s("Unknown syscall!\n");
-        lock_up();
+        err = FOS_BAD_ARGS;
+        break;
+    }
 
+    if (err != FOS_SUCCESS) {
+        term_put_fmt_s("Syscall Error (Syscall: 0x%X, Error: 0x%X)", id, err);
+        lock_up();
     }
 
     return_to_curr_thread();
