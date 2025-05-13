@@ -9,6 +9,27 @@
 
 #include "k_bios_term/term.h"
 
+/*
+ * Some helper macros for returning from these calls in both the kernel space and the user thread.
+ */
+
+#define DUAL_RET(thr, u_err, k_err) \
+    do { \
+        (thr)->ctx.eax = u_err; \
+        return (k_err); \
+    } while (0)
+
+#define DUAL_RET_COND(cond, thr, u_err, k_err) \
+    if (cond) { \
+        DUAL_RET(thr, u_err, k_err); \
+    }
+
+#define DUAL_RET_FOS_ERR(err, thr) \
+    if (err != FOS_SUCCESS) { \
+        (thr)->ctx.eax = (err);  \
+        return FOS_SUCCESS; \
+    }
+
 /**
  * Creates a new kernel state with basically no fleshed out details.
  */
@@ -127,11 +148,7 @@ fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     err = twq_enqueue(ks->sleep_q, (void *)thr, 
             ks->curr_tick + ticks);
 
-    if (err != FOS_SUCCESS) {
-        thr->ctx.eax = err;
-
-        return FOS_SUCCESS;
-    }
+    DUAL_RET_FOS_ERR(err, thr);
 
     // Only deschedule one we know our thread was added successfully to the wait queue!
     ks_deschedule_thread(ks, thr);
@@ -151,11 +168,7 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
 
     const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
 
-    if (!entry) {
-        thr->ctx.eax = FOS_BAD_ARGS;
-
-        return FOS_SUCCESS;
-    }
+    DUAL_RET_COND(!entry, thr, FOS_BAD_ARGS, FOS_SUCCESS);
 
     fernos_error_t err;
 
@@ -182,8 +195,7 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
         mem_cpy_to_user(proc->pd, u_tid, &new_tid, sizeof(thread_id_t), NULL);
     }
 
-    thr->ctx.eax = FOS_SUCCESS;
-    return FOS_SUCCESS;
+    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
 
 fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
@@ -274,11 +286,10 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
-    if (jv == 0 || jv == (1U << thr->tid)) {
-        thr->ctx.eax = FOS_BAD_ARGS;
-
-        return FOS_SUCCESS;
-    }
+    DUAL_RET_COND(
+        jv == 0 || jv == (1U << thr->tid),
+        thr, FOS_BAD_ARGS, FOS_SUCCESS
+    );
 
     // First we search to see if there already is an exited thread we can join on!
 
@@ -308,20 +319,14 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
             mem_cpy_to_user(proc->pd, u_join_ret, &local_ret, sizeof(thread_join_ret_t), NULL);
         }
 
-        thr->ctx.eax = FOS_SUCCESS;
-        
-        return FOS_SUCCESS;
+        DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
     }
 
     // Here, we searched all threads and didn't find one to join on.
     // So, The current thread must wait!
 
     err = vwq_enqueue(proc->join_queue, thr, jv);
-    if (err != FOS_SUCCESS) {
-        thr->ctx.eax = err;
-
-        return FOS_SUCCESS;
-    }
+    DUAL_RET_FOS_ERR(err, thr);
 
     // Here we successfully queued our thread!
     // Now we can safely deschedule it!
@@ -391,11 +396,13 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
 
     basic_wait_queue_t *wq;
 
-    err = proc_get_futex_wq(proc, u_futex, &wq);
-    if (err != FOS_SUCCESS) {
-        thr->ctx.eax = err;
+    basic_wait_queue_t **t_wq = (basic_wait_queue_t **)mp_get(proc->futexes, &u_futex);
+    if (!t_wq) {
+        thr->ctx.eax = FOS_INVALID_INDEX;
         return FOS_SUCCESS;
     }
+
+    wq = *t_wq;
 
     err = bwq_notify_all(wq);
     if (err != FOS_SUCCESS) {
@@ -429,6 +436,28 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
 }
 
 fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val) {
+    fernos_error_t err;
+
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    basic_wait_queue_t *wq;
+
+
+    futex_t act_val;
+    err = mem_cpy_from_user(&act_val, proc->pd, u_futex, sizeof(futex_t), NULL);
+    if (err != FOS_SUCCESS) { 
+        thr->ctx.eax = err;
+        return FOS_SUCCESS;
+    }
+
+    
+    
+
     return FOS_NOT_IMPLEMENTED;
 }
 
