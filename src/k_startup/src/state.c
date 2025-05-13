@@ -334,7 +334,49 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
 }
 
 fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex) {
-    return FOS_NOT_IMPLEMENTED;
+    fernos_error_t err;
+
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+    map_t *fm = proc->futexes;
+
+    // Never register a NULL futex.
+    if (!u_futex) {
+        thr->ctx.eax = FOS_BAD_ARGS;
+        return FOS_SUCCESS;
+    }
+
+    // Check if the given futex is already in the map.
+
+    if (mp_get(fm, &u_futex)) {
+        thr->ctx.eax = FOS_ALREADY_ALLOCATED;
+        return FOS_SUCCESS;
+    }
+
+    // Try creating the futex wait queue and placing it in the map.
+
+    basic_wait_queue_t *fwq = new_basic_wait_queue(proc->al);
+    if (!fwq) {
+        thr->ctx.eax = FOS_NO_MEM;
+        return FOS_SUCCESS;
+    }
+
+    err = mp_put(fm, &u_futex, &fwq);
+    if (err != FOS_SUCCESS) {
+        delete_wait_queue((wait_queue_t *)fwq);
+
+        thr->ctx.eax = err;
+        return FOS_SUCCESS;
+    }
+
+    // Ok, I think this is a success!
+
+    thr->ctx.eax = FOS_SUCCESS;
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
