@@ -350,38 +350,31 @@ fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex) {
     map_t *fm = proc->futexes;
 
     // Never register a NULL futex.
-    if (!u_futex) {
-        thr->ctx.eax = FOS_BAD_ARGS;
-        return FOS_SUCCESS;
-    }
+    DUAL_RET_COND(!u_futex, thr, FOS_BAD_ARGS, FOS_SUCCESS);
+
+    // Let's also confirm that the user actually has access to the futex address.
+    futex_t test;
+    err = mem_cpy_from_user(&test, proc->pd, u_futex, sizeof(u_futex), NULL);
+    DUAL_RET_FOS_ERR(err, thr);
 
     // Check if the given futex is already in the map.
+    DUAL_RET_COND(mp_get(fm, &u_futex), thr, FOS_ALREADY_ALLOCATED, FOS_SUCCESS);
 
-    if (mp_get(fm, &u_futex)) {
-        thr->ctx.eax = FOS_ALREADY_ALLOCATED;
-        return FOS_SUCCESS;
-    }
-
-    // Try creating the futex wait queue and placing it in the map.
-
+    // Try creating the futex wait queue.
     basic_wait_queue_t *fwq = new_basic_wait_queue(proc->al);
-    if (!fwq) {
-        thr->ctx.eax = FOS_NO_MEM;
-        return FOS_SUCCESS;
-    }
+    DUAL_RET_COND(!fwq, thr, FOS_NO_MEM, FOS_SUCCESS);
 
+    // Try placing it in the map.
     err = mp_put(fm, &u_futex, &fwq);
     if (err != FOS_SUCCESS) {
         delete_wait_queue((wait_queue_t *)fwq);
 
-        thr->ctx.eax = err;
-        return FOS_SUCCESS;
+        DUAL_RET(thr, err, FOS_SUCCESS);
     }
 
     // Ok, I think this is a success!
 
-    thr->ctx.eax = FOS_SUCCESS;
-    return FOS_SUCCESS;
+    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
 
 fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
@@ -397,10 +390,7 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
     basic_wait_queue_t *wq;
 
     basic_wait_queue_t **t_wq = (basic_wait_queue_t **)mp_get(proc->futexes, &u_futex);
-    if (!t_wq) {
-        thr->ctx.eax = FOS_INVALID_INDEX;
-        return FOS_SUCCESS;
-    }
+    DUAL_RET_COND(!t_wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
 
     wq = *t_wq;
 
@@ -445,23 +435,39 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
+    // Get the wait queue.
     basic_wait_queue_t *wq;
 
+    basic_wait_queue_t **t_wq = mp_get(proc->futexes, &u_futex);
+    DUAL_RET_COND(!t_wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
 
+    wq = *t_wq;
+
+    // Read the futexes actual value.
     futex_t act_val;
     err = mem_cpy_from_user(&act_val, proc->pd, u_futex, sizeof(futex_t), NULL);
-    if (err != FOS_SUCCESS) { 
-        thr->ctx.eax = err;
-        return FOS_SUCCESS;
-    }
 
-    
-    
+    // This should never happen since we confirm above our futex is in a valid address.
+    // But whatevs...
+    DUAL_RET_FOS_ERR(err, thr);
 
-    return FOS_NOT_IMPLEMENTED;
+    DUAL_RET_COND(act_val != exp_val, thr, FOS_SUCCESS, FOS_SUCCESS);
+
+    // Ok, here the actual and expected value match. 
+    // We can add our thread to the wait queue!
+
+    err = bwq_enqueue(wq, thr);
+    DUAL_RET_FOS_ERR(err, thr);
+    
+    ks_deschedule_thread(ks, thr);
+    thr->wq = (wait_queue_t *)wq;
+    thr->u_wait_ctx = NULL; // No context info needed for waiting on a futex.
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
+
     return FOS_NOT_IMPLEMENTED;
 }
 
