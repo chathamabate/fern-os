@@ -170,3 +170,10 @@ thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg);
  * If you'd like the thread's stack pages to be returned, set `return_stack` to true.
  */
 void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack);
+
+/**
+ * Register a futex with the process.
+ *
+ * Returns an error in the case of bad arguments or insufficient resources.
+ */
+fernos_error_t proc_register_futex(process_t *proc, futex_t *u_futex);

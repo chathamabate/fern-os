@@ -108,6 +108,31 @@ static bool test_many_threads(void) {
     TEST_SUCCEED();
 }
 
+/**
+ * This test is going to populate the process structures in a way that the kernel is intended to.
+ */
+static bool test_complex_delete(void) {
+    phys_addr_t pd = new_page_directory();
+    TEST_TRUE(pd != NULL_PHYS_ADDR);
+
+    process_t *proc = new_da_process(0, pd, NULL);
+    TEST_TRUE(proc != NULL);
+
+    thread_t *threads[10];
+    const size_t NUM_THREADS = sizeof(threads) / sizeof(threads[0]);
+
+    for (size_t i = 0; i < NUM_THREADS; i++) {
+        thread_t *thr = proc_new_thread(proc, fake_entry, NULL);
+        TEST_TRUE(thr != NULL);
+        threads[i] = thr;
+    }
+
+    // Ok, now maybe make a new futex??
+
+
+    delete_process(proc);
+    TEST_SUCCEED();
+}
 
 bool test_process(void) {
     BEGIN_SUITE("Process");
