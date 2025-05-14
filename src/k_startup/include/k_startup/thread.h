@@ -33,11 +33,6 @@ typedef uint32_t thread_state_t;
 
 struct _thread_t {
     /**
-     * No longer needed, inferred from parent process.
-     */
-    // allocator_t *al;
-
-    /**
      * The state of this thread.
      */
     thread_state_t state;
@@ -120,7 +115,7 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
 thread_t *new_thread_copy(thread_t *thr, process_t *new_proc);
 
 /**
- * This call is less powerful than `reap_thread` below.
+ * This call is very simple/dangerous.
  *
  * Given any thread structure, it just frees it, nothing is done to the page directory.
  * Additionally, no checks are done on the thread's state.
