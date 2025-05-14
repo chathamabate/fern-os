@@ -83,6 +83,29 @@ struct _thread_t {
     void *exit_ret_val;
 };
 
+// Where do I keep track of scheduled/descheduled threads..
+// If a thread is deleted, How do I remove it from the schedule??
+// Ever think about this one??
+// What should I scheduled thread even be???
+// IDK, my head kinda hurts...
+// The truth is that I need better organization...
+// A schedule node could have a lot of information.. 
+// When you remove a thread from a wait_queue, what happens??
+// Might there be global wait queues??
+// When a thread "waits" what happens??
+// Should a thread even know it's waitng/scheduled if it doesn't have access to such
+// structures? Ever think about that one??
+//
+// I want threads not to be aware of processes, and processes to not be aware of the 
+// global kernel state. That is what I need!
+//
+// Wait queues are tricky. There are wait queues which are local to a process,
+// and wait queues which are global.. How do I deal with this...
+// Could there be some sort of global wait map??? A map all waiting threads are placed in??
+//
+// Things even get more tricky with multiprocessing/signals...
+// Damn, this is lowkey very hard.
+
 /**
  * Create a new thread!
  *

@@ -27,6 +27,8 @@
  * is not directly owned by the thread itself. It does not remove the thread from any
  * wait queues Could we instead remove all reference to outside structures??
  * Maybe this would be a better idea... Just saying...
+ *
+ * Make everything more decoupled could be much much much better!!!!
  */
 
 struct _kernel_state_t {
