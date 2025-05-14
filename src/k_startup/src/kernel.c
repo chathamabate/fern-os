@@ -21,7 +21,7 @@
 #include "s_data/test/list.h"
 #include "s_data/test/wait_queue.h"
 #include "s_data/test/map.h"
-#include "k_startup/test/thread.h"
+#include "k_startup/test/process.h"
 
 #include <stdint.h>
 
@@ -116,7 +116,7 @@ void start_kernel(void) {
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
 
-    test_thread();
+    test_process();
     lock_up();
 
     try_setup_step(init_kernel_state(), "Failed to setup kernel state");

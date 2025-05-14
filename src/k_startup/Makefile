@@ -20,7 +20,8 @@ _ASMS		?= boot.s \
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= page.c \
-			   page_helpers.c 
+			   page_helpers.c \
+			   process.c
 
 -include ../mod_stub.mk
 
