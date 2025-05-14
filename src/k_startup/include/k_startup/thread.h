@@ -114,4 +114,15 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
  */
 void reap_thread(thread_t *thr, bool return_stack);
 
+/**
+ * This call is really very basic.
+ *
+ * It really just allocates a new thread object, and copies the given thread's context
+ * into the new object.
+ *
+ * Most of the thread's state is not copied! The created thread will be in a detached
+ * state with no parent.
+ */
+fernos_error_t thr_copy(thread_t *thr, thread_t **new_thr);
+
 

@@ -143,3 +143,17 @@ fernos_error_t proc_create_thread(process_t *proc, thread_t **thr,
  */
 void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack);
 
+/**
+ * This is a copy of the give process and thread.
+ *
+ * NOTE: The only thing that is really is the memory space and the given thread's stack.
+ * Other threads will not be included in the created thread.
+ *
+ * NOTE: futexes are NOT copied!
+ *
+ * Returns an error if there are insufficient resources or if the arguments are bad.
+ *
+ * Uses the same allocator as the given process.
+ */
+fernos_error_t proc_fork(process_t *proc, thread_t *thr, proc_id_t pid, process_t **new_proc);
+

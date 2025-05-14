@@ -6,6 +6,9 @@
 #include "s_mem/allocator.h"
 #include "s_util/constraints.h"
 
+#include "k_startup/page.h"
+#include "k_startup/page_helpers.h"
+
 static bool fm_key_eq(chained_hash_map_t *futexes, const void *k0, const void *k1) {
     (void)futexes;
     return *(const futex_t **)k0 == *(const futex_t **)k1;
@@ -97,4 +100,47 @@ void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack) {
     // Return the thread id so it can be used by later threads!
     idtb_push_id(proc->thread_table, tid);
 }
+
+fernos_error_t proc_fork(process_t *proc, thread_t *thr, proc_id_t pid, process_t **new_proc) {
+    if (!proc || !thr || !new_proc) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (thr->proc != proc) {
+        return FOS_BAD_ARGS;
+    }
+
+    phys_addr_t new_pd = copy_page_directory(proc->pd);
+    if (new_pd == NULL_PHYS_ADDR) {
+        return FOS_NO_MEM;
+    }
+
+    const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
+
+    idtb_reset_iterator(proc->thread_table);
+
+    // Free all stacks which were used in the parent process, but will NOT be used at first
+    // in this child process.
+    for (thread_id_t tid = idtb_get_iter(proc->thread_table); tid != NULL_TID; 
+            tid = idtb_next(proc->thread_table)) {
+        if (tid != thr->tid) {
+            void *s = (void *)FOS_THREAD_STACK_START(tid);
+            const void *e = (const void *)FOS_THREAD_STACK_END(tid);
+
+            pd_free_pages(new_pd, s, e);
+        }
+    }
+
+    // Now we create a new process object, and copy the given thread over.
+    
+    process_t *child = new_process(proc->al, pid, new_pd, proc);
+    if (!child) {
+        // TODO do something here.
+    }
+
+    thread_t *child_main_thr = 
+
+
+}
+
 

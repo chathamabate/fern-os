@@ -88,3 +88,11 @@ void reap_thread(thread_t *thr, bool return_stack) {
     al_free(thr->proc->al, thr);
 }
 
+fernos_error_t thr_copy(thread_t *thr, thread_t **new_thr) {
+    if (!thr || !new_thr) {
+        return FOS_BAD_ARGS;
+    }
+
+
+
+}
