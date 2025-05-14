@@ -115,6 +115,20 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
 }
 
 /**
+ * Simple and Dangerous destructor!
+ *
+ * This frees all memory used by proc! (Including the full page directory)
+ *
+ * This does NOT remove threads from wait queues or schedules!!!!!!!
+ *
+ * Before you delete a process, ALWAYS detach all threads!
+ * This call DOES NOT check if threads are detatched or not before deleting.
+ * Running this function with threads still referenced by the kernel will result in 
+ * undefided behavior later on!!
+ */
+void delete_process(process_t *proc);
+
+/**
  * Create a thread within a process with the given entry point and argument!
  * The created thread will start in a detached state.
  *

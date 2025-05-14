@@ -101,18 +101,11 @@ thread_t *new_thread_copy(thread_t *thr, process_t *new_proc) {
     return FOS_SUCCESS;
 }
 
-void reap_thread(thread_t *thr, bool return_stack) {
-    if (!thr || thr->state != THREAD_STATE_EXITED) {
+void delete_thread(thread_t *thr) {
+    if (!thr) {
         return;
     }
 
-    if (return_stack) {
-        void *tstack_start = (void *)FOS_THREAD_STACK_START(thr->tid);
-        const void *tstack_end = (void *)FOS_THREAD_STACK_END(thr->tid);
-
-        // Free the whole stack.
-        pd_free_pages(thr->proc->pd, tstack_start, tstack_end);
-    }
-    
     al_free(thr->proc->al, thr);
 }
+

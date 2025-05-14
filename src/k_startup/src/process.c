@@ -54,6 +54,37 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     return proc;
 }
 
+void delete_process(process_t *proc) {
+    delete_page_directory(proc->pd);
+
+    // Dangerously delete all threads.
+    const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
+    idtb_reset_iterator(proc->thread_table);
+    for (thread_id_t tid = idtb_get_iter(proc->thread_table);
+            tid != NULL_TID; tid = idtb_next(proc->thread_table)) {
+        thread_t *thr = idtb_get(proc->thread_table, tid);
+        delete_thread(thr);
+    }
+
+    delete_id_table(proc->thread_table);
+
+    delete_wait_queue((wait_queue_t *)proc->join_queue);
+
+    // Now we need to delete every wait queue (If there are any)
+    basic_wait_queue_t **fwq; // Pretty confusing, but yes this should be a **.
+    mp_reset_iter(proc->futexes);
+    for (fernos_error_t err = mp_get_iter(proc->futexes, NULL, (void **)&fwq);
+                err == FOS_SUCCESS; err = mp_next_iter(proc->futexes, NULL, (void **)&fwq)) {
+        delete_wait_queue((wait_queue_t *)*fwq); 
+    }
+
+    // Now delete the map as a whole.
+    delete_map(proc->futexes);
+
+    // Finally free entire process structure!
+    al_free(proc->al, proc);
+}
+
 fernos_error_t proc_create_thread(process_t *proc, thread_t **thr, 
         thread_entry_t entry, void *arg) {
     if (!thr || !entry) {
@@ -95,7 +126,15 @@ void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack) {
 
     thread_id_t tid = thr->tid;
 
-    reap_thread(thr, return_stack);
+    if (return_stack) {
+        void *tstack_start = (void *)FOS_THREAD_STACK_START(tid);
+        const void *tstack_end = (void *)FOS_THREAD_STACK_END(tid);
+
+        // Free the whole stack.
+        pd_free_pages(proc->pd, tstack_start, tstack_end);
+    }
+
+    delete_thread(thr);
 
     // Return the thread id so it can be used by later threads!
     idtb_push_id(proc->thread_table, tid);
@@ -133,6 +172,7 @@ fernos_error_t proc_fork(process_t *proc, thread_t *thr, proc_id_t pid, process_
 
     // Now we create a new process object, and copy the given thread over.
     // Ooob I am really out of focus today tbh...
+    // Might want to switch to a success oriented strategy here...?
     
     process_t *child = new_process(proc->al, pid, new_pd, proc);
 
@@ -140,7 +180,7 @@ fernos_error_t proc_fork(process_t *proc, thread_t *thr, proc_id_t pid, process_
         // TODO do something here.
     }
 
-    thread_t *child_main_thr = thr_copy()
+    //thread_t *child_main_thr = thr_copy()
 
 
 }

@@ -113,16 +113,20 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
  * new_proc will be the process of this copied thread! cr3 in the new thread's context
  * will be replaced with the page directory of the given process.
  *
+ * NOTE: This assumes that the given process's page directory already has the correct stack pages
+ * allocated!
+ *
  * NULL is returned in case of error.
  */
 thread_t *new_thread_copy(thread_t *thr, process_t *new_proc);
 
 /**
- * If the given thread is not in the exited state, this call does nothing!
+ * This call is less powerful than `reap_thread` below.
  *
- * When in the exited state, this call simply deletes the thread's resources.
- * This does not modify the parent process at all, that's your responsibility!
+ * Given any thread structure, it just frees it, nothing is done to the page directory.
+ * Additionally, no checks are done on the thread's state.
  *
- * If you'd like to free this thread's stack pages, set return stack to true!
+ * If you want this to be removed from some wait queue or schedule, you must do this yourself
+ * before call this function!
  */
-void reap_thread(thread_t *thr, bool return_stack);
+void delete_thread(thread_t *thr);
