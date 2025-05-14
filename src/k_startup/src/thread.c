@@ -93,6 +93,13 @@ fernos_error_t thr_copy(thread_t *thr, thread_t **new_thr) {
         return FOS_BAD_ARGS;
     }
 
+    if (!(thr->proc)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    allocator_t *al = thr->proc->al;
+
+
 
 
 }

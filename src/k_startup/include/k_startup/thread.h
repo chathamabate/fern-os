@@ -122,6 +122,9 @@ void reap_thread(thread_t *thr, bool return_stack);
  *
  * Most of the thread's state is not copied! The created thread will be in a detached
  * state with no parent.
+ *
+ * Returns an error if there are bad arguments or insufficient resources.
+ * Uses the same allocator as the given thread.
  */
 fernos_error_t thr_copy(thread_t *thr, thread_t **new_thr);
 
