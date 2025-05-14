@@ -72,6 +72,35 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
     return thr;
 }
 
+thread_t *new_thread_copy(thread_t *thr, process_t *new_proc) {
+    if (!thr || !new_proc) {
+        return NULL;
+    }
+
+    allocator_t *al = new_proc->al;
+
+    thread_t *copy = al_malloc(al, sizeof(thread_t));
+    if (!copy) {
+        return NULL;
+    }
+
+    copy->state = THREAD_STATE_DETATCHED;
+    copy->next_thread = NULL;
+    copy->prev_thread = NULL;
+    copy->tid = thr->tid;
+
+    copy->proc = new_proc;
+    copy->wq = NULL;
+    copy->u_wait_ctx = NULL;
+
+    mem_cpy(&(copy->ctx), &(thr->ctx), sizeof(user_ctx_t));
+    copy->ctx.cr3 = new_proc->pd;
+    
+    copy->exit_ret_val = NULL;
+
+    return FOS_SUCCESS;
+}
+
 void reap_thread(thread_t *thr, bool return_stack) {
     if (!thr || thr->state != THREAD_STATE_EXITED) {
         return;
@@ -86,37 +115,4 @@ void reap_thread(thread_t *thr, bool return_stack) {
     }
     
     al_free(thr->proc->al, thr);
-}
-
-fernos_error_t thr_copy(thread_t *thr, thread_t **new_thr) {
-    if (!thr || !new_thr) {
-        return FOS_BAD_ARGS;
-    }
-
-    if (!(thr->proc)) {
-        return FOS_STATE_MISMATCH;
-    }
-
-    allocator_t *al = thr->proc->al;
-
-    thread_t *copy = al_malloc(al, sizeof(thread_t));
-    if (!copy) {
-        return FOS_NO_MEM;
-    }
-
-    copy->state = THREAD_STATE_DETATCHED;
-    copy->next_thread = NULL;
-    copy->prev_thread = NULL;
-    copy->tid = thr->tid;
-
-    copy->proc = NULL;
-    copy->wq = NULL;
-    copy->u_wait_ctx = NULL;
-
-    mem_cpy(&(copy->ctx), &(thr->ctx), sizeof(user_ctx_t));
-    
-    copy->exit_ret_val = NULL;
-
-    *new_thr = copy;
-    return FOS_SUCCESS;
 }

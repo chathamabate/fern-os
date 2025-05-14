@@ -105,6 +105,19 @@ struct _thread_t {
 thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg);
 
 /**
+ * Copy a given thread.
+ *
+ * The created thread is always in a detached stated! The only data which is actually copied
+ * is the given thread's TID and context!
+ *
+ * new_proc will be the process of this copied thread! cr3 in the new thread's context
+ * will be replaced with the page directory of the given process.
+ *
+ * NULL is returned in case of error.
+ */
+thread_t *new_thread_copy(thread_t *thr, process_t *new_proc);
+
+/**
  * If the given thread is not in the exited state, this call does nothing!
  *
  * When in the exited state, this call simply deletes the thread's resources.
@@ -113,20 +126,3 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
  * If you'd like to free this thread's stack pages, set return stack to true!
  */
 void reap_thread(thread_t *thr, bool return_stack);
-
-/**
- * It really just allocates a new thread object, and copies the given thread's context
- * into the new object.
- *
- * Most of the thread's state is not copied! The created thread will be in a detached
- * state with no parent.
- *
- * IMPORTANT, If you'd like to actually add this created thread to another process,
- * make sure to set its parent field AND its cr3 field.
- *
- * Returns an error if there are bad arguments or insufficient resources.
- * Uses the same allocator as the given thread.
- */
-fernos_error_t thr_copy(thread_t *thr, thread_t **new_thr);
-
-
