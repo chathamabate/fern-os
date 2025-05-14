@@ -132,13 +132,15 @@ fernos_error_t proc_fork(process_t *proc, thread_t *thr, proc_id_t pid, process_
     }
 
     // Now we create a new process object, and copy the given thread over.
+    // Ooob I am really out of focus today tbh...
     
     process_t *child = new_process(proc->al, pid, new_pd, proc);
+
     if (!child) {
         // TODO do something here.
     }
 
-    thread_t *child_main_thr = 
+    thread_t *child_main_thr = thr_copy()
 
 
 }

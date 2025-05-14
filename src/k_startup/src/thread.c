@@ -99,7 +99,24 @@ fernos_error_t thr_copy(thread_t *thr, thread_t **new_thr) {
 
     allocator_t *al = thr->proc->al;
 
+    thread_t *copy = al_malloc(al, sizeof(thread_t));
+    if (!copy) {
+        return FOS_NO_MEM;
+    }
 
+    copy->state = THREAD_STATE_DETATCHED;
+    copy->next_thread = NULL;
+    copy->prev_thread = NULL;
+    copy->tid = thr->tid;
 
+    copy->proc = NULL;
+    copy->wq = NULL;
+    copy->u_wait_ctx = NULL;
 
+    mem_cpy(&(copy->ctx), &(thr->ctx), sizeof(user_ctx_t));
+    
+    copy->exit_ret_val = NULL;
+
+    *new_thr = copy;
+    return FOS_SUCCESS;
 }
