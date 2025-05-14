@@ -8,6 +8,27 @@
 #include "k_startup/fwd_defs.h"
 #include "s_bridge/ctx.h"
 
+/*
+ * Design NOTES:
+ *
+ * The structures within the kenrel are inherently cyclic. For example a process needs
+ * knowledge of threads, and threads need knowledge of processes.
+ *
+ * However, I still tried to implement behaviors in a non-cyclic way.
+ *
+ * A thread only concerns itself, well, with itself.
+ * A process only concerns itself with itself and its threads.
+ * 
+ * A behavior written for the thread structure should not modify the process which owns it.
+ * A behavior written for the process structure can modify owned threads, but not modify
+ * the overall kernel state.
+ *
+ * For example, when I call a thread's delete function, it doesn't modify anything which
+ * is not directly owned by the thread itself. It does not remove the thread from any
+ * wait queues Could we instead remove all reference to outside structures??
+ * Maybe this would be a better idea... Just saying...
+ */
+
 struct _kernel_state_t {
     /**
      * Allocator to be used by the kernel!

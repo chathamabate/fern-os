@@ -91,7 +91,7 @@ struct _thread_t {
  * This DOES NOT allocate into the owning process's page directory, that is your responsibility.
  * This will set %esp in the created thread to the correct position given its TID.
  *
- * Also, this function does not edit the parent process in anyway. It it your responsibility
+ * Also, this function does not edit the parent process in any way. It it your responsibility
  * to actually place the created thread into the process's thread table!
  *
  * Lastly, threads assume the same allocator has the parent process.
