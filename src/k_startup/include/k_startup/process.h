@@ -115,6 +115,23 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
 }
 
 /**
+ * Given a process, create a new forked process.
+ *
+ * The forked process will have pid `cpid` and parent `proc`.
+ *
+ * NOTE: The given thread `thr` will be the only thread which is copied into this new process.
+ * The new child process will always be single threaded! With the copied thread becoming the new
+ * main thread.
+ *
+ * NOTE: futexes and join queue are NOT copied!
+ *
+ * Returns NULL if there are insufficient resources or if the arguments are bad.
+ *
+ * Uses the same allocator as the given process.
+ */
+process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid);
+
+/**
  * Simple and Dangerous destructor!
  *
  * This frees all memory used by proc! (Including the full page directory)
@@ -146,25 +163,10 @@ thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg);
 /**
  * Given a process and one of its threads, delete the thread entirely from the process!
  *
- * This call does nothing if the given thread is not in an exited state!
+ * This call DOES NOT check the thread's state whatsoever, that's your responsibility.
  *
  * Also, this call doesn't deal with the join queue at all, that's your responsibility!
  *
  * If you'd like the thread's stack pages to be returned, set `return_stack` to true.
  */
-void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack);
-
-/**
- * This is a copy of the give process and thread.
- *
- * NOTE: The only thing that is really is the memory space and the given thread's stack.
- * Other threads will not be included in the created thread.
- *
- * NOTE: futexes are NOT copied!
- *
- * Returns an error if there are insufficient resources or if the arguments are bad.
- *
- * Uses the same allocator as the given process.
- */
-fernos_error_t proc_fork(process_t *proc, thread_t *thr, proc_id_t pid, process_t **new_proc);
-
+void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack);

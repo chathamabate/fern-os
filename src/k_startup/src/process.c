@@ -54,6 +54,65 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     return proc;
 }
 
+process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
+    fernos_error_t err;
+
+    if (!proc || !thr) {
+        return NULL;
+    }
+
+    if (thr->proc != proc) {
+        return NULL;
+    }
+
+    phys_addr_t new_pd = copy_page_directory(proc->pd);
+    if (new_pd == NULL_PHYS_ADDR) {
+        return NULL;
+    }
+
+    const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
+
+    idtb_reset_iterator(proc->thread_table);
+
+    // Free all stacks which were used in the parent process, but will NOT be used at first
+    // in this child process.
+    for (thread_id_t tid = idtb_get_iter(proc->thread_table); tid != NULL_TID; 
+            tid = idtb_next(proc->thread_table)) {
+        if (tid != thr->tid) {
+            void *s = (void *)FOS_THREAD_STACK_START(tid);
+            const void *e = (const void *)FOS_THREAD_STACK_END(tid);
+
+            pd_free_pages(new_pd, s, e);
+        }
+    }
+
+    process_t *child = new_process(proc->al, cpid, new_pd, proc);
+    if (!child) {
+        delete_page_directory(new_pd);
+        return NULL;
+    }
+
+    // From this point on, `child` owns `new_pd`.
+    // Deleting `child` will delete `new_pd`.
+
+    // Now we must copy the given thread, add it to the thread table, and set it as the main thread!
+
+    err = idtb_request_id(child->thread_table, thr->tid);
+    thread_t *child_main_thr = new_thread_copy(thr, child);
+
+    if (err != FOS_SUCCESS || !child_main_thr) {
+        delete_process(child);
+        delete_thread(child_main_thr);
+
+        return NULL;
+    }
+
+    idtb_set(child->thread_table, child_main_thr->tid, child_main_thr);
+    child->main_thread = child_main_thr;
+
+    return child;
+}
+
 void delete_process(process_t *proc) {
     if (!proc) {
         return;
@@ -138,8 +197,8 @@ thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg) {
     return new_thr;
 }
 
-void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack) {
-    if (!proc || !thr || thr->state != THREAD_STATE_EXITED) {
+void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack) {
+    if (!proc || !thr) {
         return;
     }
 
@@ -158,50 +217,3 @@ void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack) {
     // Return the thread id so it can be used by later threads!
     idtb_push_id(proc->thread_table, tid);
 }
-
-fernos_error_t proc_fork(process_t *proc, thread_t *thr, proc_id_t pid, process_t **new_proc) {
-    if (!proc || !thr || !new_proc) {
-        return FOS_BAD_ARGS;
-    }
-
-    if (thr->proc != proc) {
-        return FOS_BAD_ARGS;
-    }
-
-    phys_addr_t new_pd = copy_page_directory(proc->pd);
-    if (new_pd == NULL_PHYS_ADDR) {
-        return FOS_NO_MEM;
-    }
-
-    const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
-
-    idtb_reset_iterator(proc->thread_table);
-
-    // Free all stacks which were used in the parent process, but will NOT be used at first
-    // in this child process.
-    for (thread_id_t tid = idtb_get_iter(proc->thread_table); tid != NULL_TID; 
-            tid = idtb_next(proc->thread_table)) {
-        if (tid != thr->tid) {
-            void *s = (void *)FOS_THREAD_STACK_START(tid);
-            const void *e = (const void *)FOS_THREAD_STACK_END(tid);
-
-            pd_free_pages(new_pd, s, e);
-        }
-    }
-
-    // Now we create a new process object, and copy the given thread over.
-    // Ooob I am really out of focus today tbh...
-    // Might want to switch to a success oriented strategy here...?
-    
-    process_t *child = new_process(proc->al, pid, new_pd, proc);
-
-    if (!child) {
-        // TODO do something here.
-    }
-
-    //thread_t *child_main_thr = thr_copy()
-
-
-}
-
-

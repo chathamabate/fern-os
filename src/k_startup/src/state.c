@@ -268,7 +268,7 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     ks_schedule_thread(ks, joining_thread);
 
     // Ok finally, since our exited thread is no longer needed
-    proc_reap_thread(proc, thr, true);
+    proc_delete_thread(proc, thr, true);
 
     return FOS_SUCCESS;
 }
@@ -311,7 +311,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
         };
 
         // Now reap our joinable thread!
-        proc_reap_thread(proc, joinable_thread, true);
+        proc_delete_thread(proc, joinable_thread, true);
 
         if (u_join_ret) {
             mem_cpy_to_user(proc->pd, u_join_ret, &local_ret, sizeof(thread_join_ret_t), NULL);

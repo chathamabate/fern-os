@@ -91,7 +91,7 @@ thread_t *new_thread_copy(thread_t *thr, process_t *new_proc) {
     
     copy->exit_ret_val = NULL;
 
-    return FOS_SUCCESS;
+    return copy;
 }
 
 void delete_thread(thread_t *thr) {
