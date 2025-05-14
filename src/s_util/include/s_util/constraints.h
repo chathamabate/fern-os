@@ -108,13 +108,6 @@
 #define FOS_STACK_AREA_MAX_SIZE (M_256M)
 
 /**
- * EDITABLE
- *
- * How many condition is one process allowed to have allocated.
- */
-#define FOS_MAX_CONDS_PER_PROC (256)
-
-/**
  * Confirm values listed above make sense.
  */
 fernos_error_t validate_constraints(void);
