@@ -136,15 +136,12 @@ void delete_process(process_t *proc);
  *
  * (Remember, entry and arg should both be userspace pointers!)
  *
- * On Success, FOS_SUCCESS is returned and the created thread is written to *thr.
- * Returns an error if arguments are bad, or if insufficient resources.
+ * On Success, the a pointer to the created thread is returned.
+ * On error, NULL is returned.
  *
  * NOTE: This uses the same allocator which was used for `proc`.
- *
- * On error, NULL is written to *thr.
  */
-fernos_error_t proc_create_thread(process_t *proc, thread_t **thr, 
-        thread_entry_t entry, void *arg);
+thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg);
 
 /**
  * Given a process and one of its threads, delete the thread entirely from the process!

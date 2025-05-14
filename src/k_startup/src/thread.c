@@ -31,16 +31,9 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
         return NULL;
     }
 
-    // All thread stacks must be given at least 1 page to start!
-
-    const void *true_e;
     uint8_t *tstack_end = (uint8_t *)FOS_THREAD_STACK_END(tid);
-    fernos_error_t err = pd_alloc_pages(proc->pd, true, tstack_end - (2*M_4K), tstack_end, &true_e);
 
-    if (err != FOS_SUCCESS && err != FOS_ALREADY_ALLOCATED) {
-        al_free(al, thr);
-        return NULL;
-    }
+    // NOTE: we used to allocate stack pages here... NOT ANYMORE!
 
     thr->state = THREAD_STATE_DETATCHED;
 

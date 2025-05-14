@@ -93,9 +93,8 @@ struct _thread_t {
  *
  * Returns NULL if we have insufficient memory to create the thread. Or if arguments are invalid.
  *
- * This function will also allocate the initial stack page for the created thread in the parent proc's
- * page directory. NOTE: This function does NOT fail if the stack area is already allocated.
- * So be careful! Make sure one thread is only ever using one stack area!
+ * This DOES NOT allocate into the owning process's page directory, that is your responsibility.
+ * This will set %esp in the created thread to the correct position given its TID.
  *
  * Also, this function does not edit the parent process in anyway. It it your responsibility
  * to actually place the created thread into the process's thread table!

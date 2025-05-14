@@ -55,6 +55,10 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
 }
 
 void delete_process(process_t *proc) {
+    if (!proc) {
+        return;
+    }
+
     delete_page_directory(proc->pd);
 
     // Dangerously delete all threads.
@@ -85,27 +89,44 @@ void delete_process(process_t *proc) {
     al_free(proc->al, proc);
 }
 
-fernos_error_t proc_create_thread(process_t *proc, thread_t **thr, 
-        thread_entry_t entry, void *arg) {
-    if (!thr || !entry) {
-        return FOS_BAD_ARGS;
+/**
+ * Allocate a new thread, and its initial stack pages.
+ */
+static thread_t *proc_new_thread_with_stack(process_t *proc,
+        thread_id_t tid, thread_entry_t entry, void *arg) {
+    thread_t *new_thr = new_thread(proc, tid, entry, arg);
+    if (!new_thr) {
+        return NULL;
     }
+
+    const void *true_e;
+    uint8_t *tstack_end = (uint8_t *)FOS_THREAD_STACK_END(tid);
+    fernos_error_t err = pd_alloc_pages(proc->pd, true, tstack_end - (2*M_4K), tstack_end, &true_e);
+
+    if (err != FOS_SUCCESS && err != FOS_ALREADY_ALLOCATED) {
+        delete_thread(new_thr);
+        return NULL;
+    }
+
+    return new_thr;
+}
+
+thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg) {
+    if (!proc || !entry) {
+        return NULL;
+    }
+
+    const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
 
     thread_id_t tid = idtb_pop_id(proc->thread_table);
-
-    if (tid == idtb_null_id(proc->thread_table)) {
-        *thr = NULL;
-
-        return FOS_NO_MEM;
+    if (tid == NULL_TID) {
+        return NULL;
     }
 
-    thread_t *new_thr = new_thread(proc, tid, entry, arg); 
-
+    thread_t *new_thr = proc_new_thread_with_stack(proc, tid, entry, arg);
     if (!new_thr) {
         idtb_push_id(proc->thread_table, tid);
-        *thr = NULL;
-        
-        return FOS_NO_MEM;
+        return NULL;
     }
 
     idtb_set(proc->thread_table, tid, new_thr);
@@ -114,9 +135,7 @@ fernos_error_t proc_create_thread(process_t *proc, thread_t **thr,
         proc->main_thread = new_thr;
     }
 
-    *thr = new_thr;
-
-    return FOS_SUCCESS;
+    return new_thr;
 }
 
 void proc_reap_thread(process_t *proc, thread_t *thr, bool return_stack) {
