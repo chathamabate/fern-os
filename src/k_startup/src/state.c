@@ -172,14 +172,10 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
 
     DUAL_RET_COND(!entry, thr, FOS_BAD_ARGS, FOS_SUCCESS);
 
-    fernos_error_t err;
+    thread_t *new_thr = proc_new_thread(proc, entry, arg);
 
-    thread_t *new_thr;
-
-    err = proc_create_thread(proc, &new_thr, entry, arg);
-
-    if (err != FOS_SUCCESS) {
-        thr->ctx.eax = err;
+    if (!new_thr) {
+        thr->ctx.eax = FOS_UNKNWON_ERROR;
 
         if (u_tid) {
             mem_cpy_to_user(proc->pd, u_tid, &NULL_TID, sizeof(thread_id_t), NULL);
