@@ -116,8 +116,8 @@ void start_kernel(void) {
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
 
-    test_process();
-    lock_up();
+    //test_process();
+    //lock_up();
 
     try_setup_step(init_kernel_state(), "Failed to setup kernel state");
 

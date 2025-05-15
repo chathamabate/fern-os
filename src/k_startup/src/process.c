@@ -202,6 +202,10 @@ void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack) {
         return;
     }
 
+    if (thr->proc != proc) {
+        return;
+    }
+
     thread_id_t tid = thr->tid;
 
     if (return_stack) {
@@ -216,4 +220,71 @@ void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack) {
 
     // Return the thread id so it can be used by later threads!
     idtb_push_id(proc->thread_table, tid);
+}
+
+fernos_error_t proc_register_futex(process_t *proc, futex_t *u_futex) {
+    fernos_error_t err;
+
+    if (!proc || !u_futex) {
+        return FOS_BAD_ARGS;
+    }
+
+    // Is it already mapped?
+
+    if (mp_get(proc->futexes, &u_futex)) {
+        return FOS_ALREADY_ALLOCATED;
+    }
+
+    // Test out that we have access to the futex.
+
+    futex_t test;
+    err = mem_cpy_from_user(&test, proc->pd, u_futex, sizeof(futex_t), NULL);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    // Create the wait queue.
+
+    basic_wait_queue_t *bwq = new_basic_wait_queue(proc->al);
+    if (!bwq) {
+        return FOS_NO_MEM;
+    }
+
+    err = mp_put(proc->futexes, &u_futex, &bwq);
+    if (err != FOS_SUCCESS) {
+        delete_wait_queue((wait_queue_t *)bwq);
+        return err;
+    }
+    
+    return FOS_SUCCESS;
+}
+
+basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex) {
+    if (!proc || !u_futex) {
+        return NULL;
+    }
+
+    basic_wait_queue_t **bwq = mp_get(proc->futexes, &u_futex);
+
+    if (!bwq) {
+        return NULL;
+    }
+
+    return *bwq;
+}
+
+void proc_deregister_futex(process_t *proc, futex_t *u_futex) {
+    if (!proc || !u_futex) {
+        return;
+    }
+
+    basic_wait_queue_t **bwq = mp_get(proc->futexes, &u_futex);
+
+    if (!bwq) {
+        return;
+    }
+
+    mp_remove(proc->futexes, &u_futex);
+
+    delete_wait_queue((wait_queue_t *)*bwq);
 }

@@ -15,20 +15,17 @@
  * knowledge of threads, and threads need knowledge of processes.
  *
  * However, I still tried to implement behaviors in a non-cyclic way.
- *
- * A thread only concerns itself, well, with itself.
- * A process only concerns itself with itself and its threads.
  * 
- * A behavior written for the thread structure should not modify the process which owns it.
- * A behavior written for the process structure can modify owned threads, but not modify
- * the overall kernel state.
+ * Functions written in thread.c should only ever modify fields within a thread structure.
+ * Even though a thread has a wait queue pointer, no function in thread.c should modify the
+ * external wait queue.
  *
- * For example, when I call a thread's delete function, it doesn't modify anything which
- * is not directly owned by the thread itself. It does not remove the thread from any
- * wait queues Could we instead remove all reference to outside structures??
- * Maybe this would be a better idea... Just saying...
+ * Similarly, functions in process.c can modify the state of owned threads, but never modify 
+ * any higher up state. For example, the schedule.
  *
- * Make everything more decoupled could be much much much better!!!!
+ * Kernel State -- Can Modify -- > Processes -- Can Modify -- > Threads
+ *
+ * NOT THE OTHER DIRECTION!
  */
 
 struct _kernel_state_t {

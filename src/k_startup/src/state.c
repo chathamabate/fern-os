@@ -346,34 +346,9 @@ fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex) {
 
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
-    map_t *fm = proc->futexes;
 
-    // Never register a NULL futex.
-    DUAL_RET_COND(!u_futex, thr, FOS_BAD_ARGS, FOS_SUCCESS);
-
-    // Let's also confirm that the user actually has access to the futex address.
-    futex_t test;
-    err = mem_cpy_from_user(&test, proc->pd, u_futex, sizeof(u_futex), NULL);
-    DUAL_RET_FOS_ERR(err, thr);
-
-    // Check if the given futex is already in the map.
-    DUAL_RET_COND(mp_get(fm, &u_futex), thr, FOS_ALREADY_ALLOCATED, FOS_SUCCESS);
-
-    // Try creating the futex wait queue.
-    basic_wait_queue_t *fwq = new_basic_wait_queue(proc->al);
-    DUAL_RET_COND(!fwq, thr, FOS_NO_MEM, FOS_SUCCESS);
-
-    // Try placing it in the map.
-    err = mp_put(fm, &u_futex, &fwq);
-    if (err != FOS_SUCCESS) {
-        delete_wait_queue((wait_queue_t *)fwq);
-
-        DUAL_RET(thr, err, FOS_SUCCESS);
-    }
-
-    // Ok, I think this is a success!
-
-    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+    err = proc_register_futex(proc, u_futex);
+    DUAL_RET(thr, err, FOS_SUCCESS);
 }
 
 fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
@@ -386,12 +361,8 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
-    basic_wait_queue_t *wq;
-
-    basic_wait_queue_t **t_wq = (basic_wait_queue_t **)mp_get(proc->futexes, &u_futex);
-    DUAL_RET_COND(!t_wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
-
-    wq = *t_wq;
+    basic_wait_queue_t *wq = proc_get_futex_wq(proc, u_futex);
+    DUAL_RET_COND(!wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
 
     err = bwq_notify_all(wq);
     if (err != FOS_SUCCESS) {
@@ -413,10 +384,9 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
     }
 
     // At this point, all previously waiting thread should've been scheduled...
-    // Now just delete the wait queue and remove it from the map?
+    // Now it is safe to call `proc_deregister_futex`
 
-    mp_remove(proc->futexes, &u_futex);
-    delete_wait_queue((wait_queue_t *)wq);
+    proc_deregister_futex(proc, u_futex);
 
     DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
@@ -432,12 +402,8 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     process_t *proc = thr->proc;
 
     // Get the wait queue.
-    basic_wait_queue_t *wq;
-
-    basic_wait_queue_t **t_wq = mp_get(proc->futexes, &u_futex);
-    DUAL_RET_COND(!t_wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
-
-    wq = *t_wq;
+    basic_wait_queue_t *wq = proc_get_futex_wq(proc, u_futex);
+    DUAL_RET_COND(!wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
 
     // Read the futexes actual value.
     futex_t act_val;
@@ -475,12 +441,8 @@ fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
     process_t *proc = thr->proc;
 
     // Get the wait queue.
-    basic_wait_queue_t *wq;
-
-    basic_wait_queue_t **t_wq = mp_get(proc->futexes, &u_futex);
-    DUAL_RET_COND(!t_wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
-
-    wq = *t_wq;
+    basic_wait_queue_t *wq = proc_get_futex_wq(proc, u_futex);
+    DUAL_RET_COND(!wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
 
     bwq_notify_mode_t mode = all ? BWQ_NOTIFY_ALL : BWQ_NOTIFY_NEXT;
 

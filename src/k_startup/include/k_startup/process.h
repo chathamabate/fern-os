@@ -164,8 +164,11 @@ thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg);
  * Given a process and one of its threads, delete the thread entirely from the process!
  *
  * This call DOES NOT check the thread's state whatsoever, that's your responsibility.
+ * Because a thread can potentially be in a wait queue which is external to this process,
+ * this DOES NOT remove the given thread from its wait queue (if it is waiting)
  *
- * Also, this call doesn't deal with the join queue at all, that's your responsibility!
+ * (Same goes for scheduled threads)
+ * It is your responsibility to detatch the given thread before calling this function!
  *
  * If you'd like the thread's stack pages to be returned, set `return_stack` to true.
  */
@@ -177,3 +180,21 @@ void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack);
  * Returns an error in the case of bad arguments or insufficient resources.
  */
 fernos_error_t proc_register_futex(process_t *proc, futex_t *u_futex);
+
+/**
+ * Get a futexes corresponding wait queue. 
+ *
+ * Returns NULL if it cannot be found.
+ */
+basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex);
+
+/**
+ * Deregister a futex from a process.
+ *
+ * This deletes its wait queue. And removes it from the futex map.
+ *
+ * NOTE: This does NO cleanup of threads within the wait queue.
+ * Make sure all waiting threads are dealt with before calling this function.
+ */
+void proc_deregister_futex(process_t *proc, futex_t *u_futex);
+
