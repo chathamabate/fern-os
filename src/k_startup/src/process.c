@@ -70,18 +70,13 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
         return NULL;
     }
 
-    const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
-
-    idtb_reset_iterator(proc->thread_table);
-
-    // Free all stacks which were used in the parent process, but will NOT be used at first
-    // in this child process.
-    for (thread_id_t tid = idtb_get_iter(proc->thread_table); tid != NULL_TID; 
-            tid = idtb_next(proc->thread_table)) {
-        if (tid != thr->tid) {
+    // Deciding not to use an iterator here because that technically mutates `proc`.
+    for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC;  tid++) {
+        if (idtb_get(proc->thread_table, tid) && tid != thr->tid) {
             void *s = (void *)FOS_THREAD_STACK_START(tid);
             const void *e = (const void *)FOS_THREAD_STACK_END(tid);
 
+            // Free all stacks which aren't being used in the new process.
             pd_free_pages(new_pd, s, e);
         }
     }

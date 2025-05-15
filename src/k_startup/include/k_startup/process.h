@@ -123,7 +123,8 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  * The new child process will always be single threaded! With the copied thread becoming the new
  * main thread.
  *
- * NOTE: futexes and join queue are NOT copied!
+ * NOTE: futexes and join queue are NOT copied! And The given process `proc` is not edited in
+ * ANY WAY! It is your responsibility to register this new process as a child in the old.
  *
  * Returns NULL if there are insufficient resources or if the arguments are bad.
  *

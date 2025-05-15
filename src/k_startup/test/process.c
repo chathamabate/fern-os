@@ -128,10 +128,25 @@ static bool test_fork_process(void) {
     process_t *proc = new_da_process(0, pd, NULL);
     TEST_TRUE(proc != NULL);
 
-    // Forking might need to be built out more tbh...
-    // Might we want to add this to the parent process? 
-    // As a child??? Ever think about that one bud??
+    thread_t *main_thread = proc_new_thread(proc, fake_entry, NULL);
+    TEST_TRUE(main_thread != NULL);
 
+    thread_t *secondary_thread = proc_new_thread(proc, fake_entry, NULL);
+    TEST_TRUE(secondary_thread != NULL);
+
+    process_t *child_proc = new_process_fork(proc, secondary_thread, 1);
+    TEST_TRUE(child_proc != NULL);
+
+    TEST_EQUAL_HEX(1, child_proc->pid);
+    TEST_EQUAL_HEX(proc, child_proc->parent);
+
+    // We should get the secondary thread but not the first thread!
+    TEST_EQUAL_HEX(NULL, idtb_get(child_proc->thread_table, main_thread->tid));
+    TEST_TRUE(NULL != idtb_get(child_proc->thread_table, secondary_thread->tid));
+
+    TEST_EQUAL_HEX(secondary_thread->tid, child_proc->main_thread->tid);
+
+    delete_process(child_proc);
     delete_process(proc);
 
     TEST_SUCCEED();
