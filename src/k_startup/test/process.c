@@ -37,6 +37,8 @@ static bool posttest(void) {
 /*
  * These tests will play around with the thread and process structures, and confirm creation/
  * deletion still works. We are kinda simulating how the kernel will interact with these structures.
+ *
+ * Remember, process.c has no access to scheduling, so these tests are somewhat limited.
  */
 
 static bool test_new_and_delete(void) {
@@ -103,6 +105,67 @@ static bool test_many_threads(void) {
         TEST_EQUAL_HEX(proc, thr->proc);
     }
 
+    // Try deleting every other thread just to see what happens.
+
+    for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC; tid += 2) {
+        thread_t *thr = idtb_get(proc->thread_table, tid);
+        if (thr) {
+            proc_delete_thread(proc, thr, true);
+        }
+    }
+
+    delete_process(proc);
+
+    TEST_SUCCEED();
+}
+
+static bool test_fork_process(void) {
+    fernos_error_t err;
+
+    /*
+    phys_addr_t pd = new_page_directory();
+    TEST_TRUE(pd != NULL_PHYS_ADDR);
+    process_t *proc = new_da_process(0, pd, NULL);
+    TEST_TRUE(proc != NULL);
+    */
+
+
+    TEST_SUCCEED();
+}
+
+/**
+ * Test out making invlaid futexes.
+ */
+static bool test_simple_futex(void) {
+    fernos_error_t err;
+
+    phys_addr_t pd = new_page_directory();
+    TEST_TRUE(pd != NULL_PHYS_ADDR);
+
+    const void *true_e;
+    err = pd_alloc_pages(pd, true, (void *)M_4K, (const void *)(M_4K + M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    futex_t *u_futex0 = (futex_t *)M_4K;
+    futex_t *u_futex1 = (futex_t *)M_4K - 1;
+
+    process_t *proc = new_da_process(0, pd, NULL);
+    TEST_TRUE(proc != NULL);
+
+    err = proc_register_futex(proc, u_futex0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = proc_register_futex(proc, u_futex1);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = proc_register_futex(proc, u_futex0);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    proc_deregister_futex(proc, u_futex0);
+
+    err = proc_register_futex(proc, u_futex0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
     delete_process(proc);
 
     TEST_SUCCEED();
@@ -111,9 +174,18 @@ static bool test_many_threads(void) {
 /**
  * This test is going to populate the process structures in a way that the kernel is intended to.
  */
-static bool test_complex_delete(void) {
+static bool test_complex_process(void) {
+    fernos_error_t err;
+
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
+
+    const void *true_e;
+    err = pd_alloc_pages(pd, true, (void *)M_4K, (const void *)(M_4K + M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    futex_t *u_futex0 = (futex_t *)M_4K;
+    futex_t *u_futex1 = (futex_t *)M_4K + 1;
 
     process_t *proc = new_da_process(0, pd, NULL);
     TEST_TRUE(proc != NULL);
@@ -128,16 +200,38 @@ static bool test_complex_delete(void) {
     }
 
     // Ok, now maybe make a new futex??
+    
+    err = proc_register_futex(proc, u_futex0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+    err = proc_register_futex(proc, u_futex1);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    basic_wait_queue_t *wq = proc_get_futex_wq(proc, u_futex1);
+    TEST_TRUE(wq != NULL);
+
+    for (size_t i = 0; i < NUM_THREADS; i += 2) {
+        thread_t *thr = threads[i];
+
+        err = bwq_enqueue(wq, thr);
+
+        thr->state = THREAD_STATE_WAITING;
+        thr->wq = (wait_queue_t *)wq;
+        thr->u_wait_ctx = NULL;
+    }
 
     delete_process(proc);
     TEST_SUCCEED();
 }
+
 
 bool test_process(void) {
     BEGIN_SUITE("Process");
     RUN_TEST(test_new_and_delete);
     RUN_TEST(test_new_thread);
     RUN_TEST(test_many_threads);
+    RUN_TEST(test_fork_process);
+    RUN_TEST(test_simple_futex);
+    RUN_TEST(test_complex_process);
     return END_SUITE();
 }

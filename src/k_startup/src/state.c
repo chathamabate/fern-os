@@ -409,9 +409,10 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     futex_t act_val;
     err = mem_cpy_from_user(&act_val, proc->pd, u_futex, sizeof(futex_t), NULL);
 
-    // This should never happen since we confirm above our futex is in a valid address.
-    // But whatevs...
-    DUAL_RET_FOS_ERR(err, thr);
+    // If a futex is in a futex map, it must be accessible, otherwise a fatal error.
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
 
     // Immediate return if values don't match!
     DUAL_RET_COND(act_val != exp_val, thr, FOS_SUCCESS, FOS_SUCCESS);
