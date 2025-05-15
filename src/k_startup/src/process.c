@@ -25,13 +25,15 @@ static uint32_t fm_key_hash(chained_hash_map_t *futexes, const void *k) {
 
 process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent) {
     process_t *proc = al_malloc(al, sizeof(process_t));
+    list_t *children = new_linked_list(al, sizeof(process_t *));
     id_table_t *thread_table = new_id_table(al, FOS_MAX_THREADS_PER_PROC);
     vector_wait_queue_t *join_queue = new_vector_wait_queue(al);
     map_t *futexes = new_chained_hash_map(al, sizeof(futex_t *), sizeof(basic_wait_queue_t *), 
             3, fm_key_eq, fm_key_hash);
 
-    if (!proc || !thread_table || !join_queue || !futexes) {
+    if (!proc || !children || !thread_table || !join_queue || !futexes) {
         al_free(al, proc);
+        delete_list(children);
         delete_id_table(thread_table);
         delete_wait_queue((wait_queue_t *)join_queue);
         delete_map(futexes);
@@ -42,6 +44,8 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     proc->al = al;
     proc->pid = pid;
     proc->parent = parent;
+
+    proc->children = children;
 
     proc->thread_table = thread_table;
     proc->join_queue = join_queue;
@@ -114,6 +118,8 @@ void delete_process(process_t *proc) {
     }
 
     delete_page_directory(proc->pd);
+
+    delete_list(proc->children);
 
     // Dangerously delete all threads.
     const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);

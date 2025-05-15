@@ -8,6 +8,7 @@
 #include "s_util/str.h"
 #include "s_util/atomic.h"
 #include "u_concur/mutex.h"
+#include "s_util/constraints.h"
 
 static void uprintf(const char *fmt, ...) {
     char buf[256];
@@ -47,6 +48,20 @@ void *user_main(void *arg) {
             uprintf("Failed to spawn thread\n");
             while (1);
         }
+    }
+
+    proc_id_t cpid;
+
+    err = sc_fork(&cpid);
+    if (err != FOS_SUCCESS) {
+        uprintf("Failed to fork\n"); 
+        while (1);
+    }
+
+    if (cpid == FOS_MAX_PROCS) {
+        uprintf("Hello from Child\n");
+    } else {
+        uprintf("Child spawned [%u]\n", cpid);
     }
 
     while (1);

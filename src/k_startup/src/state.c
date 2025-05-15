@@ -137,6 +137,8 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
 }
 
 fernos_error_t ks_fork(kernel_state_t *ks, proc_id_t *u_cpid) {
+    fernos_error_t err;
+
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
@@ -146,15 +148,32 @@ fernos_error_t ks_fork(kernel_state_t *ks, proc_id_t *u_cpid) {
 
     DUAL_RET_COND(!u_cpid, thr, FOS_BAD_ARGS, FOS_SUCCESS);
 
+    // Reserve an ID for the child process.
+
     const proc_id_t NULL_PID = idtb_null_id(ks->proc_table);
     proc_id_t cpid = idtb_pop_id(ks->proc_table);
     DUAL_RET_COND(cpid == NULL_PID, thr, FOS_NO_MEM, FOS_SUCCESS);
 
+    // Create the child process.
+
     process_t *child = new_process_fork(proc, thr, cpid);
     if (!child) {
         idtb_push_id(ks->proc_table, cpid);
+
         DUAL_RET(thr, FOS_NO_MEM, FOS_SUCCESS);
     }
+
+    // Add the child to the children list of the parent!
+
+    err = l_push_back(proc->children, &child);
+    if (err != FOS_SUCCESS) {
+        idtb_push_id(ks->proc_table, cpid);
+        delete_process(child);
+
+        DUAL_RET(thr, err, FOS_SUCCESS);
+    }
+
+    // Success!
 
     idtb_set(ks->proc_table, cpid, child);
 

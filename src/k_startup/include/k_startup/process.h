@@ -32,7 +32,7 @@ struct _process_t {
      * A list<process_t *> which contains all living child processes. If this process exits, these
      * children will be adopted by the root process or by some system daemon.
      */
-    //list_t *children;
+    list_t *children;
 
     /**
      * A children of this process who have exited, but are yet to be reaped.
