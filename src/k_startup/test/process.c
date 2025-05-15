@@ -122,13 +122,17 @@ static bool test_many_threads(void) {
 static bool test_fork_process(void) {
     fernos_error_t err;
 
-    /*
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
+
     process_t *proc = new_da_process(0, pd, NULL);
     TEST_TRUE(proc != NULL);
-    */
 
+    // Forking might need to be built out more tbh...
+    // Might we want to add this to the parent process? 
+    // As a child??? Ever think about that one bud??
+
+    delete_process(proc);
 
     TEST_SUCCEED();
 }
