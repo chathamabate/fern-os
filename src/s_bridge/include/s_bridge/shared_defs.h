@@ -63,6 +63,15 @@ typedef struct _thread_join_ret_t {
  */
 typedef int32_t futex_t;
 
+
+/**
+ * Exit statuses of a process.
+ */
+typedef uint32_t proc_exit_status_t;
+
+#define PROC_ES_SUCCESS (0x0U)
+#define PROC_ES_UNSET   (0x1U)
+
 /*
  * Syscall IDs.
  */

@@ -42,6 +42,7 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     }
 
     proc->al = al;
+    proc->exit_status = PROC_ES_UNSET;
     proc->pid = pid;
     proc->parent = parent;
 

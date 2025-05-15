@@ -7,11 +7,21 @@
 #include "s_data/wait_queue.h"
 #include "s_data/map.h"
 
+#include <stdbool.h>
+
 struct _process_t {
     /**
      * Allocator used to alloc this process.
      */
     allocator_t *al;
+
+    /**
+     * What exit status the process exited with.
+     *
+     * We shouldn't need an "exited" boolean field since all exited processes
+     * will exist in a zombie child list.
+     */
+    proc_exit_status_t exit_status;
 
     /**
      * This process's global process id!
@@ -40,7 +50,7 @@ struct _process_t {
      * When this process exits, all zombie children will be reaped!
      * (Or maybe given to a kernel structure which reaps when appropriate)
      */
-    //list_t *zombie_children;
+    list_t *zombie_children;
 
     /**
      * This is a table of all threads under this process. 
