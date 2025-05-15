@@ -136,6 +136,39 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
     return FOS_SUCCESS;
 }
 
+fernos_error_t ks_fork(kernel_state_t *ks, proc_id_t *u_cpid) {
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    DUAL_RET_COND(!u_cpid, thr, FOS_BAD_ARGS, FOS_SUCCESS);
+
+    const proc_id_t NULL_PID = idtb_null_id(ks->proc_table);
+    proc_id_t cpid = idtb_pop_id(ks->proc_table);
+    DUAL_RET_COND(cpid == NULL_PID, thr, FOS_NO_MEM, FOS_SUCCESS);
+
+    process_t *child = new_process_fork(proc, thr, cpid);
+    if (!child) {
+        idtb_push_id(ks->proc_table, cpid);
+        DUAL_RET(thr, FOS_NO_MEM, FOS_SUCCESS);
+    }
+
+    idtb_set(ks->proc_table, cpid, child);
+
+    ks_schedule_thread(ks, child->main_thread);
+
+    proc_id_t temp_pid = cpid;
+    mem_cpy_to_user(proc->pd, u_cpid, &temp_pid, sizeof(proc_id_t), NULL);
+
+    temp_pid = FOS_MAX_PROCS;
+    mem_cpy_to_user(child->pd, u_cpid, &temp_pid, sizeof(proc_id_t), NULL);
+
+    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+}
+
 fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     fernos_error_t err;
 
@@ -156,7 +189,7 @@ fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     thr->wq = (wait_queue_t *)(ks->sleep_q);
     thr->state = THREAD_STATE_WAITING;
 
-    return FOS_SUCCESS;
+    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
 
 fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 
@@ -424,6 +457,7 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     DUAL_RET_FOS_ERR(err, thr);
     
     ks_deschedule_thread(ks, thr);
+
     thr->wq = (wait_queue_t *)wq;
     thr->u_wait_ctx = NULL; // No context info needed for waiting on a futex.
     thr->state = THREAD_STATE_WAITING;

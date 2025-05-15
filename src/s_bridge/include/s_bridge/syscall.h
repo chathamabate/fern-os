@@ -12,6 +12,22 @@
  */
 
 /**
+ * Fork the current process.
+ *
+ * Only the calling thread is copied over into the child process.
+ * Multithreading state is not copied (i.e. Futexes and the join queue)
+ *
+ * On error, an error is returned just in the calling process.
+ *
+ * On Success, FOS_SUCCESS is returned in BOTH processes.
+ * In the parent process the child's pid is written to *cpid.
+ * In the child process FOS_MAX_PROCS is written to *cpid.
+ *
+ * Returns an error if cpid is NULL, or if there are insufficient resources!
+ */
+fernos_error_t sc_fork(proc_id_t *cpid);
+
+/**
  * Exit the current thread.
  *
  * If this thread is the "main thread", the full process will exit.

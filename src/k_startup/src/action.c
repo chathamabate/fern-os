@@ -97,6 +97,10 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     fernos_error_t err = FOS_SUCCESS;
 
     switch (id) {
+    case SCID_PROC_FORK:
+        err = ks_fork(kernel, (proc_id_t *)arg0);
+        break;
+
     case SCID_THREAD_EXIT:
         err = ks_exit_thread(kernel, (void *)arg0);
         break;

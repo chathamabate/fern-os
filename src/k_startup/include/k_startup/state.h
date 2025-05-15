@@ -124,6 +124,23 @@ fernos_error_t ks_tick(kernel_state_t *ks);
  */
 
 /**
+ * Forks the process of the current thread.
+ *
+ * Only the current thread will be copied into the new process.
+ * Almost all process state will not be copied (i.e. Futexes and the Join Queue)
+ *
+ * The forked process will have its only thread scheduled, and will be set as a child
+ * of the current process.
+ *
+ * On Success FOS_SUCCESS is returned in both processes, in the child process,
+ * FOS_MAX_PROCS is written to *u_cpid, in the parent process the new child's pid is written to
+ * *u_cpid.
+ *
+ * NOTE: u_cpid is required and a userspace pointer.
+ */
+fernos_error_t ks_fork(kernel_state_t *ks, proc_id_t *u_cpid);
+
+/**
  * Take the current thread, deschedule it, and add it it to the sleep wait queue.
  *
  * Kernel error if there is no current thread.

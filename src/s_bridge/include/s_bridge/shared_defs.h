@@ -67,6 +67,9 @@ typedef int32_t futex_t;
  * Syscall IDs.
  */
 
+/* Process Syscalls */
+#define SCID_PROC_FORK (0x000U)
+
 /* Thread Syscalls */
 #define SCID_THREAD_EXIT (0x100U)
 #define SCID_THREAD_SLEEP (0x101U)

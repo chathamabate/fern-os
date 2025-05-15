@@ -120,8 +120,6 @@ static bool test_many_threads(void) {
 }
 
 static bool test_fork_process(void) {
-    fernos_error_t err;
-
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 

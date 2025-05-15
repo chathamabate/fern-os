@@ -3,6 +3,10 @@
 #include "s_bridge/ctx.h"
 #include "s_util/str.h"
 
+fernos_error_t sc_fork(proc_id_t *cpid) {
+    return (fernos_error_t)trigger_syscall(SCID_PROC_FORK, (uint32_t)cpid, 0, 0, 0);
+}
+
 void sc_thread_exit(void *retval) {
     (void)trigger_syscall(SCID_THREAD_EXIT, (uint32_t)retval, 0, 0, 0);
 
