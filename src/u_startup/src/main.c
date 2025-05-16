@@ -52,7 +52,7 @@ void *user_main(void *arg) {
 
     proc_id_t cpid;
 
-    err = sc_fork(&cpid);
+    err = sc_proc_fork(&cpid);
     if (err != FOS_SUCCESS) {
         uprintf("Failed to fork\n"); 
         while (1);

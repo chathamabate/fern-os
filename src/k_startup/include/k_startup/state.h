@@ -151,6 +151,9 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid);
  * All living children of this process are now orphans, they are adopted by the root process.
  * All zombie children of this process are now zombie orphas, also adopted by the root process.
  *
+ * NOTE: if zombie orphans are added to the root process, the root process will also get a
+ * FSIG_CHLD.
+ *
  * This function is automatically called when returning from a proceess's main thread.
  */
 fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status);

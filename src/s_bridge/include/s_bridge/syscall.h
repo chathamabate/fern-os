@@ -39,6 +39,9 @@ fernos_error_t sc_proc_fork(proc_id_t *cpid);
  * All living children of this process are now orphans, they are adopted by the root process.
  * All zombie children of this process are now zombie orphas, also adopted by the root process.
  *
+ * NOTE: if zombie orphans are added to the root process, the root process will also get a
+ * FSIG_CHLD.
+ *
  * This function is automatically called when returning from a proceess's main thread.
  */
 void sc_proc_exit(proc_exit_status_t status);

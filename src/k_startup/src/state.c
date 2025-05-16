@@ -199,10 +199,86 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
 }
 
 fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
+    fernos_error_t err;
+
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    if (ks->root_proc == proc) {
+        return FOS_NOT_IMPLEMENTED; // Do this later.
+    }
+
+    // First what do we do? Detatch all threads plz!
+
+    const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
+
+    idtb_reset_iterator(proc->thread_table);
+    for (id_t iter = idtb_get_iter(proc->thread_table); iter != NULL_TID;
+            iter = idtb_next(proc->thread_table)) {
+        thread_t *worker =  idtb_get(proc->thread_table, iter);
+
+        if (worker->state == THREAD_STATE_SCHEDULED) {
+            ks_deschedule_thread(ks, worker);
+        } else if (worker->state == THREAD_STATE_WAITING) {
+            wq_remove((wait_queue_t *)(worker->wq), worker);
+            worker->wq = NULL;
+            worker->u_wait_ctx = NULL;
+            worker->state = THREAD_STATE_DETATCHED;
+        }
+    }
+
+    // If we have zombie children, we will need to signal the root process!
+    bool signal_root = l_get_len(proc->zombie_children) > 0;
+
+    // Next, we add all living and zombie children to the root process.
+
+    while (l_get_len(proc->children) > 0) {
+        process_t *child;
+
+        err = l_pop_front(proc->children, &child);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        err = l_push_back(ks->root_proc->children, &child);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        child->parent = ks->root_proc;
+    }
+
+    while (l_get_len(proc->zombie_children) > 0) {
+        process_t *zombie_child;
+
+        err = l_pop_front(proc->zombie_children, &zombie_child);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        err = l_push_back(ks->root_proc->zombie_children, &zombie_child);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        zombie_child->parent = ks->root_proc;
+    }
+
+    // Lastly, we set our exit status add ourself to our parent's zombie list.
+    // It'd be nice if we could remove easily from a list tbh!
+    // That could be a quick addition ngl.
+
+
+
     return FOS_NOT_IMPLEMENTED;
 }
 
-fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, proc_exit_status_t *u_rces) {
+fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, 
+        proc_id_t *u_rcpid, proc_exit_status_t *u_rces) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
