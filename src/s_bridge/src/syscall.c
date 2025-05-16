@@ -3,8 +3,29 @@
 #include "s_bridge/ctx.h"
 #include "s_util/str.h"
 
-fernos_error_t sc_fork(proc_id_t *cpid) {
+fernos_error_t sc_proc_fork(proc_id_t *cpid) {
     return (fernos_error_t)trigger_syscall(SCID_PROC_FORK, (uint32_t)cpid, 0, 0, 0);
+}
+
+void sc_proc_exit(proc_exit_status_t status) {
+    (void)trigger_syscall(SCID_PROC_EXIT, (uint32_t)status, 0, 0, 0);
+}
+
+fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t *rces) {
+    return (fernos_error_t)trigger_syscall(SCID_PROC_REAP, (uint32_t)cpid, (uint32_t)rcpid, 
+            (uint32_t)rces, 0);
+}
+
+fernos_error_t sc_signal(proc_id_t pid, sig_id_t sid) {
+    return (fernos_error_t)trigger_syscall(SCID_SIGNAL, (uint32_t)pid, (uint32_t)sid, 0, 0);
+}
+
+void sc_signal_allow(sig_vector_t sv) {
+    (void)trigger_syscall(SCID_SIGNAL_ALLOW, (uint32_t)sv, 0, 0, 0);
+}
+
+fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid) {
+    return (fernos_error_t)trigger_syscall(SCID_SIGNAL_WAIT, (uint32_t)sv, (uint32_t)sid, 0, 0);
 }
 
 void sc_thread_exit(void *retval) {

@@ -115,19 +115,26 @@ typedef uint32_t proc_exit_status_t;
  */
 
 /* Process Syscalls */
-#define SCID_PROC_FORK (0x000U)
+#define SCID_PROC_FORK (0x80U)
+#define SCID_PROC_EXIT (0x81U)
+#define SCID_PROC_REAP (0x82U)
+
+/* Signal Syscalls (process adjacent) */
+#define SCID_SIGNAL       (0x90U)
+#define SCID_SIGNAL_ALLOW (0x91U)
+#define SCID_SIGNAL_WAIT  (0x92U)
 
 /* Thread Syscalls */
-#define SCID_THREAD_EXIT (0x100U)
+#define SCID_THREAD_EXIT  (0x100U)
 #define SCID_THREAD_SLEEP (0x101U)
 #define SCID_THREAD_SPAWN (0x102U)
-#define SCID_THREAD_JOIN (0x103U)
+#define SCID_THREAD_JOIN  (0x103U)
 
 /* Futex Syscalls */
-#define SCID_FUTEX_REGISTER (0x200)
+#define SCID_FUTEX_REGISTER   (0x200)
 #define SCID_FUTEX_DEREGISTER (0x201)
-#define SCID_FUTEX_WAIT (0x202)
-#define SCID_FUTEX_WAKE (0x203)
+#define SCID_FUTEX_WAIT       (0x202)
+#define SCID_FUTEX_WAKE       (0x203)
 
 /* Term Puts syscalls */
 #define SCID_TERM_PUT_S (0x400U)
