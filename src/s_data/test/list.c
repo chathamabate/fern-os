@@ -418,6 +418,52 @@ static bool test_push_back_all(void) {
     TEST_SUCCEED();
 }
 
+static bool int_cmp(const void *i, const void *j) {
+    return *(const int *)i == *(const int *)j;
+}
+
+static bool test_pop_ele(void) {
+    list_t *l = gen_list(sizeof(int));
+    TEST_TRUE(l != NULL);
+
+    int ele;
+    int *ptr;
+
+    for (int i = 0; i < 4; i++) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &i));
+    }
+
+    ele = 4;
+    TEST_FALSE(l_pop_ele(l, &ele, int_cmp, true));
+    TEST_FALSE(l_pop_ele(l, &ele, int_cmp, false));
+
+    ele = 1;
+    TEST_TRUE(l_pop_ele(l, &ele, int_cmp, true));
+
+    ele = 3;
+    TEST_TRUE(l_pop_ele(l, &ele, int_cmp, false));
+
+    // At this point the list should be 0, 2
+
+    ptr = l_get_ptr(l, 0);
+    TEST_TRUE(ptr && *ptr == 0);
+
+    ptr = l_get_ptr(l, 1);
+    TEST_TRUE(ptr && *ptr == 2);
+
+    ele = 0;
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &ele));
+
+    TEST_TRUE(l_pop_ele(l, &ele, int_cmp, true));
+
+    ptr = l_get_ptr(l, 0);
+    TEST_TRUE(ptr && *ptr == 2);
+    TEST_EQUAL_UINT(1, l_get_len(l));
+
+    delete_list(l);
+    TEST_SUCCEED();
+}
+
 bool test_list(const char *name, list_t *(*gen)(size_t cs)) {
     gen_list = gen;
     BEGIN_SUITE(name);
@@ -430,6 +476,7 @@ bool test_list(const char *name, list_t *(*gen)(size_t cs)) {
     RUN_TEST(test_mutate_iter);
     RUN_TEST(test_bad_calls);
     RUN_TEST(test_push_back_all);
+    RUN_TEST(test_pop_ele);
     return END_SUITE();
 }
 

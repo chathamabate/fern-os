@@ -44,6 +44,8 @@ bool l_pop_ele(list_t *l, const void *ele, bool (*cmp)(const void *, const void 
             if (!all) {
                 break;
             }
+
+            iter = l_get_iter(l);
         } else {
             iter = l_next_iter(l);
         }

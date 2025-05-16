@@ -237,7 +237,7 @@ static inline bool l_pop_first_match(list_t *l, const void *ele,
 
 static inline bool l_pop_all_matches(list_t *l, const void *ele, 
         bool (*cmp)(const void *, const void *)) {
-    return l_pop_ele(l, ele, cmp, false);
+    return l_pop_ele(l, ele, cmp, true);
 }
 
 typedef struct _linked_list_node_t linked_list_node_t;
