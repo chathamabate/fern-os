@@ -3,7 +3,57 @@
 #include "s_util/err.h"
 #include "s_util/str.h"
 
+/*
+ * Default function implementations
+ */
+
+fernos_error_t l_push_back_all(list_t *l, list_t *s) {
+    fernos_error_t err;
+
+    if (!s) {
+        return FOS_BAD_ARGS;
+    }
+
+    l_reset_iter(s);
+    for (void *iter = l_get_iter(s); iter; iter = l_next_iter(s)) {
+        err = l_push_back(l, iter);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+
+    l_clear(s);
+    
+    return FOS_SUCCESS;
+}
+
+bool l_pop_ele(list_t *l, const void *ele, bool (*cmp)(const void *, const void *), bool all) {
+    if (!ele || !cmp) {
+        return false;
+    }
+
+    bool removed = false;
+
+    l_reset_iter(l);
+    void *iter = l_get_iter(l);
+    while (iter) {
+        if (cmp(ele, iter)) {
+            l_pop_iter(l, NULL);  // should never error since iter is non-null.
+            removed = true;
+
+            if (!all) {
+                break;
+            }
+        } else {
+            iter = l_next_iter(l);
+        }
+    }
+
+    return removed;
+}
+
 static void delete_linked_list(list_t *l);
+static void ll_clear(list_t *l);
 static size_t ll_get_cell_size(list_t *l);
 static size_t ll_get_len(list_t *l);
 static void *ll_get_ptr(list_t *l, size_t i);
@@ -19,6 +69,7 @@ static void ll_dump(list_t *l, void (*pf)(const char *fmt, ...));
 
 static const list_impl_t LL_IMPL = {
     .delete_list = delete_linked_list,
+    .l_clear = ll_clear,
     .l_get_cell_size = ll_get_cell_size,
     .l_get_len = ll_get_len,
     .l_get_ptr = ll_get_ptr,
@@ -59,6 +110,13 @@ list_t *new_linked_list(allocator_t *al, size_t cs) {
 }
 
 static void delete_linked_list(list_t *l) {
+    ll_clear(l);
+
+    linked_list_t *ll = (linked_list_t *)l;
+    al_free(ll->al, ll);
+}
+
+static void ll_clear(list_t *l) {
     linked_list_t *ll = (linked_list_t *)l;
     linked_list_node_t *node = ll->first; 
 
@@ -68,7 +126,10 @@ static void delete_linked_list(list_t *l) {
         node = next;
     }
 
-    al_free(ll->al, ll);
+    ll->len = 0;
+    ll->first = NULL;
+    ll->last = NULL;
+    ll->iter = NULL;
 }
 
 static size_t ll_get_cell_size(list_t *l) {

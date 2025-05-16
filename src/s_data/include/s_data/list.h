@@ -15,6 +15,7 @@ typedef struct _list_t list_t;
 
 typedef struct _list_impl_t {
     void (*delete_list)(list_t *l);
+    void (*l_clear)(list_t *l);
 
     size_t (*l_get_cell_size)(list_t *l);
     size_t (*l_get_len)(list_t *l);
@@ -49,6 +50,13 @@ static inline void delete_list(list_t *l) {
     if (l) {
         l->impl->delete_list(l);
     }
+}
+
+/**
+ * Remove all elements from the list.
+ */
+static inline void l_clear(list_t *l) {
+    l->impl->l_clear(l);
 }
 
 /**
@@ -191,6 +199,45 @@ static inline void l_dump(list_t *l, void (*pf)(const char *fmt, ...)) {
     if (l->impl->l_dump) {
         l->impl->l_dump(l, pf);
     }
+}
+
+/* 
+ * Default Functions
+ */
+
+/**
+ * Transfers all elements in order from the front of s to the back of l.
+ *
+ * Returns an error if there are insufficient resources!
+ * Or `s` is NULL.
+ *
+ * After this function is called, s will point to an empty list.
+ *
+ * If there is a memory error, the states of the two lists after this call will be 
+ * undefined.
+ */
+fernos_error_t l_push_back_all(list_t *l, list_t *s);
+
+/**
+ * Remove element(s) from list `l` which match `ele`.
+ *
+ * `cmp` is used to compare elements in `l`.
+ *
+ * Returns true iff one or more elements were removed from `l`.
+ *
+ * If `all` is true, all occurences of `ele` are removed. If `all` is first, just the first
+ * occurence of `ele` is removed.
+ */
+bool l_pop_ele(list_t *l, const void *ele, bool (*cmp)(const void *, const void *), bool all);
+
+static inline bool l_pop_first_match(list_t *l, const void *ele, 
+        bool (*cmp)(const void *, const void *)) {
+    return l_pop_ele(l, ele, cmp, false);
+}
+
+static inline bool l_pop_all_matches(list_t *l, const void *ele, 
+        bool (*cmp)(const void *, const void *)) {
+    return l_pop_ele(l, ele, cmp, false);
 }
 
 typedef struct _linked_list_node_t linked_list_node_t;
