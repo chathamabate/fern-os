@@ -124,7 +124,7 @@ id_t idtb_pop_id(id_table_t *idtb);
 /**
  * This pushes an ID's cell onto the free list.
  *
- * Does nothing if the cell is already free.
+ * Does nothing if the cell is already free, or if the id is invalid.
  */
 void idtb_push_id(id_table_t *idtb, id_t id);
 

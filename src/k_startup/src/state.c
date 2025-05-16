@@ -146,31 +146,44 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
-    DUAL_RET_COND(!u_cpid, thr, FOS_BAD_ARGS, FOS_SUCCESS);
-
     // Reserve an ID for the child process.
 
     const proc_id_t NULL_PID = idtb_null_id(ks->proc_table);
-    proc_id_t cpid = idtb_pop_id(ks->proc_table);
-    DUAL_RET_COND(cpid == NULL_PID, thr, FOS_NO_MEM, FOS_SUCCESS);
+
+    proc_id_t cpid = NULL_PID;
+    process_t *child = NULL;
+    fernos_error_t push_err = FOS_UNKNWON_ERROR;
+
+    // Request child process ID.
+    cpid = idtb_pop_id(ks->proc_table);
 
     // Create the child process.
-
-    process_t *child = new_process_fork(proc, thr, cpid);
-    if (!child) {
-        idtb_push_id(ks->proc_table, cpid);
-
-        DUAL_RET(thr, FOS_NO_MEM, FOS_SUCCESS);
+    if (cpid != NULL_PID) {
+        child = new_process_fork(proc, thr, cpid);
     }
 
-    // Add the child to the children list of the parent!
+    // Push child on to children list.
+    if (child) {
+        push_err = l_push_back(proc->children, &child);
+    }
 
-    err = l_push_back(proc->children, &child);
-    if (err != FOS_SUCCESS) {
+    // Now check for errors.
+    if (cpid == NULL_PID || !child || push_err != FOS_SUCCESS) {
         idtb_push_id(ks->proc_table, cpid);
         delete_process(child);
 
-        DUAL_RET(thr, err, FOS_SUCCESS);
+        if (u_cpid) {
+            cpid = FOS_MAX_PROCS;
+            mem_cpy_to_user(proc->pd, u_cpid, &cpid, 
+                    sizeof(proc_id_t), NULL);
+        }
+
+        // Since adding the child to the child list was our last step, it is impossible
+        // that we are in this function if pushing the child to the list succeeded.
+        //
+        // Thus, we don't need to pop anything from our child list in this error case.
+
+        DUAL_RET(thr, FOS_NO_MEM, FOS_SUCCESS);
     }
 
     // Success!
@@ -179,11 +192,10 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
 
     ks_schedule_thread(ks, child->main_thread);
 
-    proc_id_t temp_pid = cpid;
-    mem_cpy_to_user(proc->pd, u_cpid, &temp_pid, sizeof(proc_id_t), NULL);
-
-    temp_pid = FOS_MAX_PROCS;
-    mem_cpy_to_user(child->pd, u_cpid, &temp_pid, sizeof(proc_id_t), NULL);
+    if (u_cpid) {
+        mem_cpy_to_user(proc->pd, u_cpid, &cpid, 
+                sizeof(proc_id_t), NULL);
+    }
 
     DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
@@ -278,22 +290,17 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
+    // In case of main thread, just defer to process exit.
+    if (thr == proc->main_thread) {
+        return ks_exit_proc(ks, (proc_exit_status_t)ret_val);
+    }
+
     // First, let's deschedule our current thread.
 
     ks_deschedule_thread(ks, thr);
 
     thr->exit_ret_val = ret_val;
     thr->state = THREAD_STATE_EXITED;
-
-    if (thr == ks->root_proc->main_thread) {
-        // TODO. (System Exit)
-        return FOS_NOT_IMPLEMENTED;
-    }
-
-    if (thr == proc->main_thread) {
-        // TODO. (Process Exit)
-        return FOS_NOT_IMPLEMENTED;
-    }
 
     thread_id_t tid = thr->tid;
 
