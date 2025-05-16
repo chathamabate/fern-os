@@ -158,19 +158,21 @@ fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status);
 /**
  * Reap a zombie child process! 
  *
- * If the requested process doesn't exist, or is yet to exit, this call returns immediately
- * with FOS_EMPTY in the current thread.
- *
- * When a process is "reaped", its exit status is retrieved, and its resources are freed!
- *
  * `cpid` is the pid of the process we want to reap. If `cpid` is FOS_MAX_PROCS, this will reap ANY 
  * child process!
+ * 
+ * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
+ * process, FOS_STATE_MISMATCH is returned to the user.
+ *
+ * When attempting to reap any zombie process, if there are no zombie children to reap,
+ * FOS_EMPTY is returned to the user.
+ *
+ * When a process is "reaped", its exit status is retrieved, and its resources are freed!
  *
  * If `u_rcpid` is given, the pid of the reaped child is written to *u_rcpid.
  * If `u_rces` is given, the exit status of the reaped child is written to *u_rces.
  *
- * If cpid is invalid, this returns an error in the current thread.
- * On error, FOS_MAX_PROCS is written to *u_rcpid,  and PROC_ES_UNSET is written to *u_rces.
+ * On error, FOS_MAX_PROCS is written to *u_rcpid, and PROC_ES_UNSET is written to *u_rces.
  */
 fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, 
         proc_exit_status_t *u_rces);

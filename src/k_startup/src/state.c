@@ -137,8 +137,6 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
 }
 
 fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
-    fernos_error_t err;
-
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
@@ -205,7 +203,96 @@ fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
 }
 
 fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, proc_exit_status_t *u_rces) {
-    return FOS_NOT_IMPLEMENTED;
+    fernos_error_t err;
+
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    process_t *rproc = NULL;
+    fernos_error_t user_err = FOS_UNKNWON_ERROR;
+
+    // First we retrieve what zombie child we want to reap (and also remove it from the zombie list)
+    // If we cannot find an applicable zombie child process, user_err will be set to the correct
+    // error code.
+
+    if (cpid == FOS_MAX_PROCS) {
+        // We are reaping any process!
+
+        // Default to error case at first.
+        user_err = FOS_EMPTY;
+
+        if (l_get_len(proc->zombie_children) > 0) {
+            err = l_pop_front(proc->zombie_children, &rproc);
+
+            // Failing to pop from the zombie list is seen as a fatal kernel error.
+            // Should never really happen though.
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+
+            user_err = FOS_SUCCESS;
+        } 
+    } else {
+
+        // Default to error case at first.
+        user_err = FOS_STATE_MISMATCH;
+
+        // We are reaping a specific process!
+        rproc = idtb_get(ks->proc_table, cpid);
+
+        if (rproc && rproc->parent == proc) {
+            l_reset_iter(proc->zombie_children);
+            for (process_t **iter = l_get_iter(proc->zombie_children); iter; 
+                    iter = l_next_iter(proc->zombie_children)) {
+
+                // We found a match!
+                if (*iter == rproc) {
+                    err = l_pop_iter(proc->zombie_children, NULL);
+                    if (err != FOS_SUCCESS) {
+                        return err;
+                    }
+
+                    user_err = FOS_SUCCESS;
+
+                    break;
+                }
+            }
+        } 
+    }
+
+    proc_id_t rcpid = FOS_MAX_PROCS;
+    proc_exit_status_t rces = PROC_ES_UNSET;
+
+    // Ok, at this point, user_err is either FOS_SUCCESS, meaning we have a freestanding zombie
+    // process stored in rproc which we can reap!
+    //
+    // Or, we couldn't find an apt process to reap.
+
+    if (user_err == FOS_SUCCESS) {
+        // REAP!
+        
+        rcpid = rproc->pid;
+        rces = rproc->exit_status;
+
+        delete_process(rproc);
+        idtb_push_id(ks->proc_table, rcpid);
+    }
+
+    if (u_rcpid) {
+        mem_cpy_to_user(proc->pd, u_rcpid, &rcpid, 
+                sizeof(proc_id_t), NULL);
+    }
+
+    if (u_rces) {
+        mem_cpy_to_user(proc->pd, u_rces, &rces, 
+                sizeof(proc_id_t), NULL);
+    }
+    
+    DUAL_RET(thr, user_err, FOS_SUCCESS);
 }
 
 fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {

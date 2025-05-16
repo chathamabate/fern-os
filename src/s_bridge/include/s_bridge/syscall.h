@@ -46,18 +46,21 @@ void sc_proc_exit(proc_exit_status_t status);
 /**
  * Reap a zombie child process! 
  *
- * If there is no child process to reap, this returns FOS_EMPTY immediately!
- *
- * When a process is "reaped", its exit status is retrieved, and its resources are freed!
- *
  * `cpid` is the pid of the process we want to reap. If `cpid` is FOS_MAX_PROCS, this will reap ANY 
  * child process!
+ * 
+ * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
+ * process, FOS_STATE_MISMATCH is returned to the user.
+ *
+ * When attempting to reap any zombie process, if there are no zombie children to reap,
+ * FOS_EMPTY is returned to the user.
+ *
+ * When a process is "reaped", its exit status is retrieved, and its resources are freed!
  *
  * If `rcpid` is given, the pid of the reaped child is written to *rcpid.
  * If `rces` is given, the exit status of the reaped child is written to *rces.
  *
- * If cpid is invalid, this returns an error.
- * On error, FOS_MAX_PROCS is written to *rcpid,  and PROC_ES_UNSET is written to *rces.
+ * On error, FOS_MAX_PROCS is written to *rcpid, and PROC_ES_UNSET is written to *rces.
  */
 fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t *rces);
 
