@@ -101,6 +101,21 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_fork(kernel, (proc_id_t *)arg0);
         break;
 
+    case SCID_PROC_EXIT:
+        break;
+
+    case SCID_PROC_REAP:
+        break;
+
+    case SCID_SIGNAL:
+        break;
+
+    case SCID_SIGNAL_ALLOW:
+        break;
+
+    case SCID_SIGNAL_WAIT:
+        break;
+
     case SCID_THREAD_EXIT:
         err = ks_exit_thread(kernel, (void *)arg0);
         break;
