@@ -98,22 +98,27 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     switch (id) {
     case SCID_PROC_FORK:
-        err = ks_fork(kernel, (proc_id_t *)arg0);
+        err = ks_fork_proc(kernel, (proc_id_t *)arg0);
         break;
 
     case SCID_PROC_EXIT:
+        err = ks_exit_proc(kernel, (proc_exit_status_t)arg0);
         break;
 
     case SCID_PROC_REAP:
+        err = ks_reap_proc(kernel, (proc_id_t)arg0, (proc_id_t *)arg1, (proc_exit_status_t *)arg2);
         break;
 
     case SCID_SIGNAL:
+        err = ks_signal(kernel, (proc_id_t)arg0, (sig_id_t)arg1);
         break;
 
     case SCID_SIGNAL_ALLOW:
+        err = ks_allow_signal(kernel, (sig_vector_t)arg0);
         break;
 
     case SCID_SIGNAL_WAIT:
+        err = ks_wait_signal(kernel, (sig_vector_t)arg0, (sig_id_t *)arg1);
         break;
 
     case SCID_THREAD_EXIT:

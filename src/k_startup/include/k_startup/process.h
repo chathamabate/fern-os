@@ -40,15 +40,14 @@ struct _process_t {
 
     /**
      * A list<process_t *> which contains all living child processes. If this process exits, these
-     * children will be adopted by the root process or by some system daemon.
+     * children will be adopted by the root process.
      */
     list_t *children;
 
     /**
-     * A children of this process who have exited, but are yet to be reaped.
+     * Children of this process who have exited, but are yet to be reaped.
      *
-     * When this process exits, all zombie children will be reaped!
-     * (Or maybe given to a kernel structure which reaps when appropriate)
+     * When this process exits, all zombie children will be adopted by the root process.
      */
     list_t *zombie_children;
 
@@ -74,11 +73,12 @@ struct _process_t {
      */
     thread_t *main_thread;
 
-
     /**
      * Like in linux, signals will be one form of IPC.
+     *
+     * This is the vector of all pending signals received by this process.
      */
-    //uint32_t sig_vec;
+    sig_vector_t sig_vec;
 
     /**
      * By default, a signal of any type will kill this process.
@@ -86,7 +86,7 @@ struct _process_t {
      * If you'd like a signal to be passed to the signal wait queue, make sure it is marked 
      * allowed via this mask. `1` means allowed, `0` means kill this process.
      */
-    //uint32_t sig_allow;
+    sig_vector_t sig_allow;
 
     /**
      * When one or more signals arrive, and they're all marked as allow, the signal vector will be
@@ -99,8 +99,7 @@ struct _process_t {
      * to this queue, you may want to check the signal vector first to see if no waiting is 
      * necessary.
      */
-    //vector_wait_queue_t *signal_queue;
-
+    vector_wait_queue_t *signal_queue;
     
     /**
      * Originally conditions were stored here, however, upon learning more about synchronization
