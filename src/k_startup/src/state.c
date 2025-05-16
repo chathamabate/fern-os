@@ -136,7 +136,7 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
     return FOS_SUCCESS;
 }
 
-fernos_error_t ks_fork(kernel_state_t *ks, proc_id_t *u_cpid) {
+fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
@@ -186,6 +186,26 @@ fernos_error_t ks_fork(kernel_state_t *ks, proc_id_t *u_cpid) {
     mem_cpy_to_user(child->pd, u_cpid, &temp_pid, sizeof(proc_id_t), NULL);
 
     DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+}
+
+fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, proc_exit_status_t *u_rces) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid) {
+    return FOS_NOT_IMPLEMENTED;
 }
 
 fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {

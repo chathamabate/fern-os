@@ -24,7 +24,7 @@
  * In the parent process the child's pid is written to *cpid.
  * In the child process FOS_MAX_PROCS is written to *cpid.
  *
- * The cpid argument is required!
+ * The cpid argument is optional.
  * 
  * Returns an error if cpid is NULL, or if there are insufficient resources!
  * On error, FOS_MAX_PROCS is written to *cpid.
@@ -44,8 +44,9 @@ fernos_error_t sc_proc_fork(proc_id_t *cpid);
 void sc_proc_exit(proc_exit_status_t status);
 
 /**
- * Reap a zombie child process! This sleeps the current thread until the desired child process has 
- * exited. If the requested process has already exited, this returns immediately.
+ * Reap a zombie child process! 
+ *
+ * If there is no child process to reap, this returns FOS_EMPTY immediately!
  *
  * When a process is "reaped", its exit status is retrieved, and its resources are freed!
  *
@@ -55,7 +56,6 @@ void sc_proc_exit(proc_exit_status_t status);
  * If `rcpid` is given, the pid of the reaped child is written to *rcpid.
  * If `rces` is given, the exit status of the reaped child is written to *rces.
  *
- * You are not allowed to wait on a process which doesn't exist yet!
  * If cpid is invalid, this returns an error.
  * On error, FOS_MAX_PROCS is written to *rcpid,  and PROC_ES_UNSET is written to *rces.
  */

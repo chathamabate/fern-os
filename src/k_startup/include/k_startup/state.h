@@ -136,9 +136,74 @@ fernos_error_t ks_tick(kernel_state_t *ks);
  * FOS_MAX_PROCS is written to *u_cpid, in the parent process the new child's pid is written to
  * *u_cpid.
  *
- * NOTE: u_cpid is required and a userspace pointer.
+ * Returns an error in the calling process if insufficient resources or some other misc error.
+ *
+ * NOTE: u_cpid is optional and a userspace pointer.
  */
-fernos_error_t ks_fork(kernel_state_t *ks, proc_id_t *u_cpid);
+fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid);
+
+/** 
+ * Exit the current process. (Becoming a zombie process)
+ *
+ * FSIG_CHLD is sent to the parent process. If this is the root process, FOS_ABORT_SYSTEM is 
+ * returned.
+ *
+ * All living children of this process are now orphans, they are adopted by the root process.
+ * All zombie children of this process are now zombie orphas, also adopted by the root process.
+ *
+ * This function is automatically called when returning from a proceess's main thread.
+ */
+fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status);
+
+/**
+ * Reap a zombie child process! 
+ *
+ * If the requested process doesn't exist, or is yet to exit, this call returns immediately
+ * with FOS_EMPTY in the current thread.
+ *
+ * When a process is "reaped", its exit status is retrieved, and its resources are freed!
+ *
+ * `cpid` is the pid of the process we want to reap. If `cpid` is FOS_MAX_PROCS, this will reap ANY 
+ * child process!
+ *
+ * If `u_rcpid` is given, the pid of the reaped child is written to *u_rcpid.
+ * If `u_rces` is given, the exit status of the reaped child is written to *u_rces.
+ *
+ * If cpid is invalid, this returns an error in the current thread.
+ * On error, FOS_MAX_PROCS is written to *u_rcpid,  and PROC_ES_UNSET is written to *u_rces.
+ */
+fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, 
+        proc_exit_status_t *u_rces);
+
+/** 
+ * Send a signal to a process with pid `pid`.
+ *
+ * If `pid` = FOS_MAX_PROCS, the signal is sent to the current process's parent.
+ *
+ * An error is returned if the given signal id is invalid, or if the receiving process
+ * cannot be found!
+ */
+fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid);
+
+/** 
+ * Set the current process's signal allow vector.
+ *
+ * NOTE: If there are pending signals which the new vector does not allow, the process will exit!
+ */
+fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv);
+
+/**
+ * Sleeps the cureent thread until any of the signals described in sv are receieved.
+ * If an apt signal is pending, this call will not sleep the current thread.
+ *
+ * On success, FOS_SUCCESS is returned to the user. 
+ * If `u_sid` is given, the recieved signal is written to *u_sid`. 
+ * The pending bit of the received signal is cleared.
+ *
+ * A user error is returned if sv is 0. 
+ * On user error, 32 is written to *u_sid.
+ */
+fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid);
 
 /**
  * Take the current thread, deschedule it, and add it it to the sleep wait queue.

@@ -110,6 +110,11 @@ typedef uint32_t proc_exit_status_t;
 #define PROC_ES_SUCCESS (0x0U)
 #define PROC_ES_UNSET   (0x1U)
 
+/**
+ * The process exited because an unallowed signal was received.
+ */
+#define PROC_ES_SIGNAL  (0x2U)
+
 /*
  * Syscall IDs.
  */
