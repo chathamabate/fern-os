@@ -16,6 +16,7 @@
  *
  * Only the calling thread is copied over into the child process.
  * Multithreading state is not copied (i.e. Futexes and the join queue)
+ * Signal vector is not copied. The created process starts with no received signals.
  *
  * On error, an error is returned just in the calling process.
  *
@@ -23,9 +24,76 @@
  * In the parent process the child's pid is written to *cpid.
  * In the child process FOS_MAX_PROCS is written to *cpid.
  *
+ * The cpid argument is required!
+ * 
  * Returns an error if cpid is NULL, or if there are insufficient resources!
+ * On error, FOS_MAX_PROCS is written to *cpid.
  */
-fernos_error_t sc_fork(proc_id_t *cpid);
+fernos_error_t sc_proc_fork(proc_id_t *cpid);
+
+/**
+ * Exit the current process. (Becoming a zombie process)
+ *
+ * FSIG_CHLD is sent to the parent process. If this is the root process, the system should exit.
+ *
+ * All living children of this process are now orphans, they are adopted by the root process.
+ * All zombie children of this process are now zombie orphas, also adopted by the root process.
+ *
+ * This function is automatically called when returning from a proceess's main thread.
+ */
+void sc_proc_exit(proc_exit_status_t status);
+
+/**
+ * Reap a zombie child process! This sleeps the current thread until the desired child process has 
+ * exited. If the requested process has already exited, this returns immediately.
+ *
+ * When a process is "reaped", its exit status is retrieved, and its resources are freed!
+ *
+ * `cpid` is the pid of the process we want to reap. If `cpid` is FOS_MAX_PROCS, this will reap ANY 
+ * child process!
+ *
+ * If `rcpid` is given, the pid of the reaped child is written to *rcpid.
+ * If `rces` is given, the exit status of the reaped child is written to *rces.
+ *
+ * You are not allowed to wait on a process which doesn't exist yet!
+ * If cpid is invalid, this returns an error.
+ * On error, FOS_MAX_PROCS is written to *rcpid,  and PROC_ES_UNSET is written to *rces.
+ */
+fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t *rces);
+
+/**
+ * Send a signal to a process with pid `pid`.
+ *
+ * If `pid` = FOS_MAX_PROCS, the signal is sent to this process's parent.
+ *
+ * An error is returned if the given signal id is invalid, or if the receiving process
+ * cannot be found!
+ */
+fernos_error_t sc_signal(proc_id_t pid, sig_id_t sid);
+
+/**
+ * By default, a process doesn't allow any signals to be received.
+ * That is, when a signal of any type is received, the process exits.
+ *
+ * This can be changed, by setting a process's signal allow vector.
+ * Set bits in this vector represent signals which will NOT kill the process when received.
+ *
+ * NOTE: If there are pending signals which the new vector does not allow, the process will exit!
+ */
+void sc_signal_allow(sig_vector_t sv);
+
+/**
+ * Sleeps the cureent thread until any of the signals described in sv are receieved.
+ * If an apt signal is pending, this call will not sleep the current thread and instead
+ * return immediately.
+ *
+ * On success, FOS_SUCCESS is returned. If `sid` is given, the recieved signal is written to
+ * `*sid`. The pending bit of the received signal is cleared.
+ *
+ * An error is returned if sv is 0. (Or something goes wrong inside the kernel)
+ * On error, 32 is written to *sid.
+ */
+fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid);
 
 /**
  * Exit the current thread.

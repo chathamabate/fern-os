@@ -13,6 +13,44 @@
 typedef id_t proc_id_t;
 
 /**
+ * A signal ID is within the range [0,31]
+ */
+typedef id_t sig_id_t;
+
+/**
+ * This is the only *special* signal type as of now.
+ *
+ * When a process exits, this signal is sent to the parent!
+ */
+#define FSIG_CHLD (0x0U)
+
+/**
+ * This is a bit vector which can be used to represent pending signals, or
+ * signals which are meant to be allowed.
+ */
+typedef uint32_t sig_vector_t;
+
+static inline sig_vector_t empty_sig_vector(void) {
+    return 0;
+}
+
+static inline sig_vector_t full_sig_vector(void) {
+    return ~(sig_vector_t)0;
+}
+
+static inline void sv_add_signal(sig_vector_t *sv, sig_id_t sid) {
+    if (sid < 32) {
+        *sv |= (1 << sid);
+    }
+}
+
+static inline void sv_remove_signal(sig_vector_t *sv, sig_id_t sid) {
+    if (sid < 32) {
+        *sv &= ~(1 << sid);
+    }
+}
+
+/**
  * The process unique ID of a thread. (Can be 0)
  */
 typedef id_t thread_id_t;
@@ -35,7 +73,7 @@ static inline join_vector_t empty_join_vector(void) {
  * A vector which accepts any thread
  */
 static inline join_vector_t full_join_vector(void) {
-    return ~0;
+    return ~(join_vector_t)0;
 }
 
 static inline void jv_add_tid(join_vector_t *jv, thread_id_t tid) {
