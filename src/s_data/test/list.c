@@ -371,6 +371,53 @@ static bool test_bad_calls(void) {
     TEST_SUCCEED();
 }
 
+/*
+ * Defaults testing. 
+ */
+
+static bool test_push_back_all(void) {
+    list_t *l = gen_list(sizeof(int));
+    TEST_TRUE(l != NULL);
+
+    for (int i = 0; i < 5; i++) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &i));
+    }
+
+    list_t *s = gen_list(sizeof(int));
+    TEST_TRUE(s != NULL);
+
+    for (int i = 5; i < 8; i++) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(s, &i));
+    }
+
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back_all(l, s));
+
+    TEST_EQUAL_UINT(8, l_get_len(l));
+    TEST_EQUAL_UINT(0, l_get_len(s));
+
+    for (int i = 0; i < 8; i++) {
+        int *ptr = l_get_ptr(l, i);
+        TEST_TRUE(ptr != NULL);
+        TEST_EQUAL_INT(i, *ptr);
+    }
+
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back_all(s, l));
+    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back_all(s, l));
+
+    TEST_EQUAL_UINT(8, l_get_len(s));
+    TEST_EQUAL_UINT(0, l_get_len(l));
+
+    for (int i = 0; i < 8; i++) {
+        int *ptr = l_get_ptr(s, i);
+        TEST_TRUE(ptr != NULL);
+        TEST_EQUAL_INT(i, *ptr);
+    }
+
+    delete_list(s);
+    delete_list(l);
+    TEST_SUCCEED();
+}
+
 bool test_list(const char *name, list_t *(*gen)(size_t cs)) {
     gen_list = gen;
     BEGIN_SUITE(name);
@@ -382,6 +429,7 @@ bool test_list(const char *name, list_t *(*gen)(size_t cs)) {
     RUN_TEST(test_basic_iter);
     RUN_TEST(test_mutate_iter);
     RUN_TEST(test_bad_calls);
+    RUN_TEST(test_push_back_all);
     return END_SUITE();
 }
 
