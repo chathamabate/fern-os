@@ -152,6 +152,37 @@ static bool test_pop(void) {
     TEST_SUCCEED();
 }
 
+static bool test_clear(void) {
+    list_t *l = gen_list(sizeof(int));
+    TEST_TRUE(l != NULL);
+
+    for (int i = 0; i < 10; i++) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &i));
+    }
+
+    TEST_EQUAL_UINT(10, l_get_len(l));
+
+    l_clear(l);
+
+    TEST_EQUAL_UINT(0, l_get_len(l));
+
+    for (int i = 20; i < 25; i++) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &i));
+    }
+
+    TEST_EQUAL_UINT(5, l_get_len(l));
+
+    for (int i = 0; i < 5; i++) {
+        int *ptr = l_get_ptr(l, i);
+        TEST_TRUE(ptr != NULL);
+        TEST_EQUAL_INT(20 + i, *ptr);
+    }
+
+    delete_list(l);
+
+    TEST_SUCCEED();
+}
+
 static bool test_big(void) {
     list_t *l = gen_list(sizeof(int));
     TEST_TRUE(l != NULL);
@@ -346,6 +377,7 @@ bool test_list(const char *name, list_t *(*gen)(size_t cs)) {
     RUN_TEST(test_cell_size);
     RUN_TEST(test_push);
     RUN_TEST(test_pop);
+    RUN_TEST(test_clear);
     RUN_TEST(test_big);
     RUN_TEST(test_basic_iter);
     RUN_TEST(test_mutate_iter);
