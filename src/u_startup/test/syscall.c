@@ -29,6 +29,15 @@ static bool test_simple_fork(void) {
     err = sc_signal_wait((1 << FSIG_CHLD), NULL);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+    proc_id_t rcpid;
+    proc_exit_status_t rces;
+
+    err = sc_proc_reap(FOS_MAX_PROCS, &rcpid, &rces);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_EQUAL_HEX(cpid, rcpid);
+    TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
+
     TEST_SUCCEED();
 }
 
