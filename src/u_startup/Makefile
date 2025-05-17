@@ -10,7 +10,7 @@ _SRCS 		?= main.c syscall.c
 _ASMS		?= main.s syscall.s
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= test.c
+_TEST_SRCS 	?= syscall.c
 
 -include ../mod_stub.mk
 

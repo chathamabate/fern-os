@@ -216,3 +216,5 @@ fernos_error_t sc_futex_wake(futex_t *futex, bool all);
  * (Probably will take this out later)
  */
 void sc_term_put_s(const char *s);
+void sc_term_put_fmt_s(const char *fmt, ...);
+

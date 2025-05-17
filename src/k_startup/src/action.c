@@ -155,8 +155,9 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     case SCID_TERM_PUT_S:
         if (!arg0) {
-            term_put_s("NULL str\n");
-            lock_up();
+            kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
+            err = FOS_SUCCESS;
+            break;
         }
 
         char *buf = da_malloc(arg1);
@@ -172,7 +173,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     }
 
     if (err != FOS_SUCCESS) {
-        term_put_fmt_s("Syscall Error (Syscall: 0x%X, Error: 0x%X)", id, err);
+        term_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
         lock_up();
     }
 

@@ -78,3 +78,14 @@ fernos_error_t sc_futex_wake(futex_t *futex, bool all) {
 void sc_term_put_s(const char *s) {
     (void)trigger_syscall(SCID_TERM_PUT_S, (uint32_t)s, str_len(s) + 1, 0, 0);
 }
+
+void sc_term_put_fmt_s(const char *fmt, ...) {
+    char buf[256];
+
+    va_list va; 
+    va_start(va, fmt);
+    str_vfmt(buf, fmt, va);
+    va_end(va);
+
+    sc_term_put_s(buf);
+}
