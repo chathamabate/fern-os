@@ -374,10 +374,64 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
 }
 
 static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid) {
+    fernos_error_t err;
+
     if (!proc || sid >= 32) {
         return FOS_BAD_ARGS;
     }
 
+    // If it is already set, we do nothing!
+    if (proc->sig_vec & (1 << sid)) {
+        return FOS_SUCCESS;
+    }
+
+    // Set the signal bit no matter what!
+    proc->sig_vec |= (1 << sid);
+
+    // Ok, but is this signal even allowed in the first place??
+    // If not, force exit the process.
+    if (!(proc->sig_allow & (1 << sid))) {
+        return ks_exit_proc_p(ks, proc, PROC_ES_SIGNAL);
+    }
+
+    // Otherwise, we notify our wait queue!
+    
+    err = vwq_notify(proc->signal_queue, sid, VWQ_NOTIFY_FIRST);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    thread_t *woken_thread;
+    err = vwq_pop(proc->signal_queue, (void **)&woken_thread, NULL);
+
+    if (err == FOS_SUCCESS) {
+        // We woke a thread up!
+        
+        // Clear our bit real quick.
+        proc->sig_vec &= ~(1 << sid);
+
+        sig_id_t *u_sid = woken_thread->u_wait_ctx;
+
+        // Detach thread.
+        woken_thread->u_wait_ctx = NULL;
+        woken_thread->wq = NULL;
+        woken_thread->state = THREAD_STATE_DETATCHED;
+
+        // Schedule thread and return correct values!
+        ks_schedule_thread(ks, woken_thread);
+
+        if (u_sid) {
+            mem_cpy_to_user(woken_thread->proc->pd, u_sid, &sid, 
+                    sizeof(sig_id_t), NULL);
+        }
+
+        woken_thread->ctx.eax = FOS_SUCCESS;
+    } else if  (err != FOS_EMPTY) {
+        // If the error was FOS_EMPTY, this is no big deal!
+        return err;
+    }
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
@@ -389,6 +443,10 @@ fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
 
     thread_t *thr = ks->curr_thread;
 
+    if (pid == thr->proc->pid) {
+        DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+    }
+
     process_t *recv_proc;
 
     if (pid == FOS_MAX_PROCS) {
@@ -399,7 +457,7 @@ fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
 
     if (!recv_proc) {
         // We couldn't find who to send to...
-        DUAL_RET(thr, FOS_STATE_MISMATCH, FOS_STATE_MISMATCH);
+        DUAL_RET(thr, FOS_STATE_MISMATCH, FOS_SUCCESS);
     }
 
     err = ks_signal_p(ks, recv_proc, sid);
@@ -411,7 +469,21 @@ fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
 }
 
 fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH; 
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    proc->sig_allow = sv;
+
+    // Are there pending signals which are not allowed??
+    if ((~(proc->sig_allow)) & proc->sig_vec) {
+        return ks_exit_proc_p(ks, proc, PROC_ES_SIGNAL);
+    }
+
+    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
 
 fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid) {
@@ -448,10 +520,14 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
 
         // did we find a match?
         if (msid < 32) {
+            // Clear the pending bit.
+            proc->sig_vec &= ~(1 << msid);
+
             if (u_sid) {
                 mem_cpy_to_user(proc->pd, u_sid, &msid, 
                         sizeof(sig_id_t), NULL);
             }
+
             DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
         }
     }
