@@ -189,14 +189,22 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
         DUAL_RET(thr, FOS_NO_MEM, FOS_SUCCESS);
     }
 
-    // Success!
-
     idtb_set(ks->proc_table, cpid, child);
 
+    // Remember, now we are working with 2 different user processes!
+
+    child->main_thread->ctx.eax = FOS_SUCCESS;
     ks_schedule_thread(ks, child->main_thread);
 
     if (u_cpid) {
-        mem_cpy_to_user(proc->pd, u_cpid, &cpid, 
+        proc_id_t temp_pid;
+
+        temp_pid = cpid;
+        mem_cpy_to_user(proc->pd, u_cpid, &temp_pid, 
+                sizeof(proc_id_t), NULL);
+
+        temp_pid = FOS_MAX_PROCS;
+        mem_cpy_to_user(child->pd, u_cpid, &temp_pid, 
                 sizeof(proc_id_t), NULL);
     }
 
@@ -251,7 +259,7 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
 
     if (!l_pop_ele(proc->parent->children, &proc, l_ptr_cmp, false)) {
         return FOS_STATE_MISMATCH; // Something very wrong if we can't find this process in
-                                   // the paren't children list.
+                                   // the parent's children list.
     }
 
     // Now we are no longer in a living children list, mark exited.
@@ -264,13 +272,13 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
         return err;
     }
 
-    err = ks_signal(ks, proc->parent->pid, FSIG_CHLD);
+    err = ks_signal_p(ks, proc->parent, FSIG_CHLD);
     if (err != FOS_SUCCESS) {
         return err;
     }
 
     if (signal_root) {
-        err = ks_signal(ks, ks->root_proc->pid, FSIG_CHLD);
+        err = ks_signal_p(ks, ks->root_proc, FSIG_CHLD);
         if (err != FOS_SUCCESS) {
             return err;
         }

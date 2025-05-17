@@ -40,7 +40,7 @@ int32_t trigger_syscall(uint32_t id, uint32_t arg0, uint32_t arg1, uint32_t arg2
  *
  * The cpid argument is optional.
  * 
- * Returns an error if cpid is NULL, or if there are insufficient resources!
+ * Returns an error if there are insufficient resources!
  * On error, FOS_MAX_PROCS is written to *cpid.
  */
 fernos_error_t sc_proc_fork(proc_id_t *cpid);
