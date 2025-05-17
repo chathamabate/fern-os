@@ -143,19 +143,6 @@ void timer_handler(void);
 typedef void (*syscall_action_t)(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
 /**
- * Trigger a system call from user space.
- *
- * id -> %eax
- * arg0 -> %ecx
- * arg1 -> %edx
- * arg2 -> %esi (restored after call)
- * arg3 -> %edi (restored after call)
- *
- * NOTE: This assumes syscalls are mapped as interrupt 48.
- */
-int32_t trigger_syscall(uint32_t id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
-
-/**
  * Set what should happen on a syscall.
  */
 void set_syscall_action(syscall_action_t sa);

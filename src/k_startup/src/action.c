@@ -7,7 +7,6 @@
 #include "s_util/misc.h"
 #include "s_util/ansii.h"
 #include "s_util/str.h"
-#include "s_bridge/syscall.h"
 #include "s_mem/allocator.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"

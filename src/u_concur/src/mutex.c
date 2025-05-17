@@ -1,6 +1,6 @@
 
 #include "u_concur/mutex.h"
-#include "s_bridge/syscall.h"
+#include "u_startup/syscall.h"
 
 fernos_error_t init_mutex(mutex_t *mut) {
     if (!mut) {

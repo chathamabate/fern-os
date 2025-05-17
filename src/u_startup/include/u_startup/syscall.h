@@ -7,6 +7,20 @@
 #include "s_util/err.h"
 #include "s_bridge/shared_defs.h"
 
+/**
+ * Trigger a system call from user space.
+ *
+ * id -> %eax
+ * arg0 -> %ecx
+ * arg1 -> %edx
+ * arg2 -> %esi (restored after call)
+ * arg3 -> %edi (restored after call)
+ *
+ * NOTE: This assumes syscalls are mapped as interrupt 48.
+ */
+int32_t trigger_syscall(uint32_t id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+
+
 /*
  * In this file, SCID is short for SYSCALL ID.
  */

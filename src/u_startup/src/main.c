@@ -4,11 +4,11 @@
 #include "k_sys/intr.h"
 #include "s_util/misc.h"
 #include "s_bridge/ctx.h"
-#include "s_bridge/syscall.h"
 #include "s_util/str.h"
 #include "s_util/atomic.h"
 #include "u_concur/mutex.h"
 #include "s_util/constraints.h"
+#include "u_startup/syscall.h"
 
 static void uprintf(const char *fmt, ...) {
     char buf[256];
@@ -31,6 +31,9 @@ void *user_main(void *arg) {
     (void)arg;
 
     fernos_error_t err;
+
+    uprintf("Hello\n");
+    while (1);
 
     str[0] = 'a';
     str[1] = 'a';

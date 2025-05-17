@@ -1,5 +1,6 @@
 
-#include "s_bridge/syscall.h"
+#include "u_startup/syscall.h"
+#include "s_bridge/shared_defs.h"
 #include "s_bridge/ctx.h"
 #include "s_util/str.h"
 
@@ -77,4 +78,3 @@ fernos_error_t sc_futex_wake(futex_t *futex, bool all) {
 void sc_term_put_s(const char *s) {
     (void)trigger_syscall(SCID_TERM_PUT_S, (uint32_t)s, str_len(s) + 1, 0, 0);
 }
-
