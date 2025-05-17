@@ -136,6 +136,11 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
     return FOS_SUCCESS;
 }
 
+static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc, 
+        proc_exit_status_t status);
+
+static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid);
+
 fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
@@ -368,8 +373,41 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     DUAL_RET(thr, user_err, FOS_SUCCESS);
 }
 
+static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid) {
+    if (!proc || sid >= 32) {
+        return FOS_BAD_ARGS;
+    }
+
+}
+
 fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
-    return FOS_NOT_IMPLEMENTED;
+    fernos_error_t err;
+
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+
+    process_t *recv_proc;
+
+    if (pid == FOS_MAX_PROCS) {
+        recv_proc = thr->proc->parent;
+    } else {
+        recv_proc = idtb_get(ks->proc_table, pid);
+    }
+
+    if (!recv_proc) {
+        // We couldn't find who to send to...
+        DUAL_RET(thr, FOS_STATE_MISMATCH, FOS_STATE_MISMATCH);
+    }
+
+    err = ks_signal_p(ks, recv_proc, sid);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+    
+    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
 
 fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
