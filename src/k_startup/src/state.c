@@ -198,15 +198,9 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
 
-fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
+static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc, 
+        proc_exit_status_t status) {
     fernos_error_t err;
-
-    if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
-    }
-
-    thread_t *thr = ks->curr_thread;
-    process_t *proc = thr->proc;
 
     if (ks->root_proc == proc) {
         return FOS_NOT_IMPLEMENTED; // Do this later.
@@ -278,6 +272,14 @@ fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
 
     // This call does not return to any user thread!
     return FOS_SUCCESS;
+}
+
+fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    return ks_exit_proc_p(ks, ks->curr_thread->proc, status);
 }
 
 fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, 
@@ -375,7 +377,60 @@ fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
 }
 
 fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid) {
-    return FOS_NOT_IMPLEMENTED;
+    fernos_error_t err;
+    
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH; 
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    const sig_id_t NULL_SID = 32;
+
+    if (sv == 0) {
+        if (u_sid) {
+            mem_cpy_to_user(proc->pd, u_sid, &NULL_SID, 
+                    sizeof(sig_id_t), NULL);
+        }
+
+        DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+    }
+
+    // Before doing any waiting, let's see if we can service a pending signal immediately!
+
+    if (sv & proc->sig_vec) { // Quick check before looping 
+        sig_id_t msid;
+        for (msid = 0; msid < 32; msid++) {
+            sig_vector_t tv = 1 << msid;
+            if ((sv & tv) && (proc->sig_vec & tv)) {
+                break;
+            }
+        }
+
+        // did we find a match?
+        if (msid < 32) {
+            if (u_sid) {
+                mem_cpy_to_user(proc->pd, u_sid, &msid, 
+                        sizeof(sig_id_t), NULL);
+            }
+            DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+        }
+    }
+
+    // We didn't find a match, looks like we'll need to wait!
+
+    err = vwq_enqueue(proc->signal_queue, thr, sv);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    ks_deschedule_thread(ks, thr);
+    thr->wq = (wait_queue_t *)(proc->signal_queue);
+    thr->state = THREAD_STATE_WAITING;
+    thr->u_wait_ctx = u_sid;
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
@@ -389,8 +444,9 @@ fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
 
     err = twq_enqueue(ks->sleep_q, (void *)thr, 
             ks->curr_tick + ticks);
-
-    DUAL_RET_FOS_ERR(err, thr);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
 
     // Only deschedule one we know our thread was added successfully to the wait queue!
     ks_deschedule_thread(ks, thr);

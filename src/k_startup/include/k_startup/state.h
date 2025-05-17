@@ -187,6 +187,12 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcp
  *
  * An error is returned if the given signal id is invalid, or if the receiving process
  * cannot be found!
+ *
+ * By "sending a signal" this set the given signal's bit in the current process's signal vector.
+ * If the signal is not allowed, the current process is forcefully exited.
+ * If the signal is allowed, threads waiting on said signal will be woken up.
+ *
+ * (NOTE: that if the signal bit is already set, this call is essentially a nop)
  */
 fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid);
 
