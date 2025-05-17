@@ -4,6 +4,7 @@
 #include "s_util/constraints.h"
 
 #define LOGF_METHOD(...) sc_term_put_fmt_s(__VA_ARGS__)
+#define FAILURE_ACTION() while (1)
 
 #include "s_util/test.h"
 
@@ -41,6 +42,77 @@ static bool test_simple_fork(void) {
     TEST_SUCCEED();
 }
 
+static bool test_simple_signal(void) {
+    fernos_error_t err;
+
+    sc_signal_allow(full_sig_vector());
+
+    // 1) Parent waits for 3.
+    // 2) Child sends 3, waits for 4.
+    // 3) Parent receives 3, sends 4.
+    // 4) Child receives 4, and exits.
+    // 5) Parent waits on FSIG_CHLD, then reaps!
+
+    // Test sending some signals between the parent and the child!
+
+    proc_id_t cpid;
+
+    err = sc_proc_fork(&cpid);
+    if (err != FOS_SUCCESS) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    sig_id_t sid;
+
+    if (cpid == FOS_MAX_PROCS) {
+        // In the child!
+        sig_vector_t csv = (1 << 3) | (1 << 5);
+
+        sc_signal_allow(csv);
+
+        sc_term_put_s("Waiting for 3 or 5\n");
+
+        err = sc_signal_wait(csv, &sid);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_UINT(3, sid);
+
+        sc_term_put_s("Sending 4\n");
+
+        err = sc_signal(FOS_MAX_PROCS, 4);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        sc_term_put_s("Waiting for 3 or 5\n");
+
+        err = sc_signal_wait(csv, &sid);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_UINT(5, sid);
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // In the parent process!
+
+    err = sc_signal(cpid, 3);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_signal_wait(full_sig_vector(), &sid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(4, sid);
+
+    err = sc_signal(cpid, 5);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_signal_wait((1 << FSIG_CHLD), NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    proc_exit_status_t rces;
+    err = sc_proc_reap(cpid, NULL, &rces);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
+
+    TEST_SUCCEED();
+}
+
 static bool test_complex_fork0(void) {
     fernos_error_t err;
 
@@ -61,7 +133,6 @@ static bool test_complex_fork0(void) {
     // 2) proc1 and 2 exit randomly.
     // 3) proc0 is forcefully exited by the FSIG_CHLD signal.
     // 4) Have all processes be reaped from the root.
-
 
     proc_id_t cpids[3];
 
@@ -127,11 +198,18 @@ static bool test_complex_fork0(void) {
     TEST_SUCCEED();
 }
 
+static bool test_complex_fork1(void) {
+    // Could we actually send some signals now... wouldn't that be cool???
+    TEST_SUCCEED();
+}
+
 bool test_syscall(void) {
     BEGIN_SUITE("Syscall");
 
     RUN_TEST(test_simple_fork);
+    RUN_TEST(test_simple_signal);
     RUN_TEST(test_complex_fork0);
+    RUN_TEST(test_complex_fork1);
     
     return END_SUITE();
 }

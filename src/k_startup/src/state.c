@@ -413,6 +413,10 @@ static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t 
     // Ok, but is this signal even allowed in the first place??
     // If not, force exit the process.
     if (!(proc->sig_allow & (1 << sid))) {
+        /*
+         * NOTE: Very importnat, this logic actually causes indirect recursion.
+         * A chain too deep of child processes could result in a stack overflow in the kernel!
+         */
         return ks_exit_proc_p(ks, proc, PROC_ES_SIGNAL);
     }
 
@@ -465,10 +469,6 @@ fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
 
     thread_t *thr = ks->curr_thread;
 
-    if (pid == thr->proc->pid) {
-        DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
-    }
-
     process_t *recv_proc;
 
     if (pid == FOS_MAX_PROCS) {
@@ -486,8 +486,17 @@ fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
     if (err != FOS_SUCCESS) {
         return err;
     }
-    
-    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+
+    /*
+     * It's very possible that the act of sending the signal exited this process!
+     *
+     * So we only return to the thread if the owning process is still alive!
+     */
+    if (!(thr->proc->exited)) {
+        thr->ctx.eax = FOS_SUCCESS;
+    }
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {

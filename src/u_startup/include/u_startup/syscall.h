@@ -88,6 +88,8 @@ fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t
  *
  * An error is returned if the given signal id is invalid, or if the receiving process
  * cannot be found!
+ *
+ * You are allowed to signal yourself!
  */
 fernos_error_t sc_signal(proc_id_t pid, sig_id_t sid);
 

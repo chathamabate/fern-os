@@ -187,7 +187,8 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcp
  *
  * An error is returned if the given signal id is invalid, or if the receiving process
  * cannot be found! 
- * An error is also returned if you try to send a signal to yourself!
+ *
+ * You are allowed to send a signal to yourself!
  *
  * By "sending a signal" this set the given signal's bit in the current process's signal vector.
  * If the signal is not allowed, the current process is forcefully exited.
