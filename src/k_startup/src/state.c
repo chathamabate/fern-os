@@ -243,10 +243,23 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     bool signal_root = l_get_len(proc->zombie_children) > 0;
 
     // Next, we add all living and zombie children to the root process.
+    // (Also setting their parents to the root process!)
+
+    l_reset_iter(proc->children);
+    for (process_t **iter = l_get_iter(proc->children); 
+            iter; iter = l_next_iter(proc->children)) {
+        (*iter)->parent = ks->root_proc;
+    }
 
     err = l_push_back_all(ks->root_proc->children, proc->children);
     if (err != FOS_SUCCESS) {
         return err;
+    }
+
+    l_reset_iter(proc->zombie_children);
+    for (process_t **iter = l_get_iter(proc->zombie_children); 
+            iter; iter = l_next_iter(proc->zombie_children)) {
+        (*iter)->parent = ks->root_proc;
     }
 
     err = l_push_back_all(ks->root_proc->zombie_children, proc->zombie_children);
