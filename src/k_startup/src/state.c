@@ -236,45 +236,48 @@ fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
 
     // Next, we add all living and zombie children to the root process.
 
-    while (l_get_len(proc->children) > 0) {
-        process_t *child;
-
-        err = l_pop_front(proc->children, &child);
-        if (err != FOS_SUCCESS) {
-            return err;
-        }
-
-        err = l_push_back(ks->root_proc->children, &child);
-        if (err != FOS_SUCCESS) {
-            return err;
-        }
-
-        child->parent = ks->root_proc;
+    err = l_push_back_all(ks->root_proc->children, proc->children);
+    if (err != FOS_SUCCESS) {
+        return err;
     }
 
-    while (l_get_len(proc->zombie_children) > 0) {
-        process_t *zombie_child;
-
-        err = l_pop_front(proc->zombie_children, &zombie_child);
-        if (err != FOS_SUCCESS) {
-            return err;
-        }
-
-        err = l_push_back(ks->root_proc->zombie_children, &zombie_child);
-        if (err != FOS_SUCCESS) {
-            return err;
-        }
-
-        zombie_child->parent = ks->root_proc;
+    err = l_push_back_all(ks->root_proc->zombie_children, proc->zombie_children);
+    if (err != FOS_SUCCESS) {
+        return err;
     }
 
-    // Lastly, we set our exit status add ourself to our parent's zombie list.
-    // It'd be nice if we could remove easily from a list tbh!
-    // That could be a quick addition ngl.
+    // Now remove our process from the parent's children list, and move it to the parent's
+    // zombie list!
 
+    if (!l_pop_ele(proc->parent->children, &proc, l_ptr_cmp, false)) {
+        return FOS_STATE_MISMATCH; // Something very wrong if we can't find this process in
+                                   // the paren't children list.
+    }
 
+    // Now we are no longer in a living children list, mark exited.
+    proc->exited = true;
+    proc->exit_status = status;
 
-    return FOS_NOT_IMPLEMENTED;
+    // Add to parents zombie children list!
+    err = l_push_back(proc->parent->zombie_children, &proc);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    err = ks_signal(ks, proc->parent->pid, FSIG_CHLD);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    if (signal_root) {
+        err = ks_signal(ks, ks->root_proc->pid, FSIG_CHLD);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+
+    // This call does not return to any user thread!
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, 
@@ -320,23 +323,15 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
         // We are reaping a specific process!
         rproc = idtb_get(ks->proc_table, cpid);
 
-        if (rproc && rproc->parent == proc) {
-            l_reset_iter(proc->zombie_children);
-            for (process_t **iter = l_get_iter(proc->zombie_children); iter; 
-                    iter = l_next_iter(proc->zombie_children)) {
+        if (rproc && rproc->parent == proc && rproc->exited == true) {
+            bool removed = l_pop_ele(proc->zombie_children, &rproc, l_ptr_cmp, false);
 
-                // We found a match!
-                if (*iter == rproc) {
-                    err = l_pop_iter(proc->zombie_children, NULL);
-                    if (err != FOS_SUCCESS) {
-                        return err;
-                    }
-
-                    user_err = FOS_SUCCESS;
-
-                    break;
-                }
+            if (!removed) {
+                // Something is very wrong if the described process is not in the zombie list.
+                return FOS_STATE_MISMATCH;
             }
+
+            user_err = FOS_SUCCESS;
         } 
     }
 

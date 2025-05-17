@@ -219,6 +219,13 @@ static inline void l_dump(list_t *l, void (*pf)(const char *fmt, ...)) {
 fernos_error_t l_push_back_all(list_t *l, list_t *s);
 
 /**
+ * Comparison helper for lists whos elements are pointers.
+ */
+static inline bool l_ptr_cmp(const void *o0, const void *o1) {
+    return *(void * const *)o0 == *(void * const *)o1;
+}
+
+/**
  * Remove element(s) from list `l` which match `ele`.
  *
  * `cmp` is used to compare elements in `l`.

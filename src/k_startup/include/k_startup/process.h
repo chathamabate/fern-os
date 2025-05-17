@@ -16,6 +16,13 @@ struct _process_t {
     allocator_t *al;
 
     /**
+     * If this is true, this is a zombie process, no threads are scheduled.
+     *
+     * Just waiting to be reaped!
+     */
+    bool exited;
+
+    /**
      * What exit status the process exited with.
      *
      * We shouldn't need an "exited" boolean field since all exited processes
