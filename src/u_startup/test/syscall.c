@@ -66,40 +66,27 @@ static bool test_simple_signal(void) {
 
     if (cpid == FOS_MAX_PROCS) {
         // In the child!
-        sig_vector_t csv = (1 << 3) | (1 << 5);
+        sig_vector_t csv = (1 << 4);
 
         sc_signal_allow(csv);
 
-        sc_term_put_s("Waiting for 3 or 5\n");
+        err = sc_signal(FOS_MAX_PROCS, 3);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         err = sc_signal_wait(csv, &sid);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
-        TEST_EQUAL_UINT(3, sid);
-
-        sc_term_put_s("Sending 4\n");
-
-        err = sc_signal(FOS_MAX_PROCS, 4);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
-        sc_term_put_s("Waiting for 3 or 5\n");
-
-        err = sc_signal_wait(csv, &sid);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
-        TEST_EQUAL_UINT(5, sid);
+        TEST_EQUAL_UINT(4, sid);
 
         sc_proc_exit(PROC_ES_SUCCESS);
     }
 
     // In the parent process!
 
-    err = sc_signal(cpid, 3);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
     err = sc_signal_wait(full_sig_vector(), &sid);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
-    TEST_EQUAL_UINT(4, sid);
+    TEST_EQUAL_UINT(3, sid);
 
-    err = sc_signal(cpid, 5);
+    err = sc_signal(cpid, 4);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     err = sc_signal_wait((1 << FSIG_CHLD), NULL);
@@ -199,7 +186,43 @@ static bool test_complex_fork0(void) {
 }
 
 static bool test_complex_fork1(void) {
-    // Could we actually send some signals now... wouldn't that be cool???
+    // root -> proc0 -> proc1 -> proc2
+    // proc1 signals proc2, they all exit due to a FSIG_CHLD chain.
+    // root reaps 3 processes.
+
+    fernos_error_t err;
+
+    sig_vector_t tmp = (1 << 3) | (1 << 4) | (1 << FSIG_CHLD);
+
+    sc_signal_allow(tmp);
+    sig_vector_t old = sc_signal_allow(full_sig_vector());
+
+    // Confirm the swap mechanism works correctly.
+    TEST_EQUAL_HEX(tmp, old);
+
+    proc_id_t cpid;
+
+    err = sc_proc_fork(&cpid);
+
+    // This is lowkey very hard to test well tbh...
+
+    if (err != FOS_SUCCESS) {
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    if (cpid == FOS_MAX_PROCS) {
+        err = sc_proc_fork(&cpid);
+
+        if (err != FOS_SUCCESS) {
+            sc_term_put_s("Child failure\n");
+            while (1);
+        }
+
+        if (cpid == FOS_MAX_PROCS) {
+
+        }
+    }
+
     TEST_SUCCEED();
 }
 

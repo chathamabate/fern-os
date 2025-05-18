@@ -507,6 +507,8 @@ fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
+    sig_vector_t old = proc->sig_allow;
+
     proc->sig_allow = sv;
 
     // Are there pending signals which are not allowed??
@@ -514,7 +516,7 @@ fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
         return ks_exit_proc_p(ks, proc, PROC_ES_SIGNAL);
     }
 
-    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+    DUAL_RET(thr, old, FOS_SUCCESS);
 }
 
 fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid) {

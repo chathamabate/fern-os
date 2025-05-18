@@ -101,8 +101,10 @@ fernos_error_t sc_signal(proc_id_t pid, sig_id_t sid);
  * Set bits in this vector represent signals which will NOT kill the process when received.
  *
  * NOTE: If there are pending signals which the new vector does not allow, the process will exit!
+ *
+ * Returns the old value of the signal vector.
  */
-void sc_signal_allow(sig_vector_t sv);
+sig_vector_t sc_signal_allow(sig_vector_t sv);
 
 /**
  * Sleeps the cureent thread until any of the signals described in sv are receieved.

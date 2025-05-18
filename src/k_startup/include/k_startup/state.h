@@ -199,7 +199,8 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcp
 fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid);
 
 /** 
- * Set the current process's signal allow vector.
+ * Set the current process's signal allow vector. Returns old signal vector value in the 
+ * current thread.
  *
  * NOTE: If there are pending signals which the new vector does not allow, the process will exit!
  */

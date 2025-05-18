@@ -21,8 +21,8 @@ fernos_error_t sc_signal(proc_id_t pid, sig_id_t sid) {
     return (fernos_error_t)trigger_syscall(SCID_SIGNAL, (uint32_t)pid, (uint32_t)sid, 0, 0);
 }
 
-void sc_signal_allow(sig_vector_t sv) {
-    (void)trigger_syscall(SCID_SIGNAL_ALLOW, (uint32_t)sv, 0, 0, 0);
+sig_vector_t sc_signal_allow(sig_vector_t sv) {
+    return  (sig_vector_t)trigger_syscall(SCID_SIGNAL_ALLOW, (uint32_t)sv, 0, 0, 0);
 }
 
 fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid) {
