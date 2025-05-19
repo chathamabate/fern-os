@@ -8,6 +8,21 @@
 
 #include "s_util/test.h"
 
+static fernos_error_t reap_single(proc_id_t *rcpid, proc_exit_status_t *rces) {
+    fernos_error_t err;
+    while (1) {
+        err = sc_proc_reap(FOS_MAX_PROCS, rcpid, rces);
+        if (err != FOS_EMPTY) {
+            return err;
+        }
+
+        err = sc_signal_wait((1 << FSIG_CHLD), NULL);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+}
+
 static bool test_simple_fork(void) {
     fernos_error_t err;
 
@@ -16,29 +31,21 @@ static bool test_simple_fork(void) {
     sc_signal_allow((1 << FSIG_CHLD));
 
     err = sc_proc_fork(&cpid);
-
-    if (err != FOS_SUCCESS) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
-    }
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     if (cpid == FOS_MAX_PROCS) {
         // We are in the child process!
         sc_proc_exit(PROC_ES_SUCCESS); 
     }
 
-    // Now let's wait on the child process to exit!
-    err = sc_signal_wait((1 << FSIG_CHLD), NULL);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
     proc_id_t rcpid;
     proc_exit_status_t rces;
 
-    err = sc_proc_reap(FOS_MAX_PROCS, &rcpid, &rces);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
+    err = reap_single(&rcpid, &rces);
     TEST_EQUAL_HEX(cpid, rcpid);
     TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
 
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
     TEST_SUCCEED();
 }
 
@@ -58,9 +65,7 @@ static bool test_simple_signal(void) {
     proc_id_t cpid;
 
     err = sc_proc_fork(&cpid);
-    if (err != FOS_SUCCESS) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
-    }
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     sig_id_t sid;
 
@@ -89,14 +94,53 @@ static bool test_simple_signal(void) {
     err = sc_signal(cpid, 4);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    err = sc_signal_wait((1 << FSIG_CHLD), NULL);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
     proc_exit_status_t rces;
-    err = sc_proc_reap(cpid, NULL, &rces);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    err = reap_single(NULL, &rces);
     TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
 
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_SUCCEED();
+}
+
+static bool test_signal_allow_exit(void) {
+    // This tests the case where we initially allow all signals, then switch to a more conservative
+    // allow vector. A process should always exit if there are pending signals which are no longer
+    // allowed.
+
+    fernos_error_t err;
+
+    sc_signal_allow(full_sig_vector()); // allow all signals.
+
+    proc_id_t cpid;
+    err = sc_proc_fork(&cpid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    if (cpid == FOS_MAX_PROCS) {
+        sc_signal_allow(full_sig_vector()); 
+        // Allow all signals in the child!
+
+        err = sc_signal(FOS_MAX_PROCS, 4);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        // Wait for the parent to send a 5.
+        err = sc_signal_wait((1 << 5), NULL);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        sc_signal_allow(empty_sig_vector());
+
+        while (1);
+    }
+
+    err = sc_signal_wait((1 << 4), NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_signal(cpid, 4);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_signal(cpid, 5);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    
     TEST_SUCCEED();
 }
 
@@ -124,17 +168,12 @@ static bool test_complex_fork0(void) {
     proc_id_t cpids[3];
 
     err = sc_proc_fork(&(cpids[0]));
-    if (err != FOS_SUCCESS) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
-    }
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     if (cpids[0] == FOS_MAX_PROCS) {
 
         err = sc_proc_fork(&(cpids[1]));
-        if (err != FOS_SUCCESS) {
-            sc_term_put_s("Child Failure\n");
-            sc_proc_exit(PROC_ES_FAILURE);
-        }
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         if (cpids[1] == FOS_MAX_PROCS) {
             // inside proc1.
@@ -143,10 +182,7 @@ static bool test_complex_fork0(void) {
         }
 
         err = sc_proc_fork(&(cpids[2]));
-        if (err != FOS_SUCCESS) {
-            sc_term_put_s("Child Failure\n");
-            sc_proc_exit(PROC_ES_FAILURE);
-        }
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         if (cpids[2] == FOS_MAX_PROCS) {
             // inside proc2
@@ -202,28 +238,45 @@ static bool test_complex_fork1(void) {
 
     proc_id_t cpid;
 
-    err = sc_proc_fork(&cpid);
+    int i;
 
-    // This is lowkey very hard to test well tbh...
-
-    if (err != FOS_SUCCESS) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
-    }
-
-    if (cpid == FOS_MAX_PROCS) {
+    for (i = 0; i < 3; i++) {
         err = sc_proc_fork(&cpid);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-        if (err != FOS_SUCCESS) {
-            sc_term_put_s("Child failure\n");
-            while (1);
-        }
-
-        if (cpid == FOS_MAX_PROCS) {
-
+        if (cpid != FOS_MAX_PROCS) {
+            break;
         }
     }
 
-    TEST_SUCCEED();
+    if (i == 2) {
+        // Kill child 3 with an arbitrary signal.
+        err = sc_signal(cpid, 1 << 4);
+        if (err != FOS_SUCCESS) {
+            sc_term_put_s("Signal Error\n");
+        }
+        while (1);
+    } else if (i == 0) {
+        int reaped = 0;
+        while (reaped < 3) {
+            err = sc_proc_reap(FOS_MAX_PROCS, NULL, NULL);
+            if (err == FOS_EMPTY) {
+                err = sc_signal_wait((1 << FSIG_CHLD), NULL); 
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            } else {
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                reaped++;
+            } 
+        }
+
+        TEST_SUCCEED();
+    } else {
+        while (1);
+    }
+}
+
+static bool test_complex_fork2(void) {
+
 }
 
 bool test_syscall(void) {
@@ -231,6 +284,7 @@ bool test_syscall(void) {
 
     RUN_TEST(test_simple_fork);
     RUN_TEST(test_simple_signal);
+    RUN_TEST(test_signal_allow_exit);
     RUN_TEST(test_complex_fork0);
     RUN_TEST(test_complex_fork1);
     
