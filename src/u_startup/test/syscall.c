@@ -266,7 +266,81 @@ static bool test_complex_fork1(void) {
 }
 
 static bool test_complex_fork2(void) {
+    // root -> proc  --*--> proc0
+    //                 *--> proc1
+    //                 *--> proc2
 
+    // proc1 signals proc0 to die.
+    // proc reaps proc0, signals proc1 and proc2, then exits.
+    // root reaps proc1, proc2, and proc.
+
+    sc_signal_allow(full_sig_vector());
+
+    fernos_error_t err;
+    proc_id_t cpid;
+
+    err = sc_proc_fork(&cpid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    if (cpid == FOS_MAX_PROCS) {
+        sc_signal_allow(1 << FSIG_CHLD);
+
+        proc_id_t cpids[3];
+
+        int i;
+        for (i = 0; i < 3; i++) {
+            err = sc_proc_fork(&(cpids[i]));
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            if (cpids[i] == FOS_MAX_PROCS) {
+                break;
+            }
+        }
+
+        if (i == 3) {
+            // proc.
+            sc_signal_allow(1 << FSIG_CHLD);
+
+            proc_id_t rcpid;
+            err = reap_single(&rcpid, NULL);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(cpids[0], rcpid);
+
+            err = sc_signal(cpids[1], 4);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            err = sc_signal(cpids[2], 4);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            sc_proc_exit(PROC_ES_SUCCESS);
+        } 
+
+        if (cpids[0] == FOS_MAX_PROCS) {
+            // proc0
+            while (1);
+        }
+
+        if (cpids[1] == FOS_MAX_PROCS) {
+            // proc1
+            err = sc_signal(cpids[0], 4);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            while (1);
+        }
+
+        if (cpids[2] == FOS_MAX_PROCS) {
+            // proc2
+            while (1);
+        }
+    }
+
+    for (int i = 0; i < 3; i++) {
+        // reap proc, proc1, and proc2
+        err = reap_single(NULL, NULL);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    TEST_SUCCEED();
 }
 
 bool test_syscall(void) {
@@ -277,6 +351,7 @@ bool test_syscall(void) {
     RUN_TEST(test_signal_allow_exit);
     RUN_TEST(test_complex_fork0);
     RUN_TEST(test_complex_fork1);
+    RUN_TEST(test_complex_fork2);
     
     return END_SUITE();
 }
