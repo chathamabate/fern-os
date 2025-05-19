@@ -408,6 +408,112 @@ static bool test_complex_fork2(void) {
     TEST_SUCCEED();
 }
 
+/* Multithreading Tests */
+
+/**
+ * Sleep for a little bit, and return the argument multiplied by 10.
+ */
+static void *example_worker0(void *arg) {
+    uint32_t uint_arg = (uint32_t)arg;
+    sc_thread_sleep(4);
+    return (void *)(uint_arg * 10);
+}
+
+/**
+ * Spawn 2 worker0 threads, join on them, return their sum.
+ * Pass arg to both created threads!
+ */
+#define WORKER1_SUB_WORKERS (2)
+static void *example_worker1(void *arg) {
+    fernos_error_t err; 
+
+    thread_id_t tids[WORKER1_SUB_WORKERS];
+    for (uint32_t i = 0; i < WORKER1_SUB_WORKERS; i++) {
+        err = sc_thread_spawn(&(tids[i]), example_worker0, arg);
+        if (err != FOS_SUCCESS) {
+            return (void *)(~0U);
+        }
+    }
+
+
+    uint32_t sum = 0;
+    uint32_t ret_val;
+
+    for (uint32_t i = 0; i < WORKER1_SUB_WORKERS; i++) {
+        err = sc_thread_join(1 << tids[i], NULL, (void **)&ret_val);
+        if (err != FOS_SUCCESS) {
+            return (void *)(~0U);
+        }
+        sum += ret_val;
+    }
+
+    return (void *)sum;
+}
+
+static bool test_thread_join0(void) {
+
+    // Maybe like spawn 5 workers, then join them?
+    // Make sure their answers all make sense?
+
+    fernos_error_t err;
+    join_vector_t jv;
+
+    thread_id_t tids[5];
+    for (uint32_t i = 0; i < 5; i++) {
+        err = sc_thread_spawn(&(tids[i]), example_worker0, (void *)i);    
+        TEST_TRUE(tids[i] < FOS_MAX_THREADS_PER_PROC);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Maybe try joining 3 and then 2 just to jazz things up a bit.
+
+    jv = (1 << tids[0]) | (1 << tids[1]) | (1 << tids[2]);
+
+    thread_id_t joined;
+    uint32_t ret_val;
+
+    for (uint32_t i = 0; i < 3; i++) {
+        err = sc_thread_join(jv, &joined, (void **)&ret_val);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        // Confirmed the joined tid is tids[0], tids[1], or tids[2]
+
+        bool confirmed = false;
+        for (uint32_t j = 0; j < 3; j++) {
+            if (joined == tids[j]) {
+                TEST_EQUAL_UINT(10 * j, ret_val);
+                confirmed = true;
+
+                tids[j] = FOS_MAX_THREADS_PER_PROC;
+            }
+        }
+        TEST_TRUE(confirmed);
+    }
+
+    jv = full_join_vector(); // Any threads.
+    for (uint32_t i = 0; i < 2; i++) {
+        err = sc_thread_join(jv, &joined, (void **)&ret_val);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        if (joined == tids[3]) {
+            TEST_EQUAL_UINT(10 * 3, ret_val);
+            tids[3] = FOS_MAX_THREADS_PER_PROC;
+        } else if (joined == tids[4]) {
+            TEST_EQUAL_UINT(10 * 4, ret_val);
+            tids[4] = FOS_MAX_THREADS_PER_PROC;
+        } else {
+            TEST_FAIL();
+        }
+    }
+    
+    TEST_SUCCEED();
+}
+
+static bool test_thread_join1(void) {
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall(void) {
     BEGIN_SUITE("Syscall");
 
@@ -418,6 +524,10 @@ bool test_syscall(void) {
     RUN_TEST(test_complex_fork0);
     RUN_TEST(test_complex_fork1);
     RUN_TEST(test_complex_fork2);
+
+    // Threading tests
+
+    RUN_TEST(test_thread_join0);
     
     return END_SUITE();
 }
