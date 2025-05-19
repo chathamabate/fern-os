@@ -49,7 +49,7 @@ static bool test_simple_fork(void) {
     TEST_SUCCEED();
 }
 
-static bool test_simple_signal(void) {
+static bool test_simple_signal0(void) {
     fernos_error_t err;
 
     sc_signal_allow(full_sig_vector());
@@ -99,6 +99,51 @@ static bool test_simple_signal(void) {
     TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
 
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_SUCCEED();
+}
+
+static bool test_simple_signal1(void) {
+    // root --> proc
+
+    fernos_error_t err;
+    proc_id_t cpid;
+
+    // Allow all signals to start.
+    sc_signal_allow(full_sig_vector());
+
+    err = sc_proc_fork(&cpid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    if (cpid == FOS_MAX_PROCS) {
+        // Send 4,5,6 to the root, then exit.
+        for (sig_id_t sid = 4; sid <= 6; sid++) {
+            err = sc_signal(FOS_MAX_PROCS, sid);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        }
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    sig_id_t rsid0;
+
+    err = sc_signal_wait((1 << 4) | (1 << 6), &rsid0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_TRUE(rsid0 == 4 || rsid0 == 6);
+
+    sig_id_t rsid1;
+
+    err = sc_signal_wait((1 << 4) | (1 << 6), &rsid1);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_TRUE(rsid0 == 4 ? rsid1 == 6 : rsid1 == 4);
+
+    sig_id_t final_rsid;
+    err = sc_signal_wait((1 << 5), &final_rsid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(5, final_rsid);
+
+    err = reap_single(NULL, NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
     TEST_SUCCEED();
 }
 
@@ -347,7 +392,8 @@ bool test_syscall(void) {
     BEGIN_SUITE("Syscall");
 
     RUN_TEST(test_simple_fork);
-    RUN_TEST(test_simple_signal);
+    RUN_TEST(test_simple_signal0);
+    RUN_TEST(test_simple_signal1);
     RUN_TEST(test_signal_allow_exit);
     RUN_TEST(test_complex_fork0);
     RUN_TEST(test_complex_fork1);
