@@ -137,9 +137,15 @@ static bool test_signal_allow_exit(void) {
     err = sc_signal(cpid, 4);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+    // After signaling 5, the child process should disallow all signals. However, at this point
+    // there should be a pending 4... Exiting the child process.
     err = sc_signal(cpid, 5);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
+    
+    proc_exit_status_t rces;
+    err = reap_single(NULL, &rces);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(PROC_ES_SIGNAL, rces);
     
     TEST_SUCCEED();
 }
@@ -198,24 +204,15 @@ static bool test_complex_fork0(void) {
 
     // Inside root procs.
 
-    size_t reaped = 0;
+    proc_id_t rcpid;
+    proc_exit_status_t rces;
+    for (int i = 0; i < 3; i++) {
+        err = reap_single(&rcpid, &rces);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    while (reaped < 3) {
-        proc_id_t rcpid;
-        proc_exit_status_t rces;
-
-        err = sc_proc_reap(FOS_MAX_PROCS, &rcpid, &rces);
-        if (err == FOS_EMPTY) {
-            err = sc_signal_wait((1 << FSIG_CHLD), NULL); 
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
-        } else {
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
-            reaped++;
-
-            if (rcpid == cpids[0]) {
-                TEST_EQUAL_HEX(PROC_ES_SIGNAL, rces);
-            }
-        } 
+        if (rcpid == cpids[0]) {
+            TEST_EQUAL_HEX(PROC_ES_SIGNAL, rces);
+        }
     }
 
     TEST_SUCCEED();
@@ -257,16 +254,9 @@ static bool test_complex_fork1(void) {
         }
         while (1);
     } else if (i == 0) {
-        int reaped = 0;
-        while (reaped < 3) {
-            err = sc_proc_reap(FOS_MAX_PROCS, NULL, NULL);
-            if (err == FOS_EMPTY) {
-                err = sc_signal_wait((1 << FSIG_CHLD), NULL); 
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
-            } else {
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
-                reaped++;
-            } 
+        for (int i = 0; i < 3; i++) {
+            err = reap_single(NULL, NULL);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
         }
 
         TEST_SUCCEED();
