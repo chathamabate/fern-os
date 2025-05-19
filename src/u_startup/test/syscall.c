@@ -38,14 +38,29 @@ static bool test_simple_fork(void) {
         sc_proc_exit(PROC_ES_SUCCESS); 
     }
 
+
+    // Reaping a non-existent process!
+    err = sc_proc_reap(12345, NULL, NULL);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    // Reaping a spceific child process!
+
     proc_id_t rcpid;
     proc_exit_status_t rces;
 
-    err = reap_single(&rcpid, &rces);
+    while (1) {
+        err = sc_proc_reap(cpid, &rcpid, &rces);
+        if (err == FOS_SUCCESS) {
+            break;
+        }
+
+        err = sc_signal_wait((1 << FSIG_CHLD), NULL);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
     TEST_EQUAL_HEX(cpid, rcpid);
     TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
 
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
     TEST_SUCCEED();
 }
 
@@ -110,6 +125,12 @@ static bool test_simple_signal1(void) {
 
     // Allow all signals to start.
     sc_signal_allow(full_sig_vector());
+
+    err = sc_signal(1234, 1);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = sc_signal(FOS_MAX_PROCS, 1);
+    TEST_TRUE(err != FOS_SUCCESS);
 
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -294,9 +315,8 @@ static bool test_complex_fork1(void) {
     if (i == 2) {
         // Kill child 3 with an arbitrary signal.
         err = sc_signal(cpid, 1 << 4);
-        if (err != FOS_SUCCESS) {
-            sc_term_put_s("Signal Error\n");
-        }
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
         while (1);
     } else if (i == 0) {
         for (int i = 0; i < 3; i++) {
