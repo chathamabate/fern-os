@@ -419,6 +419,64 @@ static void *example_worker0(void *arg) {
     return (void *)(uint_arg * 10);
 }
 
+static bool test_thread_join0(void) {
+
+    // Maybe like spawn 5 workers, then join them?
+    // Make sure their answers all make sense?
+
+    fernos_error_t err;
+    join_vector_t jv;
+
+    thread_id_t tids[5];
+    for (uint32_t i = 0; i < 5; i++) {
+        err = sc_thread_spawn(&(tids[i]), example_worker0, (void *)i);    
+        TEST_TRUE(tids[i] < FOS_MAX_THREADS_PER_PROC);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Maybe try joining 3 and then 2 just to jazz things up a bit.
+
+    jv = (1 << tids[0]) | (1 << tids[1]) | (1 << tids[2]);
+
+    thread_id_t joined;
+    uint32_t ret_val;
+
+    for (uint32_t i = 0; i < 3; i++) {
+        err = sc_thread_join(jv, &joined, (void **)&ret_val);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        // Confirmed the joined tid is tids[0], tids[1], or tids[2]
+
+        uint32_t j;
+        for (j = 0; j < 3; j++) {
+            if (joined == tids[j]) {
+                TEST_EQUAL_UINT(10 * j, ret_val);
+                tids[j] = FOS_MAX_THREADS_PER_PROC;
+                break;
+            }
+        }
+        TEST_TRUE(j < 3);
+    }
+
+    jv = full_join_vector(); // Any threads.
+    for (uint32_t i = 0; i < 2; i++) {
+        err = sc_thread_join(jv, &joined, (void **)&ret_val);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        if (joined == tids[3]) {
+            TEST_EQUAL_UINT(10 * 3, ret_val);
+            tids[3] = FOS_MAX_THREADS_PER_PROC;
+        } else if (joined == tids[4]) {
+            TEST_EQUAL_UINT(10 * 4, ret_val);
+            tids[4] = FOS_MAX_THREADS_PER_PROC;
+        } else {
+            TEST_FAIL();
+        }
+    }
+    
+    TEST_SUCCEED();
+}
+
 /**
  * Spawn 2 worker0 threads, join on them, return their sum.
  * Pass arg to both created threads!
@@ -450,66 +508,121 @@ static void *example_worker1(void *arg) {
     return (void *)sum;
 }
 
-static bool test_thread_join0(void) {
 
-    // Maybe like spawn 5 workers, then join them?
-    // Make sure their answers all make sense?
-
+static bool test_thread_join1(void) {
     fernos_error_t err;
-    join_vector_t jv;
 
-    thread_id_t tids[5];
-    for (uint32_t i = 0; i < 5; i++) {
-        err = sc_thread_spawn(&(tids[i]), example_worker0, (void *)i);    
-        TEST_TRUE(tids[i] < FOS_MAX_THREADS_PER_PROC);
+    thread_id_t tids[4];
+    const size_t workers = sizeof(tids) / sizeof(tids[0]);
+
+    join_vector_t jv = empty_join_vector();
+
+    for (uint32_t i = 0; i < workers; i++) {
+        err = sc_thread_spawn(&(tids[i]), example_worker1, (void *)i);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        jv_add_tid(&jv, tids[i]);
     }
 
-    // Maybe try joining 3 and then 2 just to jazz things up a bit.
+    for (uint32_t i = 0; i < workers; i++) {
+        thread_id_t joined; 
+        uint32_t ret_val;
 
-    jv = (1 << tids[0]) | (1 << tids[1]) | (1 << tids[2]);
-
-    thread_id_t joined;
-    uint32_t ret_val;
-
-    for (uint32_t i = 0; i < 3; i++) {
         err = sc_thread_join(jv, &joined, (void **)&ret_val);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-        // Confirmed the joined tid is tids[0], tids[1], or tids[2]
-
-        bool confirmed = false;
-        for (uint32_t j = 0; j < 3; j++) {
-            if (joined == tids[j]) {
-                TEST_EQUAL_UINT(10 * j, ret_val);
-                confirmed = true;
-
+        uint32_t j;
+        for (j = 0; j < workers; j++) {
+            if (tids[j] == joined) {
+                TEST_EQUAL_UINT(j * WORKER1_SUB_WORKERS * 10, ret_val);
                 tids[j] = FOS_MAX_THREADS_PER_PROC;
+                break;
             }
         }
-        TEST_TRUE(confirmed);
+
+        TEST_TRUE(j < workers);
     }
 
-    jv = full_join_vector(); // Any threads.
-    for (uint32_t i = 0; i < 2; i++) {
-        err = sc_thread_join(jv, &joined, (void **)&ret_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
-        if (joined == tids[3]) {
-            TEST_EQUAL_UINT(10 * 3, ret_val);
-            tids[3] = FOS_MAX_THREADS_PER_PROC;
-        } else if (joined == tids[4]) {
-            TEST_EQUAL_UINT(10 * 4, ret_val);
-            tids[4] = FOS_MAX_THREADS_PER_PROC;
-        } else {
-            TEST_FAIL();
-        }
-    }
-    
     TEST_SUCCEED();
 }
 
-static bool test_thread_join1(void) {
+/*
+ * Builtin sync function description for reference:
+ *
+ * type __sync_val_compare_and_swap (type *ptr, type oldval, type newval, ...)
+ * These builtins perform an atomic compare and swap. 
+ * That is, if the current value of *ptr is oldval, then write newval into *ptr.
+ *
+ * The “bool” version returns true if the comparison is successful and newval was written. 
+ * The “val” version returns the contents of *ptr before the operation.
+ */
+
+/**
+ * Here are some states which will make testing a little easier.
+ */
+static futex_t fut;
+static uint32_t number;
+
+/**
+ * The argument should be a futex. We expect the futex has value 0.
+ */
+#define TEST_FUTEX0_WORKER_FLIPS (3)
+static void *test_futex0_worker(void *arg) {
+    (void)arg;
+
+    fernos_error_t err;
+    uint32_t flips = 0;
+
+    while (flips < TEST_FUTEX0_WORKER_FLIPS) {
+        uint32_t old_val =  __sync_val_compare_and_swap(&number, 0, 1);
+
+        if (old_val == 0) { // We acquired number!
+            sc_thread_sleep(1); // Do "Work"
+            flips++;
+            __sync_val_compare_and_swap(&number, 1, 0); // Unlock number.
+            err = sc_futex_wake(&fut, false); // Waking 1 should be ok here.
+            if (err != FOS_SUCCESS) {
+                return (void *)1;
+            }
+
+        } else { // other thread is using number.
+            err = sc_futex_wait(&fut, 1);
+            if (err != FOS_SUCCESS) {
+                return (void *)2;
+            }
+        }
+    }
+
+    return (void *)0;
+}
+
+static bool test_futex0(void) {
+    fernos_error_t err;
+
+    err = sc_futex_register(NULL);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = sc_futex_register(&fut);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_futex_register(&fut);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    const uint32_t workers = 4;
+
+    for (uint32_t i = 0; i < workers; i++) {
+        err = sc_thread_spawn(NULL, test_futex0_worker, NULL);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    for (uint32_t i = 0; i < workers; i++) {
+        uint32_t ret_val;
+        err = sc_thread_join(full_join_vector(), NULL, (void **)&ret_val);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_UINT(0, ret_val);
+    }
+
+    sc_futex_deregister(&fut);
 
     TEST_SUCCEED();
 }
@@ -528,6 +641,8 @@ bool test_syscall(void) {
     // Threading tests
 
     RUN_TEST(test_thread_join0);
+    RUN_TEST(test_thread_join1);
+    RUN_TEST(test_futex0);
     
     return END_SUITE();
 }
