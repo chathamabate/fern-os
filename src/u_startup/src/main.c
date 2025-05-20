@@ -11,7 +11,7 @@
 void *user_main(void *arg) {
     (void)arg;
 
-    test_mutex();
+    test_syscall();
 
     return (void *)PROC_ES_SUCCESS;
 }
