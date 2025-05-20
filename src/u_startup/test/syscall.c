@@ -687,8 +687,59 @@ static bool test_futex_early_destruct(void) {
     TEST_SUCCEED();
 }
 
-// Might just have rest of futex testing be implicitly handled by the mutex tests.
-// Not the best design, but whatevs...
+
+#define TEST_FORK_AND_THREAD_WORKER_ITERS (5)
+static void *test_fork_and_thread_worker(void *arg) {
+    (void)arg;
+
+    for (int i = 0; i < TEST_FORK_AND_THREAD_WORKER_ITERS; i++) {
+        number++;
+        sc_thread_sleep(1);
+    }
+
+    return NULL;
+}
+
+static bool test_fork_and_thread(void) {
+    fernos_error_t err;
+
+    sc_signal_allow((1 << FSIG_CHLD));
+
+    thread_id_t tids[4];
+    const uint32_t workers = sizeof(tids) / sizeof(tids[0]);
+
+    number = 0;
+
+    for (uint32_t i = 0; i < workers; i++) {
+        err = sc_thread_spawn(&(tids[i]), test_fork_and_thread_worker, NULL);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    proc_id_t cpid;
+    err = sc_proc_fork(&cpid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    if (cpid == FOS_MAX_PROCS) {
+        // The point is that in our child process, none of the spawned workers should be duplicated.
+        // We should be able to modify the number freely without any race conditions.
+        number = 0;
+        test_fork_and_thread_worker(NULL);
+        TEST_EQUAL_UINT(TEST_FORK_AND_THREAD_WORKER_ITERS, number);
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    for (uint32_t i = 0; i < workers; i++) {
+        err = sc_thread_join(full_join_vector(), NULL, NULL); 
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    proc_exit_status_t rces;
+    err = reap_single(NULL, &rces);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
+
+    TEST_SUCCEED();
+}
 
 bool test_syscall(void) {
     BEGIN_SUITE("Syscall");
@@ -707,6 +758,7 @@ bool test_syscall(void) {
     RUN_TEST(test_thread_join1);
     RUN_TEST(test_futex0);
     RUN_TEST(test_futex_early_destruct);
+    RUN_TEST(test_fork_and_thread);
     
     return END_SUITE();
 }
