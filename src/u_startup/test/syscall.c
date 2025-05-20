@@ -627,6 +627,9 @@ static bool test_futex0(void) {
     TEST_SUCCEED();
 }
 
+// Might just have rest of futex testing be implicitly handled by the mutex tests.
+// Not the best design, but whatevs...
+
 bool test_syscall(void) {
     BEGIN_SUITE("Syscall");
 
