@@ -9,7 +9,7 @@
 #include "u_concur/test/mutex.h"
 
 proc_exit_status_t user_main(void) {
-    test_syscall();
+    // Your code here.
 
     return PROC_ES_SUCCESS;
 }
