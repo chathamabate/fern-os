@@ -6,8 +6,8 @@ My own 32-bit x86 operating system!
 
 Right now, FernOS is just a kernel. There is no shell/UI. 
 
-To run code, edit `src/u_startup/main.c`. This file contains the main function of the first
-and only user process spawned automatically by FernOS.
+To run code, edit `src/u_startup/main.c`. This file contains the main function of the first 
+user process.
 
 To create more processes and perform other system operations, 
 see `src/u_startup/include/u_startup/syscall.h`.
