@@ -88,7 +88,8 @@ static fernos_error_t init_kernel_state(void) {
     kernel->root_proc = proc;
     idtb_set(kernel->proc_table, pid, proc);
 
-    thread_t *thr = proc_new_thread(kernel->root_proc, user_main, NULL);
+    thread_t *thr = proc_new_thread(kernel->root_proc, 
+            (thread_entry_t)user_main, NULL);
     if (!thr) {
         return FOS_UNKNWON_ERROR;
     }

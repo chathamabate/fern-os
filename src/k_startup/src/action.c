@@ -198,7 +198,8 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         break;
 
     default:
-        err = FOS_BAD_ARGS;
+        kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
+        err = FOS_SUCCESS;
         break;
     }
 

@@ -8,11 +8,8 @@
 #include "u_startup/test/syscall.h"
 #include "u_concur/test/mutex.h"
 
-
-void *user_main(void *arg) {
-    (void)arg;
-
+proc_exit_status_t user_main(void) {
     test_syscall();
 
-    return (void *)PROC_ES_SUCCESS;
+    return PROC_ES_SUCCESS;
 }

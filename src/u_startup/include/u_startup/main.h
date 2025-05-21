@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "s_bridge/shared_defs.h"
 
 /**
  * When a new thread is created, this entry routine is what is first run.
@@ -16,5 +17,5 @@ void thread_entry_routine(void);
 /**
  * Entry point for the first user process.
  */
-void *user_main(void *arg);
+proc_exit_status_t user_main(void);
 
