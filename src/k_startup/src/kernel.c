@@ -99,6 +99,7 @@ static fernos_error_t init_kernel_state(void) {
     // Now we are actually getting somewhere, we should be able to add the sleep queue now!
 
     return FOS_SUCCESS;
+
 }
 
 void start_kernel(void) {

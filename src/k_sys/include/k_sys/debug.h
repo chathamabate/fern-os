@@ -7,6 +7,7 @@
 uint32_t read_eflags(void);
 
 uint32_t read_cr0(void);
+uint32_t read_cr2(void);
 
 // Returns the value of the stack pointer
 // before this function is called.

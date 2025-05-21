@@ -52,6 +52,13 @@ struct _thread_t {
     thread_id_t tid;
 
     /**
+     * This keeps track of how much this thread's stack is allocated.
+     *
+     * It is your choice to use this or not, It is set to NULL initially.
+     */
+    void *stack_base;
+
+    /**
      * The process this thread executes out of.
      */
     process_t *proc;

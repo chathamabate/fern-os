@@ -14,6 +14,7 @@
 #include "k_startup/kernel.h"
 #include <stdint.h>
 #include "k_startup/state.h"
+#include "k_sys/debug.h"
 #include "s_data/wait_queue.h"
 #include "k_startup/thread.h"
 #include "k_startup/gdt.h"
@@ -93,7 +94,16 @@ void fos_pf_action(user_ctx_t *ctx) {
         lock_up();
     }
 
-    ks_exit_proc(kernel, PROC_ES_PF);
+    ks_save_ctx(kernel, ctx);
+
+    uint32_t cr2 = read_cr2();
+    void *new_base = (void *)ALIGN(cr2, M_4K);
+
+    fernos_error_t err = ks_expand_stack(kernel, new_base);
+    if (err != FOS_SUCCESS) {
+        ks_exit_proc(kernel, PROC_ES_PF);
+    }
+
     return_to_curr_thread();
 }
 

@@ -100,6 +100,44 @@ void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr) {
     thr->state = THREAD_STATE_DETATCHED;
 }
 
+fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base) {
+    fernos_error_t err;
+
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    if (!IS_ALIGNED(new_base, M_4K)) {
+        return FOS_ALIGN_ERROR;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    thread_id_t tid = thr->tid;
+
+    void *stack_start = (void *)FOS_THREAD_STACK_START(tid);
+    void *true_stack_start = (uint8_t *)stack_start + M_4K;
+    const void *stack_end = (const void *)FOS_THREAD_STACK_END(tid);
+
+    if (new_base < true_stack_start || stack_end <= new_base) {
+        return FOS_INVALID_INDEX; // Trying to access an address which isn't really on the stack.
+    }
+
+    if (thr->stack_base <= new_base) {
+        return FOS_SUCCESS;
+    }
+
+    const void *true_e;
+    err = pd_alloc_pages(thr->proc->pd, true, new_base, thr->stack_base, &true_e);
+
+    if (err != FOS_SUCCESS && err != FOS_ALREADY_ALLOCATED) {
+        return err;
+    }
+
+    thr->stack_base = new_base;
+
+    return FOS_SUCCESS;
+}
+
 fernos_error_t ks_tick(kernel_state_t *ks) {
     fernos_error_t err;
 

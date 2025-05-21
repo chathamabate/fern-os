@@ -13,6 +13,11 @@ read_cr0:
     movl %cr0, %eax
     ret
 
+.global read_cr2
+read_cr2:
+    movl %cr2, %eax
+    ret
+
 .global read_esp
 read_esp:
     leal 4(%esp), %eax

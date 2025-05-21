@@ -105,6 +105,17 @@ void ks_schedule_thread(kernel_state_t *ks, thread_t *thr);
 void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr);
 
 /**
+ * Attempts to expand the stack of the current thread.
+ *
+ * new_base must be 4K aligned!
+ *
+ * If the new base is not in the stack range of the current thread, an error is returned.
+ * If there are insufficient resources, an error is returned.
+ * If this area is already allocated on the thread stack, this call still succeeds.
+ */
+fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base);
+
+/**
  * This function advances the kernel's tick counter.
  *
  * (This also updates the sleep queue and schedule automatically)

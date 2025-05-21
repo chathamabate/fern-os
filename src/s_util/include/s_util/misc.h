@@ -19,6 +19,12 @@
 
 // Only work for powers of 2 alignments.
 #define IS_ALIGNED(val, align) (((unsigned int)(val) & ((align) - 1)) == 0)
+
+/**
+ * NOTE: THIS ROUNDS DOWN!
+ *
+ * Alignment must be a power of 2.
+ */
 #define ALIGN(val, align) ((unsigned int)(val) & ~((align) - 1))
 
 #define CHECK_ALIGN(val, align) \

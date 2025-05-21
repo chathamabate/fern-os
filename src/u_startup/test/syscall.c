@@ -102,7 +102,7 @@ static bool test_simple_signal0(void) {
 
     // In the parent process!
 
-    err = sc_signal_wait(full_sig_vector(), &sid);
+    err = sc_signal_wait((1 << 3), &sid);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
     TEST_EQUAL_UINT(3, sid);
 
@@ -741,6 +741,73 @@ static bool test_fork_and_thread(void) {
     TEST_SUCCEED();
 }
 
+/*
+ * The below stack pressure tests make sure that the page fault handler is actually doing 
+ * what it's supposed to.
+ */
+
+static void test_stack_pressure_func(int iters) {
+    if (iters == 0) {
+        return;
+    }
+
+    int i = 10 * 34;
+    i++;
+    number = i;
+    
+    test_stack_pressure_func(iters - 1);
+}
+
+static void *test_stack_pressure_worker(void *arg) {
+    (void)arg;
+
+    test_stack_pressure_func(3000);
+
+    return NULL;
+}
+
+static bool test_stack_pressure(void) {
+    fernos_error_t err;
+
+    const uint32_t trials = 2;
+    const uint32_t workers = 5;
+
+    for (uint32_t t = 0; t < trials; t++) {
+        for (uint32_t i = 0; i < workers; i++) {
+            err = sc_thread_spawn(NULL, test_stack_pressure_worker, NULL);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        }
+
+        for (uint32_t i = 0; i < workers; i++) {
+            err = sc_thread_join(full_join_vector(), NULL, NULL);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        }
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool test_fatal_stack_pressure(void) {
+    fernos_error_t err;
+
+    proc_id_t cpid;
+
+    err = sc_proc_fork(&cpid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    if (cpid == FOS_MAX_PROCS) {
+        // Overflow the stack!
+        test_stack_pressure_func(100000000); 
+    }
+
+    proc_exit_status_t rces;
+    err = reap_single(NULL, &rces);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(PROC_ES_PF, rces);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall(void) {
     BEGIN_SUITE("Syscall");
 
@@ -759,6 +826,11 @@ bool test_syscall(void) {
     RUN_TEST(test_futex0);
     RUN_TEST(test_futex_early_destruct);
     RUN_TEST(test_fork_and_thread);
+
+    // Stack pressure tests
+
+    RUN_TEST(test_stack_pressure);
+    RUN_TEST(test_fatal_stack_pressure);
     
     return END_SUITE();
 }

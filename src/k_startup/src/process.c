@@ -88,8 +88,9 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
 
     // Deciding not to use an iterator here because that technically mutates `proc`.
     for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC;  tid++) {
-        if (idtb_get(proc->thread_table, tid) && tid != thr->tid) {
-            void *s = (void *)FOS_THREAD_STACK_START(tid);
+        thread_t *parent_thread = idtb_get(proc->thread_table, tid);
+        if (parent_thread && tid != thr->tid) {
+            void *s = parent_thread->stack_base;
             const void *e = (const void *)FOS_THREAD_STACK_END(tid);
 
             // Free all stacks which aren't being used in the new process.
@@ -174,13 +175,21 @@ static thread_t *proc_new_thread_with_stack(process_t *proc,
     }
 
     const void *true_e;
-    uint8_t *tstack_end = (uint8_t *)FOS_THREAD_STACK_END(tid);
-    fernos_error_t err = pd_alloc_pages(proc->pd, true, tstack_end - (2*M_4K), tstack_end, &true_e);
+    
+    const void *tstack_end = (void *)FOS_THREAD_STACK_END(tid);
+    void *tstack_start = (void *)((uint8_t *)tstack_end - M_4K);
+
+    new_thr->stack_base = (void *)tstack_end;
+
+    fernos_error_t err = pd_alloc_pages(proc->pd, true, tstack_start, tstack_end, &true_e);
 
     if (err != FOS_SUCCESS && err != FOS_ALREADY_ALLOCATED) {
         delete_thread(new_thr);
         return NULL;
     }
+
+    // Only set the new stack base one the allocation succeeds. 
+    new_thr->stack_base = tstack_start;
 
     return new_thr;
 }
@@ -224,7 +233,7 @@ void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack) {
     thread_id_t tid = thr->tid;
 
     if (return_stack) {
-        void *tstack_start = (void *)FOS_THREAD_STACK_START(tid);
+        void *tstack_start = thr->stack_base;
         const void *tstack_end = (void *)FOS_THREAD_STACK_END(tid);
 
         // Free the whole stack.
