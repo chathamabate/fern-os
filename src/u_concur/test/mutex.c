@@ -10,7 +10,10 @@
 
 #include "s_util/test.h"
 
-// Mutex testing should be pretty simple tbh!
+/*
+ * Since a mutex is really just a futex under the hood, we don't need to
+ * do too much rigorous testing here.
+ */
 
 static mutex_t mut;
 static uint32_t number;
@@ -25,7 +28,11 @@ static void *test_many_workers_worker(void *arg) {
         err = mut_lock(&mut); 
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-        if (number & 1) { // odd.
+        bool odd = (number & 1) == 1;
+
+        sc_thread_sleep(1);
+
+        if (odd) { // odd.
             number++;
         } else { // even.
             number += 3;
@@ -43,6 +50,9 @@ static bool test_many_workers(void) {
 
     fernos_error_t err;
 
+    err = init_mutex(&mut);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
     const uint32_t workers = 10;
     for (uint32_t i = 0; i < workers; i++) {
         err = sc_thread_spawn(NULL, test_many_workers_worker, NULL);
@@ -54,9 +64,29 @@ static bool test_many_workers(void) {
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
     }
 
+    cleanup_mutex(&mut);
+
     uint32_t total_iters = workers * TEST_MANY_WORKERS_WORKER_ITERS;
 
     TEST_EQUAL_UINT(total_iters * 2, number);
+
+    TEST_SUCCEED();
+}
+
+static bool test_bad_unlock(void) {
+
+    fernos_error_t err;
+
+    err = init_mutex(&mut);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = init_mutex(&mut);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = mut_unlock(&mut);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    cleanup_mutex(&mut);
 
     TEST_SUCCEED();
 }
@@ -65,6 +95,7 @@ bool test_mutex(void) {
     BEGIN_SUITE("Mutex");
 
     RUN_TEST(test_many_workers);
+    RUN_TEST(test_bad_unlock);
 
     return END_SUITE();
 }
