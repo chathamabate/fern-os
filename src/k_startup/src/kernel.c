@@ -110,13 +110,19 @@ void start_kernel(void) {
     try_setup_step(init_idt(), "Failed to initialize IDT");
     try_setup_step(init_global_tss(), "Failed to initialize TSS");
 
-    set_gpf_action(fos_gpf_action);
+    // Put these in place so we can catch errors in the following setup steps.
+    set_gpf_action(fos_lock_up_action);
+    set_pf_action(fos_lock_up_action);
 
     try_setup_step(init_term(), "Failed to initialize Terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
 
     try_setup_step(init_kernel_state(), "Failed to setup kernel state");
+
+    // Now put in the real actions.
+    set_gpf_action(fos_gpf_action);
+    set_pf_action(fos_pf_action);
 
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);

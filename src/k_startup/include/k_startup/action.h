@@ -10,9 +10,21 @@
  */
 
 /**
+ * This is a simple action which prints out a message and locks up the kernel.
+ * It's purpose is to be used in the earlier stages of kernel setup to catch extremely fatal 
+ * errors.
+ */
+void fos_lock_up_action(user_ctx_t *ctx);
+
+/**
  * What should be done in the case of a general protection fault.
  */
 void fos_gpf_action(user_ctx_t *ctx);
+
+/**
+ * What should be done in case of a page fault.
+ */
+void fos_pf_action(user_ctx_t *ctx);
 
 /**
  * What should be done during a timer interrupt.

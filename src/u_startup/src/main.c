@@ -11,7 +11,7 @@
 void *user_main(void *arg) {
     (void)arg;
 
-    test_mutex();
+    *(uint32_t *)(0x0) = 100;
 
     return (void *)PROC_ES_SUCCESS;
 }

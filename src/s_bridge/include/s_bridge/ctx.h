@@ -117,6 +117,16 @@ void set_gpf_action(intr_action_t ia);
 void gpf_handler(void);
 
 /**
+ * Set the page fault action.
+ */
+void set_pf_action(intr_action_t ia);
+
+/**
+ * Page fault handler.
+ */
+void pf_handler(void);
+
+/**
  * When the timer handler is invoked by an interrupt, it saves the
  * current context on the interrupt stack, then calls a custom action
  * with a pointer to the context.

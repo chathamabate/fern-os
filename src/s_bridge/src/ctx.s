@@ -141,6 +141,13 @@ gpf_handler:
     pushl %esp
     call *gpf_action
 
+.global pf_handler
+pf_handler:
+    // No need to push 0 here, pf has a build in error code.
+    call enter_intr_ctx
+    pushl %esp
+    call *pf_action
+
 .global timer_handler
 timer_handler:
     pushl $0 // Timer has no error.

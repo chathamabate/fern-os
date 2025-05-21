@@ -69,13 +69,32 @@ static void return_to_curr_thread(void) {
     return_to_halt_context();
 }
 
-// A lot more to build up here, although, tbh, we aren't that far from
-// being done...
+void fos_lock_up_action(user_ctx_t *ctx) {
+    (void)ctx;
+    out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), "Lock Up Triggered");
+    lock_up();
+}
 
 void fos_gpf_action(user_ctx_t *ctx) {
-    (void)ctx;
-    out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), "GPF/Interrupt with no handler");
-    lock_up();
+    if (ctx->cr3 == get_kernel_pd()) { // Are we currently in the kernel?
+        out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
+                "Kernel Locking up in GPF Action");
+        lock_up();
+    }
+
+    ks_exit_proc(kernel, PROC_ES_GPF);
+    return_to_curr_thread();
+}
+
+void fos_pf_action(user_ctx_t *ctx) {
+    if (ctx->cr3 == get_kernel_pd()) {
+        out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
+                "Kernel Locking up in PF Action");
+        lock_up();
+    }
+
+    ks_exit_proc(kernel, PROC_ES_PF);
+    return_to_curr_thread();
 }
 
 void fos_timer_action(user_ctx_t *ctx) {
@@ -83,7 +102,8 @@ void fos_timer_action(user_ctx_t *ctx) {
     
     fernos_error_t err = ks_tick(kernel);
     if (err != FOS_SUCCESS) {
-        term_put_s("AHHHH\n");
+        out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
+                "Fatal timer error");
         lock_up();
     }
 

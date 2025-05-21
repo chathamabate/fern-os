@@ -12,6 +12,12 @@ void set_gpf_action(intr_action_t ia) {
     gpf_action = ia;
 }
 
+intr_action_t pf_action = NULL;
+
+void set_pf_action(intr_action_t ia) {
+    pf_action = ia;
+}
+
 intr_action_t timer_action = NULL;
 
 void set_timer_action(intr_action_t ta) {
