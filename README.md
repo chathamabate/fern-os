@@ -23,4 +23,8 @@ make qemu.bin
 make clean
 ```
 
+### Requirements
+
+The above `make` commands will only success if you have the `i686-elf-binutils` and `qemu`.
+
 
