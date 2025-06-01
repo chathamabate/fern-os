@@ -2,10 +2,27 @@
 #pragma once
 
 /*
- * ATA Notes
- *
- *
+ * Here are the register port values.
+ * (Using only the primary bus here)
  */
+
+#define ATA_BAR0 (0x1F0U)
+
+#define ATA_REG_DATA       (ATA_BAR0 + 0) // R/W
+#define ATA_REG_ERROR      (ATA_BAR0 + 1) // R
+#define ATA_REG_FEATURES   (ATA_BAR0 + 1) // W
+#define ATA_REG_SEC_COUNT  (ATA_BAR0 + 2) // R/W
+#define ATA_REG_LBA0       (ATA_BAR0 + 3) // R/W
+#define ATA_REG_LBA1       (ATA_BAR0 + 4) // R/W
+#define ATA_REG_LBA2       (ATA_BAR0 + 5) // R/W
+#define ATA_REG_DEV_HD     (ATA_BAR0 + 6) // R/W
+#define ATA_REG_STATUS     (ATA_BAR0 + 7) // R
+#define ATA_REG_COMMAND    (ATA_BAR0 + 7) // W
+
+#define ATA_BAR1 (0x3F4U)
+
+#define ATA_REG_ALT_STAT   (ATA_BAR1 + 2) // R
+#define ATA_REG_DEV_CTL    (ATA_BAR1 + 2) // W
 
 /*
  * Alt Status Register Masks.
@@ -51,7 +68,6 @@
 #define DEV_CTL_IEN_OFF (1)
 #define DEV_CTL_IEN_MASK (1UL << DEV_CTL_IEN_OFF)
 
-
 /*
  * Device/Head Register Masks.
  */
@@ -79,7 +95,6 @@
  * the error register value.
  */
 
-
 /* 
  * Some register definitions from the docs:
  *
@@ -95,5 +110,3 @@
  * This register shall be updated to reflect the media address of the error when a media access 
  * command is unsuccessfully completed.
  */
-
-
