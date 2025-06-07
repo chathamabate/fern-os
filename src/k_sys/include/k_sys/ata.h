@@ -17,13 +17,55 @@
 #define ATA_REG_DATA       (ATA_BAR0 + 0) // R/W
 #define ATA_REG_ERROR      (ATA_BAR0 + 1) // R
 #define ATA_REG_FEATURES   (ATA_BAR0 + 1) // W
+
+/**
+ * Sector Count Register.
+ *
+ * "This register contains the number of sectors of data requested to be transferred on a read or 
+ * write operation between the host and the device. 
+ * If the value in this register is zero, a count of 256 sectors is specified."
+ */
 #define ATA_REG_SEC_COUNT  (ATA_BAR0 + 2) // R/W
+                                          
+/**
+ * LB0 Register AKA Sector Number Register.
+ *
+ * "In LBA Mode, this register contains Bits 7-0 of the LBA for any media access. 
+ * This register is used by some non-media access commands to pass command specific information 
+ * from the host to the device, or from the device to the host. 
+ * This register shall be updated to reflect the media address of the error when a media access 
+ * command is unsuccessfully completed."
+ */
 #define ATA_REG_LBA0       (ATA_BAR0 + 3) // R/W
 #define ATA_REG_LBA1       (ATA_BAR0 + 4) // R/W
 #define ATA_REG_LBA2       (ATA_BAR0 + 5) // R/W
+
+/**
+ * ATA Device Head Register.
+ *
+ * "This register contains device addressing and sector addressing information."
+ */
 #define ATA_REG_DEV_HD     (ATA_BAR0 + 6) // R/W
                                           
-/*
+/**
+ * When set to 1, we are in LBA mode (Which we should always be using tbh)
+ */
+#define ATA_REG_DEV_HD_L_OFF (6)
+#define ATA_REG_DEV_HD_L_MASK (1UL << ATA_REG_DEV_HD_L_OFF)
+
+/**
+ * Device selector. 1 for device 1, 0 for device 0.
+ */
+#define ATA_REG_DEV_HD_DEV_OFF (4)
+#define ATA_REG_DEV_HD_DEV_MASK (1UL << ATA_REG_DEV_HD_DEV_OFF)
+
+/**
+ * The bottom 4 bits of the device/head register are the highest 4 bits of the address being
+ * used. (either in CHS or LBA mode)
+ */
+#define ATA_REG_DEV_HD_HS_MASK (0x0FUL)
+                                          
+/**
  * ATA Status Register.
  *
  * "This register contains the device status. 
@@ -34,32 +76,68 @@
  * When the BSY bit is equal to one, no other bits in this register and all other Command Block 
  * registers are not valid."
  *
+ * VERY IMPORTANT!!!!
  * "host implementations should wait at least 400 ns before reading the status register to insure 
  * that the BSY bit is valid."
  */
 #define ATA_REG_STATUS     (ATA_BAR0 + 7) // R
 
+/**
+ * "BSY (Busy) is set whenever the device has control of the command Block Registers. 
+ * When the BSY bit is equal to one, a write to a command block register by the host shall be 
+ * ignored by the device."
+ *
+ * There's a lot on the busy bit in the spec, so may want to check there for more details.
+ */
 #define ATA_REG_STATUS_BSY_OFF  (7)
 #define ATA_REG_STATUS_BSY_MASK  (1UL << ATA_REG_STATUS_BSY_OFF)
 
+/**
+ * "DRDY (Device Ready) is set to indicate that the device is capable of accepting all 
+ * command codes."
+ */
 #define ATA_REG_STATUS_DRDY_OFF (6)
 #define ATA_REG_STATUS_DRDY_MASK (1UL << ATA_REG_STATUS_DRDY_OFF)
 
+/**
+ * "DF (Device Fault) indicates a device fault error has been detected."
+ */
 #define ATA_REG_STATUS_DF_OFF   (5)
 #define ATA_REG_STATUS_DF_MASK   (1UL << ATA_REG_STATUS_DF_OFF)
 
+/**
+ * "DSC (Device Seek Complete) indicates that the device heads are settled over a track. 
+ * When an error occurs, this bit shall not be changed until the Status Register is read by the 
+ * host, at which time the bit again indicates the current Seek Complete status."
+ */
 #define ATA_REG_STATUS_DSC_OFF  (4)
 #define ATA_REG_STATUS_DSC_MASK  (1UL << ATA_REG_STATUS_DSC_OFF)
 
+/**
+ * "DRQ (Data Request) indicates that the device is ready to transfer a word or byte of data between 
+ * the host and the device."
+ */
 #define ATA_REG_STATUS_DRQ_OFF  (3)
 #define ATA_REG_STATUS_DRQ_MASK  (1UL << ATA_REG_STATUS_DRQ_OFF)
 
+/**
+ * "CORR (Corrected Data) is used to indicate a correctable data error. 
+ * The definition of what constitutes a correctable error is vendor specific. 
+ * This condition does not terminate a data transfer."
+ */
 #define ATA_REG_STATUS_CORR_OFF (2)
 #define ATA_REG_STATUS_CORR_MASK (1UL << ATA_REG_STATUS_CORR_OFF)
 
+/**
+ * "IDX (Index) is vendor specific."
+ */
 #define ATA_REG_STATUS_IDX_OFF  (1)
 #define ATA_REG_STATUS_IDX_MASK  (1UL << ATA_REG_STATUS_IDX_OFF)
 
+/**
+ * "ERR (Error) indicates that an error occurred during execution of the previous command. 
+ * The bits in the Error register have additional information regarding the cause of the error."
+ */
 #define ATA_REG_STATUS_ERR_OFF  (0)
 #define ATA_REG_STATUS_ERR_MASK  (1UL << ATA_REG_STATUS_ERR_OFF)
 
@@ -75,67 +153,37 @@
 
 #define ATA_BAR1 (0x3F0U)
 
+/**
+ * Alternate Status Register.
+ *
+ * "This register contains the same information as the Status register in the command block. 
+ * The only difference being that reading this register does not imply interrupt acknowledge or 
+ * clear a pending interrupt."
+ */
 #define ATA_REG_ALT_STAT   (ATA_BAR1 + 6) // R
+
+/**
+ * Device Control Register.
+ */
 #define ATA_REG_DEV_CTL    (ATA_BAR1 + 6) // W
 
-
-/*
- * Device Control Register Masks.
+/**
+ * "SRST is the host software reset bit. 
+ * The device is held reset when this bit is set. If two devices are daisy
+ * chained on the interface, this bit resets both simultaneously;"
  */
+#define ATA_REG_DEV_CTL_SRST_OFF (2)
+#define ATA_REG_DEV_CTL_SRST_MASK (1UL << ATA_REG_DEV_CTL_SRST_OFF)
 
 /**
- * Software Reset Bit.
+ * "nIEN is the enable bit for the device interrupt to the host. 
+ * When the nIEN bit is equal to zero, and the device is selected, INTRQ shall be enabled through 
+ * a tri-state buffer. 
+ * When the nIEN bit is equal to one, or the device is not selected, the INTRQ signal shall be in 
+ * a high impedance state."
  */
-#define DEV_CTL_SRST_OFF (2)
-#define DEV_CTL_SRST_MASK (1UL << DEV_CTL_SRST_OFF)
+#define ATA_REG_DEV_CTL_IEN_OFF (1)
+#define ATA_REG_DEV_CTL_IEN_MASK (1UL << ATA_REG_DEV_CTL_IEN_OFF)
 
-/**
- * When 0 and device is selected, interrupts are enabled!
- */
-#define DEV_CTL_IEN_OFF (1)
-#define DEV_CTL_IEN_MASK (1UL << DEV_CTL_IEN_OFF)
-
-/*
- * Device/Head Register Masks.
- */
-
-/**
- * When set to 1, we are in LBA mode (Which we should always be using tbh)
- */
-#define DEV_HD_L_OFF (6)
-#define DEV_HD_L_MASK (1UL << DEV_HD_L_OFF)
-
-/**
- * Device selector. 1 for device 1, 0 for device 0.
- */
-#define DEV_HD_DEV_OFF (4)
-#define DEV_HD_DEV_MASK (1UL << DEV_HD_DEV_OFF)
-
-/**
- * The bottom 4 bits of the device/head register are the highest 4 bits of the address being
- * used. (either in CHS or LBA mode)
- */
-#define DEV_HD_HS_MASK (0x0FUL)
-
-/*
- * Leaving Error register details out for now, in case of error, just check the manual to interpret
- * the error register value.
- */
-
-/* 
- * Some register definitions from the docs:
- *
- * Sector Count Register: 
- * This register contains the number of sectors of data requested to be transferred on a read or 
- * write operation between the host and the device. 
- * If the value in this register is zero, a count of 256 sectors is specified.
- *
- * Sector Number Register:
- * In LBA Mode, this register contains Bits 7-0 of the LBA for any media access. 
- * This register is used by some non-media access commands to pass command specific information 
- * from the host to the device, or from the device to the host. 
- * This register shall be updated to reflect the media address of the error when a media access 
- * command is unsuccessfully completed.
- */
 
 void run_ata_test(void);
