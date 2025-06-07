@@ -4,6 +4,12 @@
 /*
  * Here are the register port values.
  * (Using only the primary bus here)
+ *
+ * NOTE: I have quoted the ATA spec in this header file to make my life easier.
+ */
+
+/*
+ * Command Block Registers.
  */
 
 #define ATA_BAR0 (0x1F0U)
@@ -16,41 +22,62 @@
 #define ATA_REG_LBA1       (ATA_BAR0 + 4) // R/W
 #define ATA_REG_LBA2       (ATA_BAR0 + 5) // R/W
 #define ATA_REG_DEV_HD     (ATA_BAR0 + 6) // R/W
+                                          
+/*
+ * ATA Status Register.
+ *
+ * "This register contains the device status. 
+ * The contents of this register are updated to reflect the current state of the device and the 
+ * progress of any command being executed by the device. 
+ * When the BSY bit is equal to zero, the other bits in this register are valid and the other 
+ * Command Block register may contain meaningful information. 
+ * When the BSY bit is equal to one, no other bits in this register and all other Command Block 
+ * registers are not valid."
+ *
+ * "host implementations should wait at least 400 ns before reading the status register to insure 
+ * that the BSY bit is valid."
+ */
 #define ATA_REG_STATUS     (ATA_BAR0 + 7) // R
+
+#define ATA_REG_STATUS_BSY_OFF  (7)
+#define ATA_REG_STATUS_BSY_MASK  (1UL << ATA_REG_STATUS_BSY_OFF)
+
+#define ATA_REG_STATUS_DRDY_OFF (6)
+#define ATA_REG_STATUS_DRDY_MASK (1UL << ATA_REG_STATUS_DRDY_OFF)
+
+#define ATA_REG_STATUS_DF_OFF   (5)
+#define ATA_REG_STATUS_DF_MASK   (1UL << ATA_REG_STATUS_DF_OFF)
+
+#define ATA_REG_STATUS_DSC_OFF  (4)
+#define ATA_REG_STATUS_DSC_MASK  (1UL << ATA_REG_STATUS_DSC_OFF)
+
+#define ATA_REG_STATUS_DRQ_OFF  (3)
+#define ATA_REG_STATUS_DRQ_MASK  (1UL << ATA_REG_STATUS_DRQ_OFF)
+
+#define ATA_REG_STATUS_CORR_OFF (2)
+#define ATA_REG_STATUS_CORR_MASK (1UL << ATA_REG_STATUS_CORR_OFF)
+
+#define ATA_REG_STATUS_IDX_OFF  (1)
+#define ATA_REG_STATUS_IDX_MASK  (1UL << ATA_REG_STATUS_IDX_OFF)
+
+#define ATA_REG_STATUS_ERR_OFF  (0)
+#define ATA_REG_STATUS_ERR_MASK  (1UL << ATA_REG_STATUS_ERR_OFF)
+
+/**
+ * "This register contains the command code being sent to the device. 
+ * Command execution begins immediately after this register is written."
+ */
 #define ATA_REG_COMMAND    (ATA_BAR0 + 7) // W
 
-#define ATA_BAR1 (0x3F4U)
-
-#define ATA_REG_ALT_STAT   (ATA_BAR1 + 2) // R
-#define ATA_REG_DEV_CTL    (ATA_BAR1 + 2) // W
-
 /*
- * Alt Status Register Masks.
+ * Control Block Registers.
  */
 
-#define ALT_STAT_BSY_OFF  (7)
-#define ALT_STAT_BSY_MASK  (1UL << ALT_STAT_BSY_OFF)
+#define ATA_BAR1 (0x3F0U)
 
-#define ALT_STAT_DRDY_OFF (6)
-#define ALT_STAT_DRDY_MASK (1UL << ALT_STAT_DRDY_OFF)
+#define ATA_REG_ALT_STAT   (ATA_BAR1 + 6) // R
+#define ATA_REG_DEV_CTL    (ATA_BAR1 + 6) // W
 
-#define ALT_STAT_DF_OFF   (5)
-#define ALT_STAT_DF_MASK   (1UL << ALT_STAT_DF_OFF)
-
-#define ALT_STAT_DSC_OFF  (4)
-#define ALT_STAT_DSC_MASK  (1UL << ALT_STAT_DSC_OFF)
-
-#define ALT_STAT_DRQ_OFF  (3)
-#define ALT_STAT_DRQ_MASK  (1UL << ALT_STAT_DRQ_OFF)
-
-#define ALT_STAT_CORR_OFF (2)
-#define ALT_STAT_CORR_MASK (1UL << ALT_STAT_CORR_OFF)
-
-#define ALT_STAT_IDX_OFF  (1)
-#define ALT_STAT_IDX_MASK  (1UL << ALT_STAT_IDX_OFF)
-
-#define ALT_STAT_ERR_OFF  (0)
-#define ALT_STAT_ERR_MASK  (1UL << ALT_STAT_ERR_OFF)
 
 /*
  * Device Control Register Masks.
@@ -110,3 +137,5 @@
  * This register shall be updated to reflect the media address of the error when a media access 
  * command is unsuccessfully completed.
  */
+
+void run_ata_test(void);

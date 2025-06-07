@@ -23,6 +23,8 @@
 #include "s_data/test/map.h"
 #include "k_startup/test/process.h"
 
+#include "k_sys/ata.h"
+
 #include <stdint.h>
 
 static uint8_t init_err_style;
@@ -128,6 +130,8 @@ void start_kernel(void) {
 
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
+
+    run_ata_test();
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }
