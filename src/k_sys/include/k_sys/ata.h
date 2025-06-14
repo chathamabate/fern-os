@@ -2,6 +2,8 @@
 #pragma once
 
 #include "s_util/err.h"
+#include "k_sys/io.h"
+#include <stdbool.h>
 
 /*
  * Here are the register port values.
@@ -199,13 +201,43 @@
  */
 #define ATA_SECTOR_SIZE (512U)
 
+/**
+ * This should wait around 400ns which is the recommended pause to wait
+ * before assuming your command has been acknowledged.
+ *
+ * After issuing a command, you shouldnt interpret the status register
+ * until after a pause of this lenghth.
+ */
+void ata_wait_400ns(void);
+
+/**
+ * Wait 400ns, then wait until the BSY bit is 0.
+ *
+ * Returns the final value of the status register.
+ */
+uint8_t ata_wait_complete(void);
+
 void ata_init(void);
+
+static inline void ata_enable_intr(void) {
+    outb(ATA_REG_DEV_CTL, ATA_REG_DEV_CTL_IEN_MASK); 
+    ata_wait_400ns(); // Unsure if needed, but doing it just to be safe!
+}
+
+static inline void ata_disable_intr(void) {
+    outb(ATA_REG_DEV_CTL, 0U); 
+    ata_wait_400ns();
+}
 
 /**
  * Read from disk using PIO.
  *
- * buf should have size of at least num_sectors * 512.
+ * buf should have size of at least sc * 512.
+ *
+ * VERY IMPORTANT: Assumes ATA interrupts are disabled!
  */
-fernos_error_t ata_read_pio(uint32_t lba, uint32_t num_sectors, void *buf);
+fernos_error_t ata_read_pio(uint32_t lba, uint8_t sc, void *buf);
+
+
 
 void run_ata_test(void);

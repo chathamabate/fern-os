@@ -6,26 +6,14 @@
 
 #include <stdint.h>
 
-/**
- * This should wait around 400ns which is the recommended pause to wait
- * before assuming your command has been acknowledged.
- *
- * After issuing a command, you shouldnt interpret the status register
- * until after a pause of this lenghth.
- */
-static void ata_wait_400(void) {
-    for (uint32_t i = 0; i < 14; i++) {
+void ata_wait_400ns(void) {
+    for (uint32_t i = 0; i < 4; i++) {
         inb(ATA_REG_ALT_STAT);
     }
 }
 
-/**
- * Wait 400ns, then wait until the BSY bit is 0.
- *
- * Returns the final value of the status register.
- */
-static uint8_t ata_wait_complete(void) {
-    ata_wait_400();
+uint8_t ata_wait_complete(void) {
+    ata_wait_400ns();
 
     uint8_t status;
 
@@ -53,34 +41,72 @@ void ata_init(void) {
                     
     // Clear registers. (Chatgpt says to do this for some reason)
     load_lba_and_sc(0, 0);
+
+    // Be safe since we switched the drive.
+    ata_wait_400ns();
 }
 
-fernos_error_t ata_read_pio(uint32_t lba, uint32_t num_sectors, void *buf) {
-    // Remember, we only get 28-bits for an LBA.
-    
+fernos_error_t ata_read_pio(uint32_t lba, uint8_t sc, void *buf) {
+    load_lba_and_sc(lba, sc); 
 
-    
+    outb(ATA_REG_COMMAND, 0x20); // READ SECTORS command.
+    ata_wait_400ns(); // Wait.
+
+    uint32_t true_sc = sc == 0 ? 256 : sc;
+
+    uint16_t *wbuf = (uint16_t *)buf;
+
+    for (uint32_t s = 0; s < true_sc; s++) {
+        uint8_t status;
+
+        // Wait until busy mask isn't set.
+        do {
+            status = inb(ATA_REG_STATUS);
+        } while (status & ATA_REG_STATUS_BSY_MASK);
+
+        if (status & ATA_REG_STATUS_ERR_MASK) {
+            term_put_fmt_s("ERR Reg: 0x%X\n", inb(ATA_REG_ERROR));
+            return FOS_UNKNWON_ERROR;            
+        }
+
+        if (status & ATA_REG_STATUS_DF_MASK) {
+            term_put_s("Data Fault\n");
+            return FOS_UNKNWON_ERROR;            
+        }
+
+        // Make sure data is actually ready. (Otherwise also an error).
+        if (!(status & ATA_REG_STATUS_DRQ_MASK)) {
+            term_put_s("Read not ready\n");
+            return FOS_UNKNWON_ERROR;
+        }
+
+        // 256 words in a sector.
+        for (uint32_t w = 0; w < 256; w++) {
+            wbuf[(s * 256) + w] = inw(ATA_REG_DATA);
+        }
+    }
+
+    return FOS_SUCCESS;
 }
+
 
 
 void run_ata_test(void) {
     // Right now interrupts are disabled btw... Might want to change this later!!
     term_put_s("Hello From ata code\n");
 
-    outb(ATA_REG_DEV_HD, 0xA0); // Select Master Drive.
+    ata_init();
+    ata_disable_intr();
 
-    // Clear registers. (Chatgpt says to do this for some reason)
-    outb(ATA_REG_SEC_COUNT, 0x0);
-    outb(ATA_REG_LBA0, 0x0);
-    outb(ATA_REG_LBA1, 0x0);
-    outb(ATA_REG_LBA2, 0x0);
+    uint16_t buf[512];
 
-    // Ok, now it'd be cool to read and write over PIO.
+    fernos_error_t err = ata_read_pio(100, 2, buf);
+    if (err != FOS_SUCCESS) {
+        term_put_s("Read Failure\n");
+    } else {
+        term_put_s("Read Success\n");
+    }
 
-    // Write out  IDENTIFY command.
-    outb(ATA_REG_COMMAND, 0xEC);
-
-    wait400();
     lock_up();
 
 
@@ -109,15 +135,6 @@ void run_ata_test(void) {
     }
     */
 
-    // Check power mode.
-    outb(ATA_REG_COMMAND, 0xE5);
-    wait400();
-    
-     alt_status = inb(ATA_REG_ALT_STAT);
-    term_put_fmt_s("Alt Status: 0x%X\n", alt_status);
-
-
-    wait400();
 
     lock_up();
 }
