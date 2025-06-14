@@ -10,7 +10,7 @@ MOD_NAME 	?= s_util
 _SRCS 		?= str.c misc.c constraints.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
-_ASMS		?= atomic.s str.s
+_ASMS		?= str.s
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= str.c

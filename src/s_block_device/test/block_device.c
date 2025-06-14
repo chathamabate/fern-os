@@ -5,6 +5,7 @@
 #include "k_bios_term/term.h"
 #include "s_block_device/block_device.h"
 #include "s_mem/allocator.h"
+#include "s_util/str.h"
 
 static bool pretest(void);
 static bool posttest(void);
@@ -52,11 +53,14 @@ static bool posttest(void) {
     TEST_SUCCEED();
 }
 
-static bool test_simple_rw(void) {
+static bool test_simple_rw0(void) {
     fernos_error_t err;
 
     uint8_t *wbuf = da_malloc(sector_size);
+    TEST_TRUE(wbuf != NULL);
+
     uint8_t *rbuf = da_malloc(sector_size);
+    TEST_TRUE(rbuf != NULL);
 
     for (uint32_t i = 0; i < sector_size; i++) {
         wbuf[i] = (uint8_t)i;
@@ -78,10 +82,76 @@ static bool test_simple_rw(void) {
     TEST_SUCCEED();
 }
 
+static bool test_simple_rw1(void) {
+    // Maybe, write read write read?
+
+    fernos_error_t err;
+
+    uint8_t *wbuf = da_malloc(sector_size);
+    TEST_TRUE(wbuf != NULL);
+
+    uint8_t *rbuf = da_malloc(sector_size);
+    TEST_TRUE(rbuf != NULL);
+
+    for (uint32_t i = 0; i < 5; i++) {
+        mem_set(wbuf, i, sector_size);
+
+        err = bd_write(bd, 1, 1, wbuf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        err = bd_read(bd, 1, 1, rbuf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_TRUE(mem_chk(rbuf, i, sector_size));
+    }
+
+    da_free(wbuf);
+    da_free(rbuf);
+
+    TEST_SUCCEED();
+}
+
+static bool test_simple_rw2(void) {
+    fernos_error_t err;
+
+    const size_t WBUF_SECTORS = 4;
+    const size_t RBUF_SECTORS = 2;
+    TEST_TRUE(WBUF_SECTORS > RBUF_SECTORS);
+
+    uint8_t *wbuf = da_malloc(sector_size * WBUF_SECTORS);
+    TEST_TRUE(wbuf != NULL);
+
+    uint8_t *rbuf = da_malloc(sector_size * RBUF_SECTORS);
+    TEST_TRUE(rbuf != NULL);
+
+    for (uint32_t i = 0; i < sector_size * WBUF_SECTORS; i++) {
+        wbuf[i] = (uint8_t)('a' + (i % 26));
+    }
+
+    err = bd_write(bd, 1, WBUF_SECTORS, wbuf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (uint32_t s = 1; s <= WBUF_SECTORS + 1 - RBUF_SECTORS; s++) {
+        err = bd_read(bd, s, RBUF_SECTORS, rbuf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        for (uint32_t i = 0; i < sector_size * RBUF_SECTORS; i++) {
+            TEST_EQUAL_HEX(wbuf[((s - 1) * sector_size) + i], rbuf[i]);
+        }
+    }
+
+    da_free(wbuf);
+    da_free(rbuf);
+
+    TEST_SUCCEED();
+}
+
 bool test_block_device(const char *name, block_device_t *(*gen)(void)) {
     gen_block_device = gen;
 
     BEGIN_SUITE(name);
-    RUN_TEST(test_simple_rw);
+    RUN_TEST(test_simple_rw0);
+    RUN_TEST(test_simple_rw1);
+    RUN_TEST(test_simple_rw2);
     return END_SUITE();
 }
