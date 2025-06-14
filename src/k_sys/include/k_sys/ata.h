@@ -55,6 +55,8 @@
 
 /**
  * Device selector. 1 for device 1, 0 for device 0.
+ * Device 0 = Master
+ * Device 1 = Slave (Really just secondary drive I think)
  */
 #define ATA_REG_DEV_HD_DEV_OFF (4)
 #define ATA_REG_DEV_HD_DEV_MASK (1UL << ATA_REG_DEV_HD_DEV_OFF)
