@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include "s_util/err.h"
+
 /*
  * Here are the register port values.
  * (Using only the primary bus here)
@@ -187,5 +189,23 @@
 #define ATA_REG_DEV_CTL_IEN_OFF (1)
 #define ATA_REG_DEV_CTL_IEN_MASK (1UL << ATA_REG_DEV_CTL_IEN_OFF)
 
+
+/*
+ * Simple Driver Functions.
+ */
+
+/**
+ * Size of a sector in bytes.
+ */
+#define ATA_SECTOR_SIZE (512U)
+
+void ata_init(void);
+
+/**
+ * Read from disk using PIO.
+ *
+ * buf should have size of at least num_sectors * 512.
+ */
+fernos_error_t ata_read_pio(uint32_t lba, uint32_t num_sectors, void *buf);
 
 void run_ata_test(void);
