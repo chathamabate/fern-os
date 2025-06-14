@@ -102,13 +102,27 @@ void run_ata_test(void) {
     ata_init();
     ata_disable_intr();
 
-    uint16_t buf[512];
+    fernos_error_t err;
 
-    fernos_error_t err = ata_read_pio(100, 2, buf);
+    uint16_t wbuf[512];
+    uint16_t rbuf[512];
+
+    for (uint16_t i = 0; i < 512; i++) {
+        wbuf[i] = i;
+    }
+
+    err = ata_write_pio(100, 2, wbuf);
     if (err != FOS_SUCCESS) {
-        term_put_s("Read Failure\n");
-    } else {
-        term_put_s("Read Success\n");
+        term_put_s("PIO Write Failed\n");
+    }
+
+    err = ata_read_pio(101, 1, rbuf);
+    if (err != FOS_SUCCESS) {
+        term_put_s("PIO Read Failed\n");
+    }
+
+    for (uint32_t i = 0; i < 10; i++) {
+        term_put_fmt_s("0x%X\n", rbuf[i]);
     }
 
     lock_up();
