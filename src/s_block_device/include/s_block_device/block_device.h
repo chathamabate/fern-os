@@ -32,6 +32,8 @@ struct _block_device_t {
 
 /**
  * Retrieve the number of sectors available in the block device.
+ *
+ * THIS SHOULD VALUE SHOULD NEVER CHANGE!
  */
 size_t bd_num_sectors(block_device_t *bd) {
     return bd->impl->bd_num_sectors(bd);
@@ -39,6 +41,8 @@ size_t bd_num_sectors(block_device_t *bd) {
 
 /**
  * Retrieve the size of each sector.
+ *
+ * THIS SHOULD VALUE SHOULD NEVER CHANGE!
  */
 size_t bd_sector_size(block_device_t *bd) {
     return bd->impl->bd_sector_size(bd);
