@@ -201,6 +201,10 @@
  */
 #define ATA_SECTOR_SIZE (512U)
 
+/*
+ * NOTE: The below driver is quite simple, it assumes 28bit LBA.
+ */
+
 /**
  * This should wait around 400ns which is the recommended pause to wait
  * before assuming your command has been acknowledged.
@@ -217,6 +221,9 @@ void ata_wait_400ns(void);
  */
 uint8_t ata_wait_complete(void);
 
+/**
+ * Selects primary drive and disable interrupts by default.
+ */
 void ata_init(void);
 
 static inline void ata_enable_intr(void) {
@@ -228,6 +235,17 @@ static inline void ata_disable_intr(void) {
     outb(ATA_REG_DEV_CTL, 0U); 
     ata_wait_400ns();
 }
+
+/**
+ * Exectues the ATA IDENTIFY command and stores all words in the given ID Buf.
+ * The ID Buf MUST be at least 256 Words in length.
+ */
+fernos_error_t ata_identify(uint16_t *id_buf);
+
+/**
+ * Retrieves the number of addressable sectors on the primary drive.
+ */
+fernos_error_t ata_num_sectors(uint32_t *ns);
 
 /**
  * Read or write from Disk using PIO.
@@ -242,9 +260,8 @@ static inline fernos_error_t ata_read_pio(uint32_t lba, uint8_t sc, void *buf) {
     return ata_rw_pio(true, lba, sc, buf);
 }
 
-static inline fernos_error_t ata_write_pio(uint32_t lba, uint8_t sc, void *buf) {
-    return ata_rw_pio(false, lba, sc, buf);
+static inline fernos_error_t ata_write_pio(uint32_t lba, uint8_t sc, const void *buf) {
+    return ata_rw_pio(false, lba, sc, (void *)buf);
 }
-
 
 void run_ata_test(void);
