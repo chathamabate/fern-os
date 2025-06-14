@@ -230,14 +230,21 @@ static inline void ata_disable_intr(void) {
 }
 
 /**
- * Read from disk using PIO.
+ * Read or write from Disk using PIO.
  *
  * buf should have size of at least sc * 512.
  *
  * VERY IMPORTANT: Assumes ATA interrupts are disabled!
  */
-fernos_error_t ata_read_pio(uint32_t lba, uint8_t sc, void *buf);
+fernos_error_t ata_rw_pio(bool read, uint32_t lba, uint8_t sc, void *buf);
 
+static inline fernos_error_t ata_read_pio(uint32_t lba, uint8_t sc, void *buf) {
+    return ata_rw_pio(true, lba, sc, buf);
+}
+
+static inline fernos_error_t ata_write_pio(uint32_t lba, uint8_t sc, void *buf) {
+    return ata_rw_pio(false, lba, sc, buf);
+}
 
 
 void run_ata_test(void);

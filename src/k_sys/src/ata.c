@@ -46,10 +46,10 @@ void ata_init(void) {
     ata_wait_400ns();
 }
 
-fernos_error_t ata_read_pio(uint32_t lba, uint8_t sc, void *buf) {
+fernos_error_t ata_rw_pio(bool read, uint32_t lba, uint8_t sc, void *buf) {
     load_lba_and_sc(lba, sc); 
 
-    outb(ATA_REG_COMMAND, 0x20); // READ SECTORS command.
+    outb(ATA_REG_COMMAND, read ? 0x20 : 0x30); // READ or WRITE SECTORS command.
     ata_wait_400ns(); // Wait.
 
     uint32_t true_sc = sc == 0 ? 256 : sc;
@@ -65,31 +65,35 @@ fernos_error_t ata_read_pio(uint32_t lba, uint8_t sc, void *buf) {
         } while (status & ATA_REG_STATUS_BSY_MASK);
 
         if (status & ATA_REG_STATUS_ERR_MASK) {
-            term_put_fmt_s("ERR Reg: 0x%X\n", inb(ATA_REG_ERROR));
+            // Error.
             return FOS_UNKNWON_ERROR;            
         }
 
         if (status & ATA_REG_STATUS_DF_MASK) {
-            term_put_s("Data Fault\n");
+            // Data Fault.
             return FOS_UNKNWON_ERROR;            
         }
 
         // Make sure data is actually ready. (Otherwise also an error).
         if (!(status & ATA_REG_STATUS_DRQ_MASK)) {
-            term_put_s("Read not ready\n");
+            // Something else wrong I guess.
             return FOS_UNKNWON_ERROR;
         }
 
         // 256 words in a sector.
         for (uint32_t w = 0; w < 256; w++) {
-            wbuf[(s * 256) + w] = inw(ATA_REG_DATA);
+            if (read) {
+                wbuf[(s * 256) + w] = inw(ATA_REG_DATA);
+            } else {
+                outw(ATA_REG_DATA, wbuf[(s * 256) + w]);
+            }
         }
+
+        ata_wait_400ns(); // I think I am supposed to wait after completing a sector.
     }
 
     return FOS_SUCCESS;
 }
-
-
 
 void run_ata_test(void) {
     // Right now interrupts are disabled btw... Might want to change this later!!
