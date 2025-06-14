@@ -18,6 +18,7 @@ MODS := \
 		k_sys \
 		s_data \
 		s_mem \
+		s_block_device \
 		s_util 
 
 # Static memory layout header and linker generation:
