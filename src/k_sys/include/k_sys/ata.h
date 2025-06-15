@@ -252,6 +252,8 @@ fernos_error_t ata_num_sectors(uint32_t *ns);
  *
  * buf should have size of at least sc * 512.
  *
+ * When sc == 0, 256 sectors are read/written.
+ *
  * VERY IMPORTANT: Assumes ATA interrupts are disabled!
  */
 fernos_error_t ata_rw_pio(bool read, uint32_t lba, uint8_t sc, void *buf);

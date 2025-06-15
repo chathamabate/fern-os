@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "s_block_device/block_device.h"
 
-#define TEST_BLOCK_DEVICE_MIN_SECTORS (0x10U)
+#define TEST_BLOCK_DEVICE_MIN_SECTORS (0x40U)
 
 /**
  * Run the generic Block Device test suite.

@@ -114,7 +114,7 @@ static bool test_simple_rw1(void) {
 static bool test_simple_rw2(void) {
     fernos_error_t err;
 
-    const size_t WBUF_SECTORS = 4;
+    const size_t WBUF_SECTORS = 6;
     const size_t RBUF_SECTORS = 2;
     TEST_TRUE(WBUF_SECTORS > RBUF_SECTORS);
 
@@ -146,6 +146,99 @@ static bool test_simple_rw2(void) {
     TEST_SUCCEED();
 }
 
+static bool test_complex_rw(void) {
+    const size_t MAX_SECTOR = 22;
+    TEST_TRUE(MAX_SECTOR < TEST_BLOCK_DEVICE_MIN_SECTORS);
+    TEST_TRUE(MAX_SECTOR % 2 == 0); // Must be even for this to work as expected.
+
+    fernos_error_t err;
+
+    void *buf;
+
+    buf = da_malloc(2 * sector_size);
+
+    // This will write [(1, 2), (3, 4) .. (MAX_SECTOR - 1, MAX_SECTOR)]
+    for (uint32_t s = 1; s + 1 <= MAX_SECTOR; s += 2) {
+        mem_set(buf, (uint8_t)s, sector_size);
+        mem_set((uint8_t *)buf + sector_size, (uint8_t)(s + 1), sector_size);
+
+        err = bd_write(bd, s, 2, buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Now let's try reading at an offset, and maybe writing?
+
+    // This will read [(2, 3), (4, 5) ... (MAX_SECTOR - 2, MAX_SECTOR - 1)]
+    // Also it will write... [2, 4 ... MAX_SECTOR - 2]
+    for (uint32_t s = 2; s + 1 <= MAX_SECTOR; s += 2) {
+        err = bd_read(bd, s, 2, buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_TRUE(mem_chk(buf, (uint8_t)s, sector_size));
+        TEST_TRUE(mem_chk((uint8_t *)buf + sector_size, (uint8_t)(s + 1), sector_size));
+
+        mem_set(buf, (uint8_t)(3 * s), sector_size);
+        err = bd_write(bd, s, 1, buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Write to MAX_SECTOR to make the final check of this test work nice.
+    mem_set(buf, (uint8_t)(3 * MAX_SECTOR), sector_size);
+    err = bd_write(bd, MAX_SECTOR, 1, buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (uint32_t s = 1; s <= MAX_SECTOR; s++) {
+        err = bd_read(bd, s, 1, buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        uint8_t exp = s % 2 == 0 
+            ? (uint8_t)(3 * s) : s;
+
+        TEST_TRUE(mem_chk(buf, exp, sector_size));
+    }
+
+    da_free(buf);
+
+    TEST_SUCCEED();
+}
+
+static bool test_full_rw(void) {
+    // Read/Write all Sectors of the BD. (Excluding sector 0 of course)
+    fernos_error_t err;
+
+    // Number of sectors to read/write each time.
+    const size_t S_FACTOR = 5;
+
+    void *buf = da_malloc(sector_size * S_FACTOR);
+
+    for (uint32_t i = 1, o = 0; i < num_sectors; o++) {
+        size_t s_left = num_sectors - i;
+        size_t s2w = s_left < S_FACTOR ? s_left : S_FACTOR;
+
+        mem_set(buf, o, S_FACTOR * sector_size );
+        err = bd_write(bd, i, S_FACTOR, buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        i += s2w;
+    }
+
+    for (uint32_t i = 1, o = 0; i < num_sectors; o++) {
+        size_t s_left = num_sectors - i;
+        size_t s2r = s_left < S_FACTOR ? s_left : S_FACTOR;
+
+        err = bd_read(bd, i, s2r, buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_TRUE(mem_chk(buf, o, S_FACTOR * sector_size));
+
+        i += s2r;
+    }
+
+    da_free(buf);
+
+    TEST_SUCCEED();
+}
+
 bool test_block_device(const char *name, block_device_t *(*gen)(void)) {
     gen_block_device = gen;
 
@@ -153,5 +246,7 @@ bool test_block_device(const char *name, block_device_t *(*gen)(void)) {
     RUN_TEST(test_simple_rw0);
     RUN_TEST(test_simple_rw1);
     RUN_TEST(test_simple_rw2);
+    RUN_TEST(test_complex_rw);
+    RUN_TEST(test_full_rw); // You may want to comment this out if it takes too long.
     return END_SUITE();
 }
