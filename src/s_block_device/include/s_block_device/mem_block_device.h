@@ -21,3 +21,9 @@ typedef struct _mem_block_device_t {
  * Returns NULL if there is a failure to allocate.
  */
 block_device_t *new_mem_block_device(allocator_t *al, size_t ss, size_t ns);
+
+static inline block_device_t *new_da_mem_block_device(size_t ss, size_t ns) {
+    return new_mem_block_device(get_default_allocator(), ss, ns);
+}
+
+

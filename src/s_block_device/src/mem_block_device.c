@@ -55,6 +55,10 @@ static size_t mbd_sector_size(block_device_t *bd) {
 static fernos_error_t mbd_read(block_device_t *bd, size_t sector_ind, size_t num_sectors, void *dest) {
     mem_block_device_t *mbd = (mem_block_device_t *)bd;
 
+    if (!dest) {
+        return FOS_BAD_ARGS;
+    }
+
     if (sector_ind == 0 || sector_ind >= mbd->num_sectors || sector_ind + num_sectors > mbd->num_sectors) {
         return FOS_INVALID_RANGE;
     }
@@ -71,6 +75,10 @@ static fernos_error_t mbd_read(block_device_t *bd, size_t sector_ind, size_t num
 
 static fernos_error_t mbd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src) {
     mem_block_device_t *mbd = (mem_block_device_t *)bd;
+
+    if (!src) {
+        return FOS_BAD_ARGS;
+    }
 
     if (sector_ind == 0 || sector_ind >= mbd->num_sectors || sector_ind + num_sectors > mbd->num_sectors) {
         return FOS_INVALID_RANGE;

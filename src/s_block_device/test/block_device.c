@@ -156,6 +156,7 @@ static bool test_complex_rw(void) {
     void *buf;
 
     buf = da_malloc(2 * sector_size);
+    TEST_TRUE(buf != NULL);
 
     // This will write [(1, 2), (3, 4) .. (MAX_SECTOR - 1, MAX_SECTOR)]
     for (uint32_t s = 1; s + 1 <= MAX_SECTOR; s += 2) {
@@ -202,6 +203,35 @@ static bool test_complex_rw(void) {
     TEST_SUCCEED();
 }
 
+static bool test_big_rw(void) {
+    const size_t NS = num_sectors / 8;
+
+    fernos_error_t err;
+
+    uint8_t *buf = da_malloc(NS * sector_size);
+    TEST_TRUE(buf != NULL);
+
+    for (uint32_t i = 0; i < NS * sector_size; i++) {
+        buf[i] = (uint8_t)i;
+    }
+
+    err = bd_write(bd, 1, NS, buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    mem_set(buf, 0, NS * sector_size);
+
+    err = bd_read(bd, 1, NS, buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (uint32_t i = 0; i < NS * sector_size; i++) {
+        TEST_EQUAL_UINT((uint8_t)i, buf[i]);
+    }
+
+    da_free(buf); 
+
+    TEST_SUCCEED();
+}
+
 static bool test_full_rw(void) {
     // Read/Write all Sectors of the BD. (Excluding sector 0 of course)
     fernos_error_t err;
@@ -216,7 +246,7 @@ static bool test_full_rw(void) {
         size_t s2w = s_left < S_FACTOR ? s_left : S_FACTOR;
 
         mem_set(buf, o, S_FACTOR * sector_size );
-        err = bd_write(bd, i, S_FACTOR, buf);
+        err = bd_write(bd, i, s2w, buf);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         i += s2w;
@@ -229,12 +259,40 @@ static bool test_full_rw(void) {
         err = bd_read(bd, i, s2r, buf);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-        TEST_TRUE(mem_chk(buf, o, S_FACTOR * sector_size));
+        TEST_TRUE(mem_chk(buf, o, s2r));
 
         i += s2r;
     }
 
     da_free(buf);
+
+    TEST_SUCCEED();
+}
+
+static bool test_bad_calls(void) {
+    fernos_error_t err; 
+
+    uint8_t buf[1] = {0};
+
+    // Just check some bad ranges.
+
+    err = bd_write(bd, num_sectors, 1, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_write(bd, 1, 1, NULL);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_write(bd, num_sectors - 1, 2, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_read(bd, num_sectors, 1, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_read(bd, 1, 1, NULL);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_read(bd, num_sectors - 1, 2, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
 
     TEST_SUCCEED();
 }
@@ -247,6 +305,8 @@ bool test_block_device(const char *name, block_device_t *(*gen)(void)) {
     RUN_TEST(test_simple_rw1);
     RUN_TEST(test_simple_rw2);
     RUN_TEST(test_complex_rw);
+    RUN_TEST(test_big_rw);
     RUN_TEST(test_full_rw); // You may want to comment this out if it takes too long.
+    RUN_TEST(test_bad_calls);
     return END_SUITE();
 }

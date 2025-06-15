@@ -35,7 +35,7 @@ struct _block_device_t {
  *
  * THIS SHOULD VALUE SHOULD NEVER CHANGE!
  */
-size_t bd_num_sectors(block_device_t *bd) {
+static inline size_t bd_num_sectors(block_device_t *bd) {
     return bd->impl->bd_num_sectors(bd);
 }
 
@@ -44,7 +44,7 @@ size_t bd_num_sectors(block_device_t *bd) {
  *
  * THIS SHOULD VALUE SHOULD NEVER CHANGE!
  */
-size_t bd_sector_size(block_device_t *bd) {
+static inline size_t bd_sector_size(block_device_t *bd) {
     return bd->impl->bd_sector_size(bd);
 }
 
@@ -59,7 +59,7 @@ size_t bd_sector_size(block_device_t *bd) {
  * NOTE: Reading from sector 0 is optionally valid. If you're block device returns an error
  * when attempting to read sector 0, this is OK!
  */
-fernos_error_t bd_read(block_device_t *bd, size_t sector_ind, size_t num_sectors, void *dest) {
+static inline fernos_error_t bd_read(block_device_t *bd, size_t sector_ind, size_t num_sectors, void *dest) {
     return bd->impl->bd_read(bd, sector_ind, num_sectors, dest);
 }
 
@@ -74,14 +74,14 @@ fernos_error_t bd_read(block_device_t *bd, size_t sector_ind, size_t num_sectors
  * NOTE: Writing to sector 0 is optionally valid. If you're block device returns an error
  * when attempting to read sector 0, this is OK!
  */
-fernos_error_t bd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src) {
+static inline fernos_error_t bd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src) {
     return bd->impl->bd_write(bd, sector_ind, num_sectors, src);
 }
 
 /**
  * If implemented, this is intended to print out some debug information about the block device.
  */
-void bd_dump(block_device_t *bd, void (*pf)(const char *fmt, ...)) {
+static inline void bd_dump(block_device_t *bd, void (*pf)(const char *fmt, ...)) {
     if (bd->impl->bd_dump) {
         bd->impl->bd_dump(bd, pf);
     }
@@ -90,6 +90,6 @@ void bd_dump(block_device_t *bd, void (*pf)(const char *fmt, ...)) {
 /**
  * Delete the block device.
  */
-void delete_block_device(block_device_t *bd) {
+static inline void delete_block_device(block_device_t *bd) {
     bd->impl->delete_block_device(bd);
 }
