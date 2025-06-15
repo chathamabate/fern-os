@@ -12,7 +12,8 @@ _SRCS 		?= kernel.c \
 			   gdt.c \
 			   idt.c \
 			   page.c \
-			   page_helpers.c
+			   page_helpers.c \
+			   ata_block_device.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= boot.s \
