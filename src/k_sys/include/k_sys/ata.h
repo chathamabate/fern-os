@@ -265,5 +265,3 @@ static inline fernos_error_t ata_read_pio(uint32_t lba, uint8_t sc, void *buf) {
 static inline fernos_error_t ata_write_pio(uint32_t lba, uint8_t sc, const void *buf) {
     return ata_rw_pio(false, lba, sc, (void *)buf);
 }
-
-void run_ata_test(void);

@@ -148,35 +148,3 @@ fernos_error_t ata_rw_pio(bool read, uint32_t lba, uint8_t sc, void *buf) {
 
     return FOS_SUCCESS;
 }
-
-void run_ata_test(void) {
-    // Right now interrupts are disabled btw... Might want to change this later!!
-    term_put_s("Hello From ata code\n");
-
-    fernos_error_t err;
-
-    ata_init();
-
-    uint32_t ns;
-    err = ata_num_sectors(&ns);
-
-    if (err != FOS_SUCCESS) {
-        term_put_s("AHHH\n");
-    } else {
-        term_put_fmt_s("Num Sectors: %u\n", ns);
-    }
-
-    uint16_t wbuf[256];
-
-    for (uint32_t i = 1; i < ns; i++) {
-        err = ata_read_pio(i, 1, wbuf);
-        if (err != FOS_SUCCESS) {
-            term_put_fmt_s("Bad Read LBA: %u\n", i);
-            break;
-        }
-    }
-
-    term_put_s("DONE\n");
-
-    lock_up();
-}
