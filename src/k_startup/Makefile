@@ -12,7 +12,8 @@ _SRCS 		?= kernel.c \
 			   gdt.c \
 			   idt.c \
 			   page.c \
-			   page_helpers.c
+			   page_helpers.c \
+			   ata_block_device.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= boot.s \
@@ -21,7 +22,8 @@ _ASMS		?= boot.s \
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= page.c \
 			   page_helpers.c \
-			   process.c
+			   process.c \
+			   ata_block_device.c
 
 -include ../mod_stub.mk
 

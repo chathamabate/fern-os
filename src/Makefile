@@ -18,6 +18,7 @@ MODS := \
 		k_sys \
 		s_data \
 		s_mem \
+		s_block_device \
 		s_util 
 
 # Static memory layout header and linker generation:
@@ -126,8 +127,17 @@ $(BIN_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 
 bin: $(BIN_FILE)
 
-qemu.bin: $(BIN_FILE)
-	qemu-system-x86_64 -display cocoa,zoom-to-fit=on,full-screen=on -m 4G -kernel $(BIN_FILE) -monitor stdio
+TOY_DISK := $(BUILD_DIR)/hdd.img
+$(TOY_DISK):
+	qemu-img create -f raw $(TOY_DISK) 64M
+
+qemu.bin: $(BIN_FILE) | $(TOY_DISK)
+	qemu-system-x86_64 \
+		-display cocoa,zoom-to-fit=on,full-screen=on \
+		-m 4G \
+		-hda $(TOY_DISK) \
+		-kernel $(BIN_FILE) \
+		-monitor stdio
 
 # NOTE: When we start working with disk read/write... I'd really like to figure out ISO packaging!
 
