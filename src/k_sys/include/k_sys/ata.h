@@ -215,7 +215,7 @@
 void ata_wait_400ns(void);
 
 /**
- * Wait 400ns, then wait until the BSY bit is 0.
+ * Wait 400ns, then wait until the BSY bit is 0 and the DRDY bit is 1.
  *
  * Returns the final value of the status register.
  */
@@ -227,13 +227,13 @@ uint8_t ata_wait_complete(void);
 void ata_init(void);
 
 static inline void ata_enable_intr(void) {
+    ata_wait_complete(); // Unsure if needed, but doing it just to be safe!
     outb(ATA_REG_DEV_CTL, ATA_REG_DEV_CTL_IEN_MASK); 
-    ata_wait_400ns(); // Unsure if needed, but doing it just to be safe!
 }
 
 static inline void ata_disable_intr(void) {
+    ata_wait_complete();
     outb(ATA_REG_DEV_CTL, 0U); 
-    ata_wait_400ns();
 }
 
 /**

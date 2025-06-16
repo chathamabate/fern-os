@@ -12,6 +12,13 @@ void ata_wait_400ns(void) {
     }
 }
 
+/*
+ * NOTE: New functions which actually issues commands to the drive
+ * should alwasy start with an `ata_wait_complete` call.
+ *
+ * This confirms that the drive is actually ready to accept commands!
+ */
+
 uint8_t ata_wait_complete(void) {
     ata_wait_400ns();
 
@@ -19,43 +26,46 @@ uint8_t ata_wait_complete(void) {
 
     do {
         status = inb(ATA_REG_ALT_STAT);
-    } while (status & ATA_REG_STATUS_BSY_MASK);
+
+        // Loop anther command is ready to be received.
+    } while ((status & ATA_REG_STATUS_BSY_MASK) 
+            || !(status & ATA_REG_STATUS_DRDY_MASK));
 
     return status;
 }
 
+#define ATA_WAIT_DATA_READY_RETRIES (30U)
+
 /**
  * We wait for 512 Bytes to be readable or writeable over the data register.
  *
- * This starts with a 400ns wait BTW.
+ * With a wait complete btw.
  */
 static fernos_error_t ata_wait_data_ready(void) {
-    ata_wait_400ns();
+     uint8_t status = ata_wait_complete();
 
-    uint8_t status;
+    // Now poll for DRQ to be set.
+    for (uint32_t i = 0; i < ATA_WAIT_DATA_READY_RETRIES; i++) {
+        if (status & ATA_REG_STATUS_ERR_MASK) {
+            // Error.
+            return FOS_UNKNWON_ERROR;            
+        }
 
-    // Wait until busy mask isn't set.
-    do {
-        status = inb(ATA_REG_STATUS);
-    } while (status & ATA_REG_STATUS_BSY_MASK);
+        if (status & ATA_REG_STATUS_DF_MASK) {
+            // Data Fault.
+            return FOS_UNKNWON_ERROR;            
+        }
 
-    if (status & ATA_REG_STATUS_ERR_MASK) {
-        // Error.
-        return FOS_UNKNWON_ERROR;            
+        // If data is ready, we can exit!
+        if (status & ATA_REG_STATUS_DRQ_MASK) {
+            return FOS_SUCCESS;
+        }
+
+        status = inb(ATA_REG_ALT_STAT);
     }
 
-    if (status & ATA_REG_STATUS_DF_MASK) {
-        // Data Fault.
-        return FOS_UNKNWON_ERROR;            
-    }
-
-    // Make sure data is actually ready. (Otherwise also an error).
-    if (!(status & ATA_REG_STATUS_DRQ_MASK)) {
-        // Something else wrong I guess.
-        return FOS_UNKNWON_ERROR;
-    }
-
-    return FOS_SUCCESS;
+    // DRQ was never set.
+    return FOS_UNKNWON_ERROR;
 }
 
 static void load_lba(uint32_t lba) {
@@ -78,12 +88,11 @@ void ata_init(void) {
 
     // We will always start in polling mode by default.
     ata_disable_intr();
-
-    // Be safe since we switched the drive.
-    ata_wait_400ns();
 }
 
 fernos_error_t ata_identify(uint16_t *id_buf) {
+    ata_wait_complete();
+
     outb(ATA_REG_COMMAND, 0xEC); // Identify command.
 
     fernos_error_t err = ata_wait_data_ready();
@@ -94,8 +103,6 @@ fernos_error_t ata_identify(uint16_t *id_buf) {
     for (uint32_t w = 0; w < 256; w++) {
         id_buf[w] = inw(ATA_REG_DATA);
     }
-
-    ata_wait_400ns();
 
     return FOS_SUCCESS;
 }
@@ -118,6 +125,8 @@ fernos_error_t ata_num_sectors(uint32_t *ns) {
 }
 
 fernos_error_t ata_rw_pio(bool read, uint32_t lba, uint8_t sc, void *buf) {
+    ata_wait_complete();
+
     load_lba_and_sc(lba, sc); 
 
     outb(ATA_REG_COMMAND, read ? 0x20 : 0x30); // READ or WRITE SECTORS command.
@@ -141,10 +150,6 @@ fernos_error_t ata_rw_pio(bool read, uint32_t lba, uint8_t sc, void *buf) {
             }
         }
     }
-
-    // Unsure if this is really needed, but waiitng at the end after the final
-    // read/write just to be safe.
-    ata_wait_400ns();
 
     return FOS_SUCCESS;
 }
