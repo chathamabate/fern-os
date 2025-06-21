@@ -2,6 +2,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "s_util/misc.h"
 
 typedef struct _fat_bios_param_block_2_0_t {
     /**
@@ -201,3 +202,80 @@ typedef struct _fat32_fs_info_sector_t {
      */
     uint8_t signature2[4];
 } __attribute__ ((packed)) fat32_fs_info_sector_t;
+
+/*
+ * FAT32 Date/time helpers.
+ */
+
+/**
+ * [0:4] Day of month (1 - 31)
+ * [5:8] Month of Year (1 - 12)
+ * [9:15] Count of Year from 1980 (0 - 127)
+ */
+typedef uint16_t fat32_date_t;
+
+#define FT32D_DAY_OFF (0)
+#define FT32D_DAY_WID (5)
+#define FT32D_DAY_WID_MASK TO_MASK(FT32D_DAY_WID)
+#define FT32D_DAY_MASK (FT32D_DAY_WID_MASK << FT32D_DAY_OFF)
+
+#define FT32D_MONTH_OFF (5)
+#define FT32D_MONTH_WID (4)
+#define FT32D_MONTH_WID_MASK TO_MASK(FT32D_MONTH_WID)
+#define FT32D_MONTH_MASK (FT32D_MONTH_WID_MASK << FT32D_MONTH_OFF)
+
+#define FT32D_YEAR_OFF (9)
+#define FT32D_YEAR_WID (7)
+#define FT32D_YEAR_WID_MASK TO_MASK(FT32D_YEAR_WID)
+#define FT32D_YEAR_MASK (FT32D_YEAR_WID_MASK << FT32D_YEAR_OFF)
+
+static inline uint8_t fat32_date_get_day(fat32_date_t d) {
+    return (uint8_t)((d & FT32D_DAY_MASK) >> FT32D_DAY_OFF);
+}
+
+static inline void fat32_date_set_day(fat32_date_t *d, uint8_t day) {
+    fat32_date_t date = *d;
+
+    date &= ~FT32D_DAY_MASK;
+    date |= (day << FT32D_DAY_OFF) & FT32D_DAY_MASK;
+
+    *d = date;
+}
+
+static inline uint8_t fat32_date_get_month(fat32_date_t d) {
+    return (uint8_t)((d & FT32D_MONTH_MASK) >> FT32D_MONTH_OFF);
+}
+
+static inline void fat32_date_set_month(fat32_date_t *d, uint8_t month) {
+    fat32_date_t date = *d;
+
+    date &= ~FT32D_MONTH_MASK;
+    date |= (month << FT32D_MONTH_OFF) & FT32D_MONTH_MASK;
+
+    *d = date;
+}
+
+static inline uint8_t fat32_date_get_year(fat32_date_t d) {
+    return (uint8_t)((d & FT32D_YEAR_MASK) >> FT32D_YEAR_OFF);
+}
+
+static inline void fat32_date_set_year(fat32_date_t *d, uint8_t year) {
+    fat32_date_t date = *d;
+
+    date &= ~FT32D_YEAR_MASK;
+    date |= (year << FT32D_YEAR_OFF) & FT32D_YEAR_MASK;
+
+    *d = date;
+}
+
+static inline fat32_date_t fat32_date(uint8_t month, uint8_t day, uint8_t year) {
+    fat32_date_t date; 
+
+    fat32_date_set_month(&date, month);
+    fat32_date_set_day(&date, day);
+    fat32_date_set_year(&date, year);
+
+    return date;
+}
+
+typedef uint16_t fat32_time_t;

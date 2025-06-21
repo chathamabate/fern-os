@@ -14,8 +14,15 @@
 #define M_1G   (0x40000000U)
 #define M_2G   (0x80000000U)
 
-// Converts a number n to a 64-bit constant with n 1 lsbs
-#define TO_MASK64(wid) ((1LL << wid) - 1)
+/**
+ * Converts a number n to a 64-bit constant with n 1 lsbs
+ */
+#define TO_MASK64(wid) ((1ULL << wid) - 1)
+
+/**
+ * Converts a number n to a constant with n 1 lsbs
+ */
+#define TO_MASK(wid) ((1UL << wid) - 1)
 
 // Only work for powers of 2 alignments.
 #define IS_ALIGNED(val, align) (((unsigned int)(val) & ((align) - 1)) == 0)

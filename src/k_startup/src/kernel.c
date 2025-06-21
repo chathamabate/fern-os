@@ -138,21 +138,14 @@ void start_kernel(void) {
 
     //  screw around stuff.
 
-    fat32_fs_boot_sector_t boot_sector;
+    fat32_date_t date = fat32_date(1, 2, 10);
 
-    block_device_t *bd = get_ata_block_device();
-    fernos_error_t err = bd_read(bd, 0, 1, &boot_sector);
-    if (err != FOS_SUCCESS) {
-        term_put_s("Failed to read Boot Sector\n");
-        lock_up();
-    }
+    fat32_date_set_month(&date, 4);
+    term_put_fmt_s("%u %u %u\n",
+            fat32_date_get_month(date),
+            fat32_date_get_day(date),
+            fat32_date_get_year(date));
 
-    uint16_t bytes_per_sector = 
-        boot_sector.fat32_ebpb.super.super.bytes_per_sector;
-    term_put_fmt_s("Bytes per sector: %u\n", bytes_per_sector);
-    uint32_t sectors_per_cluster = 
-        boot_sector.fat32_ebpb.super.super.sectors_per_cluster;
-    term_put_fmt_s("Sectors per Cluster: %u\n", sectors_per_cluster);
 
     lock_up();
 
