@@ -26,6 +26,7 @@
 #include "s_data/test/map.h"
 #include "k_startup/test/process.h"
 #include "s_block_device/fat32.h"
+#include "s_block_device/block_device.h"
 
 #include "k_sys/ata.h"
 
@@ -137,7 +138,21 @@ void start_kernel(void) {
 
     //  screw around stuff.
 
-    term_put_fmt_s("Boot Sector Size: %u\n", sizeof(fat32_fs_boot_sector_t));
+    fat32_fs_boot_sector_t boot_sector;
+
+    block_device_t *bd = get_ata_block_device();
+    fernos_error_t err = bd_read(bd, 0, 1, &boot_sector);
+    if (err != FOS_SUCCESS) {
+        term_put_s("Failed to read Boot Sector\n");
+        lock_up();
+    }
+
+    uint16_t bytes_per_sector = 
+        boot_sector.fat32_ebpb.super.super.bytes_per_sector;
+    term_put_fmt_s("Bytes per sector: %u\n", bytes_per_sector);
+    uint32_t sectors_per_cluster = 
+        boot_sector.fat32_ebpb.super.super.sectors_per_cluster;
+    term_put_fmt_s("Sectors per Cluster: %u\n", sectors_per_cluster);
 
     lock_up();
 

@@ -130,6 +130,7 @@ bin: $(BIN_FILE)
 TOY_DISK := $(BUILD_DIR)/hdd.img
 $(TOY_DISK):
 	qemu-img create -f raw $(TOY_DISK) 64M
+	mkfs.vfat -F 32 -s 4 -n MYDISK $(TOY_DISK)
 
 qemu.bin: $(BIN_FILE) | $(TOY_DISK)
 	qemu-system-x86_64 \
