@@ -140,8 +140,7 @@ typedef struct _fat32_extended_bios_param_block_t {
 // Next the information section I guess???
 // I think you would be correct about this!
 
-typedef struct _fat32_fs_info_sector_t fat32_fs_info_sector_t;
-struct _fat32_fs_info_sector_t {
+typedef struct _fat32_fs_info_sector_t {
     /**
      * Must be: 0x52 0x52 0x61 0x41
      * Signifies FAT32.
@@ -151,15 +150,30 @@ struct _fat32_fs_info_sector_t {
     /**
      * Should be set to 0 at init time.
      */
-    uint8_t zeros[480];
+    uint8_t reserved0[480];
 
     /**
      * Must be: 0x72 0x72 0x41 0x61
      */
     uint8_t signature1[4];
 
-    
+    /**
+     * Last known number of free clusters. 0xFFFFFFFF if unknown.
+     */
+    uint32_t num_free_clusters;    
 
+    /**
+     * Most recently allocated data cluster.
+     */
+    uint32_t last_allocated_date_cluster;
 
+    /**
+     * Should be set to 0 at init time.
+     */
+    uint8_t reserved1[12];
 
-} __attribute__ ((packed));
+    /**
+     * Must be: 0x00 0x00 0x55 0xAA
+     */
+    uint8_t signature2[4];
+} __attribute__ ((packed)) fat32_fs_info_sector_t;

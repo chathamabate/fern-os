@@ -137,7 +137,7 @@ void start_kernel(void) {
 
     //  screw around stuff.
 
-    test_ata_block_device();
+    term_put_fmt_s("FS Size: %u\n", sizeof(fat32_fs_info_sector_t));
 
     lock_up();
 
