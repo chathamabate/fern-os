@@ -137,6 +137,30 @@ typedef struct _fat32_extended_bios_param_block_t {
     char fs_label[8];
 } __attribute__ ((packed)) fat32_extended_bios_param_block_t;
 
+typedef struct _fat32_fs_boot_sector_t {
+    uint8_t jmp_instruction[3];
+
+    /**
+     * Not NULL terminated, padded with spaces.
+     */
+    char oem_name[8];
+
+    /**
+     * extended param block.
+     */
+    fat32_extended_bios_param_block_t fat32_ebpb;
+
+    /**
+     * Boot code.
+     */
+    uint8_t boot_code[512 - (13 + sizeof(fat32_extended_bios_param_block_t))];
+
+    /**
+     * Must be 0x55 0xAA.
+     */
+    uint8_t boot_signature[2];
+} __attribute__ ((packed)) fat32_fs_boot_sector_t;
+
 // Next the information section I guess???
 // I think you would be correct about this!
 

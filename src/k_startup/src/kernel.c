@@ -137,7 +137,7 @@ void start_kernel(void) {
 
     //  screw around stuff.
 
-    term_put_fmt_s("FS Size: %u\n", sizeof(fat32_fs_info_sector_t));
+    term_put_fmt_s("Boot Sector Size: %u\n", sizeof(fat32_fs_boot_sector_t));
 
     lock_up();
 
