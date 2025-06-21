@@ -137,6 +137,8 @@ typedef struct _fat32_extended_bios_param_block_t {
     char fs_label[8];
 } __attribute__ ((packed)) fat32_extended_bios_param_block_t;
 
+// Next the information section I guess???
+// I think you would be correct about this!
 
 typedef struct _fat32_fs_info_sector_t fat32_fs_info_sector_t;
 struct _fat32_fs_info_sector_t {

@@ -19,11 +19,13 @@
 #include "k_startup/test/page_helpers.h"
 #include "s_block_device/test/mem_block_device.h"
 #include "k_startup/test/ata_block_device.h"
+#include "k_startup/ata_block_device.h"
 
 #include "s_data/test/list.h"
 #include "s_data/test/wait_queue.h"
 #include "s_data/test/map.h"
 #include "k_startup/test/process.h"
+#include "s_block_device/fat32.h"
 
 #include "k_sys/ata.h"
 
@@ -133,7 +135,10 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
+    //  screw around stuff.
+
     test_ata_block_device();
+
     lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));

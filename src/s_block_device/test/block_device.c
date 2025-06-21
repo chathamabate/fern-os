@@ -66,10 +66,10 @@ static bool test_simple_rw0(void) {
         wbuf[i] = (uint8_t)i;
     }
 
-    err = bd_write(bd, 1, 1, wbuf);
+    err = bd_write(bd, 0, 1, wbuf);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    err = bd_read(bd, 1, 1, rbuf);
+    err = bd_read(bd, 0, 1, rbuf);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     for (uint32_t i = 0; i < sector_size; i++) {
@@ -128,15 +128,15 @@ static bool test_simple_rw2(void) {
         wbuf[i] = (uint8_t)('a' + (i % 26));
     }
 
-    err = bd_write(bd, 1, WBUF_SECTORS, wbuf);
+    err = bd_write(bd, 0, WBUF_SECTORS, wbuf);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    for (uint32_t s = 1; s <= WBUF_SECTORS + 1 - RBUF_SECTORS; s++) {
+    for (uint32_t s = 0; s <= WBUF_SECTORS - RBUF_SECTORS; s++) {
         err = bd_read(bd, s, RBUF_SECTORS, rbuf);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         for (uint32_t i = 0; i < sector_size * RBUF_SECTORS; i++) {
-            TEST_EQUAL_HEX(wbuf[((s - 1) * sector_size) + i], rbuf[i]);
+            TEST_EQUAL_HEX(wbuf[(s * sector_size) + i], rbuf[i]);
         }
     }
 
@@ -215,12 +215,12 @@ static bool test_big_rw(void) {
         buf[i] = (uint8_t)i;
     }
 
-    err = bd_write(bd, 1, NS, buf);
+    err = bd_write(bd, 0, NS, buf);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     mem_set(buf, 0, NS * sector_size);
 
-    err = bd_read(bd, 1, NS, buf);
+    err = bd_read(bd, 0, NS, buf);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     for (uint32_t i = 0; i < NS * sector_size; i++) {
@@ -241,7 +241,7 @@ static bool test_full_rw(void) {
 
     void *buf = da_malloc(sector_size * S_FACTOR);
 
-    for (uint32_t i = 1, o = 0; i < num_sectors; o++) {
+    for (uint32_t i = 0, o = 0; i < num_sectors; o++) {
         size_t s_left = num_sectors - i;
         size_t s2w = s_left < S_FACTOR ? s_left : S_FACTOR;
 
@@ -252,7 +252,7 @@ static bool test_full_rw(void) {
         i += s2w;
     }
 
-    for (uint32_t i = 1, o = 0; i < num_sectors; o++) {
+    for (uint32_t i = 0, o = 0; i < num_sectors; o++) {
         size_t s_left = num_sectors - i;
         size_t s2r = s_left < S_FACTOR ? s_left : S_FACTOR;
 

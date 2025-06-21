@@ -59,7 +59,7 @@ static fernos_error_t mbd_read(block_device_t *bd, size_t sector_ind, size_t num
         return FOS_BAD_ARGS;
     }
 
-    if (sector_ind == 0 || sector_ind >= mbd->num_sectors || sector_ind + num_sectors > mbd->num_sectors) {
+    if (sector_ind >= mbd->num_sectors || sector_ind + num_sectors > mbd->num_sectors) {
         return FOS_INVALID_RANGE;
     }
 
@@ -80,7 +80,7 @@ static fernos_error_t mbd_write(block_device_t *bd, size_t sector_ind, size_t nu
         return FOS_BAD_ARGS;
     }
 
-    if (sector_ind == 0 || sector_ind >= mbd->num_sectors || sector_ind + num_sectors > mbd->num_sectors) {
+    if (sector_ind >= mbd->num_sectors || sector_ind + num_sectors > mbd->num_sectors) {
         return FOS_INVALID_RANGE;
     }
 

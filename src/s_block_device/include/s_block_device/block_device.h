@@ -55,9 +55,6 @@ static inline size_t bd_sector_size(block_device_t *bd) {
  *
  * Should return an error if dest is NULL, or the the sectors requested extend past the end
  * of the block device.
- *
- * NOTE: Reading from sector 0 is optionally valid. If you're block device returns an error
- * when attempting to read sector 0, this is OK!
  */
 static inline fernos_error_t bd_read(block_device_t *bd, size_t sector_ind, size_t num_sectors, void *dest) {
     return bd->impl->bd_read(bd, sector_ind, num_sectors, dest);
@@ -71,8 +68,6 @@ static inline fernos_error_t bd_read(block_device_t *bd, size_t sector_ind, size
  * Should return an error if src is NULL, or the the sectors requested extend past the end
  * of the block device.
  *
- * NOTE: Writing to sector 0 is optionally valid. If you're block device returns an error
- * when attempting to read sector 0, this is OK!
  */
 static inline fernos_error_t bd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src) {
     return bd->impl->bd_write(bd, sector_ind, num_sectors, src);
