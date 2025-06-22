@@ -439,19 +439,9 @@ typedef struct _fat32_long_fn_dir_entry_t {
 } __attribute__ ((packed)) fat32_long_fn_dir_entry_t;
 
 /**
- * Compute the number of "Complete FATs" which can fit into an area of sectors.
- * 
- * When one "Complete FAT Sector" is added, there must be `fat_copies` instances of that sector.
- * And, there must also be (bytes_per_sector / 4) * sectors_per_cluster available sectors for data.
- *
- * So, we can divide the total number of available sectors by the sum of the 2 above values to
- * get the number of complete FAT sectors which can fit.
- *
- * I use "Complete" here, because a more rigorous algorithm could compute the maximum number of
- * data clusters which can be supported. In this case, we may want to allow for FATs which don't
- * need to be entirely filled. However, this is kinda awkward IMO.
+ * Given these parameters, calculate how many sectors should be in each FAT.
  */
-uint32_t compute_num_complete_fat_sectors(uint32_t total_sectors, uint16_t bytes_per_sector, 
+uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sector, 
         uint16_t reserved_sectors, uint8_t fat_copies,  uint8_t sectors_per_cluster);
 
 /**
@@ -463,5 +453,8 @@ uint32_t compute_num_complete_fat_sectors(uint32_t total_sectors, uint16_t bytes
  * num_sectors is the number of total sectors which will be occupied by the partition.
  *
  * An error is returned if the given block device doesn't have 512 bit sectors.
+ *
+ * sectors_per_cluster must be a power of 2 in the range [1, 128]
  */
-fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sectors);
+fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sectors, 
+        uint32_t sectors_per_cluster);
