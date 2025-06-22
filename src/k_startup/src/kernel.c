@@ -139,6 +139,7 @@ void start_kernel(void) {
     //  screw around stuff.
 
     term_put_fmt_s("SFN Size: %u\n", sizeof(fat32_short_fn_dir_entry_t));
+    term_put_fmt_s("LFN Size: %u\n", sizeof(fat32_long_fn_dir_entry_t));
 
     lock_up();
 

@@ -399,5 +399,38 @@ typedef struct _fat32_short_fn_dir_entry_t {
     uint32_t files_size;
 } __attribute__ ((packed)) fat32_short_fn_dir_entry_t;
 
-typedef struct _fat32_
+typedef struct _fat32_long_fn_dir_entry_t {
+    /**
+     * 1 Based number of this long file name entry.
+     * I believe this counts down.
+     *
+     * The first entry to be read is really the last part of the long name.
+     * This is OR'd with 0x40 if this the "last" (actually the first) long file name entry.
+     */
+    uint8_t entry_order;
+
+    /**
+     * 5 UTF-16 characters. (I may just support ascii anyway tbh)
+     */
+    uint16_t long_fn_0[5];
+
+    /**
+     * Must be 0x0F
+     */
+    uint8_t attrs;
+
+    uint8_t type;
+
+    uint8_t short_fn_checksum;
+
+    uint16_t long_fn_1[6];
+
+    /**
+     * Should always be set to 0.
+     */
+    uint8_t reserved[2];
+
+    uint16_t long_fn_2[2];
+} __attribute__ ((packed)) fat32_long_fn_dir_entry_t;
+
 
