@@ -278,4 +278,73 @@ static inline fat32_date_t fat32_date(uint8_t month, uint8_t day, uint8_t year) 
     return date;
 }
 
+/**
+ * [0:4] Seconds / 2 (0-29)
+ * [5:10] Minutes  (0-59)
+ * [11:15] Hours (0-23)
+ */
 typedef uint16_t fat32_time_t;
+
+#define FT32T_SECS_OFF (0)
+#define FT32T_SECS_WID (5)
+#define FT32T_SECS_WID_MASK TO_MASK(FT32T_SECS_WID)
+#define FT32T_SECS_MASK (FT32T_SECS_WID_MASK << FT32T_SECS_OFF)
+
+#define FT32T_MINS_OFF (5)
+#define FT32T_MINS_WID (6)
+#define FT32T_MINS_WID_MASK TO_MASK(FT32T_MINS_WID)
+#define FT32T_MINS_MASK (FT32T_MINS_WID_MASK << FT32T_MINS_OFF)
+
+#define FT32T_HOURS_OFF (11)
+#define FT32T_HOURS_WID (5)
+#define FT32T_HOURS_WID_MASK TO_MASK(FT32T_HOURS_WID)
+#define FT32T_HOURS_MASK (FT32T_HOURS_WID_MASK << FT32T_HOURS_OFF)
+
+static inline uint8_t fat32_time_get_seconds(fat32_time_t t) {
+    return (uint8_t)((t & FT32T_SECS_MASK) >> FT32T_SECS_OFF);
+}
+
+static inline void fat32_time_set_secs(fat32_time_t *t, uint8_t secs) {
+    fat32_time_t time = *t;
+
+    time &= ~FT32T_SECS_MASK;
+    time |= (secs << FT32T_SECS_OFF) & FT32T_SECS_MASK;
+
+    *t = time;
+}
+
+static inline uint8_t fat32_time_get_mins(fat32_time_t t) {
+    return (uint8_t)((t & FT32T_MINS_MASK) >> FT32T_MINS_OFF);
+}
+
+static inline void fat32_time_set_mins(fat32_time_t *t, uint8_t mins) {
+    fat32_time_t time = *t;
+
+    time &= ~FT32T_MINS_MASK;
+    time |= (mins << FT32T_MINS_OFF) & FT32T_MINS_MASK;
+
+    *t = time;
+}
+
+static inline uint8_t fat32_time_get_hours(fat32_time_t t) {
+    return (uint8_t)((t & FT32T_HOURS_MASK) >> FT32T_HOURS_OFF);
+}
+
+static inline void fat32_time_set_hours(fat32_time_t *t, uint8_t hours) {
+    fat32_time_t time = *t;
+
+    time &= ~FT32T_HOURS_MASK;
+    time |= (hours << FT32T_HOURS_OFF) & FT32T_HOURS_MASK;
+
+    *t = time;
+}
+
+static inline fat32_time_t fat32_time(uint8_t hours, uint8_t mins, uint8_t secs) {
+    fat32_time_t time;
+
+    fat32_time_set_hours(&time, hours);
+    fat32_time_set_mins(&time, mins);
+    fat32_time_set_secs(&time, secs);
+
+    return time;
+}
