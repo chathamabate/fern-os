@@ -7,7 +7,7 @@
 MOD_NAME 	?= s_block_device
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= mem_block_device.c
+_SRCS 		?= mem_block_device.c fat32.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= 

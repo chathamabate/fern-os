@@ -3,10 +3,12 @@
 
 #include <stdint.h>
 #include "s_util/misc.h"
+#include "s_block_device/block_device.h"
 
 typedef struct _fat_bios_param_block_2_0_t {
     /**
      * Probably should only ever be 512 or 4K.
+     * We'll require 512 for now.
      */
     uint16_t bytes_per_sector;
     
@@ -83,6 +85,7 @@ typedef struct _fat32_extended_bios_param_block_t {
 
     /**
      * See wikipedia on how to use these.
+     * Should be all 0. Meaning FAT mirroring is enabled.
      */
     uint16_t ext_flags;
 
@@ -406,6 +409,8 @@ typedef struct _fat32_long_fn_dir_entry_t {
      *
      * The first entry to be read is really the last part of the long name.
      * This is OR'd with 0x40 if this the "last" (actually the first) long file name entry.
+     *
+     * 7th bit must ALWAYS be 0 I think.
      */
     uint8_t entry_order;
 
@@ -433,4 +438,30 @@ typedef struct _fat32_long_fn_dir_entry_t {
     uint16_t long_fn_2[2];
 } __attribute__ ((packed)) fat32_long_fn_dir_entry_t;
 
+/**
+ * Compute the number of "Complete FATs" which can fit into an area of sectors.
+ * 
+ * When one "Complete FAT Sector" is added, there must be `fat_copies` instances of that sector.
+ * And, there must also be (bytes_per_sector / 4) * sectors_per_cluster available sectors for data.
+ *
+ * So, we can divide the total number of available sectors by the sum of the 2 above values to
+ * get the number of complete FAT sectors which can fit.
+ *
+ * I use "Complete" here, because a more rigorous algorithm could compute the maximum number of
+ * data clusters which can be supported. In this case, we may want to allow for FATs which don't
+ * need to be entirely filled. However, this is kinda awkward IMO.
+ */
+uint32_t compute_num_complete_fat_sectors(uint32_t total_sectors, uint16_t bytes_per_sector, 
+        uint16_t reserved_sectors, uint8_t fat_copies,  uint8_t sectors_per_cluster);
 
+/**
+ * Initialize a Block device with the FAT32 structure.
+ *
+ * offset it where in the block device you'd like the partition to begin. NOTE: this does NOT
+ * set any sort of global partition table if offset > 0.
+ *
+ * num_sectors is the number of total sectors which will be occupied by the partition.
+ *
+ * An error is returned if the given block device doesn't have 512 bit sectors.
+ */
+fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sectors);

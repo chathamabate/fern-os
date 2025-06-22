@@ -138,8 +138,30 @@ void start_kernel(void) {
 
     //  screw around stuff.
 
-    term_put_fmt_s("SFN Size: %u\n", sizeof(fat32_short_fn_dir_entry_t));
-    term_put_fmt_s("LFN Size: %u\n", sizeof(fat32_long_fn_dir_entry_t));
+    const uint32_t total_sectors = 2048;
+    const uint16_t bytes_per_sector = 512;
+    const uint16_t reserved_sectors = 200;
+    const uint8_t fat_copies = 2;
+    const uint8_t sectors_per_cluster = 3;
+
+    uint32_t cmpl_fat_sectors = compute_num_complete_fat_sectors(
+            total_sectors,
+            bytes_per_sector,
+            reserved_sectors,
+            fat_copies,
+            sectors_per_cluster
+    );
+
+
+    term_put_fmt_s("Supported CMPL FAT Sectors: %u\n", cmpl_fat_sectors);
+
+    term_put_fmt_s("Reserved Area: %u\n", reserved_sectors);
+    term_put_fmt_s("FAT Area: %u\n", cmpl_fat_sectors * fat_copies);
+    term_put_fmt_s("Data Area: %u\n", cmpl_fat_sectors * (bytes_per_sector / 4) * sectors_per_cluster);
+    term_put_fmt_s("Total Area Used: %u\n", 
+            reserved_sectors + (cmpl_fat_sectors * fat_copies) + 
+            (cmpl_fat_sectors * (bytes_per_sector / 4) * sectors_per_cluster)
+    );
 
     lock_up();
 
