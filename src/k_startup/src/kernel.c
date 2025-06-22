@@ -138,15 +138,7 @@ void start_kernel(void) {
 
     //  screw around stuff.
 
-    fat32_time_t time = fat32_time(1, 2, 3);
-
-    fat32_time_set_mins(&time, 59);
-
-    term_put_fmt_s("%u %u %u\n",
-            fat32_time_get_hours(time),
-            fat32_time_get_mins(time),
-            fat32_time_get_seconds(time));
-
+    term_put_fmt_s("SFN Size: %u\n", sizeof(fat32_short_fn_dir_entry_t));
 
     lock_up();
 

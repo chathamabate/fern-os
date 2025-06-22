@@ -162,9 +162,6 @@ typedef struct _fat32_fs_boot_sector_t {
     uint8_t boot_signature[2];
 } __attribute__ ((packed)) fat32_fs_boot_sector_t;
 
-// Next the information section I guess???
-// I think you would be correct about this!
-
 typedef struct _fat32_fs_info_sector_t {
     /**
      * Must be: 0x52 0x52 0x61 0x41
@@ -348,3 +345,59 @@ static inline fat32_time_t fat32_time(uint8_t hours, uint8_t mins, uint8_t secs)
 
     return time;
 }
+
+/*
+ * Now for Directory entries.
+ */
+
+#define FT32F_ATTR_RO           (1UL << 0)
+#define FT32F_ATTR_HIDDEN       (1UL << 1)
+#define FT32F_ATTR_SYSTEM       (1UL << 2)
+#define FT32F_ATTR_VOL_LABEL    (1UL << 3)
+#define FT32F_ATTR_SUBDIR       (1UL << 4)
+#define FT32F_ATTR_ARCHIVE      (1UL << 5)
+#define FT32F_ATTR_LFN          (0x0FU)
+
+typedef struct _fat32_short_fn_dir_entry_t {
+    /**
+     * Space padded.
+     *
+     * We'll say only UPPERCASE letters and numbers allowed in a short filename.
+     */
+    char short_fn[8];
+
+    /**
+     * Space padded.
+     */
+    char extenstion[3];
+
+    uint8_t attrs;
+
+    uint8_t reserved;
+
+    /**
+     * All 4 of the creation time fields are optional.
+     */
+    uint8_t creation_time_hundredths;
+    fat32_time_t creation_time;
+    fat32_date_t creation_date;
+    fat32_date_t last_access_date;
+
+    uint16_t first_cluster_high;
+    
+    /**
+     * Required.
+     */
+    fat32_time_t last_write_time;
+    fat32_date_t last_write_date;
+
+    uint16_t first_cluster_low;
+    
+    /**
+     * 0 for directories.
+     */
+    uint32_t files_size;
+} __attribute__ ((packed)) fat32_short_fn_dir_entry_t;
+
+typedef struct _fat32_
+
