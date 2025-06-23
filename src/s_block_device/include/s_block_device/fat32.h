@@ -5,6 +5,11 @@
 #include "s_util/misc.h"
 #include "s_block_device/block_device.h"
 
+#define FAT32_MASK          (0x0FFFFFFFU)
+#define FAT32_EOC           (0x0FFFFFF8U)
+#define FAT32_IS_EOC(v)     ((v & FAT32_EOC) == FAT32_EOC)
+#define FAT32_BAD_CLUSTER   (0x0FFFFFF7U)
+
 typedef struct _fat_bios_param_block_2_0_t {
     /**
      * Probably should only ever be 512 or 4K.

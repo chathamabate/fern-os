@@ -187,6 +187,8 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     }
 
     // Damn, I think that's pretty much it, now just for the root directory!
+    // Writing out to a file/directory will take some work big time!
+    // Ooob oob ooob
 
     return FOS_SUCCESS;
 }
