@@ -137,7 +137,22 @@ void start_kernel(void) {
     set_timer_action(fos_timer_action);
 
     //  screw around stuff.
+    block_device_t *bd = get_ata_block_device();
+    fernos_error_t err = init_fat32(bd, 0, bd_num_sectors(bd), 1);
+    if (err != FOS_SUCCESS) {
+        term_put_s("Failure\n");
+    } else {
+        term_put_s("Success\n");
+    }
 
+    uint32_t data[128];
+    err = bd_read(bd, 2, 1, data);
+    if (err != FOS_SUCCESS) {
+        term_put_s("Failure to read\n");
+    }
+    for (uint32_t i = 0; i < 10; i++) {
+        term_put_fmt_s("0x%X\n", data[i]);
+    }
 
     lock_up();
 

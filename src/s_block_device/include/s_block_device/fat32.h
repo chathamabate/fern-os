@@ -369,13 +369,13 @@ static inline fat32_time_t fat32_time(uint8_t hours, uint8_t mins, uint8_t secs)
 typedef struct _fat32_short_fn_dir_entry_t {
     /**
      * Space padded.
-     *
-     * We'll say only UPPERCASE letters and numbers allowed in a short filename.
+     * All CAPS.
      */
     char short_fn[8];
 
     /**
      * Space padded.
+     * All CAPS.
      */
     char extenstion[3];
 
@@ -403,6 +403,7 @@ typedef struct _fat32_short_fn_dir_entry_t {
     
     /**
      * 0 for directories.
+     * This is in a unit of bytes.
      */
     uint32_t files_size;
 } __attribute__ ((packed)) fat32_short_fn_dir_entry_t;
