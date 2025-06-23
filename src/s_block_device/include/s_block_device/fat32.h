@@ -105,7 +105,7 @@ typedef struct _fat32_extended_bios_param_block_t {
     /**
      * If 0 or 0xFFFF, there is no backup.
      *
-     * Otherwise, the 3 boot sectors should be copied starting at this sector.
+     * Otherwise, the boot sector should be copied starting at this sector.
      */
     uint16_t boot_sectors_copy_sector_start;
 
@@ -455,6 +455,10 @@ uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sect
  * An error is returned if the given block device doesn't have 512 bit sectors.
  *
  * sectors_per_cluster must be a power of 2 in the range [1, 128]
+ *
+ * Remeber, this function just initializes a FAT32 file system. Later functions for manipulating
+ * the file system must be able to work properly on any FAT32 instance, not just the one generated 
+ * by this instance.
  */
 fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sectors, 
         uint32_t sectors_per_cluster);
