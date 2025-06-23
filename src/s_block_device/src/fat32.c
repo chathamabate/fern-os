@@ -1,6 +1,7 @@
 
 #include "s_block_device/fat32.h"
 #include <stdbool.h>
+#include "s_util/str.h"
 
 uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sector, 
         uint16_t reserved_sectors, uint8_t fat_copies,  uint8_t sectors_per_cluster) {
@@ -53,11 +54,12 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
         return FOS_BAD_ARGS;
     }
 
+    const uint32_t reserved_sectors = 2;
     const uint32_t fat_copies = 2;
 
     // For now we will NOT copy the boot sector/fs_info sector.
-    const uint32_t spf = compute_sectors_per_fat(num_sectors, bps, 2, fat_copies, 
-            sectors_per_cluster);
+    const uint32_t spf = compute_sectors_per_fat(num_sectors, bps, 
+            reserved_sectors, fat_copies, sectors_per_cluster);
 
     if (spf == 0) {
         return FOS_BAD_ARGS; 
@@ -72,7 +74,7 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
                 .super = {
                     .bytes_per_sector = 512,
                     .sectors_per_cluster = sectors_per_cluster,
-                    .reserved_sectors = 2, // No boot sector copying.
+                    .reserved_sectors = reserved_sectors, // No boot sector copying.
                     .num_fats = fat_copies,
 
                     .num_small_fat_root_dir_entires = 0,
@@ -154,6 +156,37 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     if (err != FOS_SUCCESS) {
         return err;
     }
+
+    // So the FATs are going to start right after the boot and fs info sectors.
+    // At sector index 2. Remember, it's completely valid for the FATs to start later!
+
+    uint32_t fat_sector[128] = {0};
+
+    // First let's write the first FAT sector.
+    fat_sector[0] = 0x0FFFFFF8;
+    fat_sector[1] = 0xFFFFFFFF;
+    
+    // TODO: Root Dir.
+
+    for (uint32_t f = 0; f < fat_copies; f++) {
+        err = bd_write(bd, offset + reserved_sectors + (f * spf), 1, &fat_sector);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+
+    // 0 out the rest of the FAT sectors.
+    mem_set(fat_sector,0, 512);
+    for (uint32_t f = 0; f < fat_copies; f++) {
+        for (uint32_t s = 1; s < spf; s++) {
+            err = bd_write(bd, offset + reserved_sectors + (f * spf) + s, 1, &fat_sector);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+        }
+    }
+
+    // Damn, I think that's pretty much it, now just for the root directory!
 
     return FOS_SUCCESS;
 }
