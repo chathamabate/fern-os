@@ -6,10 +6,6 @@
 
 uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sector, 
         uint16_t reserved_sectors, uint8_t fat_copies,  uint8_t sectors_per_cluster) {
-    // NOTE: write now this calculation is extremely simple. It forces only full FAT sectors to be 
-    // allowed. However, this constant should not be relied on.
-    // We should be able to handle the case where a FAT can occupy half a sector.
-    
     if (total_sectors < reserved_sectors) {
         return 0;
     }
@@ -22,10 +18,18 @@ uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sect
      */
     const uint32_t data_sectors_per_fat_sector = (bytes_per_sector / 4) * sectors_per_cluster;
 
-    // Remember each "unique fat" is mirrored `fat_copies` times.
-    const uint32_t complete_fats = available_sectors / (fat_copies + data_sectors_per_fat_sector);
+    /**
+     * NOTE: I have learned that if that FAT is not large enough to cover the ENTIRE area,
+     * FAT validation will FAIL.
+     */
 
-    return complete_fats; 
+    const uint32_t complete_fat_sectors = fat_copies + data_sectors_per_fat_sector;
+
+    if (available_sectors % complete_fat_sectors == 0) {
+        return available_sectors / complete_fat_sectors;
+    } 
+
+    return (available_sectors / complete_fat_sectors) + 1;
 }
 
 fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sectors, 
@@ -55,15 +59,12 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
         return FOS_BAD_ARGS;
     }
 
-    const uint32_t reserved_sectors = 4;
-    const uint32_t fat_copies = 1;
+    const uint32_t reserved_sectors = 32;
+    const uint32_t fat_copies = 2;
 
     // For now we will NOT copy the boot sector/fs_info sector.
     const uint32_t spf = compute_sectors_per_fat(num_sectors, bps, 
             reserved_sectors, fat_copies, sectors_per_cluster);
-
-    term_put_fmt_s("Sectors per FAT: 0x%X\n", spf);
-    term_put_fmt_s("Possible Clusters: %u\n", spf * (128));
 
     if (spf == 0) {
         return FOS_BAD_ARGS; 
@@ -94,7 +95,7 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
 
                     .num_small_fat_root_dir_entires = 0,
 
-                    .num_sectors = 0,
+                    .num_sectors = num_sectors,
                     .media_descriptor = 0xF8,
                     .sectors_per_fat = 0
                 },
@@ -113,13 +114,18 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
             .minor_version = 0,
             .major_version = 1,
 
+            /*
+             * NOTE: IT is EXTREMELY IMPORTANT to understand that data cluster 2 is actually
+             * the first data cluster right after the FAT!
+             */
+
             .root_dir_cluster = 2, // Open to changing this.
 
             .fs_info_sector = 1, // Right after the boot sector.
             
             .boot_sectors_copy_sector_start = 0, // no boot sector backup
             .reserved0 = {0},
-            .drive_number = 0,
+            .drive_number = 0x80,
             .reserved1 = 0,
             .extended_boot_signature = 0x29,
             .serial_number = 0,
@@ -157,9 +163,9 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
             0x72, 0x72, 0x41, 0x61
         },
 
-        // I may plan not to keep these updated tbh...
+        // Subtract 3 for first two reserved, root dir, and readme
         .num_free_clusters = 0xFFFFFFFF,
-        .last_allocated_date_cluster = 0xFFFFFFFF ,
+        .last_allocated_date_cluster = 0xFFFFFFFF,
 
         .reserved1 = {0},
 
@@ -174,7 +180,6 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     }
 
     // So the FATs are going to start right after the boot and fs info sectors.
-    // At sector index 2. Remember, it's completely valid for the FATs to start later!
 
     uint32_t fat_sector[512 / sizeof(uint32_t)] = {0};
 
@@ -203,8 +208,7 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
         }
     }
 
-    // Damn, I think that's pretty much it, now just for the root directory!
-    // Writing out to a file/directory will take some work big time!
+    // Write out root directory and readme contents!
 
     const uint32_t data_section_offset = offset + reserved_sectors + (fat_copies * spf);
     
@@ -251,7 +255,7 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     // Remember, the root directory as a whole is more than just one sector!
 
     // Write out root directory.
-    err = bd_write(bd, data_section_offset + (2 * sectors_per_cluster), 1, root_dir);
+    err = bd_write(bd, data_section_offset, 1, root_dir);
     if (err != FOS_SUCCESS) {
         return err;
     }
@@ -259,14 +263,14 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     // Make sure ALL of the root directory is zeroed out!
     mem_set(root_dir, 0, sizeof(root_dir));
     for (uint32_t s = 1; s < sectors_per_cluster; s++) {
-        err = bd_write(bd, data_section_offset + (2 * sectors_per_cluster) + s, 1, root_dir);
+        err = bd_write(bd, data_section_offset + s, 1, root_dir);
         if (err != FOS_SUCCESS) {
             return err;
         }
     }
 
     // Write out README.TXT
-    err = bd_write(bd, data_section_offset * (3 * sectors_per_cluster), 1, readme_txt);
+    err = bd_write(bd, data_section_offset + (1 * sectors_per_cluster), 1, readme_txt);
     if (err != FOS_SUCCESS) {
         return err;
     }

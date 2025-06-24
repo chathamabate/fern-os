@@ -39,9 +39,6 @@ typedef struct _fat_bios_param_block_2_0_t {
      */
     uint16_t num_small_fat_root_dir_entires;
 
-    /**
-     * SHOULD BE 0 FOR FAT32
-     */
     uint16_t num_sectors;
 
     /**

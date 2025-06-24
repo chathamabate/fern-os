@@ -128,8 +128,11 @@ $(BIN_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 bin: $(BIN_FILE)
 
 TOY_DISK := $(BUILD_DIR)/hdd.img
-$(TOY_DISK):
-	qemu-img create -f raw $(TOY_DISK) 64M
+$(TOY_DISK): | $(BUILD_DIR)
+	qemu-img create -f raw $(TOY_DISK) 1M
+
+t: $(TOY_DISK)
+	mkfs.fat -F 32 -s 2 $(TOY_DISK)
 
 qemu.bin: $(BIN_FILE) | $(TOY_DISK)
 	qemu-system-x86_64 \
