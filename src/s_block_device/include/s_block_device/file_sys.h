@@ -60,17 +60,6 @@ typedef struct _file_sys_info_t {
     size_t len;
 } file_sys_info_t;
 
-typedef struct _file_sys_t file_sys_t;
-typedef struct _file_sys_impl_t file_sys_impl_t;
-
-struct _file_sys_impl_t {
-    int nop;
-};
-
-struct _file_sys_t {
-    const file_sys_impl_t * const impl;
-};
-
 /**
  * A handle is an implementation specific way of referencing a file.
  *
@@ -100,15 +89,44 @@ struct _file_sys_t {
  */
 typedef void *file_sys_handle_t;
 
+
+typedef struct _file_sys_t file_sys_t;
+typedef struct _file_sys_impl_t file_sys_impl_t;
+
+struct _file_sys_impl_t {
+    void (*delete_file_system)(file_sys_t *fs);
+    void (*fs_return_handle)(file_sys_t *fs, file_sys_handle_t hndl);
+    fernos_error_t (*fs_find_root_dir)(file_sys_t *fs, bool write, file_sys_handle_t *out);
+    fernos_error_t (*fs_get_info)(file_sys_t *fs, file_sys_handle_t hndl, file_sys_info_t *out);
+    fernos_error_t (*fs_is_write_handle)(file_sys_t *fs, file_sys_handle_t hndl, bool *out);
+    fernos_error_t (*fs_find)(file_sys_t *fs, file_sys_handle_t dir_hndl, size_t index, bool write, file_sys_handle_t *out);
+    fernos_error_t (*fs_get_parent_dir)(file_sys_t *fs, file_sys_handle_t hndl, bool write, file_sys_handle_t *out);
+    fernos_error_t (*fs_mkdir)(file_sys_t *fs, file_sys_handle_t dir, const char *fn, file_sys_handle_t *out);
+    fernos_error_t (*fs_touch)(file_sys_t *fs, file_sys_handle_t dir, const char *fn, file_sys_handle_t *out);
+    fernos_error_t (*fs_rm)(file_sys_t *fs, file_sys_handle_t dir, size_t index);
+    fernos_error_t (*fs_read)(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len, void *dest, size_t *readden);
+    fernos_error_t (*fs_write)(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len, const void *src, size_t *written);
+};
+
+struct _file_sys_t {
+    const file_sys_impl_t * const impl;
+};
+
 /**
  * Delete a file system.
  */
-void delete_file_system(file_sys_t *fs);
+static inline void delete_file_system(file_sys_t *fs) {
+    if (fs) {
+        fs->impl->delete_file_system(fs);
+    }
+}
 
 /**
  * Return a handle to the file system.
  */
-void fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl);
+static inline void fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl) {
+    fs->impl->fs_return_handle(fs, hndl);
+}
 
 /**
  * Retrieve a handle for the root directory.
@@ -119,7 +137,9 @@ void fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl);
  *
  * NOTE: This handle needs to be returned after use just like any other handle!
  */
-fernos_error_t fs_find_root_dir(file_sys_t *fs, bool write, file_sys_handle_t *out);
+static inline fernos_error_t fs_find_root_dir(file_sys_t *fs, bool write, file_sys_handle_t *out) {
+    return fs->impl->fs_find_root_dir(fs, write, out);
+}
 
 /**
  * READ OPERATION
@@ -128,12 +148,16 @@ fernos_error_t fs_find_root_dir(file_sys_t *fs, bool write, file_sys_handle_t *o
  *
  * On error, the value of *out is undefined.
  */
-fernos_error_t fs_get_info(file_sys_t *fs, file_sys_handle_t hndl, file_sys_info_t *out);
+static inline fernos_error_t fs_get_info(file_sys_t *fs, file_sys_handle_t hndl, file_sys_info_t *out) {
+    return fs->impl->fs_get_info(fs, hndl, out);
+}
 
 /**
  * Determine if a given handle is a readonly handle or a write handle.
  */
-fernos_error_t fs_is_write_handle(file_sys_t *fs, file_sys_handle_t hndl, bool *out);
+static inline fernos_error_t fs_is_write_handle(file_sys_t *fs, file_sys_handle_t hndl, bool *out) {
+    return fs->impl->fs_is_write_handle(fs, hndl, out);
+}
 
 /**
  * READ OPERATION
@@ -155,8 +179,10 @@ fernos_error_t fs_is_write_handle(file_sys_t *fs, file_sys_handle_t hndl, bool *
  * NOTE: I thought about saying NULL is always written to the out handle on error, but in another 
  * implementation, NULL might actually have some significance.
  */
-fernos_error_t fs_find(file_sys_t *fs, file_sys_handle_t dir_hndl, 
-        size_t index, bool write, file_sys_handle_t *out);
+static inline fernos_error_t fs_find(file_sys_t *fs, file_sys_handle_t dir_hndl, 
+        size_t index, bool write, file_sys_handle_t *out) {
+    return fs->impl->fs_find(fs, dir_hndl, index, write, out);
+}
 
 /**
  * READ OPERATION 
@@ -167,8 +193,10 @@ fernos_error_t fs_find(file_sys_t *fs, file_sys_handle_t dir_hndl,
  *
  * Returns an error if hndl points to the root directory.
  */
-fernos_error_t fs_get_parent_dir(file_sys_t *fs, file_sys_handle_t hndl, bool write, 
-        file_sys_handle_t *out);
+static inline fernos_error_t fs_get_parent_dir(file_sys_t *fs, file_sys_handle_t hndl, bool write, 
+        file_sys_handle_t *out) {
+    return fs->impl->fs_get_parent_dir(fs, hndl, write, out);
+}
 
 /**
  * WRITE OPERATION
@@ -178,8 +206,10 @@ fernos_error_t fs_get_parent_dir(file_sys_t *fs, file_sys_handle_t hndl, bool wr
  * out is an optional parameter. If provided, on success, a handle is created for the new directory
  * and written to *out (The created handle will be a write handle).
  */
-fernos_error_t fs_mkdir(file_sys_t *fs, file_sys_handle_t dir, 
-        const char *fn, file_sys_handle_t *out);
+static inline fernos_error_t fs_mkdir(file_sys_t *fs, file_sys_handle_t dir, 
+        const char *fn, file_sys_handle_t *out) {
+    return fs->impl->fs_mkdir(fs, dir, fn, out);
+}
 
 /**
  * WRITE OPERATION
@@ -189,8 +219,10 @@ fernos_error_t fs_mkdir(file_sys_t *fs, file_sys_handle_t dir,
  * out is an optional parameter. If provided, on success, a handle is created for the new file
  * and written to *out.
  */
-fernos_error_t fs_touch(file_sys_t *fs, file_sys_handle_t dir, 
-        const char *fn, file_sys_handle_t *out);
+static inline fernos_error_t fs_touch(file_sys_t *fs, file_sys_handle_t dir, 
+        const char *fn, file_sys_handle_t *out) {
+    return fs->impl->fs_touch(fs, dir, fn, out);
+}
 
 /**
  * WRITE OPERATION
@@ -200,26 +232,45 @@ fernos_error_t fs_touch(file_sys_t *fs, file_sys_handle_t dir,
  * Return FOS_IN_USE if the file trying to be deleted has any outstanding handles!
  * Returns FOS_STATE_MISMATCH if the index given points to a non-empty subdirectory!
  */
-fernos_error_t fs_rm(file_sys_t *fs, file_sys_handle_t dir, size_t index);
+static inline fernos_error_t fs_rm(file_sys_t *fs, file_sys_handle_t dir, size_t index) {
+    return fs->impl->fs_rm(fs, dir, index);
+}
 
-// Reading/appending will need work!
-// Should handles include some sort of offset into the file... how should that work???
+/*
+ * Read and write operations below are only permitted on non-directory files!
+ */
 
 /**
+ * READ OPERATION
+ *
  * Read data from a file. 
  *
  * On Success, FOS_SUCCESS is returned and the number of bytes read are written to *readden.
  * A partial read is still a success!!! So always check readden to confirm.
  *
  * readden should be a required argument.
+ *
+ * Returns an error if the given handle points to a directory.
  */
-fernos_error_t fs_read(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, 
-        void *dest, size_t *readden);
+static inline fernos_error_t fs_read(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len,
+        void *dest, size_t *readden) {
+    return fs->impl->fs_read(fs, hndl, offset, len, dest, readden);
+}
 
 /**
- * 
+ * WRITE OPERATION
+ *
+ * Write data to a file.
+ *
+ * If the write operation overshoots the end of the file, the file system should attempt to
+ * grow the file to the necessary size.
+ *
+ * Just like `fs_read` above, the total number of bytes written is place in *written on success.
+ * Any bytes being written at all is a success, so always check *written.
  */
-fernos_error_t fs_append(file_sys_t *fs, file_sys_handle_t hndl, 
-        const void *src, size_t len, size_t *written);
+static inline fernos_error_t fs_write(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len,
+        const void *src, size_t *written) {
+    return fs->impl->fs_write(fs, hndl, offset, len, src, written);
+}
 
 
