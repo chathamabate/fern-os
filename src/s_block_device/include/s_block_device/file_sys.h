@@ -76,6 +76,27 @@ struct _file_sys_t {
  *
  * A handle is given to the user via various calls below, and all handles must be returned to the
  * file system. 
+ *
+ * VERY IMPORTANT:
+ *
+ * A file system implementation should support the following constants:
+ *
+ * 1) All file handles are either read or write handles.
+ * 2) A write handle is a read handle, but a read handle is NOT a write handle.
+ * 3) Multiple read handles can exist at once for one file, but only one write handle can
+ * exist at once for a single file. (No read only handles can exist when a write handle exists)
+ *
+ * The idea here is that write handles exist for modification and reading, whereas, readonly 
+ * handles exist only for reading. The file system should internally keep track of outstanding
+ * handles and their modes.
+ *
+ * Functions below marked "READ OPERATION" will be usable by both read and write handles.
+ * Functions marked "WRITE OPERATION" will be usable ONLY by write handles.
+ * Using a handle of the incorrect type should yield a FOS_STATE_MISMATCH error.
+ *
+ * Operations which retrieve a handle should return FOS_IN_USE if outstanding handles prevent
+ * the return of a new handle. (For example, trying to get a read handle when a write handle
+ * already exists)
  */
 typedef void *file_sys_handle_t;
 
@@ -94,11 +115,15 @@ void fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl);
  *
  * The root directory should always exist within the file system!
  *
+ * Use `write` to say whether you want the handle in readonly or write mode.
+ *
  * NOTE: This handle needs to be returned after use just like any other handle!
  */
-fernos_error_t fs_find_root_dir(file_sys_t *fs, file_sys_handle_t *out);
+fernos_error_t fs_find_root_dir(file_sys_t *fs, bool write, file_sys_handle_t *out);
 
 /**
+ * READ OPERATION
+ *
  * Get information about a given file.
  *
  * On error, the value of *out is undefined.
@@ -106,6 +131,13 @@ fernos_error_t fs_find_root_dir(file_sys_t *fs, file_sys_handle_t *out);
 fernos_error_t fs_get_info(file_sys_t *fs, file_sys_handle_t hndl, file_sys_info_t *out);
 
 /**
+ * Determine if a given handle is a readonly handle or a write handle.
+ */
+fernos_error_t fs_is_write_handle(file_sys_t *fs, file_sys_handle_t hndl, bool *out);
+
+/**
+ * READ OPERATION
+ *
  * Get the handle of a file within a directory.
  *
  * A directory holds a list of entries. Index is used to pick a certain entry. 
@@ -124,27 +156,34 @@ fernos_error_t fs_get_info(file_sys_t *fs, file_sys_handle_t hndl, file_sys_info
  * implementation, NULL might actually have some significance.
  */
 fernos_error_t fs_find(file_sys_t *fs, file_sys_handle_t dir_hndl, 
-        size_t index, file_sys_handle_t *out);
+        size_t index, bool write, file_sys_handle_t *out);
 
 /**
+ * READ OPERATION 
+ *
  * Get the parent directory of a file.
  *
  * The retrieved handle is written to *out.
  *
  * Returns an error if hndl points to the root directory.
  */
-fernos_error_t fs_get_parent_dir(file_sys_t *fs, file_sys_handle_t hndl, file_sys_handle_t *out);
+fernos_error_t fs_get_parent_dir(file_sys_t *fs, file_sys_handle_t hndl, bool write, 
+        file_sys_handle_t *out);
 
 /**
+ * WRITE OPERATION
+ *
  * Create a new directory with the given name.
  *
  * out is an optional parameter. If provided, on success, a handle is created for the new directory
- * and written to *out.
+ * and written to *out (The created handle will be a write handle).
  */
 fernos_error_t fs_mkdir(file_sys_t *fs, file_sys_handle_t dir, 
         const char *fn, file_sys_handle_t *out);
 
 /**
+ * WRITE OPERATION
+ *
  * Create a new non-directory file with the given name.
  *
  * out is an optional parameter. If provided, on success, a handle is created for the new file
@@ -154,17 +193,17 @@ fernos_error_t fs_touch(file_sys_t *fs, file_sys_handle_t dir,
         const char *fn, file_sys_handle_t *out);
 
 /**
+ * WRITE OPERATION
+ *
  * Delete a file.
  *
- * Returns an error if hndl points to the root directory.
- *
- * Returns an error if hndl points to a non-empty directory. Recursive deletion could be a pretty
- * time-intensive task. So, this call kinda bubbles up the responsibilty. (Recursive deletion
- * will probably best be implemented in userspace to prevent long kernel operations)
+ * Return FOS_IN_USE if the file trying to be deleted has any outstanding handles!
+ * Returns FOS_STATE_MISMATCH if the index given points to a non-empty subdirectory!
  */
-fernos_error_t fs_rm(file_sys_t *fs, file_sys_handle_t hndl);
+fernos_error_t fs_rm(file_sys_t *fs, file_sys_handle_t dir, size_t index);
 
 // Reading/appending will need work!
+// Should handles include some sort of offset into the file... how should that work???
 
 /**
  * Read data from a file. 
