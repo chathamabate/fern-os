@@ -131,8 +131,9 @@ TOY_DISK := $(BUILD_DIR)/hdd.img
 $(TOY_DISK): | $(BUILD_DIR)
 	qemu-img create -f raw $(TOY_DISK) 1M
 
-t: $(TOY_DISK)
-	mkfs.fat -F 32 -s 2 $(TOY_DISK)
+# Used for FAT32 testing.
+# t: $(TOY_DISK)
+#	mkfs.fat -F 32 -s 2 $(TOY_DISK)
 
 qemu.bin: $(BIN_FILE) | $(TOY_DISK)
 	qemu-system-x86_64 \

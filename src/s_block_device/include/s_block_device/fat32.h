@@ -450,7 +450,7 @@ uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sect
 /**
  * Initialize a Block device with the FAT32 structure.
  *
- * offset it where in the block device you'd like the partition to begin. NOTE: this does NOT
+ * offset is where in the block device you'd like the partition to begin. NOTE: this does NOT
  * set any sort of global partition table if offset > 0.
  *
  * num_sectors is the number of total sectors which will be occupied by the partition.
