@@ -1,5 +1,5 @@
 
-#include "s_block_device/fat32.h"
+#include "s_block_device/fat32_file_sys.h"
 #include <stdbool.h>
 #include "s_util/str.h"
 #include "k_bios_term/term.h"
@@ -276,4 +276,16 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     }
 
     return FOS_SUCCESS;
+}
+
+/*
+ * FAT32 FS Work.
+ */
+
+static const file_sys_impl_t FAT32_FS_IMPL = {
+     0
+};
+
+file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset) {
+    return NULL;
 }

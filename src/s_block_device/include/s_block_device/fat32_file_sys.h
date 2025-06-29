@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "s_util/misc.h"
 #include "s_block_device/block_device.h"
+#include "s_block_device/file_sys.h"
+#include "s_mem/allocator.h"
 
 #define FAT32_MASK          (0x0FFFFFFFU)
 #define FAT32_EOC           (0x0FFFFFF8U)
@@ -465,3 +467,34 @@ uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sect
  */
 fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sectors, 
         uint32_t sectors_per_cluster);
+
+/*
+ * Now for actual file system stuff.
+ */
+
+typedef struct _fat32_file_sys_t {
+    file_sys_t super;
+
+    allocator_t *al;
+    block_device_t *bd;
+    uint32_t bd_offset;
+
+} fat32_file_sys_t;
+
+/**
+ * Create a FAT32 file system object.
+ *
+ * This assumes that a valid FAT32 parition begins at `offset` within the given `bd`.
+ * This DOES NOT intialize FAT32 on the block device.
+ *
+ * The created file system DOES NOT own the given block device.
+ * When the created file system is deleted, the given block device will persist.
+ *
+ * Returns NULL on error.
+ */
+file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset);
+
+static inline file_sys_t *new_da_fat32_file_sys(block_device_t *bd, uint32_t offset) {
+    return new_fat32_file_sys(get_default_allocator(), bd, offset);
+}
+

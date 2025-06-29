@@ -25,7 +25,7 @@
 #include "s_data/test/wait_queue.h"
 #include "s_data/test/map.h"
 #include "k_startup/test/process.h"
-#include "s_block_device/fat32.h"
+#include "s_block_device/fat32_file_sys.h"
 #include "s_block_device/block_device.h"
 
 #include "k_sys/ata.h"
