@@ -282,10 +282,117 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
  * FAT32 FS Work.
  */
 
+static void delete_fat32_file_system(file_sys_t *fs);
+static void fat32_fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl);
+static fernos_error_t fat32_fs_find_root_dir(file_sys_t *fs, bool write, file_sys_handle_t *out);
+static fernos_error_t fat32_fs_get_info(file_sys_t *fs, file_sys_handle_t hndl, file_sys_info_t *out);
+static fernos_error_t fat32_fs_is_write_handle(file_sys_t *fs, file_sys_handle_t hndl, bool *out);
+static fernos_error_t fat32_fs_find(file_sys_t *fs, file_sys_handle_t dir_hndl, size_t index, bool write, file_sys_handle_t *out);
+static fernos_error_t fat32_fs_get_parent_dir(file_sys_t *fs, file_sys_handle_t hndl, bool write, file_sys_handle_t *out);
+static fernos_error_t fat32_fs_mkdir(file_sys_t *fs, file_sys_handle_t dir, const char *fn, file_sys_handle_t *out);
+static fernos_error_t fat32_fs_touch(file_sys_t *fs, file_sys_handle_t dir, const char *fn, file_sys_handle_t *out);
+static fernos_error_t fat32_fs_rm(file_sys_t *fs, file_sys_handle_t dir, size_t index);
+static fernos_error_t fat32_fs_read(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len, void *dest, size_t *readden);
+static fernos_error_t fat32_fs_write(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len, const void *src, size_t *written);
+
 static const file_sys_impl_t FAT32_FS_IMPL = {
-     0
+    .delete_file_system = delete_fat32_file_system,
+    .fs_return_handle = fat32_fs_return_handle,
+    .fs_find_root_dir = fat32_fs_find_root_dir,
+    .fs_get_info = fat32_fs_get_info,
+    .fs_is_write_handle = fat32_fs_is_write_handle,
+    .fs_find = fat32_fs_find,
+    .fs_get_parent_dir = fat32_fs_get_parent_dir,
+    .fs_mkdir = fat32_fs_mkdir,
+    .fs_touch = fat32_fs_touch,
+    .fs_rm = fat32_fs_rm,
+    .fs_read = fat32_fs_read,
+    .fs_write = fat32_fs_write,
 };
 
-file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset) {
+file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset_sector) {
+    if (!al || !bd) {
+        return NULL;
+    }
+
+    if (bd_sector_size(bd) != 512) {
+        return NULL;
+    }
+
+    // We need to read the boot sector and the fs_info sector.
+
+    if (!(offset_sector < bd_num_sectors(bd) && bd_num_sectors(bd) - offset_sector >= 2)) {
+        return NULL;
+    }
+
+    // Ok now can we try to see if the given BD is even formatted as FAT32?
+    // There is only so much testing we can realistically do here.
+    // We'll just do some obvious checks and call it a day.
+
+    fat32_fs_boot_sector_t boot_sector;
+    fat32_fs_info_sector_t info_sector;
+
+    if (bd_read(bd, offset_sector, 1, &boot_sector) != FOS_SUCCESS) {
+        return NULL;
+    }
+
+    if (bd_read(bd, offset_sector + 1, 1, &info_sector) != FOS_SUCCESS) {
+        return NULL;
+    }
+
     return NULL;
 }
+
+static void delete_fat32_file_system(file_sys_t *fs) {
+}
+
+static void fat32_fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl) {
+}
+
+static fernos_error_t fat32_fs_find_root_dir(file_sys_t *fs, bool write, 
+        file_sys_handle_t *out) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fat32_fs_get_info(file_sys_t *fs, file_sys_handle_t hndl, 
+        file_sys_info_t *out) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fat32_fs_is_write_handle(file_sys_t *fs, file_sys_handle_t hndl, bool *out) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fat32_fs_find(file_sys_t *fs, file_sys_handle_t dir_hndl, size_t index, 
+        bool write, file_sys_handle_t *out) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fat32_fs_get_parent_dir(file_sys_t *fs, file_sys_handle_t hndl, 
+        bool write, file_sys_handle_t *out) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fat32_fs_mkdir(file_sys_t *fs, file_sys_handle_t dir, const char *fn, file_sys_handle_t *out) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fat32_fs_touch(file_sys_t *fs, file_sys_handle_t dir, const char *fn, 
+        file_sys_handle_t *out) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fat32_fs_rm(file_sys_t *fs, file_sys_handle_t dir, size_t index) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fat32_fs_read(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, 
+        size_t len, void *dest, size_t *readden) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fat32_fs_write(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, 
+        size_t len, const void *src, size_t *written) {
+    return FOS_NOT_IMPLEMENTED;
+}
+

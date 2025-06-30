@@ -477,24 +477,25 @@ typedef struct _fat32_file_sys_t {
 
     allocator_t *al;
     block_device_t *bd;
-    uint32_t bd_offset;
+    uint32_t bd_offset_sector;
 
 } fat32_file_sys_t;
 
 /**
  * Create a FAT32 file system object.
  *
- * This assumes that a valid FAT32 parition begins at `offset` within the given `bd`.
+ * This assumes that a valid FAT32 parition begins at `offset_sector` within the given `bd`.
  * This DOES NOT intialize FAT32 on the block device.
+ * This requires a block device with sector size 512!
  *
  * The created file system DOES NOT own the given block device.
  * When the created file system is deleted, the given block device will persist.
  *
  * Returns NULL on error.
  */
-file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset);
+file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset_sector);
 
-static inline file_sys_t *new_da_fat32_file_sys(block_device_t *bd, uint32_t offset) {
-    return new_fat32_file_sys(get_default_allocator(), bd, offset);
+static inline file_sys_t *new_da_fat32_file_sys(block_device_t *bd, uint32_t offset_sector) {
+    return new_fat32_file_sys(get_default_allocator(), bd, offset_sector);
 }
 
