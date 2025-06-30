@@ -47,6 +47,13 @@
         } \
     } while (0);
 
+#define PROP_NULL(expr) \
+    do { \
+        if (expr) { \
+            return NULL; \
+        } \
+    } while (0);
+
 void _dump_hex_pairs(void (*pf)(const char *fmt, ...), ...);
 
 #define dump_hex_pairs(...) _dump_hex_pairs(__VA_ARGS__, NULL)

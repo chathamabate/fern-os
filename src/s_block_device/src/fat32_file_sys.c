@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "s_util/str.h"
 #include "k_bios_term/term.h"
+#include "s_util/misc.h"
 
 uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sector, 
         uint16_t reserved_sectors, uint8_t fat_copies,  uint8_t sectors_per_cluster) {
@@ -311,34 +312,61 @@ static const file_sys_impl_t FAT32_FS_IMPL = {
 };
 
 file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset_sector) {
-    if (!al || !bd) {
-        return NULL;
-    }
+    PROP_NULL(!al || !bd);
+    PROP_NULL(bd_sector_size(bd) != 512);
 
-    if (bd_sector_size(bd) != 512) {
-        return NULL;
-    }
+    // We need to read the boot sector first.
 
-    // We need to read the boot sector and the fs_info sector.
-
-    if (!(offset_sector < bd_num_sectors(bd) && bd_num_sectors(bd) - offset_sector >= 2)) {
-        return NULL;
-    }
+    PROP_NULL(offset_sector < bd_num_sectors(bd));
 
     // Ok now can we try to see if the given BD is even formatted as FAT32?
     // There is only so much testing we can realistically do here.
     // We'll just do some obvious checks and call it a day.
 
+    // First verify boot sector.
     fat32_fs_boot_sector_t boot_sector;
+
+    PROP_NULL(bd_read(bd, offset_sector, 1, &boot_sector) != FOS_SUCCESS);
+    PROP_NULL(boot_sector.fat32_ebpb.super.super.bytes_per_sector != 512);
+
+    const uint8_t sectors_per_cluster = boot_sector.fat32_ebpb.super.super.sectors_per_cluster;
+
+    bool valid_spc = false;
+    for (uint32_t i = 0; i < 8; i++) {
+        if (sectors_per_cluster == (1UL << i)) {
+            valid_spc = true;
+            break;
+        }
+    }
+
+    PROP_NULL(!valid_spc);
+
+    const uint8_t num_fats = boot_sector.fat32_ebpb.super.super.num_fats;
+    PROP_NULL(num_fats == 0);
+
+    const uint32_t num_sectors = boot_sector.fat32_ebpb.super.super.num_sectors;
+    PROP_NULL(num_sectors == 0 || num_sectors + offset_sector < offset_sector || 
+            num_sectors + offset_sector > bd_num_sectors(bd));
+
+    // This should confirm FAT32.
+    PROP_NULL(boot_sector.fat32_ebpb.super.super.sectors_per_fat != 0);
+
+    const uint32_t sectors_per_fat = boot_sector.fat32_ebpb.sectors_per_fat;
+    PROP_NULL(sectors_per_fat == 0);
+
+    const uint32_t root_dir_cluster = boot_sector.fat32_ebpb.root_dir_cluster;
+    PROP_NULL(root_dir_cluster < 2);
+
+    const uint32_t fs_info_sector = boot_sector.fat32_ebpb.fs_info_sector;
+    PROP_NULL(fs_info_sector == 0 || fs_info_sector > num_sectors);
+
+    PROP_NULL(boot_sector.fat32_ebpb.extended_boot_signature != 0x29);
+    PROP_NULL(boot_sector.boot_signature[0] != 0x55 || boot_sector.boot_signature[1] != 0xA);
+
+    // Next verify info sector.
     fat32_fs_info_sector_t info_sector;
 
-    if (bd_read(bd, offset_sector, 1, &boot_sector) != FOS_SUCCESS) {
-        return NULL;
-    }
-
-    if (bd_read(bd, offset_sector + 1, 1, &info_sector) != FOS_SUCCESS) {
-        return NULL;
-    }
+    PROP_NULL(bd_read(bd, offset_sector + 1, 1, &info_sector) != FOS_SUCCESS);
 
     return NULL;
 }
