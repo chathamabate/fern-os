@@ -43,7 +43,8 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     }
 
     const size_t ns = bd_num_sectors(bd);
-    if (offset >= ns || offset + num_sectors > ns || ns > num_sectors) {
+    // Last check should handle wrap.
+    if (offset >= ns || offset + num_sectors > ns || offset + num_sectors < offset) {
         return FOS_INVALID_RANGE;
     }
 
@@ -96,7 +97,7 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
 
                     .num_small_fat_root_dir_entires = 0,
 
-                    .num_sectors = num_sectors,
+                    .num_sectors = 0,
                     .media_descriptor = 0xF8,
                     .sectors_per_fat = 0
                 },
@@ -363,7 +364,7 @@ file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t off
     PROP_NULL(boot_sector.fat32_ebpb.extended_boot_signature != 0x29);
     PROP_NULL(boot_sector.boot_signature[0] != 0x55 || boot_sector.boot_signature[1] != 0xA);
 
-    // Next verify info sector.
+    // Next verify info sector. (Should be less involved tbh)
     fat32_fs_info_sector_t info_sector;
 
     PROP_NULL(bd_read(bd, offset_sector + 1, 1, &info_sector) != FOS_SUCCESS);

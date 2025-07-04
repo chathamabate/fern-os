@@ -138,7 +138,7 @@ void start_kernel(void) {
 
     //  screw around stuff.
     block_device_t *bd = get_ata_block_device();
-    fernos_error_t err = init_fat32(bd, 0, bd_num_sectors(bd), 8);
+    fernos_error_t err = init_fat32(bd, 16, bd_num_sectors(bd) - 128, 1);
     if (err != FOS_SUCCESS) {
         term_put_s("Failure\n");
     } else {
