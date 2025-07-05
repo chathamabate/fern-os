@@ -6,6 +6,7 @@
 #include "s_block_device/block_device.h"
 #include "s_block_device/file_sys.h"
 #include "s_mem/allocator.h"
+#include "s_data/map.h"
 
 #define FAT32_MASK          (0x0FFFFFFFU)
 #define FAT32_EOC           (0x0FFFFFF8U)
@@ -421,6 +422,8 @@ typedef struct _fat32_long_fn_dir_entry_t {
 
     /**
      * 5 UTF-16 characters. (I may just support ascii anyway tbh)
+     *
+     * For all filename segments, after the NULL terminator comes 0xFFFF pads.
      */
     uint16_t long_fn_0[5];
 
@@ -429,6 +432,9 @@ typedef struct _fat32_long_fn_dir_entry_t {
      */
     uint8_t attrs;
 
+    /**
+     * Must be 0.
+     */
     uint8_t type;
 
     uint8_t short_fn_checksum;
@@ -442,6 +448,11 @@ typedef struct _fat32_long_fn_dir_entry_t {
 
     uint16_t long_fn_2[2];
 } __attribute__ ((packed)) fat32_long_fn_dir_entry_t;
+
+/**
+ * Computer the standard FAT32 checksum for a short filename.
+ */
+uint8_t fat32_checksum(const char *short_fn);
 
 /**
  * Given these parameters, calculate how many sectors should be in each FAT.
@@ -478,6 +489,8 @@ typedef struct _fat32_file_sys_t {
     /**
      * NOTE: All "offset" fields below are in sectors.
      * *Unless stated otherwise*
+     *
+     * All "cluster" fields are indeces into the FAT.
      */
 
     allocator_t * const al;
@@ -529,21 +542,60 @@ typedef struct _fat32_file_sys_t {
      * The cluster of the root directory.
      */
     const uint32_t root_dir_cluster;
-
-    // So, now how should handles be stored/Remembered?
-
+    
+    /**
+     * A File's first cluster index is unique across ALL files. Thus, that is the key used
+     * for this map. The values are the pointers to the allocated handles themselves.
+     *
+     * This implementation will never hold more than one copy of a handle. 
+     */
+    map_t * const handle_map;
 } fat32_file_sys_t;
 
 typedef struct _fat32_file_sys_handle_t {
     /**
      * The starting cluster of this file's parent directory.
+     *
+     * 0 if this handle is for the root directory.
      */
     const uint32_t parent_dir_cluster;
 
     /**
+     * Index of this file's first entry in the parent directory.
+     *
+     * Remember, this is index within the directory sectors. 
+     * This is different than the index passed into fs_find/rm
+     *
+     * Undefined Value if this handle is for the root directory.
+     */
+    const uint32_t first_entry_index;
+
+    /**
      * The starting cluster of this file.
      */
-    const uint32_t file_cluster;
+    const uint32_t first_file_cluster;
+
+    /**
+     * Is this a write handle?
+     */
+    const bool write;
+
+    /**
+     * This denotes the number of people currently using this handle. Should always be 1 for
+     * write handles. When this reaches 0, the handle will likely be destroyed.
+     */
+    uint32_t users;
+
+    /**
+     * Is this a directory handle?
+     */
+    const bool dir;
+
+    /**
+     * Length in bytes of the file. If this is a directory, this value should always be a multiple
+     * of the cluster size.
+     */
+    uint32_t len;
 } fat32_file_sys_handle_t;
 
 /**

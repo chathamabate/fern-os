@@ -66,6 +66,8 @@ typedef struct _file_sys_info_t {
  * A handle is given to the user via various calls below, and all handles must be returned to the
  * file system. 
  *
+ * A handle is gauranteed to be a pointer.
+ *
  * VERY IMPORTANT:
  *
  * A file system implementation should support the following constants:
@@ -86,6 +88,10 @@ typedef struct _file_sys_info_t {
  * Operations which retrieve a handle should return FOS_IN_USE if outstanding handles prevent
  * the return of a new handle. (For example, trying to get a read handle when a write handle
  * already exists)
+ *
+ * ALSO NOTE: Your implementation of these functions need not include some sort of thread safety.
+ * (They can! but they don't need to) The reader/writer paradigm is meant to just keep you 
+ * screwing up the disk unintentially when multiple handles are checked out. 
  */
 typedef void *file_sys_handle_t;
 

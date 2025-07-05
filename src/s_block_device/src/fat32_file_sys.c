@@ -5,6 +5,18 @@
 #include "k_bios_term/term.h"
 #include "s_util/misc.h"
 
+uint8_t fat32_checksum(const char *short_fn) {
+    uint8_t checksum = 0;
+
+    // Remember 8 + 3 length (No NT)
+    for (uint8_t i = 0; i < 11; i++) {
+        // I think this is just a rotate and add. 
+        checksum = ((checksum & 1) ? 0x80 : 0) + (checksum >> 1) + short_fn[i];
+    }
+
+    return checksum;
+}
+
 uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sector, 
         uint16_t reserved_sectors, uint8_t fat_copies,  uint8_t sectors_per_cluster) {
     if (total_sectors < reserved_sectors) {
@@ -237,7 +249,7 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     char readme_txt[512] = "First FernOS File!";
     size_t readme_txt_size = str_len(readme_txt) + 1;
 
-    root_dir[1] = (fat32_short_fn_dir_entry_t) {
+    root_dir[1 /*2*/] = (fat32_short_fn_dir_entry_t) {
         .short_fn = {'R', 'E', 'A', 'D', 'M', 'E', ' ', ' '},
         .extenstion = {'T', 'X', 'T'},
         .attrs = 0,
@@ -253,6 +265,26 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
         .first_cluster_low = 3,
         .files_size = readme_txt_size
     };
+
+    // Example Long Filename directory entry!
+    /*
+    ((fat32_long_fn_dir_entry_t *)root_dir)[1] = (fat32_long_fn_dir_entry_t) {
+        .entry_order = 0x40 | 1,
+
+        .long_fn_0 = { 'a', 'b', 'c', '.', 't' },
+
+        .attrs = 0x0F,
+        .type = 0,
+
+        .short_fn_checksum = fat32_checksum(root_dir[2].short_fn),
+
+        .long_fn_1 = { 'x', 't', 0x0, 0xFFFF, 0xFFFF, 0xFFFF },
+
+        .reserved = {0, 0},
+
+        .long_fn_2 = { 0xFFFF, 0xFFFF }
+    };
+    */
 
     // Remember, the root directory as a whole is more than just one sector!
 
@@ -283,6 +315,18 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
 /*
  * FAT32 FS Work.
  */
+
+static bool hndl_map_key_eq_ft(chained_hash_map_t *chm, const void *k0, const void *k1) {
+    (void)chm;
+
+    return *(uint32_t *)k0 == *(uint32_t *)k1;
+}
+
+static uint32_t hndl_key_hash_ft(chained_hash_map_t *chm, const void *k) {
+    (void)chm;
+
+    return ((((*(uint32_t *)k) + 133) * 7) + 1) * 3; // kinda random hash func.
+}
 
 static void delete_fat32_file_system(file_sys_t *fs);
 static void fat32_fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl);
@@ -388,7 +432,15 @@ file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t off
     // Validation is done, now I think we can actually start puutting together the structure.
     
     fat32_file_sys_t *fat32_fs = al_malloc(al, sizeof(fat32_file_sys_t));
-    PROP_NULL(!fat32_fs);
+    map_t *hndl_map = new_chained_hash_map(al, sizeof(uint32_t), sizeof(fat32_file_sys_handle_t *), 
+            3, hndl_map_key_eq_ft, hndl_key_hash_ft);
+
+    if (!fat32_fs || !hndl_map) {
+        delete_file_system((file_sys_t *)fat32_fs);
+        delete_map(hndl_map);
+
+        return NULL;
+    }
 
     *(const file_sys_impl_t **)&(fat32_fs->super.impl) = &FAT32_FS_IMPL;
 
@@ -423,13 +475,17 @@ file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t off
     *(uint32_t *)&(fat32_fs->num_clusters) = max_clusters;
     *(uint32_t *)&(fat32_fs->root_dir_cluster) = root_dir_cluster;
 
+    *(map_t **)&(fat32_fs->handle_map) = hndl_map;
+
     return (file_sys_t *)fat32_fs;
 }
 
 static void delete_fat32_file_system(file_sys_t *fs) {
+    // TODO
 }
 
 static void fat32_fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl) {
+    // TODO
 }
 
 static fernos_error_t fat32_fs_find_root_dir(file_sys_t *fs, bool write, 
