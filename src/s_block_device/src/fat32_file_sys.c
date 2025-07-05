@@ -421,7 +421,7 @@ file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t off
     }
 
     *(uint32_t *)&(fat32_fs->num_clusters) = max_clusters;
-    
+    *(uint32_t *)&(fat32_fs->root_dir_cluster) = root_dir_cluster;
 
     return (file_sys_t *)fat32_fs;
 }

@@ -525,7 +525,26 @@ typedef struct _fat32_file_sys_t {
      */
     const uint32_t num_clusters;
 
+    /**
+     * The cluster of the root directory.
+     */
+    const uint32_t root_dir_cluster;
+
+    // So, now how should handles be stored/Remembered?
+
 } fat32_file_sys_t;
+
+typedef struct _fat32_file_sys_handle_t {
+    /**
+     * The starting cluster of this file's parent directory.
+     */
+    const uint32_t parent_dir_cluster;
+
+    /**
+     * The starting cluster of this file.
+     */
+    const uint32_t file_cluster;
+} fat32_file_sys_handle_t;
 
 /**
  * Create a FAT32 file system object.
