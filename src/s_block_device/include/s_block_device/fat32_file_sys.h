@@ -475,9 +475,55 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
 typedef struct _fat32_file_sys_t {
     file_sys_t super;
 
-    allocator_t *al;
-    block_device_t *bd;
-    uint32_t bd_offset_sector;
+    /**
+     * NOTE: All "offset" fields below are in sectors.
+     * *Unless stated otherwise*
+     */
+
+    allocator_t * const al;
+    block_device_t * const bd;
+    const uint32_t bd_offset;
+
+    /**
+     * Number of sectors in this partition. NOT size of the block device.
+     */
+    const uint32_t num_sectors;
+
+    /**
+     * All "offset" fields below are relative to `bd_offset` above.
+     *
+     * Some of these fields will be directly from the boot sector. It's nice not
+     * to need to read disk everytime we want to know simple information about the FS.
+     */
+
+    /**
+     * Sector where first FAT begins.
+     */
+    const uint16_t fat_offset;
+
+    /**
+     * FAT redundancy
+     */
+    const uint8_t num_fats;
+
+    /**
+     * Remember that the space the FAT addresses may be smaller or larger than how much
+     * space is actually available. 
+     */
+    const uint32_t sectors_per_fat;
+
+    /**
+     * Where the data clusters begin. 
+     * Remember, there are no data clusters 0 or 1.
+     */
+    const uint32_t data_section_offset;
+
+    const uint8_t sectors_per_cluster;
+
+    /**
+     * Number of data clusters in the fat32 image.
+     */
+    const uint32_t num_clusters;
 
 } fat32_file_sys_t;
 

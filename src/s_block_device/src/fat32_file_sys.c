@@ -318,7 +318,7 @@ file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t off
 
     // We need to read the boot sector first.
 
-    PROP_NULL(offset_sector < bd_num_sectors(bd));
+    PROP_NULL(offset_sector >= bd_num_sectors(bd));
 
     // Ok now can we try to see if the given BD is even formatted as FAT32?
     // There is only so much testing we can realistically do here.
@@ -342,15 +342,22 @@ file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t off
 
     PROP_NULL(!valid_spc);
 
+    const uint16_t reserved_sectors = boot_sector.fat32_ebpb.super.super.reserved_sectors;
+    PROP_NULL(reserved_sectors < 2); // Need space at least for VBR and info sector.
+
     const uint8_t num_fats = boot_sector.fat32_ebpb.super.super.num_fats;
     PROP_NULL(num_fats == 0);
 
-    const uint32_t num_sectors = boot_sector.fat32_ebpb.super.super.num_sectors;
-    PROP_NULL(num_sectors == 0 || num_sectors + offset_sector < offset_sector || 
-            num_sectors + offset_sector > bd_num_sectors(bd));
-
     // This should confirm FAT32.
     PROP_NULL(boot_sector.fat32_ebpb.super.super.sectors_per_fat != 0);
+
+    // I think the point is to choose whichever field is non-zero.
+    const uint32_t num_sectors = boot_sector.fat32_ebpb.super.super.num_sectors == 0 
+        ? boot_sector.fat32_ebpb.super.num_sectors 
+        : boot_sector.fat32_ebpb.super.super.num_sectors;
+
+    PROP_NULL(num_sectors == 0 || num_sectors + offset_sector < offset_sector || 
+            num_sectors + offset_sector > bd_num_sectors(bd));
 
     const uint32_t sectors_per_fat = boot_sector.fat32_ebpb.sectors_per_fat;
     PROP_NULL(sectors_per_fat == 0);
@@ -362,14 +369,61 @@ file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t off
     PROP_NULL(fs_info_sector == 0 || fs_info_sector > num_sectors);
 
     PROP_NULL(boot_sector.fat32_ebpb.extended_boot_signature != 0x29);
-    PROP_NULL(boot_sector.boot_signature[0] != 0x55 || boot_sector.boot_signature[1] != 0xA);
+    PROP_NULL(boot_sector.boot_signature[0] != 0x55 || boot_sector.boot_signature[1] != 0xAA);
 
     // Next verify info sector. (Should be less involved tbh)
     fat32_fs_info_sector_t info_sector;
 
-    PROP_NULL(bd_read(bd, offset_sector + 1, 1, &info_sector) != FOS_SUCCESS);
+    PROP_NULL(bd_read(bd, offset_sector + fs_info_sector, 1, &info_sector) != FOS_SUCCESS);
 
-    return NULL;
+    const uint32_t sig0 = *(uint32_t *)&(info_sector.signature0);
+    PROP_NULL(sig0 != 0x41615252);
+
+    const uint32_t sig1 = *(uint32_t *)&(info_sector.signature1);
+    PROP_NULL(sig1 != 0x61417272);
+
+    const uint32_t sig2 = *(uint32_t *)&(info_sector.signature2);
+    PROP_NULL(sig2 == 0xAA55);
+
+    // Validation is done, now I think we can actually start puutting together the structure.
+    
+    fat32_file_sys_t *fat32_fs = al_malloc(al, sizeof(fat32_file_sys_t));
+    PROP_NULL(!fat32_fs);
+
+    *(const file_sys_impl_t **)&(fat32_fs->super.impl) = &FAT32_FS_IMPL;
+
+    // We have a lot of const fields here, unsure if this is really necessary,
+    // but whatevs...
+
+    *(allocator_t **)&(fat32_fs->al) = al;
+    *(block_device_t **)&(fat32_fs->bd) = bd;
+    *(uint32_t *)&(fat32_fs->bd_offset) = offset_sector;
+
+    *(uint32_t *)&(fat32_fs->num_sectors) = num_sectors;
+
+    *(uint32_t *)&(fat32_fs->fat_offset) = reserved_sectors;
+    *(uint8_t *)&(fat32_fs->num_fats) = num_fats;
+    *(uint32_t *)&(fat32_fs->sectors_per_fat) = sectors_per_fat; 
+
+    *(uint32_t *)&(fat32_fs->data_section_offset) = reserved_sectors 
+        + (num_fats * sectors_per_fat);
+    *(uint8_t *)&(fat32_fs->sectors_per_cluster) = sectors_per_cluster;
+    
+    // Ok, now we need to calc how many data clusters are actually in the image.
+    uint32_t max_clusters = (num_sectors - fat32_fs->data_section_offset) 
+        / sectors_per_cluster;
+
+    // This is the max number of clusters one fat could address.
+    // Remember, 2 entries of the FAT are never used.
+    const uint32_t fat_spanned_clusters = ((sectors_per_fat * 512) / sizeof(uint32_t)) - 2;
+    if (fat_spanned_clusters < max_clusters) {
+        max_clusters = fat_spanned_clusters;
+    }
+
+    *(uint32_t *)&(fat32_fs->num_clusters) = max_clusters;
+    
+
+    return (file_sys_t *)fat32_fs;
 }
 
 static void delete_fat32_file_system(file_sys_t *fs) {
