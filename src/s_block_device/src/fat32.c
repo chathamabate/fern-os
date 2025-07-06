@@ -444,6 +444,12 @@ fernos_error_t parse_fat32(block_device_t *bd, uint32_t offset, fat32_info_t *ou
     return FOS_SUCCESS;
 }
 
+// Just saying, this could be an eaiser way to go!!
+uint32_t parse_fat32_free_clusters(const uint32_t *fat_sector, uint8_t start_index,
+        fat32_free_pair_t *buf, uint32_t buf_len, uint8_t *next_index) {
+    return 0; 
+}
+
 // What if we want to get free clusters within a FAT???
 
 /**

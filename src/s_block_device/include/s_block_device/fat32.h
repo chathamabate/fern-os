@@ -516,6 +516,22 @@ typedef struct _fat32_info_t {
 } fat32_info_t;
 
 /**
+ * It'll likely be useful to be able to determine which sections of a FAT sector are
+ * entirely full of unused slots. That is what this structure is for!
+ */
+typedef struct _fat32_free_pair_t {
+    /**
+     * The first free cluster index.
+     */
+    uint32_t start;
+
+    /**
+     * How many clusters there are.
+     */
+    uint32_t clusters;
+} fat32_free_pair_t;
+
+/**
  * Compute the standard FAT32 checksum for a short filename.
  */
 uint8_t fat32_checksum(const char *short_fn);
@@ -552,6 +568,21 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
  * On success, information about the partition is written to *out.
  */
 fernos_error_t parse_fat32(block_device_t *bd, uint32_t offset, fat32_info_t *out);
+
+/**
+ * Parse a given fat_sector for free clusters.
+ *
+ * The number of free pairs read out will be returned.
+ *
+ * `slot_index` is where to start in the fat_sector. 
+ *
+ * If `next_index` is given, the index of the final cluster to be checked + 1 will be written to
+ * *next_index. If *next_index == SLOTS_PER_FAT_SECTOR, this means the entire fat was searched.
+ *
+ * The FAT search stops iff the output buffer was entirely filled with free pairs.
+ */
+uint32_t parse_fat32_free_clusters(const uint32_t *fat_sector, uint8_t start_index,
+        fat32_free_pair_t *buf, uint32_t buf_len, uint8_t *next_index);
 
 /*
 fernos_error_t fat32_get_cluster_chain(fat32_file_sys_t *fat32_fs, uint32_t start, 
