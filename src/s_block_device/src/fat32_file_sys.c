@@ -5,312 +5,6 @@
 #include "k_bios_term/term.h"
 #include "s_util/misc.h"
 
-uint8_t fat32_checksum(const char *short_fn) {
-    uint8_t checksum = 0;
-
-    // Remember 8 + 3 length (No NT)
-    for (uint8_t i = 0; i < 11; i++) {
-        // I think this is just a rotate and add. 
-        checksum = ((checksum & 1) ? 0x80 : 0) + (checksum >> 1) + short_fn[i];
-    }
-
-    return checksum;
-}
-
-uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sector, 
-        uint16_t reserved_sectors, uint8_t fat_copies,  uint8_t sectors_per_cluster) {
-    if (total_sectors < reserved_sectors) {
-        return 0;
-    }
-
-    const uint32_t available_sectors = total_sectors - reserved_sectors;
-
-    /**
-     * How many data sectors are required to add a single complete FAT sector.
-     * Assumes `bytes_per_sector` is divisible by 4.
-     */
-    const uint32_t data_sectors_per_fat_sector = (bytes_per_sector / 4) * sectors_per_cluster;
-
-    /**
-     * NOTE: I have learned that if that FAT is not large enough to cover the ENTIRE area,
-     * FAT validation will FAIL.
-     */
-
-    const uint32_t complete_fat_sectors = fat_copies + data_sectors_per_fat_sector;
-
-    if (available_sectors % complete_fat_sectors == 0) {
-        return available_sectors / complete_fat_sectors;
-    } 
-
-    return (available_sectors / complete_fat_sectors) + 1;
-}
-
-fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sectors, 
-        uint32_t sectors_per_cluster) {
-    fernos_error_t err;
-
-    const size_t bps = bd_sector_size(bd);
-    if (bps != 512) {
-        return FOS_BAD_ARGS;
-    }
-
-    const size_t ns = bd_num_sectors(bd);
-    // Last check should handle wrap.
-    if (offset >= ns || offset + num_sectors > ns || offset + num_sectors < offset) {
-        return FOS_INVALID_RANGE;
-    }
-
-    // Valid options: 1, 2, 4, 8, 16, 32, 64, 128
-    bool valid = false;
-    for (uint32_t shift = 0; shift < 8; shift++) {
-        if (sectors_per_cluster == 1UL << shift) {
-            valid = true;
-            break;
-        }
-    }
-
-    if (!valid) {
-        return FOS_BAD_ARGS;
-    }
-
-    const uint32_t reserved_sectors = 32;
-    const uint32_t fat_copies = 2;
-
-    // For now we will NOT copy the boot sector/fs_info sector.
-    const uint32_t spf = compute_sectors_per_fat(num_sectors, bps, 
-            reserved_sectors, fat_copies, sectors_per_cluster);
-
-    if (spf == 0) {
-        return FOS_BAD_ARGS; 
-    }
-
-    const uint32_t used_sectors = reserved_sectors + (spf * fat_copies);
-    if (num_sectors < used_sectors) {
-        return FOS_INVALID_RANGE;
-    }
-    
-    // Make sure we have at LEAST 16 data clusters.
-    const uint32_t available_data_clusters = (num_sectors - used_sectors) / sectors_per_cluster;
-    if (available_data_clusters < 16) {
-        return FOS_INVALID_RANGE;
-    }
-
-    // Ok, our, args are valid we think. Let's write out the boot sector and fs_info sector.
-
-    fat32_fs_boot_sector_t boot_sector = {
-        .oem_name = {'F', 'e', 'r', 'n', 'O', 'S', ' ', ' '},
-        .fat32_ebpb = {
-            .super = {
-                .super = {
-                    .bytes_per_sector = 512,
-                    .sectors_per_cluster = sectors_per_cluster,
-                    .reserved_sectors = reserved_sectors, // No boot sector copying.
-                    .num_fats = fat_copies,
-
-                    .num_small_fat_root_dir_entires = 0,
-
-                    .num_sectors = 0,
-                    .media_descriptor = 0xF8,
-                    .sectors_per_fat = 0
-                },
-                
-                // 1s for LBA.
-                .sectors_per_track = 1,
-                .heads_per_disk = 1,
-
-                .volume_absolute_offset = offset,
-                .num_sectors = num_sectors,
-            },
-
-            .sectors_per_fat = spf,
-            .ext_flags = 0, // mirroring will be enabled.
-
-            .minor_version = 0,
-            .major_version = 1,
-
-            /*
-             * NOTE: IT is EXTREMELY IMPORTANT to understand that data cluster 2 is actually
-             * the first data cluster right after the FAT!
-             */
-
-            .root_dir_cluster = 2, // Open to changing this.
-
-            .fs_info_sector = 1, // Right after the boot sector.
-            
-            .boot_sectors_copy_sector_start = 0, // no boot sector backup
-            .reserved0 = {0},
-            .drive_number = 0x80,
-            .reserved1 = 0,
-            .extended_boot_signature = 0x29,
-            .serial_number = 0,
-
-            .volume_label = {
-                'F', 'e', 'r', 'n', 'V', 'o', 'l', 
-                ' ', ' ' , ' ', ' ' 
-            },
-
-            .fs_label = {
-                'F', 'A', 'T', '3', '2', '.', 'f', 's'
-            }
-        },
-
-        .boot_code = {0},
-
-        .boot_signature = {
-            0x55, 0xAA
-        }
-    };
-
-    err = bd_write(bd, offset, 1, &boot_sector);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    fat32_fs_info_sector_t info_sector = {
-        .signature0 = {
-            0x52, 0x52, 0x61, 0x41
-        },
-
-        .reserved0 = {0},
-
-        .signature1 = {
-            0x72, 0x72, 0x41, 0x61
-        },
-
-        // Subtract 3 for first two reserved, root dir, and readme
-        .num_free_clusters = 0xFFFFFFFF,
-        .last_allocated_date_cluster = 0xFFFFFFFF,
-
-        .reserved1 = {0},
-
-        .signature2 = {
-            0x0, 0x0, 0x55, 0xAA
-        }
-    };
-
-    err = bd_write(bd, offset + 1, 1, &info_sector);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    // So the FATs are going to start right after the boot and fs info sectors.
-
-    uint32_t fat_sector[512 / sizeof(uint32_t)] = {0};
-
-    // First let's write the first FAT sector.
-    fat_sector[0] = 0x0FFFFFF8;
-    fat_sector[1] = 0xFFFFFFFF;
-
-    fat_sector[2] = FAT32_EOC; // Root directory.
-    fat_sector[3] = FAT32_EOC; // README.TXT
-
-    for (uint32_t f = 0; f < fat_copies; f++) {
-        err = bd_write(bd, offset + reserved_sectors + (f * spf), 1, &fat_sector);
-        if (err != FOS_SUCCESS) {
-            return err;
-        }
-    }
-
-    // 0 out the rest of the FAT sectors.
-    mem_set(fat_sector,0, 512);
-    for (uint32_t f = 0; f < fat_copies; f++) {
-        for (uint32_t s = 1; s < spf; s++) {
-            err = bd_write(bd, offset + reserved_sectors + (f * spf) + s, 1, &fat_sector);
-            if (err != FOS_SUCCESS) {
-                return err;
-            }
-        }
-    }
-
-    // Write out root directory and readme contents!
-
-    const uint32_t data_section_offset = offset + reserved_sectors + (fat_copies * spf);
-    
-    fat32_short_fn_dir_entry_t root_dir[512 / sizeof(fat32_short_fn_dir_entry_t)] = {0};
-
-    // Pointer back to self.
-    root_dir[0] = (fat32_short_fn_dir_entry_t) {
-        .short_fn = {'.', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
-        .extenstion = {' ', ' ', ' '},
-        .attrs = FT32F_ATTR_SUBDIR,
-        .reserved = 0,
-
-        // Creation stuff not speicifed.
-
-        .first_cluster_high = 0,
-        
-        .last_write_time = fat32_time(0, 0, 0),
-        .last_access_date = fat32_date(1, 1, 0),
-
-        .first_cluster_low = 2,
-        .files_size = 0
-    };
-
-    char readme_txt[512] = "First FernOS File!";
-    size_t readme_txt_size = str_len(readme_txt) + 1;
-
-    root_dir[1 /*2*/] = (fat32_short_fn_dir_entry_t) {
-        .short_fn = {'R', 'E', 'A', 'D', 'M', 'E', ' ', ' '},
-        .extenstion = {'T', 'X', 'T'},
-        .attrs = 0,
-        .reserved = 0,
-
-        // Creation stuff not speicifed.
-
-        .first_cluster_high = 0,
-        
-        .last_write_time = fat32_time(0, 0, 0),
-        .last_access_date = fat32_date(1, 0, 0),
-
-        .first_cluster_low = 3,
-        .files_size = readme_txt_size
-    };
-
-    // Example Long Filename directory entry!
-    /*
-    ((fat32_long_fn_dir_entry_t *)root_dir)[1] = (fat32_long_fn_dir_entry_t) {
-        .entry_order = 0x40 | 1,
-
-        .long_fn_0 = { 'a', 'b', 'c', '.', 't' },
-
-        .attrs = 0x0F,
-        .type = 0,
-
-        .short_fn_checksum = fat32_checksum(root_dir[2].short_fn),
-
-        .long_fn_1 = { 'x', 't', 0x0, 0xFFFF, 0xFFFF, 0xFFFF },
-
-        .reserved = {0, 0},
-
-        .long_fn_2 = { 0xFFFF, 0xFFFF }
-    };
-    */
-
-    // Remember, the root directory as a whole is more than just one sector!
-
-    // Write out root directory.
-    err = bd_write(bd, data_section_offset, 1, root_dir);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    // Make sure ALL of the root directory is zeroed out!
-    mem_set(root_dir, 0, sizeof(root_dir));
-    for (uint32_t s = 1; s < sectors_per_cluster; s++) {
-        err = bd_write(bd, data_section_offset + s, 1, root_dir);
-        if (err != FOS_SUCCESS) {
-            return err;
-        }
-    }
-
-    // Write out README.TXT
-    err = bd_write(bd, data_section_offset + (1 * sectors_per_cluster), 1, readme_txt);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    return FOS_SUCCESS;
-}
 
 /*
  * FAT32 FS Work.
@@ -484,13 +178,54 @@ static void delete_fat32_file_system(file_sys_t *fs) {
     // TODO
 }
 
+/**
+ * Get the number of files within a directory.
+ */
+static fernos_error_t fat32_num_used_dir_entries(fat32_file_sys_t *fat32_fs, uint32_t dir_cluster, 
+        uint32_t *out) {
+    /*
+    uint32_t sub_files = 0;    
+
+    const uint32_t num_entries = 512 / sizeof(fat32_short_fn_dir_entry_t);
+
+    uint8_t sector[512];
+
+    fat32_short_fn_dir_entry_t *sfn_entries = (fat32_short_fn_dir_entry_t *)sector;
+    fat32_long_fn_dir_entry_t *lfn_entries = (fat32_long_fn_dir_entry_t *)sector;
+    */
+
+    return FOS_NOT_IMPLEMENTED;
+    
+}
+
+/* FS Interface implementations */
+
 static void fat32_fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl) {
     // TODO
 }
 
 static fernos_error_t fat32_fs_find_root_dir(file_sys_t *fs, bool write, 
         file_sys_handle_t *out) {
-    return FOS_NOT_IMPLEMENTED;
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+
+    if (!fs || !out) {
+        return FOS_BAD_ARGS;
+    }
+
+    uint32_t rd_cluster = fat32_fs->root_dir_cluster;
+    fat32_file_sys_handle_t **hndl_ptr = mp_get(fat32_fs->handle_map, &rd_cluster);
+
+    fat32_file_sys_handle_t *hndl;
+
+    if (hndl_ptr) {
+        hndl = *hndl_ptr;
+    } else {
+        // Damn, I think imma need some fat32 helpers tbh....
+        // Maybe defined above this as like driver stuff???
+        // No root directory handle, time to create a new one!
+    }
+
+    return FOS_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_get_info(file_sys_t *fs, file_sys_handle_t hndl, 
