@@ -444,6 +444,8 @@ fernos_error_t parse_fat32(block_device_t *bd, uint32_t offset, fat32_info_t *ou
     return FOS_SUCCESS;
 }
 
+// What if we want to get free clusters within a FAT???
+
 /**
  * This is for getting the cluster chain for a specific file/directory.
  *

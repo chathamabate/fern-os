@@ -27,6 +27,7 @@
 #include "k_startup/test/process.h"
 #include "s_block_device/fat32_file_sys.h"
 #include "s_block_device/block_device.h"
+#include "s_block_device/fat32.h"
 
 #include "k_sys/ata.h"
 
@@ -138,25 +139,19 @@ void start_kernel(void) {
 
     //  screw around stuff.
     block_device_t *bd = get_ata_block_device();
-    fernos_error_t err = init_fat32(bd, 0, bd_num_sectors(bd), 1);
+
+    fat32_info_t info;
+    fernos_error_t err = parse_fat32(bd, 0, &info);
     if (err != FOS_SUCCESS) {
         term_put_s("Failure\n");
     } else {
         term_put_s("Success\n");
+
+        term_put_fmt_s("NUM Clusters: %u\n", info.num_clusters);
+        term_put_fmt_s("Sectors Per Cluster: %u\n", info.sectors_per_cluster);
+        term_put_fmt_s("DS Offset: %u\n", info.data_section_offset);
     }
 
-    /*
-    fat32_file_sys_t *f32_fs = (fat32_file_sys_t *)new_fat32_file_sys(get_default_allocator(), bd, 0);
-    if (f32_fs) {
-        term_put_s("Success getting FS\n");
-    } else {
-        term_put_s("Failure getting FS\n");
-    }
-
-    term_put_fmt_s("NUM Clusters: %u\n", f32_fs->num_clusters);
-    term_put_fmt_s("NUM Sectors: %u\n", f32_fs->num_sectors);
-    term_put_fmt_s("SPC: %u\n", f32_fs->sectors_per_cluster);
-    */
 
     lock_up();
 
