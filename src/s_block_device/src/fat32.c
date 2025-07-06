@@ -444,44 +444,60 @@ fernos_error_t parse_fat32(block_device_t *bd, uint32_t offset, fat32_info_t *ou
     return FOS_SUCCESS;
 }
 
-// Just saying, this could be an eaiser way to go!!
-uint32_t parse_fat32_free_clusters(const uint32_t *fat_sector, uint8_t start_index,
-        fat32_free_pair_t *buf, uint32_t buf_len, uint8_t *next_index) {
-    return 0; 
-}
-
-// What if we want to get free clusters within a FAT???
-
-/**
- * This is for getting the cluster chain for a specific file/directory.
- *
- * The chain will be written out to `chain`, AND will be terminated with EOC.
- * If the entire chain buffer is filled, you should call this function again to get the rest of the
- * chain!
- *
- * IMPORTANT, `start` is not written to the chain. This is meant to make repeated calls to this
- * funciton a little easier to work with.
- *
- * FOS_SUCCESS should be returned unless there is some error reading from the block device.
- * If FOS_SUCCESS is NOT returned, disregard all results written to chain!
- */
-/* 
-static fernos_error_t fat32_get_cluster_chain(fat32_file_sys_t *fat32_fs, uint32_t start, 
-        uint32_t *chain, uint32_t chain_len) {
-    fernos_error_t err;
-
-    if (!fat32_fs || !chain || chain_len == 0) {
+fernos_error_t fat32_get_free_clusters(const uint32_t *fat_sector, uint8_t start_index,
+        fat32_free_pair_t *buf, uint32_t buf_len, uint8_t *readden, uint8_t *next_index) {
+    if (!fat_sector || start_index >= FAT32_SLOTS_PER_FAT_SECTOR || !buf || !readden) {
         return FOS_BAD_ARGS;
     }
 
-    if (start < 2 || start >= fat32_fs->num_clusters) {
+    uint8_t found = 0;
+
+    // The start of the free area we are traversing. This max value means "we are yet to reach
+    // a free cluster"
+    uint8_t free_start = FAT32_SLOTS_PER_FAT_SECTOR;
+
+    uint8_t i;
+
+    for (i = start_index; i < FAT32_SLOTS_PER_FAT_SECTOR && found < buf_len; i++) {
+        if (fat_sector[i] == 0) {
+            if (free_start == FAT32_SLOTS_PER_FAT_SECTOR) {
+                free_start = i;
+            }
+        } else if (free_start != FAT32_SLOTS_PER_FAT_SECTOR) {
+            buf[found].start = free_start;
+            buf[found].clusters = i - free_start;
+
+            free_start = FAT32_SLOTS_PER_FAT_SECTOR;
+
+            found++;
+        }
+    }
+
+    if (next_index) {
+        *next_index = i;
+    }
+
+    *readden = found;
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_get_cluster_chain(block_device_t *bd, const fat32_info_t *info, uint32_t start, 
+        uint32_t *chain, uint32_t chain_len) {
+    fernos_error_t err;
+
+    if (!bd || !info || !chain || chain_len == 0) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (start < 2 || start >= info->num_clusters) {
         return FOS_INVALID_RANGE;
     }
 
     uint32_t fat_sector[FAT32_SLOTS_PER_FAT_SECTOR];
 
     // The currently loaded fat sector.
-    uint32_t curr_fat_sector = fat32_fs->sectors_per_fat; // uninitialized.
+    uint32_t curr_fat_sector = info->sectors_per_fat; // uninitialized.
     uint32_t curr_cluster = start;
 
     uint32_t i;
@@ -492,7 +508,7 @@ static fernos_error_t fat32_get_cluster_chain(fat32_file_sys_t *fat32_fs, uint32
         // First off, see if we need to load in a new fat sector.
         uint32_t cluster_fat_sector = curr_cluster / FAT32_SLOTS_PER_FAT_SECTOR;
         if (cluster_fat_sector != curr_fat_sector) {
-            err = bd_read(fat32_fs->bd, fat32_fs->bd_offset + fat32_fs->fat_offset + cluster_fat_sector,
+            err = bd_read(bd, info->bd_offset + info->fat_offset + cluster_fat_sector,
                     1, fat_sector);
             if (err != FOS_SUCCESS) {
                 return err;
@@ -508,4 +524,3 @@ static fernos_error_t fat32_get_cluster_chain(fat32_file_sys_t *fat32_fs, uint32
 
     return FOS_SUCCESS;
 }
-*/

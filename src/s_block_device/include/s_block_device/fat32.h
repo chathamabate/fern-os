@@ -518,6 +518,9 @@ typedef struct _fat32_info_t {
 /**
  * It'll likely be useful to be able to determine which sections of a FAT sector are
  * entirely full of unused slots. That is what this structure is for!
+ *
+ * Unlike with a memory allocator, it's no big deal if two free pairs border each other in the
+ * FAT. (No need for coalescing is what I mean)
  */
 typedef struct _fat32_free_pair_t {
     /**
@@ -579,12 +582,25 @@ fernos_error_t parse_fat32(block_device_t *bd, uint32_t offset, fat32_info_t *ou
  * If `next_index` is given, the index of the final cluster to be checked + 1 will be written to
  * *next_index. If *next_index == SLOTS_PER_FAT_SECTOR, this means the entire fat was searched.
  *
- * The FAT search stops iff the output buffer was entirely filled with free pairs.
+ * NOTE: the `start` fields of these pairs is always relative to the FAT sector given.
+ * You may need to add a constant offset after calling this function to make the 
+ * start indeces absolute across all the FAT sectors.
+ *
+ * The FAT search stops early iff the output buffer was entirely filled with free pairs.
  */
-uint32_t parse_fat32_free_clusters(const uint32_t *fat_sector, uint8_t start_index,
-        fat32_free_pair_t *buf, uint32_t buf_len, uint8_t *next_index);
+fernos_error_t fat32_get_free_clusters(const uint32_t *fat_sector, uint8_t start_index,
+        fat32_free_pair_t *buf, uint32_t buf_len, uint8_t *readden, uint8_t *next_index);
 
-/*
-fernos_error_t fat32_get_cluster_chain(fat32_file_sys_t *fat32_fs, uint32_t start, 
+/**
+ * The chain will be written out to `chain`, AND will be terminated with EOC.
+ * If the entire chain buffer is filled, you should call this function again to get the rest of the
+ * chain!
+ *
+ * IMPORTANT, `start` is not written to the chain. This is meant to make repeated calls to this
+ * funciton a little easier to work with.
+ *
+ * FOS_SUCCESS should be returned unless there is some error reading from the block device.
+ * If FOS_SUCCESS is NOT returned, disregard all results written to chain!
+ */
+fernos_error_t fat32_get_cluster_chain(block_device_t *bd, const fat32_info_t *info, uint32_t start, 
         uint32_t *chain, uint32_t chain_len);
-*/
