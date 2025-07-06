@@ -483,14 +483,15 @@ fernos_error_t fat32_get_free_clusters(const uint32_t *fat_sector, uint8_t start
 }
 
 fernos_error_t fat32_get_cluster_chain(block_device_t *bd, const fat32_info_t *info, uint32_t start, 
-        uint32_t *chain, uint32_t chain_len) {
+        uint32_t *chain, uint32_t chain_len, uint32_t *readden) {
     fernos_error_t err;
 
-    if (!bd || !info || !chain || chain_len == 0) {
+    if (!bd || !info || !chain || chain_len == 0 || !readden) {
         return FOS_BAD_ARGS;
     }
 
     if (start < 2 || start >= info->num_clusters) {
+        // NOTE: this will be entered if start is EOC.
         return FOS_INVALID_RANGE;
     }
 
@@ -503,8 +504,7 @@ fernos_error_t fat32_get_cluster_chain(block_device_t *bd, const fat32_info_t *i
     uint32_t i;
 
     // Run while we have slots in the buffer, and the end of chain is not reached.
-    for (i = 0; i < chain_len && !FAT32_IS_EOC(curr_cluster); i++) {
-
+    for (i = 0; i < chain_len; i++) {
         // First off, see if we need to load in a new fat sector.
         uint32_t cluster_fat_sector = curr_cluster / FAT32_SLOTS_PER_FAT_SECTOR;
         if (cluster_fat_sector != curr_fat_sector) {
@@ -519,8 +519,47 @@ fernos_error_t fat32_get_cluster_chain(block_device_t *bd, const fat32_info_t *i
 
         // Ok I think now we can actually read the chain value.
         curr_cluster = fat_sector[curr_cluster % FAT32_SLOTS_PER_FAT_SECTOR];
-        fat_sector[i] = curr_cluster;
+
+        if (FAT32_IS_EOC(curr_cluster)) {
+            break;
+        }
+
+        fat_sector[i] = curr_cluster; // This will write EOC at the end... which is OK!
     }
+
+    *readden = i; 
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_num_clusters(block_device_t *bd, const fat32_info_t *info, uint32_t start,
+        uint32_t *num_clusters) {
+    fernos_error_t err;
+
+    if (!bd || !info || !num_clusters) {
+        return FOS_BAD_ARGS;
+    }
+
+    uint32_t total_readden = 1;
+
+    uint32_t readden;
+    uint32_t chain[16];
+    const uint32_t chain_len = sizeof(chain) / sizeof(uint32_t);
+
+    uint32_t curr_cluster = start;
+
+    do {
+        err = fat32_get_cluster_chain(bd, info, curr_cluster, chain, chain_len, &readden);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+        
+        total_readden += readden;
+
+        curr_cluster = chain[chain_len - 1];
+    } while (readden == chain_len);
+
+    *num_clusters = total_readden;
 
     return FOS_SUCCESS;
 }

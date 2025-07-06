@@ -592,9 +592,11 @@ fernos_error_t fat32_get_free_clusters(const uint32_t *fat_sector, uint8_t start
         fat32_free_pair_t *buf, uint32_t buf_len, uint8_t *readden, uint8_t *next_index);
 
 /**
- * The chain will be written out to `chain`, AND will be terminated with EOC.
+ * The chain will be written out to `chain`.
  * If the entire chain buffer is filled, you should call this function again to get the rest of the
  * chain!
+ *
+ * To determine how many cluster indeces were placed in `chain`, use *readden.
  *
  * IMPORTANT, `start` is not written to the chain. This is meant to make repeated calls to this
  * funciton a little easier to work with.
@@ -603,4 +605,12 @@ fernos_error_t fat32_get_free_clusters(const uint32_t *fat_sector, uint8_t start
  * If FOS_SUCCESS is NOT returned, disregard all results written to chain!
  */
 fernos_error_t fat32_get_cluster_chain(block_device_t *bd, const fat32_info_t *info, uint32_t start, 
-        uint32_t *chain, uint32_t chain_len);
+        uint32_t *chain, uint32_t chain_len, uint32_t *readden);
+
+/**
+ * This is a kinda helper which uses the get_cluster_chain above.
+ * 
+ * It determines how many clusters are in one file's full chain.
+ */
+fernos_error_t fat32_num_clusters(block_device_t *bd, const fat32_info_t *info, uint32_t start,
+        uint32_t *num_clusters);

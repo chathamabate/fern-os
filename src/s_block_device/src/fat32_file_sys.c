@@ -118,13 +118,15 @@ static void fat32_fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl) {
 
 static fernos_error_t fat32_fs_find_root_dir(file_sys_t *fs, bool write, 
         file_sys_handle_t *out) {
+    fernos_error_t err;
+
     fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
 
     if (!fs || !out) {
         return FOS_BAD_ARGS;
     }
 
-    uint32_t rd_cluster = fat32_fs->root_dir_cluster;
+    uint32_t rd_cluster = fat32_fs->info.root_dir_cluster;
     fat32_file_sys_handle_t **hndl_ptr = mp_get(fat32_fs->handle_map, &rd_cluster);
 
     fat32_file_sys_handle_t *hndl;
@@ -132,10 +134,40 @@ static fernos_error_t fat32_fs_find_root_dir(file_sys_t *fs, bool write,
     if (hndl_ptr) {
         hndl = *hndl_ptr;
     } else {
-        // Damn, I think imma need some fat32 helpers tbh....
-        // Maybe defined above this as like driver stuff???
-        // No root directory handle, time to create a new one!
+        // Ok, no handle exists, let's create a new one!
+        hndl = al_malloc(fat32_fs->al, sizeof(fat32_file_sys_handle_t));
+        if (!hndl) {
+            return FOS_NO_MEM;
+        }
+        
+        uint32_t num_rd_clusters;
+        err = fat32_num_clusters(fat32_fs->bd, &(fat32_fs->info), rd_cluster, 
+                &num_rd_clusters);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        *(uint32_t *)&(hndl->parent_dir_cluster) = 0;
+        // No parent directory index needed for root directory.
+        *(uint32_t *)&(hndl->write) = write;
+        hndl->users = 0;
+        *(bool *)&(hndl->dir) = true;
+        hndl->len = num_rd_clusters * (fat32_fs->info.sectors_per_cluster * 512);
+
+        // Put our handle in the map!
+        err = mp_put(fat32_fs->handle_map, &rd_cluster, &hndl);
+        if (err != FOS_SUCCESS) {
+            al_free(fat32_fs->al, hndl);
+            return err;
+        }
     }
+    
+    if (hndl->write && hndl->users > 0) {
+        return FOS_IN_USE;
+    }
+    
+    hndl->users++;
+    *out = hndl;
 
     return FOS_SUCCESS;
 }
