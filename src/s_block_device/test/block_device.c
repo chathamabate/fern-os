@@ -324,8 +324,10 @@ static bool test_rw_piece1(void) {
 
     // The sector index we'll use for this test.
     const size_t SI = 2;
+    TEST_TRUE(SI < TEST_BLOCK_DEVICE_MIN_SECTORS);
 
     uint8_t *sbuf = da_malloc(sector_size);
+    TEST_TRUE(sbuf != NULL);
 
     for (size_t i = 0; i < sector_size; i++) {
         sbuf[i] = i % 256;
@@ -360,6 +362,73 @@ static bool test_rw_piece1(void) {
     TEST_SUCCEED();
 }
 
+#define TEST_BLOCK_DEVICE_RW_PIECE2_SHIFT (20)
+static bool test_rw_piece2(void) {
+    fernos_error_t err;
+
+    // The sector index we'll use for this test.
+    const size_t SI = 5;
+    TEST_TRUE(SI < TEST_BLOCK_DEVICE_MIN_SECTORS);
+    
+    uint8_t *sbuf = da_malloc(sector_size);
+    TEST_TRUE(sbuf != NULL);
+
+    mem_set(sbuf, 0, sector_size);
+    err = bd_write(bd, SI, 1, sbuf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    da_free(sbuf);
+
+    // Ok, our sector is zero'd out.  
+    
+    const size_t base_offset = 100;
+
+    uint8_t window0[45];
+    mem_set(window0, 1, sizeof(window0));
+
+    uint8_t window1[60];
+    mem_set(window1, 2, sizeof(window1));
+
+    // This condition is required for this test to work.
+    TEST_TRUE(base_offset + TEST_BLOCK_DEVICE_RW_PIECE2_SHIFT + sizeof(window1) <= sector_size);
+    TEST_TRUE(sizeof(window0) >= TEST_BLOCK_DEVICE_RW_PIECE2_SHIFT);
+
+    err = bd_write_piece(bd, SI, base_offset, sizeof(window0), window0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = bd_write_piece(bd, SI, base_offset + TEST_BLOCK_DEVICE_RW_PIECE2_SHIFT, sizeof(window1), window1);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    uint8_t window2[TEST_BLOCK_DEVICE_RW_PIECE2_SHIFT + sizeof(window1)];
+    err = bd_read_piece(bd, SI, base_offset, sizeof(window2), window2);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t i = 0; i < TEST_BLOCK_DEVICE_RW_PIECE2_SHIFT; i++) {
+        TEST_EQUAL_UINT(1, window2[i]);
+    }
+
+    for (size_t i = TEST_BLOCK_DEVICE_RW_PIECE2_SHIFT; i < sizeof(window2); i++) {
+        TEST_EQUAL_UINT(2, window2[i]);
+    }
+
+    // Now let's overwrite everything except the ending elements.
+    mem_set(window2, 3, sizeof(window2));
+    err = bd_write_piece(bd, SI, base_offset + 1, sizeof(window2) - 2, window2);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    mem_set(window2, 0, sizeof(window2));
+    err = bd_read_piece(bd, SI, base_offset, sizeof(window2), window2);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_EQUAL_UINT(1, window2[0]);
+    TEST_EQUAL_UINT(2, window2[sizeof(window2) - 1]);
+    for (size_t i = 1; i < sizeof(window2) - 1; i++) {
+        TEST_EQUAL_UINT(3, window2[i]);
+    }
+    
+    TEST_SUCCEED();
+}
+
 static bool test_bad_calls(void) {
     fernos_error_t err; 
 
@@ -385,6 +454,30 @@ static bool test_bad_calls(void) {
     err = bd_read(bd, num_sectors - 1, 2, buf);
     TEST_TRUE(err != FOS_SUCCESS);
 
+    err = bd_read_piece(bd, num_sectors, 0, 100, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_read_piece(bd, 0, sector_size, 100, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_read_piece(bd, 0, sector_size - 1, 2, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_read_piece(bd, 0, sector_size - 1, 1, NULL);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_write_piece(bd, num_sectors, 0, 100, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_write_piece(bd, 0, sector_size, 100, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_write_piece(bd, 0, sector_size - 1, 2, buf);
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    err = bd_write_piece(bd, 0, sector_size - 1, 1, NULL);
+    TEST_TRUE(err != FOS_SUCCESS);
+
     TEST_SUCCEED();
 }
 
@@ -401,6 +494,7 @@ bool test_block_device(const char *name, block_device_t *(*gen)(void)) {
     
     RUN_TEST(test_rw_piece0);
     RUN_TEST(test_rw_piece1);
+    RUN_TEST(test_rw_piece2);
 
     RUN_TEST(test_bad_calls);
     return END_SUITE();

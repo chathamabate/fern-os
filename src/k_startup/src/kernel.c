@@ -137,7 +137,7 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-    test_mem_block_device();
+    test_ata_block_device();
     lock_up();
 
     /*
