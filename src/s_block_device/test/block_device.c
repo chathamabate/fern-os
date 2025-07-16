@@ -39,6 +39,9 @@ static bool pretest(void) {
 }
 
 static bool posttest(void) {
+    fernos_error_t err = bd_flush(bd);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
     delete_block_device(bd);
 
     bd = NULL;
@@ -269,6 +272,94 @@ static bool test_full_rw(void) {
     TEST_SUCCEED();
 }
 
+static bool test_rw_piece0(void) {
+    // NOTE: This test requires sector size be a multiple of 32.
+    
+    fernos_error_t err;
+
+    uint8_t window[32];
+
+    TEST_TRUE(sizeof(window) < sector_size);
+    TEST_EQUAL_UINT(0, sector_size % sizeof(window));
+
+    for (size_t i = 0; i < sizeof(window); i++) {
+        window[i] = i;
+    }
+
+    for (size_t i = 0; i < sector_size; i += sizeof(window)) {
+        err = bd_write_piece(bd, 0, i, sizeof(window), window);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    uint8_t *sbuf = da_malloc(sector_size);
+    TEST_TRUE(sbuf != NULL);
+
+    // Make sure one big read works.
+    err = bd_read(bd, 0, 1, sbuf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t i = 0; i < sector_size; i++) {
+        TEST_EQUAL_UINT(i % sizeof(window), sbuf[i]);
+    }
+
+    da_free(sbuf);
+
+    // Now make sure a bunch of small piece reads work.
+    for (size_t i = 0; i < sector_size; i += sizeof(window)) {
+        mem_set(window, 0, sizeof(window));
+
+        err = bd_read_piece(bd, 0, i, sizeof(window), window);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        for (size_t j = 0; j < sizeof(window); j++) {
+            TEST_EQUAL_UINT(j, window[j]);
+        }
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool test_rw_piece1(void) {
+    fernos_error_t err;
+
+    // The sector index we'll use for this test.
+    const size_t SI = 2;
+
+    uint8_t *sbuf = da_malloc(sector_size);
+
+    for (size_t i = 0; i < sector_size; i++) {
+        sbuf[i] = i % 256;
+    }
+
+    err = bd_write(bd, SI, 1, sbuf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    da_free(sbuf);
+
+    const size_t test_offsets[] = {
+        0, 5, 13, 64, 75, 100, 128
+    };
+    const size_t num_offsets = sizeof(test_offsets) / sizeof(test_offsets[0]);
+
+    uint8_t window[40];
+
+    for (size_t oi = 0; oi < num_offsets; oi++) {
+        size_t offset = test_offsets[oi];
+
+        // Only run this case if we don't overshoot the end of the sector.
+        if (offset + sizeof(window) <= sector_size) {
+            err = bd_read_piece(bd, SI, offset, sizeof(window), window);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            for (size_t i = offset; i < offset + sizeof(window); i++) {
+                TEST_EQUAL_UINT(i % 256, window[i - offset]);
+            }
+        }
+    }
+
+    TEST_SUCCEED();
+}
+
 static bool test_bad_calls(void) {
     fernos_error_t err; 
 
@@ -307,6 +398,10 @@ bool test_block_device(const char *name, block_device_t *(*gen)(void)) {
     RUN_TEST(test_complex_rw);
     RUN_TEST(test_big_rw);
     RUN_TEST(test_full_rw); // You may want to comment this out if it takes too long.
+    
+    RUN_TEST(test_rw_piece0);
+    RUN_TEST(test_rw_piece1);
+
     RUN_TEST(test_bad_calls);
     return END_SUITE();
 }

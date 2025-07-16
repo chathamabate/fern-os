@@ -150,6 +150,11 @@ static fernos_error_t abd_read_piece(block_device_t *bd, size_t sector_ind, size
         return FOS_BAD_ARGS;
     }
 
+    if (abd->sector_size > sizeof(abd->piece_buffer)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+
     if (sector_ind >= abd->num_sectors || offset >= abd->sector_size || offset + len > abd->sector_size ||
             offset + len < offset) {
         return FOS_INVALID_RANGE;
@@ -172,6 +177,10 @@ static fernos_error_t abd_write_piece(block_device_t *bd, size_t sector_ind, siz
 
     if (!src) {
         return FOS_BAD_ARGS;
+    }
+
+    if (abd->sector_size > sizeof(abd->piece_buffer)) {
+        return FOS_STATE_MISMATCH;
     }
 
     if (sector_ind >= abd->num_sectors || offset >= abd->sector_size || offset + len > abd->sector_size ||

@@ -116,6 +116,12 @@ static inline fernos_error_t bd_write_piece(block_device_t *bd, size_t sector_in
 /**
  * If implemented, this function should perform some sort of implementation specific cache
  * flush.
+ *
+ * All read/write functions should be opaque to cache flushes. What I mean here is that writes
+ * should always be immediately visible to subsequent reads without the need for a flush.
+ *
+ * What the flush does should never affect the outputs of any of the functions in this interface.
+ * It'll likely be something you want to do before deleting a block device.
  */
 static inline fernos_error_t bd_flush(block_device_t *bd) {
     if (bd->impl->bd_flush) {

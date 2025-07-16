@@ -137,6 +137,10 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
+    test_mem_block_device();
+    lock_up();
+
+    /*
     //  screw around stuff.
     block_device_t *bd = get_ata_block_device();
 
@@ -152,8 +156,8 @@ void start_kernel(void) {
         term_put_fmt_s("DS Offset: %u\n", info.data_section_offset);
     }
 
-
     lock_up();
+    */
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }
