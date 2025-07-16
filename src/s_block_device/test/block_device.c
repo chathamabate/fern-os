@@ -429,6 +429,50 @@ static bool test_rw_piece2(void) {
     TEST_SUCCEED();
 }
 
+static bool test_rw_combined(void) {
+    // This test kinda combines the rw piece functions and the normal rw functions.
+
+    fernos_error_t err;
+
+    uint8_t *sbuf = da_malloc(sector_size);
+    TEST_TRUE(sbuf != NULL);
+
+    for (size_t i = 0; i < TEST_BLOCK_DEVICE_MIN_SECTORS; i++) {
+        mem_set(sbuf, i % 256, sector_size);
+        err = bd_write(bd, i, 1, sbuf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    uint8_t window[15];
+    mem_set(window, 0xFFU, sizeof(window));
+
+    for (size_t i = 0; i < TEST_BLOCK_DEVICE_MIN_SECTORS; i += 3) {
+        TEST_TRUE(i + sizeof(window) <= sector_size);     
+        err = bd_write_piece(bd, i, i, sizeof(window), window);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // this buffer is kinda thicc
+    uint8_t *big_buf = da_malloc(sector_size * TEST_BLOCK_DEVICE_MIN_SECTORS);
+
+    err = bd_read(bd, 0, TEST_BLOCK_DEVICE_MIN_SECTORS, big_buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t i = 0; i < TEST_BLOCK_DEVICE_MIN_SECTORS; i++) {
+        mem_set(sbuf, i % 256, sector_size);
+        if (i % 3 == 0) {
+            mem_set(sbuf + i, 0xFFU, sizeof(window));
+        } 
+
+        TEST_TRUE(mem_cmp(sbuf, big_buf + (i * sector_size), sector_size));
+    }
+
+    da_free(big_buf);
+    da_free(sbuf);
+
+    TEST_SUCCEED();
+}
+
 static bool test_bad_calls(void) {
     fernos_error_t err; 
 
@@ -495,6 +539,7 @@ bool test_block_device(const char *name, block_device_t *(*gen)(void)) {
     RUN_TEST(test_rw_piece0);
     RUN_TEST(test_rw_piece1);
     RUN_TEST(test_rw_piece2);
+    RUN_TEST(test_rw_combined);
 
     RUN_TEST(test_bad_calls);
     return END_SUITE();
