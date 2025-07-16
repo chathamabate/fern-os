@@ -15,6 +15,12 @@ typedef struct _block_device_impl_t {
     fernos_error_t (*bd_read)(block_device_t *bd, size_t sector_ind, size_t num_sectors, void *dest);
     fernos_error_t (*bd_write)(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src);
 
+    fernos_error_t (*bd_read_piece)(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, void *dest);
+    fernos_error_t (*bd_write_piece)(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, const void *src);
+
+    // OPTIONAL
+    fernos_error_t (*bd_flush)(block_device_t *bd);
+
     // OPTIONAL
     void (*bd_dump)(block_device_t *bd, void (*pf)(const char *fmt, ...));
 
@@ -71,6 +77,52 @@ static inline fernos_error_t bd_read(block_device_t *bd, size_t sector_ind, size
  */
 static inline fernos_error_t bd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src) {
     return bd->impl->bd_write(bd, sector_ind, num_sectors, src);
+}
+
+/*
+ * NOTE: bd_read_piece and bd_write_piece have been added to this interface to allow for 
+ * the possibility of efficient reads/writes of a single sector. For example, a BD implementation
+ * may involve so form of caching. In which case, reading/writing in units of full sectors
+ * may not be necessary.
+ *
+ * The implemeter doesn't need to make their implementations of these functions efficient though.
+ * They can always just be wrappers of bd_write and bd_read above.
+ */
+
+/**
+ * Blocking read of a piece of data within a single sector.
+ *
+ * dest must have size at least len.
+ *
+ * Should return an error if dest is NULL, or if the piece requested extends past the sector
+ * boundary.
+ */
+static inline fernos_error_t bd_read_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, void *dest) {
+    return bd->impl->bd_read_piece(bd, sector_ind, offset, len, dest);
+}
+
+/**
+ * Blocking write of a piece of data within a single sector.
+ *
+ * src must have size at least len.
+ *
+ * Should return an error if src is NULL, or if the piece requested extends past the sector
+ * boundary.
+ */
+static inline fernos_error_t bd_write_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, const void *src) {
+    return bd->impl->bd_write_piece(bd, sector_ind, offset, len, src);
+}
+
+/**
+ * If implemented, this function should perform some sort of implementation specific cache
+ * flush.
+ */
+static inline fernos_error_t bd_flush(block_device_t *bd) {
+    if (bd->impl->bd_flush) {
+        return bd->impl->bd_flush(bd);
+    }
+
+    return FOS_SUCCESS;
 }
 
 /**

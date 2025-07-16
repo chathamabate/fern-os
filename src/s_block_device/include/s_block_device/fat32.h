@@ -614,3 +614,6 @@ fernos_error_t fat32_get_cluster_chain(block_device_t *bd, const fat32_info_t *i
  */
 fernos_error_t fat32_num_clusters(block_device_t *bd, const fat32_info_t *info, uint32_t start,
         uint32_t *num_clusters);
+
+// Ok, what if we want a filename or something?? then what??
+// I don't even fucking know at this point...

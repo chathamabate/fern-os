@@ -174,6 +174,8 @@ static fernos_error_t fat32_fs_find_root_dir(file_sys_t *fs, bool write,
 
 static fernos_error_t fat32_fs_get_info(file_sys_t *fs, file_sys_handle_t hndl, 
         file_sys_info_t *out) {
+    // We need the full name of this file...
+    // And some other info it looks like...
     return FOS_NOT_IMPLEMENTED;
 }
 
