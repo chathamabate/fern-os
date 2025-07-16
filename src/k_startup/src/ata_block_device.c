@@ -1,11 +1,14 @@
 
 #include "k_startup/ata_block_device.h"
 #include "k_sys/ata.h"
+#include "s_util/str.h"
 
 static size_t abd_num_sectors(block_device_t *bd);
 static size_t abd_sector_size(block_device_t *bd);
 static fernos_error_t abd_read(block_device_t *bd, size_t sector_ind, size_t num_sectors, void *dest);
 static fernos_error_t abd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src);
+static fernos_error_t abd_read_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, void *dest);
+static fernos_error_t abd_write_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, const void *src);
 static void delete_ata_block_device(block_device_t *bd);
 
 const block_device_impl_t ABD_IMPL = {
@@ -13,6 +16,12 @@ const block_device_impl_t ABD_IMPL = {
     .bd_sector_size = abd_sector_size,
     .bd_read = abd_read,
     .bd_write = abd_write,
+    .bd_read_piece = abd_read_piece,
+    .bd_write_piece = abd_write_piece,
+
+    .bd_flush = NULL,
+    .bd_dump = NULL,
+
     .delete_block_device = delete_ata_block_device
 };
 
@@ -129,6 +138,59 @@ static fernos_error_t abd_write(block_device_t *bd, size_t sector_ind, size_t nu
         total_sectors_written += sectors_to_write;
     }
 
+    return FOS_SUCCESS;
+}
+
+static fernos_error_t abd_read_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, void *dest) {
+    fernos_error_t err;
+
+    ata_block_device_t *abd = (ata_block_device_t *)bd;
+
+    if (!dest) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (sector_ind >= abd->num_sectors || offset >= abd->sector_size || offset + len > abd->sector_size ||
+            offset + len < offset) {
+        return FOS_INVALID_RANGE;
+    }
+
+    err = ata_read_pio(sector_ind, 1, abd->piece_buffer);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    mem_cpy(dest, abd->piece_buffer + offset, len);
+
+    return FOS_SUCCESS;
+}
+
+static fernos_error_t abd_write_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, const void *src) {
+    fernos_error_t err;
+
+    ata_block_device_t *abd = (ata_block_device_t *)bd;
+
+    if (!src) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (sector_ind >= abd->num_sectors || offset >= abd->sector_size || offset + len > abd->sector_size ||
+            offset + len < offset) {
+        return FOS_INVALID_RANGE;
+    }
+
+    err = ata_read_pio(sector_ind, 1, abd->piece_buffer);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    mem_cpy(abd->piece_buffer + offset, src, len);
+
+    err = ata_write_pio(sector_ind, 1, abd->piece_buffer);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+    
     return FOS_SUCCESS;
 }
 
