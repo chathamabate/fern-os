@@ -28,6 +28,7 @@
 #include "s_block_device/fat32_file_sys.h"
 #include "s_block_device/block_device.h"
 #include "s_block_device/fat32.h"
+#include "s_block_device/test/cached_block_device.h"
 
 #include "k_sys/ata.h"
 
@@ -137,7 +138,7 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-    test_ata_block_device();
+    test_cached_block_device();
     lock_up();
 
     /*

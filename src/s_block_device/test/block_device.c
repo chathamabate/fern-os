@@ -454,6 +454,7 @@ static bool test_rw_combined(void) {
 
     // this buffer is kinda thicc
     uint8_t *big_buf = da_malloc(sector_size * TEST_BLOCK_DEVICE_MIN_SECTORS);
+    TEST_TRUE(big_buf != NULL);
 
     err = bd_read(bd, 0, TEST_BLOCK_DEVICE_MIN_SECTORS, big_buf);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);

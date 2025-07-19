@@ -59,8 +59,6 @@ block_device_t *new_cached_block_device(allocator_t *al, block_device_t *bd, siz
 
                 if (!(c[i].sector)) {
                     cache_alloc_fail = true;
-                } else {
-                    c[i].i.next_free = i + 1;
                 }
             }
         }
@@ -90,8 +88,8 @@ block_device_t *new_cached_block_device(allocator_t *al, block_device_t *bd, siz
     *(block_device_t **)&(cbd->wrapped_bd) = bd;
     cbd->r = rand(seed);
     *(size_t *)&(cbd->cache_cap) = cc;
+    cbd->cache_fill = 0;
     *(cached_sector_entry_t **)&(cbd->cache) = c;
-    cbd->next_free = 0;
     *(map_t **)&(cbd->sector_map) = sm;
 
     return (block_device_t *)cbd;
@@ -239,20 +237,26 @@ static fernos_error_t cbd_get_cache_entry_ind(cached_block_device_t *cbd, size_t
     if (!ind_p) {
         // Cache Miss!  (Let's load a sector into the cache!)
 
-        if (cbd->next_free != cbd->cache_cap) {
+        if (cbd->cache_fill < cbd->cache_cap) {
             // Cache is not full.
-            
-            ind = cbd->next_free;
+            ind = cbd->cache_fill++;
 
-            // Advance free list.
-            cbd->next_free = cbd->cache[cbd->next_free].i.next_free;
         } else {
-            // Cache is full. (Remove a used sector.
+            // Cache is full. (Remove a used sector)
             
             ind = next_rand(&(cbd->r)) % cbd->cache_cap;
+            
+            // Write out sector which is to be written over.
+            err = bd_write(cbd->wrapped_bd, cbd->cache[ind].sector_ind, 1, cbd->cache[ind].sector);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+
+            // Remove sector from mapping.
+            mp_remove(cbd->sector_map, &(cbd->cache[ind].sector_ind));
         }
 
-        cbd->cache[ind].i.sector_ind = sector_ind;
+        cbd->cache[ind].sector_ind = sector_ind;
 
         err = mp_put(cbd->sector_map, &sector_ind, &ind);
         if (err != FOS_SUCCESS) {
@@ -372,11 +376,7 @@ static fernos_error_t cbd_flush(block_device_t *bd) {
         return FOS_NO_MEM;
     }
 
-    for (size_t i = 0; i < cbd->cache_cap; i++) {
-        cbd->cache[i].i.next_free = i + 1;
-    }
-
-    cbd->next_free = 0;
+    cbd->cache_fill = 0;
 
     return FOS_SUCCESS;
 }
@@ -391,8 +391,6 @@ static void delete_cached_block_device(block_device_t *bd) {
     }
 
     al_free(cbd->al, cbd->cache);
-
-    delete_block_device(cbd->wrapped_bd);
 
     al_free(cbd->al, cbd);
 }

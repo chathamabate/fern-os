@@ -7,19 +7,10 @@
 #include "s_util/rand.h"
 
 typedef struct _cached_sector_entry_t {
-    union {
-        /**
-         * Only interpret this field when this entry is in the free-list.
-         * A value of cache capacity means this entry is the last in the free list.
-         */
-        size_t next_free;
-
-        /**
-         * Index of the sector cached here.
-         * Only interpret if this entry is NOT in the free list.
-         */
-        size_t sector_ind;
-    } i;
+    /**
+     * Index of the sector cached here.
+     */
+    size_t sector_ind;
 
     /**
      * For all sector entries, this will be Non-NULL and point to a sector sized 
@@ -42,20 +33,19 @@ typedef struct _cached_block_device_t {
     rand_t r; 
 
     /**
-     * The number of entries in the cache.
+     * The number of slots in the cache.
      */
     const size_t cache_cap;
+
+    /**
+     * Number of used slots in the cache.
+     */
+    size_t cache_fill;
 
     /**
      * The cache. This will be allocated in its entirety at init time.
      */
     cached_sector_entry_t * const cache;
-
-    /**
-     * Next free entry in the cache. 
-     * Is cache_cap if the cache is full.
-     */
-    size_t next_free;
 
     /**
      * This is a map of sector index (size_t) -> cache index (size_t).
@@ -67,8 +57,8 @@ typedef struct _cached_block_device_t {
 /**
  * Create a new cached_block_device. 
  *
- * NOTE: This OWNs the given block device! When the cached block device is deleted, so is
- * the wrapped block device (might change this in the future)
+ * NOTE: the wrapped block device is not OWNED by the created cached block device.
+ * (i.e. when you delete the cached block device, its underlying bd will persist)
  *
  * cc is the maximum number of sectors which can be cahced at once.
  * seed is the seed to start the prng with.
