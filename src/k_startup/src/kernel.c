@@ -29,6 +29,7 @@
 #include "s_block_device/block_device.h"
 #include "s_block_device/fat32.h"
 #include "s_block_device/test/cached_block_device.h"
+#include "s_util/rand.h"
 
 #include "k_sys/ata.h"
 
@@ -138,7 +139,19 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-    test_cached_block_device();
+    rand_t r = rand(1238);
+
+    for (int i = 0; i < 100; i++) {
+        if (next_rand(&r) % 2 == 0) {
+            term_put_s("Even\n");
+        } else {
+            term_put_s("Odd\n");
+        }
+    }
+
+    lock_up();
+
+    test_cached_block_device_side_by_side();
     lock_up();
 
     /*
