@@ -7,11 +7,19 @@
 #include "s_util/rand.h"
 
 typedef struct _cached_sector_entry_t {
-    /**
-     * Only interpret this field when this entry is in the free-list.
-     * A value of cache capacity means this entry is the last in the free list.
-     */
-    size_t next_free;
+    union {
+        /**
+         * Only interpret this field when this entry is in the free-list.
+         * A value of cache capacity means this entry is the last in the free list.
+         */
+        size_t next_free;
+
+        /**
+         * Index of the sector cached here.
+         * Only interpret if this entry is NOT in the free list.
+         */
+        size_t sector_ind;
+    } i;
 
     /**
      * For all sector entries, this will be Non-NULL and point to a sector sized 

@@ -224,6 +224,60 @@ static fernos_error_t cbd_write(block_device_t *bd, size_t sector_ind, size_t nu
 }
 
 static fernos_error_t cbd_read_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, void *dest) {
+    cached_block_device_t *cbd = (cached_block_device_t *)bd;
+
+    if (!dest) {
+        return FOS_BAD_ARGS;
+    }
+
+    const size_t ns = bd_num_sectors(cbd->wrapped_bd);
+    const size_t ss = bd_sector_size(cbd->wrapped_bd);
+
+    if (sector_ind >= ns || offset >= ss || offset + len > ss || offset + len < offset) {
+        return FOS_INVALID_RANGE;
+    }
+
+    fernos_error_t err;
+
+    size_t *cache_entry_ind_p = mp_get(cbd->sector_map, &sector_ind); 
+    size_t cache_entry_ind;
+
+    if (!cache_entry_ind_p) {
+        // Cache Miss!  (Let's load a sector into the cache!)
+
+        if (cbd->next_free != cbd->cache_cap) {
+            // Cache is not full.
+            
+            cache_entry_ind = cbd->next_free;
+
+            // Advance free list.
+            cbd->next_free = cbd->cache[cbd->next_free].i.next_free;
+        } else {
+            // Cache is full. (Remove a used sector.
+            
+            cache_entry_ind = next_rand(&(cbd->r)) % cbd->cache_cap;
+        }
+
+        cbd->cache[cache_entry_ind].i.sector_ind = sector_ind;
+
+        err = mp_put(cbd->sector_map, &sector_ind, &cache_entry_ind);
+        if (err != FOS_SUCCESS) {
+            return err; 
+        }
+
+        err = bd_read(cbd->wrapped_bd, sector_ind, 1, cbd->cache[cache_entry_ind].sector); 
+        if (err != FOS_SUCCESS) {
+            return err; 
+        }
+    } else {
+        cache_entry_ind = *cache_entry_ind_p;
+    }
+
+    // Copy from cache into the dest buffer.
+
+    uint8_t *cache_sector = cbd->cache[cache_entry_ind].sector;
+    mem_cpy(dest, cache_sector + offset, len);
+
     return FOS_SUCCESS;
 }
 
