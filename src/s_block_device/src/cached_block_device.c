@@ -168,6 +168,58 @@ static fernos_error_t cbd_read(block_device_t *bd, size_t sector_ind, size_t num
 }
 
 static fernos_error_t cbd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src) {
+    cached_block_device_t *cbd = (cached_block_device_t *)bd;
+
+    if (!src) {
+        return FOS_BAD_ARGS;
+    }
+
+    const size_t ns = bd_num_sectors(cbd->wrapped_bd);
+    const size_t ss = bd_sector_size(cbd->wrapped_bd);
+
+    if (sector_ind >= ns || sector_ind + num_sectors > ns || sector_ind + num_sectors < sector_ind) {
+        return FOS_INVALID_RANGE;
+    }
+
+    fernos_error_t err;
+
+    // Index of the first sector NOT to be written out yet.
+    size_t section_start = sector_ind;
+
+    for (size_t i = sector_ind; i < sector_ind + num_sectors; i++) {
+        size_t *cache_entry_ind_p = mp_get(cbd->sector_map, &i);
+
+        if (cache_entry_ind_p) {
+
+            // A group of sectors which all missed the cache will be written directly to the 
+            // wrapped bd.
+            if (section_start < i) {
+                err = bd_write(cbd->wrapped_bd, section_start, i - section_start, 
+                        (const uint8_t *)src + ((section_start - sector_ind) * ss)); 
+
+                if (err != FOS_SUCCESS)  {
+                    return err;
+                }
+            }
+
+            size_t cache_entry_ind = *cache_entry_ind_p;
+            void *cache_sector = cbd->cache[cache_entry_ind].sector;
+            
+            mem_cpy(cache_sector, (const uint8_t *)src + ((i - sector_ind) * ss), ss);
+
+            section_start = i + 1;
+        }
+    }
+
+    if (section_start < sector_ind + num_sectors) {
+        err = bd_write(cbd->wrapped_bd, section_start, sector_ind + num_sectors - section_start, 
+                (const uint8_t *)src + ((section_start - sector_ind) * ss));
+
+        if (err != FOS_SUCCESS) {
+            return err;
+        } 
+    }
+
     return FOS_SUCCESS;
 }
 
