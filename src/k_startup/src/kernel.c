@@ -139,18 +139,6 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-    rand_t r = rand(1238);
-
-    for (int i = 0; i < 100; i++) {
-        if (next_rand(&r) % 2 == 0) {
-            term_put_s("Even\n");
-        } else {
-            term_put_s("Odd\n");
-        }
-    }
-
-    lock_up();
-
     test_cached_block_device_side_by_side();
     lock_up();
 

@@ -15,7 +15,7 @@ static block_device_t *underlying_bd = NULL;
  * Assumes underlying BD is initialized.
  */
 static block_device_t *gen_cached_bd(void) {
-    return new_da_cached_block_device(underlying_bd, 8, 1237);
+    return new_da_cached_block_device(underlying_bd, 8, 0);
 }
 
 bool test_cached_block_device(void) {
@@ -57,7 +57,7 @@ static bool test_side_by_side(void) {
     block_device_t *mbd_under = new_da_mem_block_device(sector_size, num_sectors);
     TEST_TRUE(mbd_under != NULL);
 
-    block_device_t *cbd = new_da_cached_block_device(mbd_under, 16, 123891);
+    block_device_t *cbd = new_da_cached_block_device(mbd_under, 16, 0);
     TEST_TRUE(cbd != NULL);
 
     uint8_t *big_buf0 = da_malloc(sector_size * num_sectors);
@@ -76,17 +76,17 @@ static bool test_side_by_side(void) {
     err = bd_write(cbd, 0, num_sectors, big_buf0);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    rand_t r = rand(1238489);
+    rand_t r = rand(0);
 
     for (size_t attempt = 0; attempt < 4; attempt++) {
         // We are going to do the same thing a few times.
 
         // Each write round we will either call bd_write or bd_write_piece.
         for (size_t round = 0; round < 100; round++) {
-            uint32_t pick = next_rand(&r);
+            uint32_t pick = next_rand_u32(&r);
             size_t offset_sector = pick % num_sectors;
 
-            if (next_rand(&r) % 2 == 0) {
+            if (next_rand_u1(&r) % 2 == 0) {
                 // sector operation
                 
                 size_t sectors = (pick % 8) + 1;
@@ -95,9 +95,9 @@ static bool test_side_by_side(void) {
                     sectors = num_sectors - offset_sector;
                 }
 
-                if (next_rand(&r) % 2 == 0) {
+                if (next_rand_u1(&r) % 2 == 0) {
                     // bd_write
-                    LOGF_METHOD("BD Write %u %u\n", offset_sector, sectors);
+                    //LOGF_METHOD("BD Write %u %u\n", offset_sector, sectors);
 
                     mem_set(big_buf0, pick % 256, sectors * sector_size);
 
@@ -109,7 +109,7 @@ static bool test_side_by_side(void) {
                 } else {
                     // bd_read
                     
-                    //LOGF_METHOD("BD Read %u %u\n", offset_sector, sectors);
+                    LOGF_METHOD("BD Read %u %u\n", offset_sector, sectors);
 
                     err = bd_read(mbd_cntl, offset_sector, sectors, big_buf0);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -129,7 +129,7 @@ static bool test_side_by_side(void) {
                     bytes = sector_size - offset_index;
                 }
 
-                if (next_rand(&r) % 2 == 0) {
+                if (next_rand_u1(&r) % 2 == 0) {
                     // bd_write_piece
 
                     //LOGF_METHOD("BD Write Piece %u %u %u\n", offset_sector, offset_index, bytes);

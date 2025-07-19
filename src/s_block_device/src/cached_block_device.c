@@ -244,7 +244,7 @@ static fernos_error_t cbd_get_cache_entry_ind(cached_block_device_t *cbd, size_t
         } else {
             // Cache is full. (Remove a used sector)
             
-            ind = next_rand(&(cbd->r)) % cbd->cache_cap;
+            ind = next_rand_u32(&(cbd->r)) % cbd->cache_cap;
             
             // Write out sector which is to be written over.
             err = bd_write(cbd->wrapped_bd, cbd->cache[ind].sector_ind, 1, cbd->cache[ind].sector);

@@ -3,18 +3,16 @@
 
 #include <stdint.h>
 
-#define RAND_MAX (0x7FFFFFFFU)
+typedef uint64_t rand_t;
 
-typedef uint32_t rand_t;
-
-static inline rand_t rand(uint32_t seed) {
-    return seed % (RAND_MAX + 1);
+static inline rand_t rand(uint64_t seed) {
+    // Provide a fallback seed.
+    return seed == 0 ? 0xAABB1234FFEEBACDULL : seed;
 }
 
-static inline uint32_t next_rand(rand_t *r) {
-    // This PRNG was taken from ChatGPT. Apparnetly, this is the 
-    // glibc implementation.
-    *r = ((1103515245 * *r) + 12345) % (RAND_MAX + 1);
+uint8_t next_rand_u1(rand_t *r);
+uint8_t next_rand_u8(rand_t *r);
+uint16_t next_rand_u16(rand_t *r);
+uint32_t next_rand_u32(rand_t *r);
 
-    return *r;
-}
+
