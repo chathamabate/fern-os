@@ -6,10 +6,19 @@
 #include "s_data/map.h"
 #include "s_util/rand.h"
 
-typedef struct _cached_sector_pair_t {
-    size_t sector_ind;
+typedef struct _cached_sector_entry_t {
+    /**
+     * Only interpret this field when this entry is in the free-list.
+     * A value of cache capacity means this entry is the last in the free list.
+     */
+    size_t next_free;
+
+    /**
+     * For all sector entries, this will be Non-NULL and point to a sector sized 
+     * block of memory.
+     */
     uint8_t *sector;
-} cached_sector_pair_t;
+} cached_sector_entry_t;
 
 typedef struct _cached_block_device_t {
     block_device_t super;
@@ -32,7 +41,13 @@ typedef struct _cached_block_device_t {
     /**
      * The cache. This will be allocated in its entirety at init time.
      */
-    cached_sector_pair_t * const cache;
+    cached_sector_entry_t * const cache;
+
+    /**
+     * Next free entry in the cache. 
+     * Is cache_cap if the cache is full.
+     */
+    size_t next_free;
 
     /**
      * This is a map of sector index (size_t) -> cache index (size_t).
@@ -52,9 +67,9 @@ typedef struct _cached_block_device_t {
  *
  * Returns NULL if params are bad or if allocation fails.
  */
-cached_block_device_t *new_cached_block_device(allocator_t *al, block_device_t *bd, size_t cc, uint32_t seed);
+block_device_t *new_cached_block_device(allocator_t *al, block_device_t *bd, size_t cc, uint32_t seed);
 
-static inline cached_block_device_t *new_da_cached_block_device(block_device_t *bd, size_t cc, uint32_t seed) {
+static inline block_device_t *new_da_cached_block_device(block_device_t *bd, size_t cc, uint32_t seed) {
     return new_cached_block_device(get_default_allocator(), bd, cc, seed);
 }
 
