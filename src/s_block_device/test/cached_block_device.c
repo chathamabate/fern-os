@@ -46,6 +46,19 @@ bool test_cached_block_device(void) {
 #include "s_util/test.h"
 
 static bool test_side_by_side(void) {
+    /*
+     * This is a pretty rigorous test that I which I could make a little more generic,
+     * but whatevs.
+     *
+     * It does random reads/writes to to mem_bd and a cached_bd.
+     * It confirms all operations are consistent between the two block devices.
+     *
+     * At a certain point it flushes the cache too and confirms an underlying block device
+     * has the same contents as the control.
+     */
+
+    size_t nal = al_num_user_blocks(get_default_allocator());
+
     fernos_error_t err;
 
     const size_t sector_size = 512;
@@ -78,43 +91,40 @@ static bool test_side_by_side(void) {
 
     rand_t r = rand(0);
 
-    for (size_t attempt = 0; attempt < 4; attempt++) {
+    for (size_t attempt = 0; attempt < 16; attempt++) {
         // We are going to do the same thing a few times.
 
-        // Each write round we will either call bd_write or bd_write_piece.
-        for (size_t round = 0; round < 100; round++) {
-            uint32_t pick = next_rand_u32(&r);
-            size_t offset_sector = pick % num_sectors;
+        // Each round basically flips two coins.
+        // Based on the outcome, a random read/write/read_piece/write_piece operation is performed.
+        for (size_t round = 0; round < 200; round++) {
+            size_t sector_ind = next_rand_u32(&r) % num_sectors;
 
-            if (next_rand_u1(&r) % 2 == 0) {
+            if (next_rand_u1(&r)) {
                 // sector operation
                 
-                size_t sectors = (pick % 8) + 1;
+                size_t sectors = (next_rand_u8(&r) % 16) + 1;
 
-                if (offset_sector + sectors > num_sectors) {
-                    sectors = num_sectors - offset_sector;
+                if (sector_ind + sectors > num_sectors) {
+                    sectors = num_sectors - sector_ind;
                 }
 
-                if (next_rand_u1(&r) % 2 == 0) {
+                if (next_rand_u1(&r)) {
                     // bd_write
-                    //LOGF_METHOD("BD Write %u %u\n", offset_sector, sectors);
 
-                    mem_set(big_buf0, pick % 256, sectors * sector_size);
+                    mem_set(big_buf0, next_rand_u8(&r), sectors * sector_size);
 
-                    err = bd_write(mbd_cntl, offset_sector, sectors, big_buf0);
+                    err = bd_write(mbd_cntl, sector_ind, sectors, big_buf0);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-                    err = bd_write(cbd, offset_sector, sectors, big_buf0);
+                    err = bd_write(cbd, sector_ind, sectors, big_buf0);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
                 } else {
                     // bd_read
                     
-                    LOGF_METHOD("BD Read %u %u\n", offset_sector, sectors);
-
-                    err = bd_read(mbd_cntl, offset_sector, sectors, big_buf0);
+                    err = bd_read(mbd_cntl, sector_ind, sectors, big_buf0);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-                    err = bd_read(cbd, offset_sector, sectors, big_buf1);
+                    err = bd_read(cbd, sector_ind, sectors, big_buf1);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
                     TEST_TRUE(mem_cmp(big_buf0, big_buf1, sector_size * sectors));
@@ -122,40 +132,61 @@ static bool test_side_by_side(void) {
             } else {
                 // bd piece functions
 
-                size_t offset_index = pick % sector_size;
-                size_t bytes = (pick % 32) + 1;
+                size_t offset = next_rand_u16(&r) % sector_size;
+                size_t bytes = (next_rand_u8(&r) % 32) + 1;
 
-                if (offset_index + bytes > sector_size) {
-                    bytes = sector_size - offset_index;
+                if (offset + bytes > sector_size) {
+                    bytes = sector_size - offset;
                 }
 
                 if (next_rand_u1(&r) % 2 == 0) {
                     // bd_write_piece
 
-                    //LOGF_METHOD("BD Write Piece %u %u %u\n", offset_sector, offset_index, bytes);
-                    mem_set(big_buf0, pick % 256, bytes);
+                    mem_set(big_buf0, next_rand_u8(&r), bytes);
 
-                    err = bd_write_piece(mbd_cntl, offset_sector, offset_index, bytes, big_buf0);
+                    err = bd_write_piece(mbd_cntl, sector_ind, offset, bytes, big_buf0);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-                    err = bd_write_piece(cbd, offset_sector, offset_index, bytes, big_buf0);
+                    err = bd_write_piece(cbd, sector_ind, offset, bytes, big_buf0);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
                 } else {
                     // bd_read_piece
                     
-                    LOGF_METHOD("BD Read Piece %u %u %u\n", offset_sector, offset_index, bytes);
-                    err = bd_read_piece(mbd_cntl, offset_sector, offset_index, bytes, big_buf0);
+                    err = bd_read_piece(mbd_cntl, sector_ind, offset, bytes, big_buf0);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-                    err = bd_read_piece(cbd, offset_sector, offset_index, bytes, big_buf1);
+                    err = bd_read_piece(cbd, sector_ind, offset, bytes, big_buf1);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
                     TEST_TRUE(mem_cmp(big_buf0, big_buf1, bytes));
                 }
-
             }
         }
+
+        // After all rounds, let's flush the cache.
+
+        err = bd_flush(cbd);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        err = bd_read(mbd_cntl, 0, num_sectors, big_buf0);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        err = bd_read(mbd_under, 0, num_sectors, big_buf1);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_TRUE(mem_cmp(big_buf0, big_buf1, num_sectors * sector_size));
     }
+
+    delete_block_device(cbd);
+    delete_block_device(mbd_under);
+    delete_block_device(mbd_cntl);
+
+    da_free(big_buf0);
+    da_free(big_buf1);
+
+    size_t nalp = al_num_user_blocks(get_default_allocator());
+
+    TEST_EQUAL_UINT(nal, nalp);
 
     TEST_SUCCEED();
 }

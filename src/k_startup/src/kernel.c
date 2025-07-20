@@ -139,9 +139,10 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
+
+
     test_cached_block_device_side_by_side();
     lock_up();
-
     /*
     //  screw around stuff.
     block_device_t *bd = get_ata_block_device();
