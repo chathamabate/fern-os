@@ -21,6 +21,7 @@
 #include "k_startup/test/ata_block_device.h"
 #include "k_startup/ata_block_device.h"
 
+#include "s_block_device/cached_block_device.h"
 #include "s_data/test/list.h"
 #include "s_data/test/wait_queue.h"
 #include "s_data/test/map.h"
@@ -140,27 +141,29 @@ void start_kernel(void) {
     set_timer_action(fos_timer_action);
 
 
-
-    test_cached_block_device_side_by_side();
-    lock_up();
-    /*
+    fernos_error_t err;
     //  screw around stuff.
-    block_device_t *bd = get_ata_block_device();
+    block_device_t *bd = new_da_cached_block_device(get_ata_block_device(), 256, 0);
 
-    fat32_info_t info;
-    fernos_error_t err = parse_fat32(bd, 0, &info);
-    if (err != FOS_SUCCESS) {
-        term_put_s("Failure\n");
-    } else {
-        term_put_s("Success\n");
+    rand_t r = rand(0);
+    uint8_t piece[16];
+    for (size_t i = 0; i < 100000; i++) {
+        uint32_t si = next_rand_u8(&r); 
+        if (next_rand_u1(&r)) {
+            err = bd_read_piece(bd, si, 0, sizeof(piece), piece);
+        } else {
+            err = bd_write_piece(bd, si, 0, sizeof(piece), piece);
+        }
 
-        term_put_fmt_s("NUM Clusters: %u\n", info.num_clusters);
-        term_put_fmt_s("Sectors Per Cluster: %u\n", info.sectors_per_cluster);
-        term_put_fmt_s("DS Offset: %u\n", info.data_section_offset);
+        if (err != FOS_SUCCESS) {
+            term_put_s("AHHH\n");
+            lock_up();
+        }
     }
 
+    term_put_s("DONE\n");
+
     lock_up();
-    */
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }

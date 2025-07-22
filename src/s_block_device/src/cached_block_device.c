@@ -378,6 +378,12 @@ static fernos_error_t cbd_flush(block_device_t *bd) {
 
     cbd->cache_fill = 0;
 
+    // Finally, flush the underlying block device.
+    err = bd_flush(cbd->wrapped_bd);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
     return FOS_SUCCESS;
 }
 

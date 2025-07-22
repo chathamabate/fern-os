@@ -57,7 +57,7 @@ typedef struct _cached_block_device_t {
 /**
  * Create a new cached_block_device. 
  *
- * NOTE: the wrapped block device is not OWNED by the created cached block device.
+ * NOTE: the wrapped block device is NOT OWNED by the created cached block device.
  * (i.e. when you delete the cached block device, its underlying bd will persist)
  *
  * cc is the maximum number of sectors which can be cahced at once.
