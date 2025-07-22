@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "s_util/misc.h"
 #include "s_block_device/block_device.h"
+#include "s_mem/allocator.h"
 
 #define FAT32_MASK          (0x0FFFFFFFU)
 #define FAT32_EOC           (0x0FFFFFF8U)
@@ -449,10 +450,11 @@ typedef struct _fat32_long_fn_dir_entry_t {
 } __attribute__ ((packed)) fat32_long_fn_dir_entry_t;
 
 /**
- * This struct has nothing to do with the FAT32 spec. It just condenses the
- * information found in the boot sector.
+ * This is going to be an intermediary interface between a block device and a file system.
+ * 
+ * The FAT32 device will provide helpers for using the FAT32 specific structures!
  */
-typedef struct _fat32_info_t {
+typedef struct _fat32_device_t {
     /**
      * NOTE: All "offset" fields below are in sectors.
      * *Unless stated otherwise*
@@ -460,17 +462,26 @@ typedef struct _fat32_info_t {
      * All "cluster" fields are indeces into the FAT.
      */
 
+    allocator_t * const al;
+
+    /**
+     * This is NOT OWNED by the fat32 device.
+     *
+     * Deleting the FAT32 device will NOT delete this block device.
+     */
+    block_device_t * const bd;
+
     /**
      * Absolute offset of the partition start within the BD.
      *
      * All offsets below are relative to this number!
      */
-    uint32_t bd_offset;
+    const uint32_t bd_offset;
 
     /**
      * Number of sectors in this partition. NOT size of the block device.
      */
-    uint32_t num_sectors;
+    const uint32_t num_sectors;
 
     /**
      * All "offset" fields below are relative to `bd_offset` above.
@@ -482,57 +493,37 @@ typedef struct _fat32_info_t {
     /**
      * Sector where first FAT begins.
      */
-    uint16_t fat_offset;
+    const uint16_t fat_offset;
 
     /**
      * FAT redundancy
      */
-    uint8_t num_fats;
+    const uint8_t num_fats;
 
     /**
      * Remember that the space the FAT addresses may be smaller or larger than how much
      * space is actually available. 
      */
-    uint32_t sectors_per_fat;
+    const uint32_t sectors_per_fat;
 
     /**
      * Where the data clusters begin. 
      * Remember, there are no data clusters 0 or 1.
      */
-    uint32_t data_section_offset;
+    const uint32_t data_section_offset;
 
-    uint8_t sectors_per_cluster;
+    const uint8_t sectors_per_cluster;
 
     /**
      * Number of data clusters in the fat32 image.
      */
-    uint32_t num_clusters;
+    const uint32_t num_clusters;
 
     /**
      * The cluster of the root directory.
      */
-    uint32_t root_dir_cluster;
-
-} fat32_info_t;
-
-/**
- * It'll likely be useful to be able to determine which sections of a FAT sector are
- * entirely full of unused slots. That is what this structure is for!
- *
- * Unlike with a memory allocator, it's no big deal if two free pairs border each other in the
- * FAT. (No need for coalescing is what I mean)
- */
-typedef struct _fat32_free_pair_t {
-    /**
-     * The first free cluster index.
-     */
-    uint32_t start;
-
-    /**
-     * How many clusters there are.
-     */
-    uint32_t clusters;
-} fat32_free_pair_t;
+    const uint32_t root_dir_cluster;
+} fat32_device_t;
 
 /**
  * Compute the standard FAT32 checksum for a short filename.
@@ -568,52 +559,11 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
  * Parse/Validate a FAT32 partition. 
  * `offset` should be the very beginning of the parition in `bd`. (unit of sectors)
  *
- * On success, information about the partition is written to *out.
+ * On success, a new fat32_device_t will be written to *dev_out.
  */
-fernos_error_t parse_fat32(block_device_t *bd, uint32_t offset, fat32_info_t *out);
+fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint32_t offset, fat32_device_t **dev_out);
 
-/**
- * Parse a given fat_sector for free clusters.
- *
- * The number of free pairs read out will be returned.
- *
- * `slot_index` is where to start in the fat_sector. 
- *
- * If `next_index` is given, the index of the final cluster to be checked + 1 will be written to
- * *next_index. If *next_index == SLOTS_PER_FAT_SECTOR, this means the entire fat was searched.
- *
- * NOTE: the `start` fields of these pairs is always relative to the FAT sector given.
- * You may need to add a constant offset after calling this function to make the 
- * start indeces absolute across all the FAT sectors.
- *
- * The FAT search stops early iff the output buffer was entirely filled with free pairs.
- */
-fernos_error_t fat32_get_free_clusters(const uint32_t *fat_sector, uint8_t start_index,
-        fat32_free_pair_t *buf, uint32_t buf_len, uint8_t *readden, uint8_t *next_index);
+static inline fernos_error_t parse_new_da_fat32_device(block_device_t *bd, uint32_t offset, fat32_device_t **dev_out) {
+    return parse_new_fat32_device(get_default_allocator(), bd, offset, dev_out);
+}
 
-/**
- * The chain will be written out to `chain`.
- * If the entire chain buffer is filled, you should call this function again to get the rest of the
- * chain!
- *
- * To determine how many cluster indeces were placed in `chain`, use *readden.
- *
- * IMPORTANT, `start` is not written to the chain. This is meant to make repeated calls to this
- * funciton a little easier to work with.
- *
- * FOS_SUCCESS should be returned unless there is some error reading from the block device.
- * If FOS_SUCCESS is NOT returned, disregard all results written to chain!
- */
-fernos_error_t fat32_get_cluster_chain(block_device_t *bd, const fat32_info_t *info, uint32_t start, 
-        uint32_t *chain, uint32_t chain_len, uint32_t *readden);
-
-/**
- * This is a kinda helper which uses the get_cluster_chain above.
- * 
- * It determines how many clusters are in one file's full chain.
- */
-fernos_error_t fat32_num_clusters(block_device_t *bd, const fat32_info_t *info, uint32_t start,
-        uint32_t *num_clusters);
-
-// Ok, what if we want a filename or something?? then what??
-// I don't even fucking know at this point...

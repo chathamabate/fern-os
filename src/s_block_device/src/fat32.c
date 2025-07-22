@@ -310,8 +310,8 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     return FOS_SUCCESS;
 }
 
-fernos_error_t parse_fat32(block_device_t *bd, uint32_t offset, fat32_info_t *out) {
-    if (!bd || !out) {
+fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint32_t offset, fat32_device_t **dev_out) {
+    if (!bd || !dev_out) {
         return FOS_BAD_ARGS;
     }
 
@@ -427,139 +427,28 @@ fernos_error_t parse_fat32(block_device_t *bd, uint32_t offset, fat32_info_t *ou
         max_clusters = fat_spanned_clusters;
     }
 
-    // Woo, our validation succeeded, time to write out values!
+    // Woo, our validation succeeded, time to allocate a new FAT32 device!
 
-    *out = (fat32_info_t) {
-        .bd_offset = offset,
-        .num_sectors = num_sectors,
-        .fat_offset = reserved_sectors,
-        .num_fats = num_fats,
-        .sectors_per_fat = sectors_per_fat,
-        .data_section_offset = reserved_sectors + (sectors_per_fat * num_fats),
-        .sectors_per_cluster = sectors_per_cluster,
-        .num_clusters = max_clusters,
-        .root_dir_cluster = root_dir_cluster,
-    };
+    fat32_device_t *dev = al_malloc(al, sizeof(fat32_device_t));
+
+    if (!dev) {
+        return FOS_NO_MEM;
+    }
+
+    *(allocator_t **)&(dev->al) = al;
+    *(block_device_t **)&(dev->bd) = bd;
+    *(uint32_t *)&(dev->bd_offset) = offset;
+    *(uint32_t *)&(dev->num_sectors) = num_sectors;
+    *(uint16_t *)&(dev->fat_offset) = reserved_sectors;
+    *(uint8_t *)&(dev->num_fats) = num_fats;
+    *(uint32_t *)&(dev->sectors_per_fat) = sectors_per_fat;
+    *(uint32_t *)&(dev->data_section_offset) = reserved_sectors + (sectors_per_fat * num_fats);
+    *(uint8_t *)&(dev->sectors_per_cluster) = sectors_per_cluster;
+    *(uint32_t *)&(dev->num_clusters) = max_clusters;
+    *(uint32_t *)&(dev->root_dir_cluster) = root_dir_cluster;
+
+    *dev_out = dev;
         
     return FOS_SUCCESS;
 }
 
-fernos_error_t fat32_get_free_clusters(const uint32_t *fat_sector, uint8_t start_index,
-        fat32_free_pair_t *buf, uint32_t buf_len, uint8_t *readden, uint8_t *next_index) {
-    if (!fat_sector || start_index >= FAT32_SLOTS_PER_FAT_SECTOR || !buf || !readden) {
-        return FOS_BAD_ARGS;
-    }
-
-    uint8_t found = 0;
-
-    // The start of the free area we are traversing. This max value means "we are yet to reach
-    // a free cluster"
-    uint8_t free_start = FAT32_SLOTS_PER_FAT_SECTOR;
-
-    uint8_t i;
-
-    for (i = start_index; i < FAT32_SLOTS_PER_FAT_SECTOR && found < buf_len; i++) {
-        if (fat_sector[i] == 0) {
-            if (free_start == FAT32_SLOTS_PER_FAT_SECTOR) {
-                free_start = i;
-            }
-        } else if (free_start != FAT32_SLOTS_PER_FAT_SECTOR) {
-            buf[found].start = free_start;
-            buf[found].clusters = i - free_start;
-
-            free_start = FAT32_SLOTS_PER_FAT_SECTOR;
-
-            found++;
-        }
-    }
-
-    if (next_index) {
-        *next_index = i;
-    }
-
-    *readden = found;
-
-    return FOS_SUCCESS;
-}
-
-fernos_error_t fat32_get_cluster_chain(block_device_t *bd, const fat32_info_t *info, uint32_t start, 
-        uint32_t *chain, uint32_t chain_len, uint32_t *readden) {
-    fernos_error_t err;
-
-    if (!bd || !info || !chain || chain_len == 0 || !readden) {
-        return FOS_BAD_ARGS;
-    }
-
-    if (start < 2 || start >= info->num_clusters) {
-        // NOTE: this will be entered if start is EOC.
-        return FOS_INVALID_RANGE;
-    }
-
-    uint32_t fat_sector[FAT32_SLOTS_PER_FAT_SECTOR];
-
-    // The currently loaded fat sector.
-    uint32_t curr_fat_sector = info->sectors_per_fat; // uninitialized.
-    uint32_t curr_cluster = start;
-
-    uint32_t i;
-
-    // Run while we have slots in the buffer, and the end of chain is not reached.
-    for (i = 0; i < chain_len; i++) {
-        // First off, see if we need to load in a new fat sector.
-        uint32_t cluster_fat_sector = curr_cluster / FAT32_SLOTS_PER_FAT_SECTOR;
-        if (cluster_fat_sector != curr_fat_sector) {
-            err = bd_read(bd, info->bd_offset + info->fat_offset + cluster_fat_sector,
-                    1, fat_sector);
-            if (err != FOS_SUCCESS) {
-                return err;
-            }
-            
-            curr_fat_sector = cluster_fat_sector;
-        }
-
-        // Ok I think now we can actually read the chain value.
-        curr_cluster = fat_sector[curr_cluster % FAT32_SLOTS_PER_FAT_SECTOR];
-
-        if (FAT32_IS_EOC(curr_cluster)) {
-            break;
-        }
-
-        fat_sector[i] = curr_cluster; // This will write EOC at the end... which is OK!
-    }
-
-    *readden = i; 
-
-    return FOS_SUCCESS;
-}
-
-fernos_error_t fat32_num_clusters(block_device_t *bd, const fat32_info_t *info, uint32_t start,
-        uint32_t *num_clusters) {
-    fernos_error_t err;
-
-    if (!bd || !info || !num_clusters) {
-        return FOS_BAD_ARGS;
-    }
-
-    uint32_t total_readden = 1;
-
-    uint32_t readden;
-    uint32_t chain[16];
-    const uint32_t chain_len = sizeof(chain) / sizeof(uint32_t);
-
-    uint32_t curr_cluster = start;
-
-    do {
-        err = fat32_get_cluster_chain(bd, info, curr_cluster, chain, chain_len, &readden);
-        if (err != FOS_SUCCESS) {
-            return err;
-        }
-        
-        total_readden += readden;
-
-        curr_cluster = chain[chain_len - 1];
-    } while (readden == chain_len);
-
-    *num_clusters = total_readden;
-
-    return FOS_SUCCESS;
-}
