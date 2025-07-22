@@ -452,3 +452,85 @@ fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint3
     return FOS_SUCCESS;
 }
 
+void delete_fat32_device(fat32_device_t *dev) {
+    al_free(dev->al, dev);
+}
+
+fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t cluster, uint32_t *out_val) {
+    if (!out_val) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (fat > dev->num_fats || cluster > dev->num_sectors) {
+        return FOS_INVALID_INDEX;
+    }
+
+    const uint32_t abs_read_sector = 
+        dev->bd_offset + dev->fat_offset + (fat * dev->sectors_per_fat) + 
+        (cluster / FAT32_SLOTS_PER_FAT_SECTOR);
+
+    const uint32_t slot_index = cluster % FAT32_SLOTS_PER_FAT_SECTOR;
+
+    fernos_error_t err = bd_read_piece(dev->bd, abs_read_sector, 
+            slot_index * sizeof(uint32_t), sizeof(uint32_t), out_val); 
+
+    return err;
+}
+
+fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t cluster, uint32_t val) {
+    if (fat > dev->num_fats || cluster > dev->num_sectors) {
+        return FOS_INVALID_INDEX;
+    }
+
+    const uint32_t abs_write_sector = 
+        dev->bd_offset + dev->fat_offset + (fat * dev->sectors_per_fat) + 
+        (cluster / FAT32_SLOTS_PER_FAT_SECTOR);
+
+    const uint32_t slot_index = cluster % FAT32_SLOTS_PER_FAT_SECTOR;
+
+    fernos_error_t err = bd_write_piece(dev->bd, abs_write_sector, 
+            slot_index * sizeof(uint32_t), sizeof(uint32_t), &val);
+
+    return err;
+}
+
+fernos_error_t fat32_sync_fats(fat32_device_t *dev, uint8_t master_fat) {
+    if (master_fat > dev->num_fats) {
+        return FOS_INVALID_INDEX;
+    }
+
+    // Don't need to do any work if there is only one FAT!
+    if (dev->num_fats == 1) {
+        return FOS_SUCCESS;
+    }
+
+    fernos_error_t err;
+
+    uint8_t sector_buffer[512];
+
+    const uint32_t abs_master_fat_offset = dev->bd_offset + dev->fat_offset + 
+        (master_fat * dev->sectors_per_fat);
+
+    for (uint32_t si = 0; si < dev->sectors_per_fat; si++) {
+        err = bd_read(dev->bd, abs_master_fat_offset + si, 
+                1, sector_buffer);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        for (uint8_t fi = 0; fi < dev->num_fats; fi++) {
+            if (fi != master_fat) {
+                const uint32_t abs_copy_fat_offset = dev->bd_offset + dev->fat_offset +
+                    (fi * dev->sectors_per_fat);
+
+                err = bd_write(dev->bd, abs_copy_fat_offset + si, 
+                        1, sector_buffer);
+                if (err != FOS_SUCCESS) {
+                    return err;
+                }
+            }
+        }
+    }
+
+    return FOS_SUCCESS;
+}
