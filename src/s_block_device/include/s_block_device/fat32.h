@@ -515,9 +515,12 @@ typedef struct _fat32_device_t {
     const uint8_t sectors_per_cluster;
 
     /**
-     * Number of data clusters in the fat32 image.
+     * Number of slots in the FAT.
+     *
+     * Remember, this means there will be num_fat_slots - 2 clusters after the FAT section
+     * as Clusters 0 and 1 don't exist!
      */
-    const uint32_t num_clusters;
+    const uint32_t num_fat_slots;
 
     /**
      * The cluster of the root directory.
@@ -572,19 +575,19 @@ void delete_fat32_device(fat32_device_t *dev);
 /**
  * Get a data cluster's entry in one of the FATs.
  */
-fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t cluster, uint32_t *out_val);
+fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slot_ind, uint32_t *out_val);
 
-static inline fernos_error_t fat32_get_fat0_slot(fat32_device_t *dev, uint32_t cluster, uint32_t *out_val) {
-    return fat32_get_fat_slot(dev, 0, cluster, out_val);
+static inline fernos_error_t fat32_get_fat0_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t *out_val) {
+    return fat32_get_fat_slot(dev, 0, slot_ind, out_val);
 }
 
 /**
- * Set a data cluster's entry in one of the FATs.
+ * Set a data slot_ind's entry in one of the FATs.
  */
-fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t cluster, uint32_t val);
+fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slot_ind, uint32_t val);
 
-static inline fernos_error_t fat32_set_fat0_slot(fat32_device_t *dev, uint32_t cluster, uint32_t val) {
-    return fat32_set_fat_slot(dev, 0, cluster, val);
+static inline fernos_error_t fat32_set_fat0_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t val) {
+    return fat32_set_fat_slot(dev, 0, slot_ind, val);
 }
 
 /**
@@ -593,6 +596,7 @@ static inline fernos_error_t fat32_set_fat0_slot(fat32_device_t *dev, uint32_t c
  */
 fernos_error_t fat32_sync_fats(fat32_device_t *dev, uint8_t master_fat);
 
+// Ok, now what if we wanted to read from a specific cluster chain??? ever think about that one??
 
 
 

@@ -444,7 +444,7 @@ fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint3
     *(uint32_t *)&(dev->sectors_per_fat) = sectors_per_fat;
     *(uint32_t *)&(dev->data_section_offset) = reserved_sectors + (sectors_per_fat * num_fats);
     *(uint8_t *)&(dev->sectors_per_cluster) = sectors_per_cluster;
-    *(uint32_t *)&(dev->num_clusters) = max_clusters;
+    *(uint32_t *)&(dev->num_fat_slots) = max_clusters + 2;
     *(uint32_t *)&(dev->root_dir_cluster) = root_dir_cluster;
 
     *dev_out = dev;
@@ -456,20 +456,20 @@ void delete_fat32_device(fat32_device_t *dev) {
     al_free(dev->al, dev);
 }
 
-fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t cluster, uint32_t *out_val) {
+fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slot_ind, uint32_t *out_val) {
     if (!out_val) {
         return FOS_BAD_ARGS;
     }
 
-    if (fat > dev->num_fats || cluster > dev->num_sectors) {
+    if (fat > dev->num_fats || slot_ind > dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
 
     const uint32_t abs_read_sector = 
         dev->bd_offset + dev->fat_offset + (fat * dev->sectors_per_fat) + 
-        (cluster / FAT32_SLOTS_PER_FAT_SECTOR);
+        (slot_ind / FAT32_SLOTS_PER_FAT_SECTOR);
 
-    const uint32_t slot_index = cluster % FAT32_SLOTS_PER_FAT_SECTOR;
+    const uint32_t slot_index = slot_ind % FAT32_SLOTS_PER_FAT_SECTOR;
 
     fernos_error_t err = bd_read_piece(dev->bd, abs_read_sector, 
             slot_index * sizeof(uint32_t), sizeof(uint32_t), out_val); 
@@ -477,16 +477,16 @@ fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t clu
     return err;
 }
 
-fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t cluster, uint32_t val) {
-    if (fat > dev->num_fats || cluster > dev->num_sectors) {
+fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slot_ind, uint32_t val) {
+    if (fat > dev->num_fats || slot_ind > dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
 
     const uint32_t abs_write_sector = 
         dev->bd_offset + dev->fat_offset + (fat * dev->sectors_per_fat) + 
-        (cluster / FAT32_SLOTS_PER_FAT_SECTOR);
+        (slot_ind / FAT32_SLOTS_PER_FAT_SECTOR);
 
-    const uint32_t slot_index = cluster % FAT32_SLOTS_PER_FAT_SECTOR;
+    const uint32_t slot_index = slot_ind % FAT32_SLOTS_PER_FAT_SECTOR;
 
     fernos_error_t err = bd_write_piece(dev->bd, abs_write_sector, 
             slot_index * sizeof(uint32_t), sizeof(uint32_t), &val);
