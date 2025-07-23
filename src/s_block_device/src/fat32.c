@@ -527,3 +527,74 @@ fernos_error_t fat32_sync_fats(fat32_device_t *dev) {
 
     return FOS_SUCCESS;
 }
+
+fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t chain_start_ind, 
+        uint32_t num_steps, uint32_t *chain_iter_ind) {
+    if (!chain_iter_ind) {
+        return FOS_BAD_ARGS;
+    }
+    
+    if (chain_start_ind < 2 || chain_start_ind >= dev->num_fat_slots) {
+        return FOS_INVALID_INDEX;
+    }
+
+    fernos_error_t err;
+
+    uint32_t chain_iter = chain_start_ind;
+
+    // advance the iterator chain_offset times!
+    for (uint32_t i = 0; i < num_steps; i++) {
+        uint32_t next_iter;
+
+        err = fat32_get_fat_slot(dev, chain_iter, &next_iter);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        chain_iter = next_iter;
+
+        // We reached the end of chain early, that's ok, just exit the loop.
+        if (FAT32_IS_EOC(chain_iter)) {
+            break;
+        }
+
+        // Uh-oh, our chain is malformed!
+        if (chain_iter < 2 || chain_iter >= dev->num_fat_slots) {
+            return FOS_STATE_MISMATCH;
+        }
+    }
+
+    // Write out what we found!
+    *chain_iter_ind = chain_iter;
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_read(fat32_device_t *dev, uint32_t chain_start_ind,
+        uint32_t chain_offset, uint32_t num_clusters, void *dest, uint32_t *clusters_read) {
+
+    if (!dest) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    uint32_t chain_iter;
+    err = fat32_traverse_chain(dev, chain_start_ind, chain_offset, &chain_iter);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+    
+    // Ok, now.... we read out each cluster!
+    for (uint32_t i = 0; i < num_clusters; i++) {
+
+    }
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_write(fat32_device_t *dev, uint32_t chain_start_ind, 
+        uint32_t chain_offset, uint32_t num_clusters, const void *src, uint32_t *clusters_written) {
+    return FOS_NOT_IMPLEMENTED;
+}
+
