@@ -456,17 +456,17 @@ void delete_fat32_device(fat32_device_t *dev) {
     al_free(dev->al, dev);
 }
 
-fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slot_ind, uint32_t *out_val) {
+fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t *out_val) {
     if (!out_val) {
         return FOS_BAD_ARGS;
     }
 
-    if (fat > dev->num_fats || slot_ind > dev->num_fat_slots) {
+    if (slot_ind >= dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
 
     const uint32_t abs_read_sector = 
-        dev->bd_offset + dev->fat_offset + (fat * dev->sectors_per_fat) + 
+        dev->bd_offset + dev->fat_offset +  
         (slot_ind / FAT32_SLOTS_PER_FAT_SECTOR);
 
     const uint32_t slot_index = slot_ind % FAT32_SLOTS_PER_FAT_SECTOR;
@@ -477,13 +477,13 @@ fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slo
     return err;
 }
 
-fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slot_ind, uint32_t val) {
-    if (fat > dev->num_fats || slot_ind > dev->num_fat_slots) {
+fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t val) {
+    if (slot_ind >= dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
 
     const uint32_t abs_write_sector = 
-        dev->bd_offset + dev->fat_offset + (fat * dev->sectors_per_fat) + 
+        dev->bd_offset + dev->fat_offset + 
         (slot_ind / FAT32_SLOTS_PER_FAT_SECTOR);
 
     const uint32_t slot_index = slot_ind % FAT32_SLOTS_PER_FAT_SECTOR;
@@ -494,11 +494,7 @@ fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slo
     return err;
 }
 
-fernos_error_t fat32_sync_fats(fat32_device_t *dev, uint8_t master_fat) {
-    if (master_fat > dev->num_fats) {
-        return FOS_INVALID_INDEX;
-    }
-
+fernos_error_t fat32_sync_fats(fat32_device_t *dev) {
     // Don't need to do any work if there is only one FAT!
     if (dev->num_fats == 1) {
         return FOS_SUCCESS;
@@ -508,8 +504,7 @@ fernos_error_t fat32_sync_fats(fat32_device_t *dev, uint8_t master_fat) {
 
     uint8_t sector_buffer[512];
 
-    const uint32_t abs_master_fat_offset = dev->bd_offset + dev->fat_offset + 
-        (master_fat * dev->sectors_per_fat);
+    const uint32_t abs_master_fat_offset = dev->bd_offset + dev->fat_offset;
 
     for (uint32_t si = 0; si < dev->sectors_per_fat; si++) {
         err = bd_read(dev->bd, abs_master_fat_offset + si, 
@@ -518,16 +513,14 @@ fernos_error_t fat32_sync_fats(fat32_device_t *dev, uint8_t master_fat) {
             return err;
         }
 
-        for (uint8_t fi = 0; fi < dev->num_fats; fi++) {
-            if (fi != master_fat) {
-                const uint32_t abs_copy_fat_offset = dev->bd_offset + dev->fat_offset +
-                    (fi * dev->sectors_per_fat);
+        for (uint8_t fi = 1; fi < dev->num_fats; fi++) {
+            const uint32_t abs_copy_fat_offset = dev->bd_offset + dev->fat_offset +
+                (fi * dev->sectors_per_fat);
 
-                err = bd_write(dev->bd, abs_copy_fat_offset + si, 
-                        1, sector_buffer);
-                if (err != FOS_SUCCESS) {
-                    return err;
-                }
+            err = bd_write(dev->bd, abs_copy_fat_offset + si, 
+                    1, sector_buffer);
+            if (err != FOS_SUCCESS) {
+                return err;
             }
         }
     }

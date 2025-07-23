@@ -573,28 +573,19 @@ static inline fernos_error_t parse_new_da_fat32_device(block_device_t *bd, uint3
 void delete_fat32_device(fat32_device_t *dev);
 
 /**
- * Get a data cluster's entry in one of the FATs.
+ * Get a data cluster's entry in FAT 0.
  */
-fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slot_ind, uint32_t *out_val);
-
-static inline fernos_error_t fat32_get_fat0_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t *out_val) {
-    return fat32_get_fat_slot(dev, 0, slot_ind, out_val);
-}
+fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t *out_val);
 
 /**
- * Set a data slot_ind's entry in one of the FATs.
+ * Set a data slot_ind's entry in FAT 0.
  */
-fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint8_t fat, uint32_t slot_ind, uint32_t val);
-
-static inline fernos_error_t fat32_set_fat0_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t val) {
-    return fat32_set_fat_slot(dev, 0, slot_ind, val);
-}
+fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t val);
 
 /**
- * The "master FAT" is assumed to contain accurate information. "Syncing" copies the entire 
- * master FAT into all the other redundancy FATs.
+ * Copy the contents of FAT 0 into all the other FATs.
  */
-fernos_error_t fat32_sync_fats(fat32_device_t *dev, uint8_t master_fat);
+fernos_error_t fat32_sync_fats(fat32_device_t *dev);
 
 // Ok, now what if we wanted to read from a specific cluster chain??? ever think about that one??
 
