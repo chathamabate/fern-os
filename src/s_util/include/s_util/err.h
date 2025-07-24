@@ -68,6 +68,12 @@ typedef uint16_t fernos_error_t;
  */ 
 #define FOS_IN_USE             (13)
 
+/**
+ * Basically FOS_NO_MEM, but no pertaining so some other type of
+ * storage. (Like disk space)
+ */
+#define FOS_NO_SPACE           (14)
+
 
 
 

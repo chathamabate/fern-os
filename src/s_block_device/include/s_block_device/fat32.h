@@ -5,6 +5,8 @@
 #include "s_util/misc.h"
 #include "s_block_device/block_device.h"
 #include "s_mem/allocator.h"
+#include "s_data/list.h"
+#include "s_util/rand.h"
 
 #define FAT32_MASK          (0x0FFFFFFFU)
 #define FAT32_EOC           (0x0FFFFFF8U)
@@ -526,6 +528,21 @@ typedef struct _fat32_device_t {
      * The cluster of the root directory.
      */
     const uint32_t root_dir_cluster;
+
+    /**
+     * Used for behaviors of the fat32 device which require randomness.
+     */
+    rand_t r;
+
+    /**
+     * This array holds indeces of FAT slots whose corresponding clusters are not in use.
+     */
+    uint32_t free_q[FAT32_SLOTS_PER_FAT_SECTOR];
+
+    /**
+     * free_q[0]...free_q[free_q_fill - 1] are occupied in the free_q array.
+     */
+    uint32_t free_q_fill;
 } fat32_device_t;
 
 /**
@@ -564,10 +581,12 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
  *
  * On success, a new fat32_device_t will be written to *dev_out.
  */
-fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint32_t offset, fat32_device_t **dev_out);
+fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint32_t offset, 
+        uint64_t seed, fat32_device_t **dev_out);
 
-static inline fernos_error_t parse_new_da_fat32_device(block_device_t *bd, uint32_t offset, fat32_device_t **dev_out) {
-    return parse_new_fat32_device(get_default_allocator(), bd, offset, dev_out);
+static inline fernos_error_t parse_new_da_fat32_device(block_device_t *bd, uint32_t offset, 
+        uint64_t seed, fat32_device_t **dev_out) {
+    return parse_new_fat32_device(get_default_allocator(), bd, offset, seed, dev_out);
 }
 
 void delete_fat32_device(fat32_device_t *dev);
@@ -600,6 +619,11 @@ fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32
  * Copy the contents of FAT 0 into all the other FATs.
  */
 fernos_error_t fat32_sync_fats(fat32_device_t *dev);
+
+/**
+ * Get an index of a slot which is not in use in the FAT.
+ */
+fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
 
 /**
  * Use this function if you want the slot index of a cluster within a chain.

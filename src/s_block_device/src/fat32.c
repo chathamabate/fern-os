@@ -310,7 +310,8 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     return FOS_SUCCESS;
 }
 
-fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint32_t offset, fat32_device_t **dev_out) {
+fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint32_t offset, 
+        uint64_t seed, fat32_device_t **dev_out) {
     if (!bd || !dev_out) {
         return FOS_BAD_ARGS;
     }
@@ -447,6 +448,9 @@ fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint3
     *(uint32_t *)&(dev->num_fat_slots) = max_clusters + 2;
     *(uint32_t *)&(dev->root_dir_cluster) = root_dir_cluster;
 
+    dev->r = rand(seed);
+    dev->free_q_fill = 0;
+
     *dev_out = dev;
         
     return FOS_SUCCESS;
@@ -528,8 +532,63 @@ fernos_error_t fat32_sync_fats(fat32_device_t *dev) {
     return FOS_SUCCESS;
 }
 
+fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind) {
+    fernos_error_t err;
+
+    if (!slot_ind) {
+        return FOS_BAD_ARGS;
+    }
+
+    // Do we need to repopulate the q?
+    if (dev->free_q_fill == 0) {
+        uint32_t fat_sector[FAT32_SLOTS_PER_FAT_SECTOR];
+
+        // We will try at most 5 times to find at least one free slot.
+        for (uint32_t i = 0; dev->free_q_fill == 0 && i < 5; i++) {
+            // Maybe want to move away from this randow dart thow at some point, but whatevs!
+            const uint32_t fat_sector_ind = next_rand_u32(&(dev->r)) % dev->sectors_per_fat;
+
+            err = bd_read(dev->bd, dev->fat_offset + fat_sector_ind, 1, fat_sector);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+
+            uint32_t start = 0;
+            if (fat_sector_ind == 0) {
+                start = 2; // On the first sector, we skip the first two slots!
+            }
+
+            uint32_t stop = FAT32_SLOTS_PER_FAT_SECTOR;
+            if (fat_sector_ind == dev->sectors_per_fat - 1) {
+                // On the last sector, we see if the entire FAT sector is used.
+                uint32_t rem = dev->num_fat_slots % FAT32_SLOTS_PER_FAT_SECTOR;
+                if (rem > 0) {
+                    // A remainder of 0 means the entire last FAT sector is used.
+                    stop = rem;
+                }
+            }
+
+            for (uint32_t i = start; i < stop; i++) {
+                if (fat_sector[i] == 0) {
+                    dev->free_q[dev->free_q_fill++] = (fat_sector_ind * FAT32_SLOTS_PER_FAT_SECTOR) + i;
+                }
+            }
+        }
+    }
+
+    // Did the q actually get filled in any way??
+    if (dev->free_q_fill == 0) {
+        return FOS_NO_SPACE;
+    }
+
+    *slot_ind = dev->free_q[--(dev->free_q_fill)];
+
+    return FOS_SUCCESS;
+}
+
 fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t chain_start_ind, 
         uint32_t num_steps, uint32_t *chain_iter_ind) {
+    // May want to rework this??
     if (!chain_iter_ind) {
         return FOS_BAD_ARGS;
     }
@@ -587,7 +646,7 @@ fernos_error_t fat32_read(fat32_device_t *dev, uint32_t chain_start_ind,
     
     // Ok, now.... we read out each cluster!
     for (uint32_t i = 0; i < num_clusters; i++) {
-
+        // I think it's time to go to sleep!
     }
 
     return FOS_SUCCESS;
