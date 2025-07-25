@@ -621,6 +621,22 @@ fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32
 fernos_error_t fat32_sync_fats(fat32_device_t *dev);
 
 /**
+ * Traverse a chain starting at `slot_ind`. Each slot in the chain will be written over
+ * with value 0.
+ *
+ * An error is returned if slot_ind is invalid, if the the chain is malformed, or
+ * if there is an error while using the underlying block device.
+ */
+fernos_error_t fat32_free_chain(fat32_device_t *dev, uint32_t slot_ind);
+
+/**
+ * Do some extra shit here I guess...
+ */
+fernos_error_t fat32_extend_chain(fat32_device_t *dev, uint32_t slot_ind, uint32_t num_clusters);
+
+// The functions below may need to be reworked tbh....
+
+/**
  * Get an index of a slot which is not in use in the FAT.
  */
 fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
