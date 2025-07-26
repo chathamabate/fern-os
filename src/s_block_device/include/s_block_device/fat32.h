@@ -630,16 +630,41 @@ fernos_error_t fat32_sync_fats(fat32_device_t *dev);
 fernos_error_t fat32_free_chain(fat32_device_t *dev, uint32_t slot_ind);
 
 /**
- * Do some extra shit here I guess...
+ * Pop a free slot from the free queue and write it to *slot_ind.
+ * (The free slot is given the temporary value of EOC before being returned)
+ *
+ * If a free slot cannot be found FOS_NO_SPACE is returned.
+ * If there is some other error, FOS_UNKNOWN_ERROR is returned.
+ * Otherwise FOS_SUCCESS is returned.
  */
-fernos_error_t fat32_extend_chain(fat32_device_t *dev, uint32_t slot_ind, uint32_t num_clusters);
+fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
+
+/**
+ * Attempt to create a new chain of length `len`.
+ *
+ * If we run out of disk space before claiming `len` clusters, the entire chain created thus far
+ * is freed. FOS_NO_SPACE is returned.
+ *
+ * If there is some unexpected error, a partial/malformed chain may be left over in the BD.
+ * In this case, FOS_UNKNOWN_ERROR is returned.
+ *
+ * FOS_SUCCESS is ONLY returned when the ENTIRE chain is successfully allocated. When this 
+ * happens, the starting slot index is written to *slot_ind.
+ */
+fernos_error_t fat32_new_chain(fat32_device_t *dev, uint32_t len, uint32_t *slot_ind);
+
+
+
+
+
 
 // The functions below may need to be reworked tbh....
+// // PROBS WILL DELETE!!
 
 /**
  * Get an index of a slot which is not in use in the FAT.
  */
-fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
+//fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
 
 /**
  * Use this function if you want the slot index of a cluster within a chain.

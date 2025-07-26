@@ -568,6 +568,11 @@ fernos_error_t fat32_free_chain(fat32_device_t *dev, uint32_t slot_ind) {
     return FOS_SUCCESS;
 }
 
+/**
+ * FOS_SUCCESS means the free queue is non-empty now.
+ * FOS_NO_SPACE means we failed at finding any free entries.
+ * FOS_UNKNOWN error means there was some other error.
+ */
 static fernos_error_t fat32_populate_free_queue(fat32_device_t *dev) {
     if (dev->free_q_fill > 0) {
         return FOS_SUCCESS;
@@ -584,7 +589,7 @@ static fernos_error_t fat32_populate_free_queue(fat32_device_t *dev) {
 
         err = bd_read(dev->bd, dev->fat_offset + fat_sector_ind, 1, fat_sector);
         if (err != FOS_SUCCESS) {
-            return err;
+            return FOS_UNKNWON_ERROR;
         }
 
         uint32_t start = 0;
@@ -615,6 +620,98 @@ static fernos_error_t fat32_populate_free_queue(fat32_device_t *dev) {
 
     return FOS_SUCCESS;
 }
+
+fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind) {
+    if (!slot_ind) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    if (dev->free_q_fill == 0) {
+        err = fat32_populate_free_queue(dev);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+
+    uint32_t free_ind = dev->free_q[--(dev->free_q_fill)];
+
+    err = fat32_set_fat_slot(dev, free_ind, FAT32_EOC);
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    *slot_ind = free_ind;
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_new_chain(fat32_device_t *dev, uint32_t len, uint32_t *slot_ind) {
+    fernos_error_t err;
+
+    if (!slot_ind) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (len == 0) {
+        *slot_ind = FAT32_EOC;
+
+        return FOS_SUCCESS;
+    }
+
+    uint32_t head;
+
+    err = fat32_pop_free_fat_slot(dev, &head);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    uint32_t tail = head;
+
+    for (uint32_t i = 1; i < len; i++) {
+        uint32_t next_free;
+
+        err = fat32_pop_free_fat_slot(dev, &next_free);
+        if (err == FOS_NO_SPACE) {
+            break;
+        }
+
+        if (err != FOS_SUCCESS) {
+            // If we are in here, it is gauranteed, err has value FOS_UNKNOWN_ERROR,
+            // but might as well be explicit.
+            return FOS_UNKNWON_ERROR;
+        }
+
+        err = fat32_set_fat_slot(dev, tail, next_free);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        tail = next_free;
+    }
+
+    // If we exited the above loop do to lack of space, there should be a valid
+    // non-empty chain starting at head. Let's try to free it, then return.
+    if (err == FOS_NO_SPACE) {
+        err = fat32_free_chain(dev, head);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        return FOS_NO_SPACE;
+    }
+
+    // Remember, we shouldn't need to write EOC to tail, since this should already
+    // be done by pop_free_fat_slot.
+
+    *slot_ind = head;
+
+    return FOS_SUCCESS;
+}
+
+
+// OLD FUNCTIONS .... Probs will delete tbh...
 
 
 
