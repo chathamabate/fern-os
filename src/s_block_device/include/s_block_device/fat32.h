@@ -653,8 +653,27 @@ fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
  */
 fernos_error_t fat32_new_chain(fat32_device_t *dev, uint32_t len, uint32_t *slot_ind);
 
+/**
+ * Attempt to resize the given chain to length `new_len`.
+ *
+ * If `new_len` < the length of the chain, clusters will be freed.
+ * If `new_len` > the length of the chain, clusters will be allocated.
+ *
+ * When extending a chain, if space runs out, all clusters which were newly allocated will be freed.
+ * The given chain will remain at its original length. FOS_NO_SPACE will be returned.
+ * If there is some funky error with the underlying block device, FOS_UNKNOWN_ERROR is returned.
+ *
+ * FOS_SUCCESS is returned if and only if the given chain now has exact length `new_len`.
+ * (A `new_len` value of 0, will free the entire chain)
+ */
+fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32_t new_len);
+
+// Ok, and what does traverse actually do though???
+// Maybe extend? Or length??
 
 
+// Ok, now what if we want to extend a chain???
+// Then what??
 
 
 

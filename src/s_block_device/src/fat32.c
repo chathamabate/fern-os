@@ -710,6 +710,86 @@ fernos_error_t fat32_new_chain(fat32_device_t *dev, uint32_t len, uint32_t *slot
     return FOS_SUCCESS;
 }
 
+fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32_t new_len) {
+    if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
+        return FOS_INVALID_INDEX;
+    }
+
+    if (new_len == 0) {
+        return fat32_free_chain(dev, slot_ind);
+    }
+
+    fernos_error_t err;
+
+    // new_len > 0
+
+    uint32_t iter = slot_ind;
+    uint32_t links = 1; // Number of links visited thus far.
+                        // starts at 1, because we know the 1st link is valid from above.
+
+    while (true) {
+
+        // The situation where we have already traversed `new_len` links,
+        // a shrink is needed! (This logic would NOT work if `new_len` was 0)
+        if (links == new_len) {
+            // First get the index of the rest of the list.
+            // This segment will be entirely deleted!
+            uint32_t seg_head;
+            err = fat32_get_fat_slot(dev, iter, &seg_head);
+            if (err != FOS_SUCCESS) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            // Our list is ALREADY the correct size!
+            if (FAT32_IS_EOC(seg_head)) {
+                return FOS_SUCCESS;
+            }
+
+            // Otherwise, detatch and delete!
+            err = fat32_set_fat_slot(dev, iter, FAT32_EOC); 
+            if (err != FOS_SUCCESS) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            err = fat32_free_chain(dev, seg_head);
+            if (err != FOS_SUCCESS) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            return FOS_SUCCESS;
+        }
+        
+        uint32_t next_iter;
+        err = fat32_get_fat_slot(dev, iter, &next_iter);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        // Our iterator is the end of the chain!!!
+        if (FAT32_IS_EOC(next_iter)) {
+            break;
+        }
+
+        iter = next_iter;
+        links++;
+    }
+
+    uint32_t new_seg;
+    err = fat32_new_chain(dev, new_len - links, &new_seg);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    // Attach new segment.
+    err = fat32_set_fat_slot(dev, iter, new_seg);
+    if (err != FOS_SUCCESS) {
+        fat32_free_chain(dev, new_seg);
+        return FOS_UNKNWON_ERROR;
+    }
+    
+    return FOS_SUCCESS;
+}
+
 
 // OLD FUNCTIONS .... Probs will delete tbh...
 
