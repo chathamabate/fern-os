@@ -624,8 +624,8 @@ fernos_error_t fat32_sync_fats(fat32_device_t *dev);
  * Traverse a chain starting at `slot_ind`. Each slot in the chain will be written over
  * with value 0.
  *
- * An error is returned if slot_ind is invalid, if the the chain is malformed, or
- * if there is an error while using the underlying block device.
+ * If the chain is malformed, FOS_STATE_MISMATCH is returned.
+ * If there is an error with the block device, FOS_UNKNOWN_ERROR is returned.
  */
 fernos_error_t fat32_free_chain(fat32_device_t *dev, uint32_t slot_ind);
 
@@ -662,77 +662,41 @@ fernos_error_t fat32_new_chain(fat32_device_t *dev, uint32_t len, uint32_t *slot
  * When extending a chain, if space runs out, all clusters which were newly allocated will be freed.
  * The given chain will remain at its original length. FOS_NO_SPACE will be returned.
  * If there is some funky error with the underlying block device, FOS_UNKNOWN_ERROR is returned.
+ * If there is a malformed chain, FOS_STATE_MISMATCH is returned.
  *
  * FOS_SUCCESS is returned if and only if the given chain now has exact length `new_len`.
  * (A `new_len` value of 0, will free the entire chain)
  */
 fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32_t new_len);
 
-// Ok, and what does traverse actually do though???
-// Maybe extend? Or length??
-
-
-// Ok, now what if we want to extend a chain???
-// Then what??
-
-
-
-// The functions below may need to be reworked tbh....
-// // PROBS WILL DELETE!!
-
-/**
- * Get an index of a slot which is not in use in the FAT.
- */
-//fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
-
 /**
  * Use this function if you want the slot index of a cluster within a chain.
  *
- * For example, fat32_traverse_chain(d, 5, 1, &out) would find the next cluster in the chain
- * starting with index 5 and write its index to *chain_iter_ind.
+ * `cluster_offset` >= the length of the chain, FOS_INVALID_INDEX is returned.
+ * (Errors can also be returned if there are issues with the block device)
  *
- * Returns an error if chain_start_ind is invalid, or if there is an error reading from the 
- * underlying block device, or if chain_iter_ind is NULL, OR if the chain is malformed!
- *
- * If num_steps >= the length of the chain, FOS_SUCCESS is still returned, however EOC is
- * written to *chain_offset_ind.
+ * Otherwise, FOS_SUCCESS is returned, and the requested slot index is written to *slot_stop_ind.
  */
-fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t chain_start_ind, 
-        uint32_t num_steps, uint32_t *chain_iter_ind);
+fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t cluster_offset, uint32_t *slot_stop_ind);
 
 /**
- * Read clusters from a cluster chain.
+ * Read a chain of clusters into `dest`.
  *
- * chain_start_ind should be the index of the first cluster in the chain.
- * chain_offset should be what link in the chain to start reading at.
- * num_clusters is the number of clusters to read.
- * dest is where to read to, must have size AT LEAST cluster_size * num_clusters.
- * clusters_read is optional, but recommended. If given, the number of clusters successfully
- * read to dest will be written to *clusters_read.
+ * `dest` must have size at least `num_clusters` * cluster size.
  *
- * NOTE: That this still succeeds even if the end of the chain is reached before all clusters
- * can be read! So make sure to check *clusters_read on SUCCESS.
- *
- * Errors are returned if the chain is malformed in some way or if dest is NULL.
+ * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
  */
-fernos_error_t fat32_read(fat32_device_t *dev, uint32_t chain_start_ind, 
-        uint32_t chain_offset, uint32_t num_clusters, void *dest, uint32_t *clusters_read);
+fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t cluster_offset, uint32_t num_clusters, void *dest);
 
 /**
- * Write clusters to a cluster chain.
+ * Write a chain of clusters from `src1.
  *
- * chain_start_ind should be the index of the first cluster in the chain.
- * chain_offset should be what link in the chain to start writing to.
- * num_clusters is the number of clusters to write.
- * src is where to write from. must have size AT LEASE cluster_size * num_clusters.
- * clusters_written is optional, but recommended. If given, the number of clusters successfully
- * written will be stored in *clusters_written.
+ * `src1 must have size at least `num_clusters` * cluster size.
  *
- * NOTE: This succesds even if the end of the chain is reached before all data is written.
- * In this case, this function just exits without writing the extra clusters.
- *
- * Errors are returned if the chain is malformed in some way or if src is NULL.
+ * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
  */
-fernos_error_t fat32_write(fat32_device_t *dev, uint32_t chain_start_ind, 
-        uint32_t chain_offset, uint32_t num_clusters, const void *src, uint32_t *clusters_written);
+fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t cluster_offset, uint32_t num_clusters, const void *src);
 
