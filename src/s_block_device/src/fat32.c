@@ -796,9 +796,8 @@ fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32
     return FOS_SUCCESS;
 }
 
-
 fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t cluster_offset, uint32_t *slot_stop_ind) {
+        uint32_t slot_offset, uint32_t *slot_stop_ind) {
     if (!slot_stop_ind) {
         return FOS_BAD_ARGS;
     }
@@ -807,17 +806,120 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
         return FOS_INVALID_INDEX;
     }
 
+    fernos_error_t err;
+    
     uint32_t iter = slot_ind;
 
-    return FOS_NOT_IMPLEMENTED;
+    for (uint32_t i = 0; i < slot_offset; i++) {
+        uint32_t next_iter;
+        err = fat32_get_fat_slot(dev, iter, &next_iter);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        // We reached the end too early!
+        if (FAT32_IS_EOC(next_iter)) {
+            return FOS_INVALID_INDEX;
+        }
+
+        // Malformed chain.
+        if (next_iter < 2 || next_iter >= dev->num_fat_slots) {
+            return FOS_STATE_MISMATCH;
+        }
+
+        iter = next_iter;
+    }
+
+    *slot_stop_ind = iter;
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t cluster_offset, uint32_t num_clusters, void *dest) {
+        uint32_t sector_offset, uint32_t num_sectors, void *dest) {
+    
+
     return FOS_NOT_IMPLEMENTED;
 }
 
 fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t cluster_offset, uint32_t num_clusters, const void *src) {
+        uint32_t sector_offset, uint32_t num_sectors, const void *src) {
+
     return FOS_NOT_IMPLEMENTED;
+}
+
+fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest) {
+    const uint32_t sector_size = bd_sector_size(dev->bd);
+
+    if (!dest) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (byte_offset >= sector_size || len > sector_size || byte_offset + len > sector_size) {
+        return FOS_INVALID_RANGE;
+    }
+
+    if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
+        return FOS_INVALID_INDEX;
+    }
+
+    fernos_error_t err;
+
+    const uint32_t cluster_offset = sector_offset / dev->sectors_per_cluster;
+    const uint32_t internal_sector_offset = sector_offset % dev->sectors_per_cluster;
+
+    uint32_t cluster_ind;
+    err = fat32_traverse_chain(dev, slot_ind, cluster_offset, &cluster_ind);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    const uint32_t abs_sector_offset = dev->bd_offset + dev->data_section_offset +
+        ((cluster_ind - 2) * dev->sectors_per_cluster) + internal_sector_offset;
+
+    err = bd_read_piece(dev->bd, abs_sector_offset, byte_offset, len, dest);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src) {
+    const uint32_t sector_size = bd_sector_size(dev->bd);
+
+    if (!src) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (byte_offset >= sector_size || len > sector_size || byte_offset + len > sector_size) {
+        return FOS_INVALID_RANGE;
+    }
+
+    if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
+        return FOS_INVALID_INDEX;
+    }
+
+    fernos_error_t err;
+
+    const uint32_t cluster_offset = sector_offset / dev->sectors_per_cluster;
+    const uint32_t internal_sector_offset = sector_offset % dev->sectors_per_cluster;
+
+    uint32_t cluster_ind;
+    err = fat32_traverse_chain(dev, slot_ind, cluster_offset, &cluster_ind);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    const uint32_t abs_sector_offset = dev->bd_offset + dev->data_section_offset +
+        ((cluster_ind - 2) * dev->sectors_per_cluster) + internal_sector_offset;
+
+    err = bd_write_piece(dev->bd, abs_sector_offset, byte_offset, len, src);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    return FOS_SUCCESS;
 }

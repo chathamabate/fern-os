@@ -672,31 +672,58 @@ fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32
 /**
  * Use this function if you want the slot index of a cluster within a chain.
  *
- * `cluster_offset` >= the length of the chain, FOS_INVALID_INDEX is returned.
+ * `slot_offset` >= the length of the chain, FOS_INVALID_INDEX is returned.
  * (Errors can also be returned if there are issues with the block device)
  *
  * Otherwise, FOS_SUCCESS is returned, and the requested slot index is written to *slot_stop_ind.
  */
 fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t cluster_offset, uint32_t *slot_stop_ind);
+        uint32_t slot_offset, uint32_t *slot_stop_ind);
 
 /**
- * Read a chain of clusters into `dest`.
+ * Read sectors of a chain into `dest`.
  *
- * `dest` must have size at least `num_clusters` * cluster size.
+ * `dest` must have size at least `num_sectors` * sector size.
  *
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
  */
 fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t cluster_offset, uint32_t num_clusters, void *dest);
+        uint32_t sector_offset, uint32_t num_sectors, void *dest);
 
 /**
- * Write a chain of clusters from `src1.
+ * Write sectors of a chain from `src`.
  *
- * `src1 must have size at least `num_clusters` * cluster size.
+ * `src` must have size at least `num_sectors` * sector size.
  *
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
  */
 fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t cluster_offset, uint32_t num_clusters, const void *src);
+        uint32_t sector_offset, uint32_t num_sectors, const void *src);
+
+/*
+ * The read/write piece functions below are implemented to use the bd read/write piece functions.
+ * The idea once again is that they MIGHT be much more efficient for read/writing small pieces
+ * of data.
+ */
+
+/**
+ * Read bytes from just ONE sector within a chain.
+ * 
+ * `dest` must have size at least `len`.
+ *
+ * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
+ */
+fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest);
+
+/**
+ * Write bytes to just ONE sector within a chain.
+ *
+ * `len` must be < sector size.
+ * `src` must have size at least `len`.
+ *
+ * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
+ */
+fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src);
 
