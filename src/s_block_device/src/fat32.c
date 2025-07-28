@@ -835,91 +835,160 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
     return FOS_SUCCESS;
 }
 
+/**
+ * Returns FOS_INVALID_RANGE if the chain is not large enough!
+ * Returns FOS_STATE_MISMATCH if the chain is malformed!
+ */
+static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t sector_offset, uint32_t num_sectors, void *buf, bool write) {
+
+    const uint32_t sector_size = bd_sector_size(dev->bd);
+
+    if (!buf) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
+        return FOS_INVALID_INDEX;
+    }
+
+    if (num_sectors == 0) {
+        return FOS_SUCCESS;
+    }
+
+    fernos_error_t err;
+
+    // Advance to the correct cluster index.
+    uint32_t cluster_iter;
+    err = fat32_traverse_chain(dev, slot_ind, 
+            sector_offset / dev->sectors_per_cluster, &cluster_iter);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    uint32_t sectors_processed = 0;
+
+    while (true) {
+        uint8_t sectors_to_process = (num_sectors - sectors_processed);
+
+        if (sectors_to_process > dev->sectors_per_cluster) {
+            sectors_to_process = dev->sectors_per_cluster;
+        }
+
+        uint8_t shift = 0;
+
+        // On the first iteration only, we may start from the middle of a cluster instead of the
+        // beginning.
+        if (sectors_processed == 0) {
+            shift = sector_offset % dev->sectors_per_cluster;
+            sectors_to_process -= shift;
+        }
+
+        const uint32_t abs_sector = dev->bd_offset + dev->data_section_offset + 
+            ((cluster_iter - 2) * dev->sectors_per_cluster) + shift;
+
+        if (write) {
+            err = bd_write(dev->bd, abs_sector, sectors_to_process, 
+                    (const uint8_t *)buf + (sectors_processed * sector_size));
+        } else {
+            err = bd_read(dev->bd, abs_sector, sectors_to_process, 
+                    (uint8_t *)buf + (sectors_processed * sector_size));
+        }
+
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        sectors_processed += sectors_to_process;
+
+        // We'll check for exact equality as a way of confirming this function was written 
+        // correctly. If we overshoot the exact number of sectors we were supposed to process,
+        // we'll loop forever.
+        if (sectors_processed == num_sectors) {
+            return FOS_SUCCESS;
+        }
+
+        // Ok we have successfully processed all the sectors we care about in this cluster,
+        // let's advance to the next!
+
+        uint32_t next_cluster;
+        err = fat32_get_fat_slot(dev, cluster_iter, &next_cluster);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        if (FAT32_IS_EOC(next_cluster)) {
+            return FOS_INVALID_RANGE;
+        }
+
+        if (next_cluster < 2 || next_cluster >= dev->num_fat_slots) {
+            return FOS_STATE_MISMATCH;
+        }
+
+        // Success!
+        cluster_iter = next_cluster;
+    }
+}
+
 fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t sector_offset, uint32_t num_sectors, void *dest) {
-    
-
-    return FOS_NOT_IMPLEMENTED;
+    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, dest, false);
 }
 
 fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t num_sectors, const void *src) {
+    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, (void *)src, true);
+}
 
-    return FOS_NOT_IMPLEMENTED;
+static fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *buf, bool write) {
+    const uint32_t sector_size = bd_sector_size(dev->bd);
+
+    if (!buf) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (byte_offset >= sector_size || len > sector_size || byte_offset + len > sector_size) {
+        return FOS_INVALID_RANGE;
+    }
+
+    if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
+        return FOS_INVALID_INDEX;
+    }
+
+    fernos_error_t err;
+
+    const uint32_t cluster_offset = sector_offset / dev->sectors_per_cluster;
+    const uint32_t internal_sector_offset = sector_offset % dev->sectors_per_cluster;
+
+    uint32_t cluster_ind;
+    err = fat32_traverse_chain(dev, slot_ind, cluster_offset, &cluster_ind);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    const uint32_t abs_sector_offset = dev->bd_offset + dev->data_section_offset +
+        ((cluster_ind - 2) * dev->sectors_per_cluster) + internal_sector_offset;
+
+    if (write) {
+        err = bd_write_piece(dev->bd, abs_sector_offset, byte_offset, len, buf);
+    } else {
+        err = bd_read_piece(dev->bd, abs_sector_offset, byte_offset, len, buf);
+    }
+
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest) {
-    const uint32_t sector_size = bd_sector_size(dev->bd);
-
-    if (!dest) {
-        return FOS_BAD_ARGS;
-    }
-
-    if (byte_offset >= sector_size || len > sector_size || byte_offset + len > sector_size) {
-        return FOS_INVALID_RANGE;
-    }
-
-    if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
-        return FOS_INVALID_INDEX;
-    }
-
-    fernos_error_t err;
-
-    const uint32_t cluster_offset = sector_offset / dev->sectors_per_cluster;
-    const uint32_t internal_sector_offset = sector_offset % dev->sectors_per_cluster;
-
-    uint32_t cluster_ind;
-    err = fat32_traverse_chain(dev, slot_ind, cluster_offset, &cluster_ind);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    const uint32_t abs_sector_offset = dev->bd_offset + dev->data_section_offset +
-        ((cluster_ind - 2) * dev->sectors_per_cluster) + internal_sector_offset;
-
-    err = bd_read_piece(dev->bd, abs_sector_offset, byte_offset, len, dest);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    return FOS_SUCCESS;
+    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, dest, false);
 }
 
 fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src) {
-    const uint32_t sector_size = bd_sector_size(dev->bd);
-
-    if (!src) {
-        return FOS_BAD_ARGS;
-    }
-
-    if (byte_offset >= sector_size || len > sector_size || byte_offset + len > sector_size) {
-        return FOS_INVALID_RANGE;
-    }
-
-    if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
-        return FOS_INVALID_INDEX;
-    }
-
-    fernos_error_t err;
-
-    const uint32_t cluster_offset = sector_offset / dev->sectors_per_cluster;
-    const uint32_t internal_sector_offset = sector_offset % dev->sectors_per_cluster;
-
-    uint32_t cluster_ind;
-    err = fat32_traverse_chain(dev, slot_ind, cluster_offset, &cluster_ind);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    const uint32_t abs_sector_offset = dev->bd_offset + dev->data_section_offset +
-        ((cluster_ind - 2) * dev->sectors_per_cluster) + internal_sector_offset;
-
-    err = bd_write_piece(dev->bd, abs_sector_offset, byte_offset, len, src);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    return FOS_SUCCESS;
+    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, (void *)src, true);
 }
