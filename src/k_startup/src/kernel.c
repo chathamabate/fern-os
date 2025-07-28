@@ -26,11 +26,11 @@
 #include "s_data/test/wait_queue.h"
 #include "s_data/test/map.h"
 #include "k_startup/test/process.h"
-#include "s_block_device/fat32_file_sys.h"
 #include "s_block_device/block_device.h"
 #include "s_block_device/fat32.h"
 #include "s_block_device/test/cached_block_device.h"
 #include "s_util/rand.h"
+#include "s_block_device/test/fat32.h"
 
 #include "k_sys/ata.h"
 
@@ -140,29 +140,7 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-
-    fernos_error_t err;
-    //  screw around stuff.
-    block_device_t *bd = new_da_cached_block_device(get_ata_block_device(), 256, 0);
-
-    rand_t r = rand(0);
-    uint8_t piece[16];
-    for (size_t i = 0; i < 100000; i++) {
-        uint32_t si = next_rand_u8(&r); 
-        if (next_rand_u1(&r)) {
-            err = bd_read_piece(bd, si, 0, sizeof(piece), piece);
-        } else {
-            err = bd_write_piece(bd, si, 0, sizeof(piece), piece);
-        }
-
-        if (err != FOS_SUCCESS) {
-            term_put_s("AHHH\n");
-            lock_up();
-        }
-    }
-
-    term_put_s("DONE\n");
-
+    test_fat32_device();
     lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));

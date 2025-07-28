@@ -579,6 +579,9 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
  * Parse/Validate a FAT32 partition. 
  * `offset` should be the very beginning of the parition in `bd`. (unit of sectors)
  *
+ * The given block device is NOT OWNED by the fat32_device_t * returned.
+ * After you delete the FAT32 device, the underlying block device persists.
+ *
  * On success, a new fat32_device_t will be written to *dev_out.
  */
 fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint32_t offset, 
