@@ -144,5 +144,7 @@ static inline void bd_dump(block_device_t *bd, void (*pf)(const char *fmt, ...))
  * Delete the block device.
  */
 static inline void delete_block_device(block_device_t *bd) {
-    bd->impl->delete_block_device(bd);
+    if (bd) {
+        bd->impl->delete_block_device(bd);
+    }
 }

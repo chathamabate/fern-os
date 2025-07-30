@@ -9,29 +9,18 @@
 #include "s_util/rand.h"
 #include "s_util/str.h"
 
-static block_device_t *underlying_bd = NULL;
 
-/**
- * Assumes underlying BD is initialized.
- */
 static block_device_t *gen_cached_bd(void) {
-    return new_da_cached_block_device(underlying_bd, 8, 0);
+    block_device_t *underlying_bd = new_da_mem_block_device(512, 128);
+    if (!underlying_bd) {
+        return NULL;
+    }
+
+    return new_da_cached_block_device(underlying_bd, 8, 0, true);
 }
 
 bool test_cached_block_device(void) {
-    underlying_bd = new_da_mem_block_device(512, 128);
-    if (!underlying_bd) {
-        term_put_s("Could not init underlying BD!\n");
-
-        return false;
-    }
-
-    bool result = test_block_device("Cached Block Device", gen_cached_bd);
-
-    delete_block_device(underlying_bd);
-    underlying_bd = NULL;
-
-    return result;
+    return test_block_device("Cached Block Device", gen_cached_bd);
 }
 
 /*
@@ -70,7 +59,7 @@ static bool test_side_by_side(void) {
     block_device_t *mbd_under = new_da_mem_block_device(sector_size, num_sectors);
     TEST_TRUE(mbd_under != NULL);
 
-    block_device_t *cbd = new_da_cached_block_device(mbd_under, 16, 0);
+    block_device_t *cbd = new_da_cached_block_device(mbd_under, 16, 0, true);
     TEST_TRUE(cbd != NULL);
 
     uint8_t *big_buf0 = da_malloc(sector_size * num_sectors);
@@ -178,7 +167,6 @@ static bool test_side_by_side(void) {
     }
 
     delete_block_device(cbd);
-    delete_block_device(mbd_under);
     delete_block_device(mbd_cntl);
 
     da_free(big_buf0);

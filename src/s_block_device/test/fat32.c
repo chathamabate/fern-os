@@ -25,6 +25,9 @@ static bool posttest(void) {
     TEST_SUCCEED();
 }
 
+// I think we start by doing simple testing on what we have??
+// I think we should instead do the directory manipulation stuff first imo.
+
 static bool dummy_test(void) {
     TEST_SUCCEED();
 }

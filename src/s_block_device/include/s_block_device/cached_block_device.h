@@ -24,6 +24,8 @@ typedef struct _cached_block_device_t {
 
     allocator_t * const al;
 
+    const bool delete_wrapped_bd;
+
     block_device_t * const wrapped_bd;
 
     /**
@@ -57,17 +59,18 @@ typedef struct _cached_block_device_t {
 /**
  * Create a new cached_block_device. 
  *
- * NOTE: the wrapped block device is NOT OWNED by the created cached block device.
- * (i.e. when you delete the cached block device, its underlying bd will persist)
- *
  * cc is the maximum number of sectors which can be cahced at once.
  * seed is the seed to start the prng with.
  *
+ * dubd stands for "delete underlying block device". If true, the underlying block device will
+ * be deleted when this cached block device is deleted. (Otherwise, the underlying block device
+ * will persist)
+ *
  * Returns NULL if params are bad or if allocation fails.
  */
-block_device_t *new_cached_block_device(allocator_t *al, block_device_t *bd, size_t cc, uint32_t seed);
+block_device_t *new_cached_block_device(allocator_t *al, block_device_t *bd, size_t cc, uint32_t seed, bool dubd);
 
-static inline block_device_t *new_da_cached_block_device(block_device_t *bd, size_t cc, uint32_t seed) {
-    return new_cached_block_device(get_default_allocator(), bd, cc, seed);
+static inline block_device_t *new_da_cached_block_device(block_device_t *bd, size_t cc, uint32_t seed, bool dubd) {
+    return new_cached_block_device(get_default_allocator(), bd, cc, seed, dubd);
 }
 

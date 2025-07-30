@@ -37,7 +37,7 @@ static uint32_t size_t_hash_f(chained_hash_map_t *chm, const void *k) {
     return (((((*(const size_t *)k) * 3) + 2) * 17) + 1) * 13;
 }
 
-block_device_t *new_cached_block_device(allocator_t *al, block_device_t *bd, size_t cc, uint32_t seed) {
+block_device_t *new_cached_block_device(allocator_t *al, block_device_t *bd, size_t cc, uint32_t seed, bool dubd) {
     if (!al || !bd || cc == 0) {
         return NULL;
     }
@@ -86,6 +86,7 @@ block_device_t *new_cached_block_device(allocator_t *al, block_device_t *bd, siz
     *(const block_device_impl_t **)&(cbd->super.impl) = &CBD_IMPL;
     *(allocator_t **)&(cbd->al) = al;
     *(block_device_t **)&(cbd->wrapped_bd) = bd;
+    *(bool *)&(cbd->delete_wrapped_bd) = dubd;
     cbd->r = rand(seed);
     *(size_t *)&(cbd->cache_cap) = cc;
     cbd->cache_fill = 0;
@@ -390,6 +391,9 @@ static fernos_error_t cbd_flush(block_device_t *bd) {
 static void delete_cached_block_device(block_device_t *bd) {
     cached_block_device_t *cbd = (cached_block_device_t *)bd;
 
+    block_device_t *wrapped_bd = cbd->wrapped_bd;
+    bool delete_wrapped_bd = cbd->delete_wrapped_bd;
+
     delete_map(cbd->sector_map);
 
     for (size_t i = 0; i < cbd->cache_cap; i++) {
@@ -399,5 +403,9 @@ static void delete_cached_block_device(block_device_t *bd) {
     al_free(cbd->al, cbd->cache);
 
     al_free(cbd->al, cbd);
+
+    if (delete_wrapped_bd) {
+        delete_block_device(wrapped_bd);
+    }
 }
 

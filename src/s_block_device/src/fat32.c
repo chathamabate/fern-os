@@ -311,7 +311,7 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
 }
 
 fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint32_t offset, 
-        uint64_t seed, fat32_device_t **dev_out) {
+        uint64_t seed, bool dubd, fat32_device_t **dev_out) {
     if (!bd || !dev_out) {
         return FOS_BAD_ARGS;
     }
@@ -437,6 +437,7 @@ fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint3
     }
 
     *(allocator_t **)&(dev->al) = al;
+    *(bool *)&(dev->delete_wrapped_bd) = dubd;
     *(block_device_t **)&(dev->bd) = bd;
     *(uint32_t *)&(dev->bd_offset) = offset;
     *(uint32_t *)&(dev->num_sectors) = num_sectors;
@@ -457,7 +458,18 @@ fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint3
 }
 
 void delete_fat32_device(fat32_device_t *dev) {
+    if (!dev) {
+        return;
+    }
+
+    bool delete_wrapped_bd = dev->delete_wrapped_bd;
+    block_device_t *wrapped_bd = dev->bd;
+
     al_free(dev->al, dev);
+
+    if (delete_wrapped_bd) {
+        delete_block_device(wrapped_bd);
+    }
 }
 
 fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t *out_val) {

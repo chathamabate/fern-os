@@ -466,11 +466,8 @@ typedef struct _fat32_device_t {
 
     allocator_t * const al;
 
-    /**
-     * This is NOT OWNED by the fat32 device.
-     *
-     * Deleting the FAT32 device will NOT delete this block device.
-     */
+    const bool delete_wrapped_bd;
+
     block_device_t * const bd;
 
     /**
@@ -579,17 +576,18 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
  * Parse/Validate a FAT32 partition. 
  * `offset` should be the very beginning of the parition in `bd`. (unit of sectors)
  *
- * The given block device is NOT OWNED by the fat32_device_t * returned.
- * After you delete the FAT32 device, the underlying block device persists.
+ * If `dubd` is True (delete underlying block device), the given block device will be deleted
+ * when this fat32 device is deleted. Otherwise, the bd will persist after this device is 
+ * deleted.
  *
  * On success, a new fat32_device_t will be written to *dev_out.
  */
 fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint32_t offset, 
-        uint64_t seed, fat32_device_t **dev_out);
+        uint64_t seed, bool dubd, fat32_device_t **dev_out);
 
 static inline fernos_error_t parse_new_da_fat32_device(block_device_t *bd, uint32_t offset, 
-        uint64_t seed, fat32_device_t **dev_out) {
-    return parse_new_fat32_device(get_default_allocator(), bd, offset, seed, dev_out);
+        uint64_t seed, bool dubd, fat32_device_t **dev_out) {
+    return parse_new_fat32_device(get_default_allocator(), bd, offset, seed, dubd, dev_out);
 }
 
 void delete_fat32_device(fat32_device_t *dev);
