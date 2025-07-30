@@ -140,7 +140,7 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-    test_cached_block_device();
+    term_put_fmt_s("S: %u\n", sizeof(fat32_dir_entry_t));
     lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));

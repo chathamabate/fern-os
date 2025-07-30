@@ -1004,3 +1004,127 @@ fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src) {
     return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, (void *)src, true);
 }
+
+fernos_error_t fat32_read_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, fat32_dir_entry_t *entry) {
+    if (!entry) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    const uint32_t sector_size = bd_sector_size(dev->bd);
+    const uint32_t entries_per_sector = sector_size / sizeof(fat32_dir_entry_t);
+
+    err = fat32_read_piece(dev, slot_ind, entry_offset / entries_per_sector, 
+            (entry_offset % entries_per_sector) * sizeof(fat32_dir_entry_t), 
+            sizeof(fat32_dir_entry_t), entry);
+
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_write_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, const fat32_dir_entry_t *entry) {
+    if (!entry) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    const uint32_t sector_size = bd_sector_size(dev->bd);
+    const uint32_t entries_per_sector = sector_size / sizeof(fat32_dir_entry_t);
+
+    err = fat32_write_piece(dev, slot_ind, entry_offset / entries_per_sector, 
+            (entry_offset % entries_per_sector) * sizeof(fat32_dir_entry_t), 
+            sizeof(fat32_dir_entry_t), entry);
+
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_traverse_dir_entries(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t entry_offset, uint32_t *sfn_entry_offset) {
+    if (!sfn_entry_offset) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    // We'll start by advancing in the directory's cluster chain to save time when when use
+    // the read and write functions above. No need to start at `slot_ind` if we skip the first few
+    // clusters every time we read.
+    uint32_t fwd_slot_ind;
+
+    const uint32_t sector_size = bd_sector_size(dev->bd);
+    const uint32_t dir_entries_per_cluster = 
+        (sector_size * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
+
+    err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, 
+            &fwd_slot_ind);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    fat32_dir_entry_t dir_entry;
+
+    const uint32_t skipped_entries = (fwd_slot_ind - slot_ind) * dir_entries_per_cluster;
+    const uint32_t fwd_entry_offset = entry_offset % dir_entries_per_cluster;
+    uint32_t offset_iter = fwd_entry_offset;
+
+    while (true) {
+        err = fat32_read_dir_entry(dev, fwd_slot_ind, offset_iter, &dir_entry);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        if (dir_entry.raw[0] == FAT32_DIR_ENTRY_UNUSED || 
+                dir_entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
+            // Here we reached the end of the sequence before reaching the SFN Entry :(.
+            return FOS_STATE_MISMATCH;
+        }
+
+        if (!FT32F_ATTR_IS_LFN(dir_entry.short_fn.attrs)) {
+            // We found our end! Wooh!
+            *sfn_entry_offset = entry_offset + skipped_entries  + (offset_iter - fwd_entry_offset);
+            return FOS_SUCCESS;
+        }
+
+        // Otherwise, we just keep going!
+        offset_iter++;
+    }
+}
+
+fernos_error_t fat32_read_file_info(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t entry_offset, fat32_file_info_t *info) {
+    if (!info) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    // We'll start by advancing in the directory's cluster chain to save time when when use
+    // the read and write functions above. No need to start at `slot_ind` if we skip the first few
+    // clusters every time we read.
+    uint32_t fwd_slot_ind;
+    uint32_t fwd_entry_offset;
+
+    const uint32_t sector_size = bd_sector_size(dev->bd);
+    const uint32_t dir_entries_per_cluster = 
+        (sector_size * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
+
+    err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, 
+            &fwd_slot_ind);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    fwd_entry_offset = entry_offset % dir_entries_per_cluster;
+    
+}

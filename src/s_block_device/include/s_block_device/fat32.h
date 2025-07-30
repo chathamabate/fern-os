@@ -15,6 +15,12 @@
 
 #define FAT32_SLOTS_PER_FAT_SECTOR (512 / sizeof(uint32_t))
 
+/**
+ * Maximum length of a file's long file name.
+ * Remeber, this is in 16-bit characters. (Does NOT include 16-bit NULL terminator 0x0000)
+ */
+#define FAT32_MAX_FN_LEN (255U)
+
 typedef struct _fat_bios_param_block_2_0_t {
     /**
      * Probably should only ever be 512 or 4K.
@@ -368,6 +374,8 @@ static inline fat32_time_t fat32_time(uint8_t hours, uint8_t mins, uint8_t secs)
 #define FT32F_ATTR_ARCHIVE      (1UL << 5)
 #define FT32F_ATTR_LFN          (0x0FU)
 
+#define FT32F_ATTR_IS_LFN(attr) (((attr) & FT32F_ATTR_LFN) == FT32F_ATTR_LFN)
+
 typedef struct _fat32_short_fn_dir_entry_t {
     /**
      * Space padded.
@@ -450,6 +458,31 @@ typedef struct _fat32_long_fn_dir_entry_t {
 
     uint16_t long_fn_2[2];
 } __attribute__ ((packed)) fat32_long_fn_dir_entry_t;
+
+/**
+ * If the first byte of a directory entry holds this value,
+ * it is unallocated and free to use!
+ */
+#define FAT32_DIR_ENTRY_UNUSED (0xE5U)
+
+/**
+ * If the first byte of a directory entry holds this value,
+ * you have reached the end of the directory. This entry and all following entries
+ * are unusable! (Unless you move advance the terminator that is)
+ */
+#define FAT32_DIR_ENTRY_TERMINTAOR (0x0U)
+
+typedef union _fat32_dir_entry_t {
+    /**
+     * Use raw[0] to determine if this entry is used or not!
+     */
+
+    // Raw bytes.
+    uint8_t raw[sizeof(fat32_short_fn_dir_entry_t)];
+
+    fat32_short_fn_dir_entry_t short_fn;
+    fat32_long_fn_dir_entry_t long_fn;
+} fat32_dir_entry_t;
 
 /**
  * This is going to be an intermediary interface between a block device and a file system.
@@ -541,6 +574,11 @@ typedef struct _fat32_device_t {
      */
     uint32_t free_q_fill;
 } fat32_device_t;
+
+typedef struct _fat32_file_info_t {
+    uint16_t long_fn[FAT32_MAX_FN_LEN + 1];
+    fat32_short_fn_dir_entry_t info;
+} fat32_file_info_t;
 
 /**
  * Compute the standard FAT32 checksum for a short filename.
@@ -728,3 +766,44 @@ fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
 fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src);
 
+/*
+ * Directory Functions
+ */
+
+/**
+ * Given a directory which starts at cluster `slot_ind`, read out directory entry
+ * at `entry_offset`. (This is basically an index into array where each element has size 32-bytes)
+ *
+ * Read entry is copied into *entry.
+ */
+fernos_error_t fat32_read_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, fat32_dir_entry_t *entry);
+
+/**
+ * Given a directory which starts at cluster `slot_ind`, write to directory entry
+ * at `entry_offset`. (This is basically an index into array where each element has size 32-bytes)
+ */
+fernos_error_t fat32_write_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, const fat32_dir_entry_t *entry);
+
+/**
+ * Given the start of a sequence of directory entries starting at `entry_offset`.
+ * Find the entry offset value of the short file name entry 
+ * (i.e. the last used entry of the sequence)
+ */
+fernos_error_t fat32_traverse_dir_entries(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t entry_offset, uint32_t *sfn_entry_offset);
+
+/**
+ * Read out file information for a file whose entries start at index `entry_offset` within
+ * a directory which begins at cluster `slot_ind`.
+ *
+ * NOTE: For the sake of performance, this function DOES NOT search the full given directory for 
+ * its NULL Terminator to determine if `entry_offset` is valid. If the directory's cluster chain
+ * is long enough to be indexed by `entry_offset`, this file assumes `entry_offset` is in bounds
+ * for the directory itself.
+ *
+ * Only interpret *info when FOS_SUCCESS is returned.
+ */
+fernos_error_t fat32_read_file_info(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t entry_offset, fat32_file_info_t *info);
