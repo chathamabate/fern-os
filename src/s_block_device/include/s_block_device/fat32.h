@@ -13,7 +13,13 @@
 #define FAT32_IS_EOC(v)     ((v & FAT32_EOC) == FAT32_EOC)
 #define FAT32_BAD_CLUSTER   (0x0FFFFFF7U)
 
-#define FAT32_SLOTS_PER_FAT_SECTOR (512 / sizeof(uint32_t))
+/**
+ * A FAT32 device will ultimately require that the underlying block device has a sector
+ * size of 512.
+ */
+#define FAT32_REQ_SECTOR_SIZE (512U)
+
+#define FAT32_SLOTS_PER_FAT_SECTOR (FAT32_REQ_SECTOR_SIZE / sizeof(uint32_t))
 
 typedef struct _fat_bios_param_block_2_0_t {
     /**
@@ -868,3 +874,9 @@ fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
  */
 fernos_error_t fat32_search_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
         uint32_t *entry_offset);
+
+/**
+ * Ooob
+ */
+fernos_error_t fat32_allocate_entry(fat32_device_t *dev, uint32_t slot_ind, 
+        fat32_short_fn_dir_entry_t *sfn_entry, uint16_t *lfn, uint32_t *entry_offset);

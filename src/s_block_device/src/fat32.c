@@ -48,7 +48,7 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     fernos_error_t err;
 
     const size_t bps = bd_sector_size(bd);
-    if (bps != 512) {
+    if (bps != FAT32_REQ_SECTOR_SIZE) {
         return FOS_BAD_ARGS;
     }
 
@@ -317,7 +317,7 @@ fernos_error_t parse_new_fat32_device(allocator_t *al, block_device_t *bd, uint3
     }
 
     // We need to read the boot sector first.
-    if (bd_sector_size(bd) != 512 || offset >= bd_num_sectors(bd)) {
+    if (bd_sector_size(bd) != FAT32_REQ_SECTOR_SIZE || offset >= bd_num_sectors(bd)) {
         return FOS_INVALID_RANGE;
     }
 
@@ -518,7 +518,7 @@ fernos_error_t fat32_sync_fats(fat32_device_t *dev) {
 
     fernos_error_t err;
 
-    uint8_t sector_buffer[512];
+    uint8_t sector_buffer[FAT32_REQ_SECTOR_SIZE];
 
     const uint32_t abs_master_fat_offset = dev->bd_offset + dev->fat_offset;
 
@@ -853,9 +853,6 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
  */
 static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t sector_offset, uint32_t num_sectors, void *buf, bool write) {
-
-    const uint32_t sector_size = bd_sector_size(dev->bd);
-
     if (!buf) {
         return FOS_BAD_ARGS;
     }
@@ -901,10 +898,10 @@ static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind,
 
         if (write) {
             err = bd_write(dev->bd, abs_sector, sectors_to_process, 
-                    (const uint8_t *)buf + (sectors_processed * sector_size));
+                    (const uint8_t *)buf + (sectors_processed * FAT32_REQ_SECTOR_SIZE));
         } else {
             err = bd_read(dev->bd, abs_sector, sectors_to_process, 
-                    (uint8_t *)buf + (sectors_processed * sector_size));
+                    (uint8_t *)buf + (sectors_processed * FAT32_REQ_SECTOR_SIZE));
         }
 
         if (err != FOS_SUCCESS) {
@@ -954,13 +951,11 @@ fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
 
 static fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *buf, bool write) {
-    const uint32_t sector_size = bd_sector_size(dev->bd);
-
     if (!buf) {
         return FOS_BAD_ARGS;
     }
 
-    if (byte_offset >= sector_size || len > sector_size || byte_offset + len > sector_size) {
+    if (byte_offset >= FAT32_REQ_SECTOR_SIZE || len > FAT32_REQ_SECTOR_SIZE || byte_offset + len > FAT32_REQ_SECTOR_SIZE) {
         return FOS_INVALID_RANGE;
     }
 
@@ -1013,8 +1008,7 @@ fernos_error_t fat32_read_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
 
     fernos_error_t err;
 
-    const uint32_t sector_size = bd_sector_size(dev->bd);
-    const uint32_t entries_per_sector = sector_size / sizeof(fat32_dir_entry_t);
+    const uint32_t entries_per_sector = FAT32_REQ_SECTOR_SIZE / sizeof(fat32_dir_entry_t);
 
     err = fat32_read_piece(dev, slot_ind, entry_offset / entries_per_sector, 
             (entry_offset % entries_per_sector) * sizeof(fat32_dir_entry_t), 
@@ -1035,8 +1029,7 @@ fernos_error_t fat32_write_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
 
     fernos_error_t err;
 
-    const uint32_t sector_size = bd_sector_size(dev->bd);
-    const uint32_t entries_per_sector = sector_size / sizeof(fat32_dir_entry_t);
+    const uint32_t entries_per_sector = FAT32_REQ_SECTOR_SIZE / sizeof(fat32_dir_entry_t);
 
     err = fat32_write_piece(dev, slot_ind, entry_offset / entries_per_sector, 
             (entry_offset % entries_per_sector) * sizeof(fat32_dir_entry_t), 
@@ -1059,9 +1052,8 @@ fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
 
     uint32_t fwd_slot_ind;
 
-    const uint32_t sector_size = bd_sector_size(dev->bd);
     const uint32_t dir_entries_per_cluster = 
-        (sector_size * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
+        (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
 
     err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, 
             &fwd_slot_ind);
@@ -1117,9 +1109,8 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
     // clusters every time we read.
     uint32_t fwd_slot_ind;
 
-    const uint32_t sector_size = bd_sector_size(dev->bd);
     const uint32_t dir_entries_per_cluster = 
-        (sector_size * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
+        (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
 
     err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, 
             &fwd_slot_ind);
@@ -1171,9 +1162,8 @@ fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
         return FOS_BAD_ARGS;
     }
 
-    const uint32_t sector_size = bd_sector_size(dev->bd);
     const uint32_t dir_entries_per_cluster = 
-        (sector_size * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
+        (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
 
     uint32_t fwd_steps = sfn_entry_offset / dir_entries_per_cluster;
     uint32_t fwd_offset = sfn_entry_offset % dir_entries_per_cluster;
@@ -1312,9 +1302,8 @@ fernos_error_t fat32_search_free_seq(fat32_device_t *dev, uint32_t slot_ind, uin
         return FOS_SUCCESS;
     }
 
-    const uint32_t sector_size = bd_sector_size(dev->bd);
     const uint32_t dir_entries_per_cluster = 
-        (sector_size * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
+        (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
 
     fernos_error_t err;
 
