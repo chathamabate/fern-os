@@ -1210,6 +1210,9 @@ fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
         return FOS_STATE_MISMATCH; 
     }
 
+    // Save for the end.
+    const uint32_t sfn_fwd_offset = fwd_offset;
+
     uint32_t chars_written = 0;
 
     while (true) {
@@ -1264,4 +1267,36 @@ fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
 
 end:
 
+    if (chars_written == 0) {
+        // In the case no characters were written, no LFN entries were found, write out the 
+        // short file name.
+        
+        err = fat32_read_dir_entry(dev, fwd_ind, sfn_fwd_offset, &entry);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        for (size_t i = 0; i < 8; i++) {
+            if (entry.short_fn.short_fn[i] == ' ') {
+                break;
+            }
+            lfn[chars_written++] = entry.short_fn.short_fn[i];
+        }
+
+        if (entry.short_fn.extenstion[0] != ' ') {
+            lfn[chars_written++] = '.';
+
+            for (size_t i = 0; i < 3; i++) {
+                if (entry.short_fn.extenstion[i] == ' ') {
+                    break;
+                }
+                lfn[chars_written++] = entry.short_fn.extenstion[i];
+            }
+        }
+    } 
+
+    // Write out Null terminator and call it a day!
+    lfn[chars_written] = 0; 
+
+    return FOS_SUCCESS;
 }
