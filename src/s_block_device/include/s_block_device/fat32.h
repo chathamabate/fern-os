@@ -855,3 +855,16 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
 fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sfn_entry_offset, uint16_t *lfn);
 
+/**
+ * Search for a consecutive sequence of free entries within a directory starting at `slot_ind`.
+ *
+ * On FOS_SUCCESS, a sequence of at least `seq_len` free entries was found, and its starting offset
+ * is written to `*entry_offset`.
+ * 
+ * If the directory terminator is reached before an adequate length sequence is found,
+ * FOS_NO_SPACE is returned.
+ *
+ * Other errors may be returned.
+ */
+fernos_error_t fat32_search_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
+        uint32_t *entry_offset);
