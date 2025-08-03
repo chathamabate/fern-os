@@ -575,11 +575,6 @@ typedef struct _fat32_device_t {
     uint32_t free_q_fill;
 } fat32_device_t;
 
-typedef struct _fat32_file_info_t {
-    uint16_t long_fn[FAT32_MAX_FN_LEN + 1];
-    fat32_short_fn_dir_entry_t info;
-} fat32_file_info_t;
-
 /**
  * Compute the standard FAT32 checksum for a short filename.
  */
@@ -768,6 +763,15 @@ fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
 
 /*
  * Directory Functions
+ *
+ * A "dir entry" is a single 32-bit value within the directory.
+ * A "dir sequence" is a continguous sequence of 32-bit "dir entry"'s for the information
+ * of a single file.
+ *
+ * "entry offset" will usually denote the an index into a directory. (in units of "dir entries")
+ *
+ * A "valid entry" is an entry within the directory which is known to be before the terminator.
+ * (Or if there is no terminatory, just exists on in the directory sectors)
  */
 
 /**
@@ -775,6 +779,9 @@ fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
  * at `entry_offset`. (This is basically an index into array where each element has size 32-bytes)
  *
  * Read entry is copied into *entry.
+ *
+ * No checks if `entry_offset` comes before the terminator.
+ * If `entry_offset` exceeds the directory sectors, FOS_INDEX_INVALID is returned.
  */
 fernos_error_t fat32_read_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t entry_offset, fat32_dir_entry_t *entry);
@@ -782,17 +789,65 @@ fernos_error_t fat32_read_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
 /**
  * Given a directory which starts at cluster `slot_ind`, write to directory entry
  * at `entry_offset`. (This is basically an index into array where each element has size 32-bytes)
+ *
+ * No checks if `entry_offset` comes before the terminator.
+ * If `entry_offset` exceeds the directory sectors, FOS_INDEX_INVALID is returned.
  */
 fernos_error_t fat32_write_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t entry_offset, const fat32_dir_entry_t *entry);
 
 /**
- * Given the start of a sequence of directory entries starting at `entry_offset`.
- * Find the entry offset value of the short file name entry 
- * (i.e. the last used entry of the sequence)
+ * Does the given directory have any valid directory entires?
+ * (i.e. is it not empty)
+ *
+ * Returns FOS_SUCCESS if so, FOS_EMPTY if empty.
+ * Other errors may be returned.
+ *
+ * If FOS_SUCCESS is returned, it is gauranteed that entry with offset 0 is valid.
  */
-fernos_error_t fat32_traverse_dir_entries(fat32_device_t *dev, uint32_t slot_ind, 
+fernos_error_t fat32_dir_has_valid_entries(fat32_device_t *dev, uint32_t slot_ind);
+
+/**
+ * Given a VALID entry offset within a directory, determine if the entry at `entry_offset + 1`
+ * is also VALID.
+ *
+ * If the next entry is Valid, FOS_SUCCESS is returned.
+ * If the next entry is the terminator, FOS_EMPTY is returned.
+ * If the next entry doesn't exist on disk, FOS_EMPTY is returned.
+ * Other error may be returned.
+ *
+ * NOTE: This function is intended to be used during iteration. Undefined behavior if the
+ * given entry is invalid.
+ */
+fernos_error_t fat32_dir_entry_has_next(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset);
+
+/**
+ *
+ */
+fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, uint32_t *seq_start);
+
+/**
+ * Given the offset of a directory entry within a directory sequence, write the index 
+ * of the sequence's SFN entry to `*sfn_entry_offset`.
+ *
+ * If entry offset points to an SFN entry, `entry_offset` is written.
+ *
+ * If an unused entry is encounter FOS_STATE_MISMATCH will be returned. 
+ */
+fernos_error_t fat32_traverse_dir_seq(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t entry_offset, uint32_t *sfn_entry_offset);
+
+
+/**
+ *
+ */
+fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, uint32_t *seq_entry_offset);
+
+
+fernos_error_t fat32_next_dir_entry(fat32_device_t *dev, uint32_t slot_ind
 
 /**
  * Read out file information for a file whose entries start at index `entry_offset` within

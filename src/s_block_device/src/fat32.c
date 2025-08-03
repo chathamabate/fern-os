@@ -1049,7 +1049,48 @@ fernos_error_t fat32_write_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
     return FOS_SUCCESS;
 }
 
-fernos_error_t fat32_traverse_dir_entries(fat32_device_t *dev, uint32_t slot_ind, 
+fernos_error_t fat32_dir_has_valid_entries(fat32_device_t *dev, uint32_t slot_ind) {
+    fat32_dir_entry_t first_entry;
+
+    fernos_error_t err;
+
+    err = fat32_read_dir_entry(dev, slot_ind, 0, &first_entry);
+
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    if (first_entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
+        return FOS_EMPTY;
+    }
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_dir_entry_has_next(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset) {
+    fat32_dir_entry_t next_entry;
+
+    fernos_error_t err;
+
+    err = fat32_read_dir_entry(dev, slot_ind, entry_offset + 1, &next_entry);
+
+    if (err == FOS_INVALID_INDEX) {
+        return FOS_EMPTY;
+    }
+
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    if (next_entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
+        return FOS_EMPTY;
+    }
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_traverse_dir_seq(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t entry_offset, uint32_t *sfn_entry_offset) {
     if (!sfn_entry_offset) {
         return FOS_BAD_ARGS;
@@ -1074,7 +1115,6 @@ fernos_error_t fat32_traverse_dir_entries(fat32_device_t *dev, uint32_t slot_ind
 
     fat32_dir_entry_t dir_entry;
 
-    const uint32_t skipped_entries = (fwd_slot_ind - slot_ind) * dir_entries_per_cluster;
     const uint32_t fwd_entry_offset = entry_offset % dir_entries_per_cluster;
     uint32_t offset_iter = fwd_entry_offset;
 
@@ -1092,7 +1132,7 @@ fernos_error_t fat32_traverse_dir_entries(fat32_device_t *dev, uint32_t slot_ind
 
         if (!FT32F_ATTR_IS_LFN(dir_entry.short_fn.attrs)) {
             // We found our end! Wooh!
-            *sfn_entry_offset = entry_offset + skipped_entries  + (offset_iter - fwd_entry_offset);
+            *sfn_entry_offset = entry_offset + (offset_iter - fwd_entry_offset);
             return FOS_SUCCESS;
         }
 
