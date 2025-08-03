@@ -15,12 +15,6 @@
 
 #define FAT32_SLOTS_PER_FAT_SECTOR (512 / sizeof(uint32_t))
 
-/**
- * Maximum length of a file's long file name.
- * Remeber, this is in 16-bit characters. (Does NOT include 16-bit NULL terminator 0x0000)
- */
-#define FAT32_MAX_FN_LEN (255U)
-
 typedef struct _fat_bios_param_block_2_0_t {
     /**
      * Probably should only ever be 512 or 4K.
@@ -460,6 +454,24 @@ typedef struct _fat32_long_fn_dir_entry_t {
 } __attribute__ ((packed)) fat32_long_fn_dir_entry_t;
 
 /**
+ * Maximum length of a file's long file name.
+ * Remeber, this is in 16-bit characters. (Does NOT include 16-bit NULL terminator 0x0000)
+ */
+#define FAT32_MAX_LFN_LEN (255U)
+
+/**
+ * Number of 16-bit characters contained in a single LFN Entry.
+ */
+#define FAT32_CHARS_PER_LFN_ENTRY (13U)
+
+/**
+ * This is the maximum possible length in directory entries of a sequnece describing a single
+ * file. 13 chars for each LFN entry + 1 Extra if there is a remainder + 1 for the SFN entry.
+ */
+#define FAT32_MAX_DIR_SEQ_LEN ((FAT32_MAX_LFN_LEN / FAT32_CHARS_PER_LFN_ENTRY) + \
+        ((FAT32_MAX_LFN_LEN % FAT32_CHARS_PER_LFN_ENTRY == 0 ? 0 : 1) + 1))
+
+/**
  * If the first byte of a directory entry holds this value,
  * it is unallocated and free to use!
  */
@@ -827,8 +839,19 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t entry_offset, uint32_t *sfn_entry_offset);
 
 /**
+ * Get a sequence's Long Filename given a pointer to its SFN entry.
  *
+ * This function back tracks from the short file name entry over each of the LFN entries.
+ * One by one filling the lfn buffer provided.
+ *
+ * `lfn` must have size at least FAT32_MAX_LFN_LEN + 1.
+ *
+ * If the given file has no LFN entries, the Short file name will be copied into `lfn`.
+ *
+ * The contents written to `lfn` are only gauranteed to be valid when FOS_SUCCESS is returned.
+ *
+ * This will return an error if your sequence has too many LFN entries.
  */
 fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t entry_offset, uint16_t *lfn);
+        uint32_t sfn_entry_offset, uint16_t *lfn);
 

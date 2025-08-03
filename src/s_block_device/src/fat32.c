@@ -1165,30 +1165,103 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
     }
 }
 
-fernos_error_t fat32_read_file_info(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t entry_offset, fat32_file_info_t *info) {
-    if (!info) {
+fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sfn_entry_offset, uint16_t *lfn) {
+    if (!lfn) {
         return FOS_BAD_ARGS;
     }
-
-    fernos_error_t err;
-
-    // We'll start by advancing in the directory's cluster chain to save time when when use
-    // the read and write functions above. No need to start at `slot_ind` if we skip the first few
-    // clusters every time we read.
-    uint32_t fwd_slot_ind;
-    uint32_t fwd_entry_offset;
 
     const uint32_t sector_size = bd_sector_size(dev->bd);
     const uint32_t dir_entries_per_cluster = 
         (sector_size * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
 
-    err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, 
-            &fwd_slot_ind);
+    uint32_t fwd_steps = sfn_entry_offset / dir_entries_per_cluster;
+    uint32_t fwd_offset = sfn_entry_offset % dir_entries_per_cluster;
+
+    // Ok this is kinda tricky, the idea here is that the fwd_offset is >= the MAX_SEQ_LEN - 1,
+    // then it will be impossible this sequence bleeds into the previous directory cluster!
+    //
+    // Otherwise, because it is possible, we have our forward indeces start at the cluster before
+    // that which `sfn_entry_offset` belongs to.
+    //
+    // I am going to need to test this heavily because this is pretty confusing.
+    if (fwd_offset < (FAT32_MAX_DIR_SEQ_LEN - 1) && fwd_steps > 0) {
+        fwd_steps--;
+        fwd_offset += dir_entries_per_cluster;
+    }
+
+    fernos_error_t err;
+
+    uint32_t fwd_ind;
+    err = fat32_traverse_chain(dev, slot_ind, fwd_steps, &fwd_ind);
+    if (err != FOS_SUCCESS) {
+        return err;  // Likely index out of bounds.
+    }
+
+    fat32_dir_entry_t entry;
+    err = fat32_read_dir_entry(dev, fwd_ind, fwd_offset, &entry);
     if (err != FOS_SUCCESS) {
         return err;
     }
 
-    fwd_entry_offset = entry_offset % dir_entries_per_cluster;
-    
+    // Confirm, that our first entry indexed is actually an SFN entry.
+    if (entry.raw[0] == FAT32_DIR_ENTRY_UNUSED || entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR ||
+            FT32F_ATTR_IS_LFN(entry.short_fn.attrs)) {
+        return FOS_STATE_MISMATCH; 
+    }
+
+    uint32_t chars_written = 0;
+
+    while (true) {
+        // Ok, first things first, let's back track.
+        
+        if (fwd_offset == 0) {
+            goto end; // No where to go, that's ok.
+        }
+
+        fwd_offset--;
+
+        err = fat32_read_dir_entry(dev, fwd_ind, fwd_offset, &entry);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        if (entry.raw[0] == FAT32_DIR_ENTRY_UNUSED ||
+                !FT32F_ATTR_IS_LFN(entry.short_fn.attrs)) {
+            goto end; // We hit an unused entry or the end of another chain.
+        }
+
+        // Aye yo, your sequence should never have more than MAX LFN LEN characters to write.
+        if (chars_written >= FAT32_MAX_LFN_LEN) {
+            return FOS_STATE_MISMATCH;
+        }
+
+        // Ok, here we should be gauranteed to be on an LFN Entry.
+        //
+        // Write out each piece to the LFN buffer, exit early if the NULL terminator is found.
+        
+        for (size_t i = 0; i < 5; i++) {
+            if (entry.long_fn.long_fn_0[i] == 0) {
+                goto end; 
+            }
+            lfn[chars_written++] = entry.long_fn.long_fn_0[i];
+        }
+
+        for (size_t i = 0; i < 6; i++) {
+            if (entry.long_fn.long_fn_1[i] == 0) {
+                goto end; 
+            }
+            lfn[chars_written++] = entry.long_fn.long_fn_1[i];
+        }
+
+        for (size_t i = 0; i < 2; i++) {
+            if (entry.long_fn.long_fn_2[i] == 0) {
+                goto end; 
+            }
+            lfn[chars_written++] = entry.long_fn.long_fn_2[i];
+        }
+    }
+
+end:
+
 }
