@@ -769,9 +769,6 @@ fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
  * of a single file.
  *
  * "entry offset" will usually denote the an index into a directory. (in units of "dir entries")
- *
- * A "valid entry" is an entry within the directory which is known to be before the terminator.
- * (Or if there is no terminatory, just exists on in the directory sectors)
  */
 
 /**
@@ -797,33 +794,20 @@ fernos_error_t fat32_write_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t entry_offset, const fat32_dir_entry_t *entry);
 
 /**
- * Does the given directory have any valid directory entires?
- * (i.e. is it not empty)
+ * Given the offset of an entry within a directory, get the offset of the start of 
+ * the next directory sequence.
  *
- * Returns FOS_SUCCESS if so, FOS_EMPTY if empty.
+ * If `entry_offset` points to the directory terminator, FOS_EMPTY is returned.
+ * If `entry_offset` overshoots the directory sectors, FOS_EMPTY is returned.
+ * If `entry_offset` points to an existing slot which comes AFTER the directory terminator,
+ * undefined behavior.
+ * If `entry_offset` already points to an LFN or SFN entry, `entry_offset` is written to 
+ * `*seq_start`. FOS_SUCCES is returned.
+ * Otherwise, the directory is traversed until an LFN/SFN entry is found. This offset is then
+ * written to `*seq_start`. FOS_SUCCESS is returned.
+ * If no SFN/LFN entry is found before hitting the terminator, FOS_EMPTY is returned.
+ *
  * Other errors may be returned.
- *
- * If FOS_SUCCESS is returned, it is gauranteed that entry with offset 0 is valid.
- */
-fernos_error_t fat32_dir_has_valid_entries(fat32_device_t *dev, uint32_t slot_ind);
-
-/**
- * Given a VALID entry offset within a directory, determine if the entry at `entry_offset + 1`
- * is also VALID.
- *
- * If the next entry is Valid, FOS_SUCCESS is returned.
- * If the next entry is the terminator, FOS_EMPTY is returned.
- * If the next entry doesn't exist on disk, FOS_EMPTY is returned.
- * Other error may be returned.
- *
- * NOTE: This function is intended to be used during iteration. Undefined behavior if the
- * given entry is invalid.
- */
-fernos_error_t fat32_dir_entry_has_next(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t entry_offset);
-
-/**
- *
  */
 fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t entry_offset, uint32_t *seq_start);
@@ -834,31 +818,17 @@ fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
  *
  * If entry offset points to an SFN entry, `entry_offset` is written.
  *
- * If an unused entry is encounter FOS_STATE_MISMATCH will be returned. 
+ * If an unused entry is encountered or the end of the directory is reached before finding
+ * the SFN, return FOS_STATE_MISMATCH.
+ *
+ * Other errors may be returned.
  */
-fernos_error_t fat32_traverse_dir_seq(fat32_device_t *dev, uint32_t slot_ind, 
+fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t entry_offset, uint32_t *sfn_entry_offset);
 
-
 /**
  *
  */
-fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t entry_offset, uint32_t *seq_entry_offset);
+fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, uint16_t *lfn);
 
-
-fernos_error_t fat32_next_dir_entry(fat32_device_t *dev, uint32_t slot_ind
-
-/**
- * Read out file information for a file whose entries start at index `entry_offset` within
- * a directory which begins at cluster `slot_ind`.
- *
- * NOTE: For the sake of performance, this function DOES NOT search the full given directory for 
- * its NULL Terminator to determine if `entry_offset` is valid. If the directory's cluster chain
- * is long enough to be indexed by `entry_offset`, this file assumes `entry_offset` is in bounds
- * for the directory itself.
- *
- * Only interpret *info when FOS_SUCCESS is returned.
- */
-fernos_error_t fat32_read_file_info(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t entry_offset, fat32_file_info_t *info);

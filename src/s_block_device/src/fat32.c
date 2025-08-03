@@ -1049,48 +1049,62 @@ fernos_error_t fat32_write_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
     return FOS_SUCCESS;
 }
 
-fernos_error_t fat32_dir_has_valid_entries(fat32_device_t *dev, uint32_t slot_ind) {
-    fat32_dir_entry_t first_entry;
+fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, uint32_t *seq_start) {
+    if (!seq_start) {
+        return FOS_BAD_ARGS;
+    }
 
     fernos_error_t err;
 
-    err = fat32_read_dir_entry(dev, slot_ind, 0, &first_entry);
+    uint32_t fwd_slot_ind;
 
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
-    }
+    const uint32_t sector_size = bd_sector_size(dev->bd);
+    const uint32_t dir_entries_per_cluster = 
+        (sector_size * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
 
-    if (first_entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
-        return FOS_EMPTY;
-    }
-
-    return FOS_SUCCESS;
-}
-
-fernos_error_t fat32_dir_entry_has_next(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t entry_offset) {
-    fat32_dir_entry_t next_entry;
-
-    fernos_error_t err;
-
-    err = fat32_read_dir_entry(dev, slot_ind, entry_offset + 1, &next_entry);
-
+    err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, 
+            &fwd_slot_ind);
     if (err == FOS_INVALID_INDEX) {
-        return FOS_EMPTY;
+        return FOS_EMPTY; // We overshot the end of the directory sectors.
     }
 
     if (err != FOS_SUCCESS) {
         return FOS_UNKNWON_ERROR;
     }
 
-    if (next_entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
-        return FOS_EMPTY;
-    }
+    const uint32_t fwd_entry_offset = entry_offset % dir_entries_per_cluster;
+    uint32_t iter = fwd_entry_offset;
 
-    return FOS_SUCCESS;
+    while (true) {
+        fat32_dir_entry_t entry;
+
+        err = fat32_read_dir_entry(dev, fwd_slot_ind, iter, &entry);
+        if (err == FOS_INVALID_INDEX) {
+            return FOS_EMPTY; // The directory had no terminator, we went up to the very last entry
+                              // then overshot.
+        }
+
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        if (entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
+            return FOS_EMPTY; // We hit the terminator.
+        }
+
+        if (entry.raw[0] != FAT32_DIR_ENTRY_UNUSED) {
+            // We hit a used entry!!! WOOO!!!
+
+            *seq_start = entry_offset + (iter - fwd_entry_offset);
+            return FOS_SUCCESS;
+        }
+
+        iter++;
+    }
 }
 
-fernos_error_t fat32_traverse_dir_seq(fat32_device_t *dev, uint32_t slot_ind, 
+fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t entry_offset, uint32_t *sfn_entry_offset) {
     if (!sfn_entry_offset) {
         return FOS_BAD_ARGS;
@@ -1109,19 +1123,29 @@ fernos_error_t fat32_traverse_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
 
     err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, 
             &fwd_slot_ind);
-    if (err != FOS_SUCCESS) {
-        return err;
+    if (err == FOS_INVALID_INDEX) {
+        return FOS_INVALID_INDEX;
     }
 
-    fat32_dir_entry_t dir_entry;
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
 
     const uint32_t fwd_entry_offset = entry_offset % dir_entries_per_cluster;
     uint32_t offset_iter = fwd_entry_offset;
 
     while (true) {
+        fat32_dir_entry_t dir_entry;
+
         err = fat32_read_dir_entry(dev, fwd_slot_ind, offset_iter, &dir_entry);
+        if (err == FOS_INVALID_INDEX) {
+            return FOS_STATE_MISMATCH; // Here we were reading a valid sequence, but ended up
+                                       // overshooting the end of the directory before the 
+                                       // sequence ended!
+        }
+
         if (err != FOS_SUCCESS) {
-            return err;
+            return FOS_UNKNWON_ERROR;
         }
 
         if (dir_entry.raw[0] == FAT32_DIR_ENTRY_UNUSED || 
