@@ -1008,6 +1008,8 @@ fernos_error_t fat32_read_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
 
     fernos_error_t err;
 
+    // This is basically a compile time constant but whatevs.
+    // 512 / 32 = 16
     const uint32_t entries_per_sector = FAT32_REQ_SECTOR_SIZE / sizeof(fat32_dir_entry_t);
 
     err = fat32_read_piece(dev, slot_ind, entry_offset / entries_per_sector, 
@@ -1050,13 +1052,14 @@ fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
 
     fernos_error_t err;
 
-    uint32_t fwd_slot_ind;
+    uint32_t iter;
 
     const uint32_t dir_entries_per_cluster = 
         (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
 
+    // Here we skip ahead until the cluster which holds the entry we are starting at.
     err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, 
-            &fwd_slot_ind);
+            &iter);
     if (err == FOS_INVALID_INDEX) {
         return FOS_EMPTY; // We overshot the end of the directory sectors.
     }
@@ -1064,35 +1067,59 @@ fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
     if (err != FOS_SUCCESS) {
         return FOS_UNKNWON_ERROR;
     }
+    
+    uint32_t entries_checked = 0;
+    bool first_iter = true;
 
-    const uint32_t fwd_entry_offset = entry_offset % dir_entries_per_cluster;
-    uint32_t iter = fwd_entry_offset;
+    // For this function, we are not going to use the fwd_ind paradigm 
+    // because a sequence of empty entries could potentially be very long.
+    // It'd be more efficient to just iterate over the cluster chain directly ourselves.
 
     while (true) {
         fat32_dir_entry_t entry;
 
-        err = fat32_read_dir_entry(dev, fwd_slot_ind, iter, &entry);
-        if (err == FOS_INVALID_INDEX) {
-            return FOS_EMPTY; // The directory had no terminator, we went up to the very last entry
-                              // then overshot.
+        uint32_t start = 0;
+
+        if (first_iter) {
+            start = entry_offset % dir_entries_per_cluster;
+            first_iter = false;
         }
 
+        for (uint32_t i = start; i < dir_entries_per_cluster; i++, entries_checked++) {
+            err = fat32_read_dir_entry(dev, iter, i, &entry);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+
+            if (entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
+                return FOS_EMPTY; // We hit the terminator.
+            }
+
+            if (entry.raw[0] != FAT32_DIR_ENTRY_UNUSED) {
+                // We hit a used entry!!! WOOO!!!
+                *seq_start = entry_offset + entries_checked;
+                return FOS_SUCCESS;
+            }
+        }
+
+        // Now we need to advance cluster iterator.
+
+        uint32_t next_iter;
+        
+        err = fat32_get_fat_slot(dev, iter, &next_iter);
         if (err != FOS_SUCCESS) {
             return FOS_UNKNWON_ERROR;
         }
 
-        if (entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
-            return FOS_EMPTY; // We hit the terminator.
+        if (FAT32_IS_EOC(next_iter)) {
+            return FOS_EMPTY;
         }
 
-        if (entry.raw[0] != FAT32_DIR_ENTRY_UNUSED) {
-            // We hit a used entry!!! WOOO!!!
-
-            *seq_start = entry_offset + (iter - fwd_entry_offset);
-            return FOS_SUCCESS;
+        if (next_iter < 2 || next_iter >= dev->num_fat_slots) {
+            return FOS_STATE_MISMATCH;
         }
 
-        iter++;
+        iter = next_iter;
     }
 }
 
@@ -1126,8 +1153,17 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
     uint32_t offset_iter = fwd_entry_offset;
 
     while (true) {
+        // If we have already traversed the max number of entries, exit early!
+        const uint32_t visited = offset_iter - fwd_entry_offset;
+        if (visited >= FAT32_MAX_DIR_SEQ_LEN) {
+            return FOS_STATE_MISMATCH;
+        }
+
         fat32_dir_entry_t dir_entry;
 
+        // We are somewhat safe to use this read function here because the max length of 
+        // a used sequence is 21. Which is pretty small. There isn't really an advantage to
+        // incrememnting some cluster index as we go.
         err = fat32_read_dir_entry(dev, fwd_slot_ind, offset_iter, &dir_entry);
         if (err == FOS_INVALID_INDEX) {
             return FOS_STATE_MISMATCH; // Here we were reading a valid sequence, but ended up
@@ -1147,7 +1183,9 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
 
         if (!FT32F_ATTR_IS_LFN(dir_entry.short_fn.attrs)) {
             // We found our end! Wooh!
-            *sfn_entry_offset = entry_offset + (offset_iter - fwd_entry_offset);
+            // Remember, `visited` doesn't include this entry we are on right now.
+            // Only ones we have previously processed completely.
+            *sfn_entry_offset = entry_offset + visited;
             return FOS_SUCCESS;
         }
 
@@ -1168,14 +1206,14 @@ fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
     uint32_t fwd_steps = sfn_entry_offset / dir_entries_per_cluster;
     uint32_t fwd_offset = sfn_entry_offset % dir_entries_per_cluster;
 
-    // Ok this is kinda tricky, the idea here is that the fwd_offset is >= the MAX_SEQ_LEN - 1,
-    // then it will be impossible this sequence bleeds into the previous directory cluster!
-    //
-    // Otherwise, because it is possible, we have our forward indeces start at the cluster before
-    // that which `sfn_entry_offset` belongs to.
+    // We step backwards one cluster at a time until the `fwd_offset` is >= MAX_SEQ_LEN - 1
+    // (Or we run out of clusters).
+    // 
+    // The idea here is that when we traverse the cluster chain we can't overshoot the potential
+    // beginning of the file's sequence.
     //
     // I am going to need to test this heavily because this is pretty confusing.
-    if (fwd_offset < (FAT32_MAX_DIR_SEQ_LEN - 1) && fwd_steps > 0) {
+    while (fwd_offset < (FAT32_MAX_DIR_SEQ_LEN - 1) && fwd_steps > 0) {
         fwd_steps--;
         fwd_offset += dir_entries_per_cluster;
     }

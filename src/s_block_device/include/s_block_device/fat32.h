@@ -876,7 +876,7 @@ fernos_error_t fat32_search_free_seq(fat32_device_t *dev, uint32_t slot_ind, uin
         uint32_t *entry_offset);
 
 /**
- * Ooob
+ * Ooob What should this do???
  */
 fernos_error_t fat32_allocate_entry(fat32_device_t *dev, uint32_t slot_ind, 
         fat32_short_fn_dir_entry_t *sfn_entry, uint16_t *lfn, uint32_t *entry_offset);
