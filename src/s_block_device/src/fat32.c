@@ -1379,6 +1379,127 @@ fernos_error_t fat32_check_names(fat32_device_t *dev, uint32_t slot_ind,
     }
 }
 
+fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
+        uint32_t *entry_offset) {
+    if (!entry_offset) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (seq_len == 0) {
+        *entry_offset = 0;
+        return FOS_SUCCESS;
+    }
+
+    const uint32_t dir_entries_per_cluster = 
+        (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
+
+    fernos_error_t err;
+
+    // When true, we are in the middle of a free sequence.
+    bool in_free_seq = false;
+
+    uint32_t iter = slot_ind;
+    uint32_t iter_chain_index = 0;
+
+    uint32_t last_free_offset = 0;
+    uint32_t last_free_chain_index = 0;
+    uint32_t free_seq_len = 0;
+
+    while (true) {
+        fat32_dir_entry_t entry;
+
+        for (uint32_t i = 0; i < dir_entries_per_cluster; i++) {
+            err = fat32_read_dir_entry(dev, iter, i, &entry);
+            if (err != FOS_SUCCESS) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            if (entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
+                // Here we hit the terminator before we found an adequate length sequence.
+                // Let's just advance the terminator and keep going.
+                //
+                // This could be more efficient, but whatevs.
+
+                // First advance the terminator if there is space.
+                if (i < dir_entries_per_cluster - 1) {
+                    err = fat32_write_dir_entry(dev, iter, i + 1, &entry);
+                    if (err != FOS_SUCCESS) {
+                        return FOS_UNKNWON_ERROR;
+                    }
+                }
+
+                // Next Write over the current index with an unused entry.
+                entry.raw[0] = FAT32_DIR_ENTRY_UNUSED;
+
+                err = fat32_write_dir_entry(dev, iter, i, &entry);
+                if (err != FOS_SUCCESS) {
+                    return FOS_UNKNWON_ERROR;
+                }
+            }
+            
+            if (entry.raw[0] == FAT32_DIR_ENTRY_UNUSED) {
+                // Unused entry found.
+                if (!in_free_seq) {
+                    last_free_offset = i;
+                    last_free_chain_index = iter_chain_index;
+                    free_seq_len = 0;
+
+                    in_free_seq = true;
+                } 
+
+                free_seq_len++;
+
+                if (free_seq_len == seq_len) {
+                    *entry_offset = (last_free_chain_index * dir_entries_per_cluster) + last_free_offset;
+                    return FOS_SUCCESS;
+                }
+            } else if (in_free_seq) {
+                // Used + we were iterating over a free sequence!
+                in_free_seq = false;
+            }
+        }
+
+        // Ok, now we must go to the next cluster!
+
+        uint32_t next_iter;
+        err = fat32_get_fat_slot(dev, iter, &next_iter);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        if (FAT32_IS_EOC(next_iter)) {
+            // We made it to the end of our chain without finding a match, let's just
+            // expand the chain here.
+
+            uint32_t new_cluster;
+            err = fat32_pop_free_fat_slot(dev, &new_cluster);
+            if (err != FOS_SUCCESS) {
+                return err; // This is OK because pop_fat_slot also returns an 
+                            // FOS_NO_SPACE error.
+            }
+
+            // Place the directory terminator at the very beginning of this new directory
+            // cluster.
+            entry.raw[0] = FAT32_DIR_ENTRY_TERMINTAOR;
+            err = fat32_write_dir_entry(dev, new_cluster, 0, &entry);
+            if (err != FOS_SUCCESS) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            // Finally, add the new cluster to our current chain!
+            err = fat32_set_fat_slot(dev, iter, new_cluster);
+            if (err != FOS_SUCCESS) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            next_iter = new_cluster;
+        }
+
+        iter = next_iter;
+        iter_chain_index++;
+    }
+}
+
 fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset,
         const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn) {
     if (!sfn_entry) {
@@ -1471,109 +1592,4 @@ fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t 
     }
     
     return FOS_SUCCESS;
-}
-
-fernos_error_t fat32_allocate_seq(fat32_device_t *dev, uint32_t slot_ind, 
-        fat32_short_fn_dir_entry_t *sfn_entry, uint16_t *lfn, uint32_t *entry_offset) {
-    if (!sfn_entry || !entry_offset) {
-        return FOS_BAD_ARGS;
-    }
-
-    // Number of entries for the sequence as a whole.
-    uint32_t seq_len = 1;
-
-    // Length of the LFN name. (Not including null terminator)
-    uint32_t lfn_len = 0;
-
-    if (lfn) {
-        while (lfn[lfn_len] != 0) {
-            lfn_len++;
-            if (lfn_len > FAT32_MAX_LFN_LEN) {
-                return FOS_STATE_MISMATCH;
-            }
-        }
-
-        seq_len += FAT32_NUM_LFN_ENTRIES(lfn_len);
-    }
-
-
-
-}
-
-fernos_error_t fat32_search_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
-        uint32_t *entry_offset) {
-    if (!entry_offset) {
-        return FOS_BAD_ARGS;
-    }
-
-    if (seq_len == 0) {
-        *entry_offset = 0;
-        return FOS_SUCCESS;
-    }
-
-    const uint32_t dir_entries_per_cluster = 
-        (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) / sizeof(fat32_dir_entry_t);
-
-    fernos_error_t err;
-
-    // When true, we are in the middle of a free sequence.
-    bool in_free_seq = false;
-
-    uint32_t iter = slot_ind;
-    uint32_t iter_chain_index = 0;
-
-    uint32_t last_free_offset = 0;
-    uint32_t last_free_chain_index = 0;
-    uint32_t free_seq_len = 0;
-
-    while (true) {
-        fat32_dir_entry_t entry;
-
-        for (uint32_t i = 0; i < dir_entries_per_cluster; i++) {
-            err = fat32_read_dir_entry(dev, iter, i, &entry);
-            if (err != FOS_SUCCESS) {
-                return FOS_UNKNWON_ERROR;
-            }
-
-            if (entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
-                return FOS_NO_SPACE;
-            }
-            
-            if (entry.raw[0] == FAT32_DIR_ENTRY_UNUSED) {
-                // Unused entry found.
-                if (!in_free_seq) {
-                    last_free_offset = i;
-                    last_free_chain_index = iter_chain_index;
-                    free_seq_len = 0;
-
-                    in_free_seq = true;
-                } 
-
-                free_seq_len++;
-
-                if (free_seq_len == seq_len) {
-                    *entry_offset = (last_free_chain_index * dir_entries_per_cluster) + last_free_offset;
-                    return FOS_SUCCESS;
-                }
-            } else if (in_free_seq) {
-                // Used + we were iterating over a free sequence!
-                in_free_seq = false;
-            }
-        }
-
-        // Ok, now we must go to the next cluster!
-
-        uint32_t next_iter;
-        err = fat32_get_fat_slot(dev, iter, &next_iter);
-        if (err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
-        }
-
-        if (FAT32_IS_EOC(next_iter)) {
-            return FOS_NO_SPACE;
-        }
-
-        iter = next_iter;
-        iter_chain_index++;
-    }
 }

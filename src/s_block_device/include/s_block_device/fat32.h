@@ -881,6 +881,18 @@ fernos_error_t fat32_check_names(fat32_device_t *dev, uint32_t slot_ind,
         const char *sfn, const uint16_t *lfn);
 
 /**
+ * Find a sequence of free entires within a directory which has a length of at least `seq_len`.
+ *
+ * On Success, FOS_SUCCESS is returned, and the starting offset of the sequence is written to
+ * `*entry_offset`.
+ *
+ * NOTE: if an initial search fails to find an adequate sequnce, the directory will be expanded.
+ * If the expansion fails FOS_NO_SPACE will be returned.
+ */
+fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
+        uint32_t *entry_offset);
+
+/**
  * This call forcefully writes the given sequence to a directory starting at `entry_offset`.
  *
  * NOTE: This DOES NOT check the entries it writes over. Only use this call when you KNOW
@@ -895,37 +907,3 @@ fernos_error_t fat32_check_names(fat32_device_t *dev, uint32_t slot_ind,
 fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset,
         const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn);
 
-
-/**
- * Attempt to allocate a sequnce of one or more entries in a directory.
- *
- * If you'd like no long file name entries, just set `lfn` to NULL.
- * Otherwise `lfn` should be a NULL terminated array which doesn't surpass the max lfn length.
- *
- * On success, FOS_SUCCESS is returned, a seqeunce ending in the given SFN entry is 
- * written to the directory. The offset of the starting entry of the sequence is
- * written to `*entry_offset`.
- *
- * THIS DOES NOT CHECK FOR NAME REPITITION. 
- *
- * If after searching the entire directory cluster chain, no place can be found to
- * put this new sequence, the directory will be extended to fit this new sequence.
- * If this extension fails due to lack of space, FOS_NO_SPACE is returned.
- */
-fernos_error_t fat32_allocate_seq(fat32_device_t *dev, uint32_t slot_ind, 
-        fat32_short_fn_dir_entry_t *sfn_entry, uint16_t *lfn, uint32_t *entry_offset);
-
-// MIGHT DELETE THIS GUY.
-/**
- * Search for a consecutive sequence of free entries within a directory starting at `slot_ind`.
- *
- * On FOS_SUCCESS, a sequence of at least `seq_len` free entries was found, and its starting offset
- * is written to `*entry_offset`.
- * 
- * If the directory terminator is reached before an adequate length sequence is found,
- * FOS_NO_SPACE is returned.
- *
- * Other errors may be returned.
- */
-fernos_error_t fat32_search_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
-        uint32_t *entry_offset);
