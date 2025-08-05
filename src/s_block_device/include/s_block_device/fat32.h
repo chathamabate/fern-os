@@ -856,7 +856,7 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
  *
  * `lfn` must have size at least FAT32_MAX_LFN_LEN + 1.
  *
- * If the given file has no LFN entries, the Short file name will be copied into `lfn`.
+ * If the given file has no LFN entries, FOS_EMPTY is returned.
  *
  * The contents written to `lfn` are only gauranteed to be valid when FOS_SUCCESS is returned.
  *
@@ -864,6 +864,21 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
  */
 fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sfn_entry_offset, uint16_t *lfn);
+
+/**
+ * Check if the given name combination is available. 
+ * If either `sfn` or `lfn` is used in an existing directory sequence, FOS_IN_USE is returned.
+ *
+ * NOTE: `sfn` should really be a pointer to the name array in a short_fn entry.
+ * This makes sure it is easy to compare directly while searching the directory.
+ * Remember, short file names must be space padded.
+ *
+ * NOTE: `lfn` can be NULL, in this case, only the short file name is searched for.
+ *
+ * FOS_SUCCESS means `sfn` and `lfn` are yet to be used in the given directory!
+ */
+fernos_error_t fat32_check_names(fat32_device_t *dev, uint32_t slot_ind, 
+        const char *sfn, const uint16_t *lfn);
 
 /**
  * This call forcefully writes the given sequence to a directory starting at `entry_offset`.
@@ -879,6 +894,8 @@ fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
  */
 fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset,
         const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn);
+
+
 /**
  * Attempt to allocate a sequnce of one or more entries in a directory.
  *
