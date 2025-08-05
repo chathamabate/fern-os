@@ -140,7 +140,7 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-    term_put_fmt_s("%u\n", FAT32_MAX_DIR_SEQ_LEN);
+    term_put_fmt_s("%u\n", FAT32_NUM_LFN_ENTRIES(14));
     lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));

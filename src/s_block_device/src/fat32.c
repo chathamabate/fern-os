@@ -1329,6 +1329,127 @@ end:
     return FOS_SUCCESS;
 }
 
+fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset,
+        const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn) {
+    if (!sfn_entry) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    const uint32_t dir_entries_per_cluster = (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) /
+        sizeof(fat32_dir_entry_t);
+
+    uint32_t fwd_slot_ind;
+    err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, &fwd_slot_ind);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    const uint32_t fwd_entry_offset = entry_offset % dir_entries_per_cluster;
+
+    // Calc number of LFN entries.
+
+    uint32_t lfn_len = 0;
+    if (lfn) {
+        while (lfn[lfn_len] != 0) {
+            lfn_len++;
+            if (lfn_len > FAT32_MAX_LFN_LEN) {
+                return FOS_BAD_ARGS;
+            }
+        }
+    }
+    const uint32_t num_lfn_entries = FAT32_NUM_LFN_ENTRIES(lfn_len);
+
+    // First, write out the SFN entry.
+    err = fat32_write_dir_entry(dev, fwd_slot_ind, fwd_entry_offset + num_lfn_entries, 
+            (const fat32_dir_entry_t *)sfn_entry);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    // Write out LFN entries if there are any.
+    if (num_lfn_entries > 0) {
+        const uint8_t sfn_check_sum = fat32_checksum(sfn_entry->short_fn);
+
+        fat32_long_fn_dir_entry_t lfn_entry;
+        
+        // We are going to do the lfn entry placement starting from the SFN entry, then walking
+        // backwards.
+        for (uint32_t lfn_iter = 0; lfn_iter < num_lfn_entries; lfn_iter++) {
+
+            // 0 out the whole entry now so we don't need to deal with NULL terminators.
+            mem_set(&lfn_entry, 0, sizeof(fat32_long_fn_dir_entry_t));
+
+            lfn_entry.entry_order = lfn_iter + 1;
+            if (lfn_iter == num_lfn_entries - 1) {
+                lfn_entry.entry_order |= 0x40; // If this is the starting entry it must start with 0x40.
+            }
+
+            lfn_entry.attrs = FT32F_ATTR_LFN;
+            lfn_entry.type = 0;
+            lfn_entry.short_fn_checksum = sfn_check_sum;
+
+            // determine what part of the LFN string we are copying.
+
+            const uint32_t start = lfn_iter * FAT32_CHARS_PER_LFN_ENTRY;
+            const uint32_t end = lfn_iter < num_lfn_entries - 1 ? (lfn_iter + 1) * FAT32_CHARS_PER_LFN_ENTRY : lfn_len;
+
+            for (uint32_t char_i = start; char_i < end; char_i++) {
+                const uint32_t rel = char_i % FAT32_CHARS_PER_LFN_ENTRY;
+
+                // 0: 0-4
+                // 1: 5-10
+                // 2: 11-12
+                if (rel <= 4) {
+                    lfn_entry.long_fn_0[rel] = lfn[char_i];
+                } else if (rel <= 10) {
+                    lfn_entry.long_fn_1[rel - 5] = lfn[char_i];
+                } else {
+                    lfn_entry.long_fn_2[rel - 10] = lfn[char_i];
+                }
+            }
+
+            // Ok, finally actually write out the LFN entry.
+            err = fat32_write_dir_entry(dev, fwd_slot_ind, 
+                    fwd_entry_offset + (num_lfn_entries - 1) - lfn_iter, 
+                    (const fat32_dir_entry_t *)&lfn_entry);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+        }
+    }
+    
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_allocate_seq(fat32_device_t *dev, uint32_t slot_ind, 
+        fat32_short_fn_dir_entry_t *sfn_entry, uint16_t *lfn, uint32_t *entry_offset) {
+    if (!sfn_entry || !entry_offset) {
+        return FOS_BAD_ARGS;
+    }
+
+    // Number of entries for the sequence as a whole.
+    uint32_t seq_len = 1;
+
+    // Length of the LFN name. (Not including null terminator)
+    uint32_t lfn_len = 0;
+
+    if (lfn) {
+        while (lfn[lfn_len] != 0) {
+            lfn_len++;
+            if (lfn_len > FAT32_MAX_LFN_LEN) {
+                return FOS_STATE_MISMATCH;
+            }
+        }
+
+        seq_len += FAT32_NUM_LFN_ENTRIES(lfn_len);
+    }
+
+
+
+}
+
 fernos_error_t fat32_search_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
         uint32_t *entry_offset) {
     if (!entry_offset) {
