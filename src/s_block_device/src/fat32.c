@@ -477,6 +477,8 @@ fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32
         return FOS_BAD_ARGS;
     }
 
+    slot_ind &= FAT32_MASK;
+
     if (slot_ind >= dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
@@ -502,6 +504,8 @@ fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32
 }
 
 fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t val) {
+    slot_ind &= FAT32_MASK;
+
     if (slot_ind >= dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
