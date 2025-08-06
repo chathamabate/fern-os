@@ -83,17 +83,86 @@ static bool test_get_set_fat_slots(void) {
     TEST_SUCCEED();
 }
 
-static bool test_free_chain(void) {
+/**
+ * Helper for writing a predefined chain to the FAT.
+ */
+static bool fat32_store_chain(fat32_device_t *dev, const uint32_t *chain, uint32_t chain_len) {
+    fernos_error_t err;
+
+    if (chain_len == 0) {
+        TEST_SUCCEED();
+    }
+
+    for (uint32_t i = 0; i < chain_len - 1; i++) {
+        err =  fat32_set_fat_slot(dev, chain[i], chain[i + 1]);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+    err = fat32_set_fat_slot(dev, chain[chain_len - 1], FAT32_EOC);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    
+    TEST_SUCCEED();
+}
+
+static bool test_free_valid_chain(void) {
+    fernos_error_t err; 
+    uint32_t slot_val;
+
+    const uint32_t chain_indeces[] = {
+        4, 6, 9, 5, 3
+    };
+    const uint32_t chain_indeces_len = sizeof(chain_indeces) / sizeof(uint32_t);
+
+    TEST_TRUE(fat32_store_chain(dev, chain_indeces, chain_indeces_len));
+
+    err = fat32_free_chain(dev, chain_indeces[0]); 
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (uint32_t i = 0; i < chain_indeces_len; i++) {
+        err = fat32_get_fat_slot(dev, chain_indeces[i], &slot_val);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_UINT(0, slot_val);
+    }
+
+    // Lastly, let's just try a single element chain.
+    err = fat32_set_fat_slot(dev, 10, FAT32_EOC);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_free_chain(dev, 10); 
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_get_fat_slot(dev, 10, &slot_val);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(0, slot_val);
 
     TEST_SUCCEED();
 }
 
-// I'm not really sure how to test some of this chain stuff IMO.
+static bool test_free_bad_chain(void) {
+    fernos_error_t err; 
+
+    const uint32_t chain_indeces[] = {
+        3, 4, 5
+    };
+    const uint32_t chain_indeces_len = sizeof(chain_indeces) / sizeof(uint32_t);
+
+    TEST_TRUE(fat32_store_chain(dev, chain_indeces, chain_indeces_len));
+
+    err = fat32_set_fat_slot(dev, chain_indeces[chain_indeces_len - 1], FAT32_BAD_CLUSTER);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    
+    err = fat32_free_chain(dev, chain_indeces[0]); 
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    TEST_SUCCEED();
+}
+
 
 bool test_fat32_device(void) {
     BEGIN_SUITE("FAT32 Device");
     RUN_TEST(test_get_set_fat_slots);
-    RUN_TEST(test_free_chain);
+    RUN_TEST(test_free_valid_chain);
+    RUN_TEST(test_free_bad_chain);
     return END_SUITE();
 }
 
