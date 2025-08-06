@@ -8,7 +8,12 @@
 #include "s_data/list.h"
 #include "s_util/rand.h"
 
+/**
+ * No slot entry ever uses the upper 4 bits. I believe these are reserved for the OS.
+ * FernOS will never use these bits for now.
+ */
 #define FAT32_MASK          (0x0FFFFFFFU)
+
 #define FAT32_EOC           (0x0FFFFFF8U)
 #define FAT32_IS_EOC(v)     ((v & FAT32_EOC) == FAT32_EOC)
 #define FAT32_BAD_CLUSTER   (0x0FFFFFF7U)
@@ -488,6 +493,12 @@ typedef struct _fat32_long_fn_dir_entry_t {
 #define FAT32_DIR_ENTRY_UNUSED (0xE5U)
 
 /**
+ * When a sequence begins with LFN entries, the very first LFN entry must have
+ * its order byte OR'd with this value.
+ */
+#define FAT32_LFN_START_PREFIX (0x40U)
+
+/**
  * If the first byte of a directory entry holds this value,
  * you have reached the end of the directory. This entry and all following entries
  * are unusable! (Unless you move advance the terminator that is)
@@ -663,13 +674,23 @@ static inline size_t fat32_cluster_size(fat32_device_t *dev) {
 
 /**
  * Get a data cluster's entry in FAT 0.
+ *
+ * NOTE: To make my life easier, this will ALWAYS mask off the top 4 bits to 0.
  */
 fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t *out_val);
 
 /**
  * Set a data slot_ind's entry in FAT 0.
+ *
+ * NOTE: This will also mask off the top 4 bits of the given value before writing.
  */
 fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t val);
+
+/*
+ * NOTE: I modified the above two functions after the fact to deal with the bit masking.
+ * If I ever need to write/read a value > 0x0FFFFFFFU, I should consider introducing
+ * direct read/write functions which don't mask.
+ */
 
 /**
  * Copy the contents of FAT 0 into all the other FATs.
@@ -692,6 +713,8 @@ fernos_error_t fat32_free_chain(fat32_device_t *dev, uint32_t slot_ind);
  * If a free slot cannot be found FOS_NO_SPACE is returned.
  * If there is some other error, FOS_UNKNOWN_ERROR is returned.
  * Otherwise FOS_SUCCESS is returned.
+ *
+ * It is gauranteed that the value written to `*slot_ind` on success has 0's in the top 4 bits.
  */
 fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
 
@@ -706,6 +729,8 @@ fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
  *
  * FOS_SUCCESS is ONLY returned when the ENTIRE chain is successfully allocated. When this 
  * happens, the starting slot index is written to *slot_ind.
+ *
+ * It is gauranteed that the value written to `*slot_ind` on success has 0's in the top 4 bits.
  */
 fernos_error_t fat32_new_chain(fat32_device_t *dev, uint32_t len, uint32_t *slot_ind);
 
@@ -732,6 +757,8 @@ fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32
  * (Errors can also be returned if there are issues with the block device)
  *
  * Otherwise, FOS_SUCCESS is returned, and the requested slot index is written to *slot_stop_ind.
+ *
+ * It is gauranteed that the value written to `*slot_ind` on success has 0's in the top 4 bits.
  */
 fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t slot_offset, uint32_t *slot_stop_ind);
@@ -742,6 +769,8 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
  * `dest` must have size at least `num_sectors` * sector size.
  *
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
+ * If the given chain is malformed or someway, or if a bad cluster is hit, FOS_STATE_MISMATCH
+ * is returned.
  */
 fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t sector_offset, uint32_t num_sectors, void *dest);
@@ -752,6 +781,8 @@ fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind,
  * `src` must have size at least `num_sectors` * sector size.
  *
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
+ * If the given chain is malformed or someway, or if a bad cluster is hit, FOS_STATE_MISMATCH
+ * is returned.
  */
 fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t num_sectors, const void *src);
@@ -768,6 +799,7 @@ fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
  * `dest` must have size at least `len`.
  *
  * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
+ * If the given slot_ind points to a bad cluster FOS_STATE_MISMATCH is returned.
  */
 fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest);
@@ -779,6 +811,7 @@ fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
  * `src` must have size at least `len`.
  *
  * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
+ * If the given slot_ind points to a bad cluster FOS_STATE_MISMATCH is returned.
  */
 fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src);
@@ -891,6 +924,18 @@ fernos_error_t fat32_check_names(fat32_device_t *dev, uint32_t slot_ind,
  */
 fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
         uint32_t *entry_offset);
+
+/**
+ * Given a sequence, set all of it's entries to unused.
+ *
+ * This function pretty much always returns FOS_SUCCESS unless there is some issue writing to
+ * the device.
+ *
+ * This function will stop erasing when the given chain ends. If the chain is malformed.
+ * For example, it has no SFN entry, this is OK. All the LFN entries will be erased up until
+ * the terminator or an unused entry.
+ */
+fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset);
 
 /**
  * This call forcefully writes the given sequence to a directory starting at `entry_offset`.

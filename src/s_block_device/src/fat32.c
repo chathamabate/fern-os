@@ -487,10 +487,18 @@ fernos_error_t fat32_get_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32
 
     const uint32_t slot_index = slot_ind % FAT32_SLOTS_PER_FAT_SECTOR;
 
-    fernos_error_t err = bd_read_piece(dev->bd, abs_read_sector, 
-            slot_index * sizeof(uint32_t), sizeof(uint32_t), out_val); 
+    uint32_t act_val;
 
-    return err;
+    fernos_error_t err = bd_read_piece(dev->bd, abs_read_sector, 
+            slot_index * sizeof(uint32_t), sizeof(uint32_t), &act_val); 
+
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    *out_val = act_val & FAT32_MASK;
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32_t val) {
@@ -504,8 +512,10 @@ fernos_error_t fat32_set_fat_slot(fat32_device_t *dev, uint32_t slot_ind, uint32
 
     const uint32_t slot_index = slot_ind % FAT32_SLOTS_PER_FAT_SECTOR;
 
+    uint32_t masked_val = val & FAT32_MASK;
+
     fernos_error_t err = bd_write_piece(dev->bd, abs_write_sector, 
-            slot_index * sizeof(uint32_t), sizeof(uint32_t), &val);
+            slot_index * sizeof(uint32_t), sizeof(uint32_t), &masked_val);
 
     return err;
 }
@@ -545,6 +555,8 @@ fernos_error_t fat32_sync_fats(fat32_device_t *dev) {
 }
 
 fernos_error_t fat32_free_chain(fat32_device_t *dev, uint32_t slot_ind) {
+    slot_ind &= FAT32_MASK;
+
     if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
@@ -584,6 +596,9 @@ fernos_error_t fat32_free_chain(fat32_device_t *dev, uint32_t slot_ind) {
  * FOS_SUCCESS means the free queue is non-empty now.
  * FOS_NO_SPACE means we failed at finding any free entries.
  * FOS_UNKNOWN error means there was some other error.
+ *
+ * NOTE: The Free queue will always be filled with entries that have the top 4 bits already
+ * masked off.
  */
 static fernos_error_t fat32_populate_free_queue(fat32_device_t *dev) {
     if (dev->free_q_fill > 0) {
@@ -620,7 +635,8 @@ static fernos_error_t fat32_populate_free_queue(fat32_device_t *dev) {
         }
 
         for (uint32_t i = start; i < stop; i++) {
-            if (fat_sector[i] == 0) {
+            // Since we read the FAT sector directly, we must deal with masking ourselves.
+            if ((fat_sector[i] & FAT32_MASK) == 0) {
                 dev->free_q[dev->free_q_fill++] = (fat_sector_ind * FAT32_SLOTS_PER_FAT_SECTOR) + i;
             }
         }
@@ -647,6 +663,7 @@ fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind) 
         }
     }
 
+    // No need to mask the free index. Gauranteed to have 0 in the top 4 bits.
     uint32_t free_ind = dev->free_q[--(dev->free_q_fill)];
 
     err = fat32_set_fat_slot(dev, free_ind, FAT32_EOC);
@@ -715,7 +732,7 @@ fernos_error_t fat32_new_chain(fat32_device_t *dev, uint32_t len, uint32_t *slot
     }
 
     // Remember, we shouldn't need to write EOC to tail, since this should already
-    // be done by pop_free_fat_slot.
+    // be done by pop_free_fat_slot. Also shouldn't need to do any masking!
 
     *slot_ind = head;
 
@@ -723,6 +740,8 @@ fernos_error_t fat32_new_chain(fat32_device_t *dev, uint32_t len, uint32_t *slot
 }
 
 fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32_t new_len) {
+    slot_ind &= FAT32_MASK;
+
     if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
@@ -740,20 +759,23 @@ fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32
                         // starts at 1, because we know the 1st link is valid from above.
 
     while (true) {
+        // Have to do this first to catch any malform errors early.
+        uint32_t next_iter;
+        err = fat32_get_fat_slot(dev, iter, &next_iter);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        // This actually means the cluster at `iter` is bad.
+        if (next_iter == FAT32_BAD_CLUSTER) {
+            return FOS_STATE_MISMATCH;
+        }
 
         // The situation where we have already traversed `new_len` links,
         // a shrink is needed! (This logic would NOT work if `new_len` was 0)
         if (links == new_len) {
-            // First get the index of the rest of the list.
-            // This segment will be entirely deleted!
-            uint32_t seg_head;
-            err = fat32_get_fat_slot(dev, iter, &seg_head);
-            if (err != FOS_SUCCESS) {
-                return FOS_UNKNWON_ERROR;
-            }
-
             // Our list is ALREADY the correct size!
-            if (FAT32_IS_EOC(seg_head)) {
+            if (FAT32_IS_EOC(next_iter)) {
                 return FOS_SUCCESS;
             }
 
@@ -763,7 +785,7 @@ fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32
                 return FOS_UNKNWON_ERROR;
             }
 
-            err = fat32_free_chain(dev, seg_head);
+            err = fat32_free_chain(dev, next_iter);
             if (err != FOS_SUCCESS) {
                 // This will propegate malformed chained errors when attempting to delete.
                 return err;
@@ -771,18 +793,13 @@ fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32
 
             return FOS_SUCCESS;
         }
-        
-        uint32_t next_iter;
-        err = fat32_get_fat_slot(dev, iter, &next_iter);
-        if (err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
-        }
 
         // Our iterator is the end of the chain!!!
         if (FAT32_IS_EOC(next_iter)) {
             break;
         }
 
+        // Our next iter is invalid
         if (next_iter < 2 || next_iter >= dev->num_fat_slots) {
             // Malformed chain!
             return FOS_STATE_MISMATCH;
@@ -813,6 +830,8 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
     if (!slot_stop_ind) {
         return FOS_BAD_ARGS;
     }
+
+    slot_ind &= FAT32_MASK;
 
     if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
@@ -857,6 +876,8 @@ static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind,
         return FOS_BAD_ARGS;
     }
 
+    slot_ind &= FAT32_MASK;
+
     if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
@@ -878,6 +899,18 @@ static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind,
     uint32_t sectors_processed = 0;
 
     while (true) {
+        uint32_t next_cluster;
+        err = fat32_get_fat_slot(dev, cluster_iter, &next_cluster);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        // We are going to read the next cluster first to determine if this cluster is bad.
+
+        if (next_cluster == FAT32_BAD_CLUSTER) {
+            return FOS_STATE_MISMATCH;
+        }
+
         uint8_t sectors_to_process = (num_sectors - sectors_processed);
 
         if (sectors_to_process > dev->sectors_per_cluster) {
@@ -920,12 +953,6 @@ static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind,
         // Ok we have successfully processed all the sectors we care about in this cluster,
         // let's advance to the next!
 
-        uint32_t next_cluster;
-        err = fat32_get_fat_slot(dev, cluster_iter, &next_cluster);
-        if (err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
-        }
-
         if (FAT32_IS_EOC(next_cluster)) {
             return FOS_INVALID_RANGE;
         }
@@ -959,6 +986,8 @@ static fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_
         return FOS_INVALID_RANGE;
     }
 
+    slot_ind &= FAT32_MASK;
+
     if (slot_ind < 2 || slot_ind >= dev->num_fat_slots) {
         return FOS_INVALID_INDEX;
     }
@@ -972,6 +1001,18 @@ static fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_
     err = fat32_traverse_chain(dev, slot_ind, cluster_offset, &cluster_ind);
     if (err != FOS_SUCCESS) {
         return err;
+    }
+
+    // Is the cluster we are reading/writing to even valid though?
+
+    uint32_t slot_val;
+    err = fat32_get_fat_slot(dev, cluster_ind, &slot_val);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    if (slot_val == FAT32_BAD_CLUSTER) {
+        return FOS_STATE_MISMATCH;
     }
 
     const uint32_t abs_sector_offset = dev->bd_offset + dev->data_section_offset +
@@ -999,6 +1040,16 @@ fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src) {
     return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, (void *)src, true);
 }
+
+/*
+ * The directory functions below are slightly looser with cluster error checking than the 
+ * above functions. This is because functions below rely on the functions above.
+ *
+ * I tried to make it so that if a bad cluster is reached, the above functions fail.
+ * This way, the below functions don't need to check for bad clusters.
+ *
+ * Overall, though, this is starting to get kinda messy. I am trying my best.
+ */
 
 fernos_error_t fat32_read_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t entry_offset, fat32_dir_entry_t *entry) {
@@ -1500,6 +1551,64 @@ fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32
     }
 }
 
+fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset) {
+    fernos_error_t err;
+
+    const uint32_t dir_entries_per_cluster = (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) /
+        sizeof(fat32_dir_entry_t);
+    
+    uint32_t slot_iter = slot_ind;
+
+    while (true) {
+        uint32_t start = 0;
+        if (slot_iter == slot_ind) {
+            start = entry_offset;
+        }
+
+        for (uint32_t i = start; i < dir_entries_per_cluster; i++) {
+            fat32_dir_entry_t entry;
+
+            err = fat32_read_dir_entry(dev, slot_iter, i, &entry);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+
+            if (entry.raw[0] == FAT32_DIR_ENTRY_UNUSED || 
+                    entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
+                return FOS_SUCCESS; // We made it to an explicit end!
+                                    // This may imply a malformed chain was erased, but we'll allow
+                                    // it.
+            }
+
+            bool sfn = !FT32F_ATTR_IS_LFN(entry.short_fn.attrs);
+
+            entry.raw[0] = FAT32_DIR_ENTRY_UNUSED;
+            err = fat32_write_dir_entry(dev, slot_iter, i, &entry);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+
+            // We reached the end of a chain
+            if (sfn) {
+                return FOS_SUCCESS;
+            }
+        }
+
+        uint32_t next_slot_iter;
+        err = fat32_get_fat_slot(dev, slot_iter, &next_slot_iter);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        if (FAT32_IS_EOC(next_slot_iter) || next_slot_iter < 2 || next_slot_iter >= dev->num_fat_slots) {
+            return FOS_SUCCESS; // Again, the chain could've ended.. or been some invalid value.
+                                // We'll just return SUCCESS, we erased what we could.
+        }
+
+        slot_iter = next_slot_iter;
+    }
+}
+
 fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset,
         const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn) {
     if (!sfn_entry) {
@@ -1554,7 +1663,7 @@ fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t 
 
             lfn_entry.entry_order = lfn_iter + 1;
             if (lfn_iter == num_lfn_entries - 1) {
-                lfn_entry.entry_order |= 0x40; // If this is the starting entry it must start with 0x40.
+                lfn_entry.entry_order |= FAT32_LFN_START_PREFIX; // If this is the starting entry it must start with 0x40.
             }
 
             lfn_entry.attrs = FT32F_ATTR_LFN;
