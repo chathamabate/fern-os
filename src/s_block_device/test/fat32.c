@@ -30,7 +30,7 @@ static bool pretest(void) {
     TEST_TRUE(bd != NULL);
 
     fernos_error_t err;
-    err = init_fat32(bd, 0, 2048, 4);
+    err = init_fat32(bd, 0, 1028, 4);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     err = parse_new_da_fat32_device(bd, 0, 0, true, &dev);
@@ -150,9 +150,85 @@ static bool test_free_bad_chain(void) {
     err = fat32_set_fat_slot(dev, chain_indeces[chain_indeces_len - 1], FAT32_BAD_CLUSTER);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    
     err = fat32_free_chain(dev, chain_indeces[0]); 
     TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    TEST_SUCCEED();
+}
+
+static bool test_pop_free_fat_slot(void) {
+    fernos_error_t err;
+
+    while (true) {
+        uint32_t slot_ind;
+
+        err = fat32_pop_free_fat_slot(dev, &slot_ind);
+
+        if (err == FOS_NO_SPACE) {
+            TEST_SUCCEED();
+        }
+
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_TRUE(slot_ind > 2 && slot_ind < dev->num_fat_slots);
+
+        uint32_t slot_val;
+
+        err = fat32_get_fat_slot(dev, slot_ind, &slot_val);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FAT32_EOC, slot_val);
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool test_new_chain(void) {
+    fernos_error_t err;
+
+    uint32_t slot_ind;
+
+    // Try a bunch of different lengths.
+    for (uint32_t len = 1; len < 25; len += 3) {
+        err = fat32_new_chain(dev, len, &slot_ind);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        uint32_t iter = slot_ind;
+        for (size_t i = 0; i < len; i++) {
+            uint32_t next_iter;
+
+            err = fat32_get_fat_slot(dev, iter, &next_iter);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            iter = next_iter;
+        }
+
+        TEST_EQUAL_HEX(FAT32_EOC, iter);
+
+        err = fat32_free_chain(dev, slot_ind);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool test_new_chain_big(void) {
+    // Let's just try out exhausting the number of chains?
+    
+    fernos_error_t err;
+
+    uint32_t slot_ind;
+
+    err = fat32_new_chain(dev, dev->num_fat_slots, &slot_ind);
+    TEST_EQUAL_HEX(FOS_NO_SPACE, err);
+    
+    // Now try making a bunch of small chains until we run out of space.
+    while (true) {
+        err = fat32_new_chain(dev, 5, &slot_ind);
+        if (err == FOS_NO_SPACE) {
+            TEST_SUCCEED();
+        }
+
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
 
     TEST_SUCCEED();
 }
@@ -163,6 +239,9 @@ bool test_fat32_device(void) {
     RUN_TEST(test_get_set_fat_slots);
     RUN_TEST(test_free_valid_chain);
     RUN_TEST(test_free_bad_chain);
+    RUN_TEST(test_pop_free_fat_slot);
+    RUN_TEST(test_new_chain);
+    RUN_TEST(test_new_chain_big);
     return END_SUITE();
 }
 

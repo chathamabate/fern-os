@@ -816,6 +816,11 @@ fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
 fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src);
 
+/**
+ * Print out some string representation of the FAT.
+ */
+void fat32_dump_fat(fat32_device_t *dev, void (*pf)(const char *fmt, ...));
+
 /*
  * Directory Functions
  *

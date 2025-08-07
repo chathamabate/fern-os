@@ -2,6 +2,7 @@
 #include "s_block_device/fat32.h"
 #include <stdbool.h>
 #include "s_util/str.h"
+#include "s_util/ansii.h"
 
 uint8_t fat32_checksum(const char *short_fn) {
     uint8_t checksum = 0;
@@ -197,7 +198,7 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
 
     // First let's write the first FAT sector.
     fat_sector[0] = 0x0FFFFFF8;
-    fat_sector[1] = 0xFFFFFFFF;
+    fat_sector[1] = 0x0FFFFFFF;
 
     fat_sector[2] = FAT32_EOC; // Root directory.
     fat_sector[3] = FAT32_EOC; // README.TXT
@@ -1043,6 +1044,40 @@ fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
 fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src) {
     return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, (void *)src, true);
+}
+
+void fat32_dump_fat(fat32_device_t *dev, void (*pf)(const char *fmt, ...)) {
+    if (!pf) {
+        return;
+    }
+
+    fernos_error_t err;
+
+    const uint32_t cols = 14;
+
+    for (uint32_t row = 0; row * cols < dev->num_fat_slots; row++) {
+        uint32_t start = row * cols;
+        uint32_t end = start + cols;
+        if (end > dev->num_fat_slots) {
+            end = dev->num_fat_slots;
+        }
+
+        for (uint32_t i = start; i < end; i++) {
+            uint32_t slot_val;
+            err = fat32_get_fat_slot(dev, i, &slot_val);
+            if (err != FOS_SUCCESS) {
+                return;
+            }
+
+            if (i % FAT32_SLOTS_PER_FAT_SECTOR == 0) {
+                pf(ANSII_BRIGHT_GREEN_FG "|%04X" ANSII_RESET, slot_val);
+            } else {
+                pf(" %04X", slot_val);
+            }
+        }
+
+        pf("\n");
+    }
 }
 
 /*
