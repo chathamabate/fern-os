@@ -361,6 +361,26 @@ static bool test_traverse_chain(void) {
     err = fat32_traverse_chain(dev, init_chain[0], init_chain_len, &traversed_ind);
     TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
 
+    // Now malform the chain.
+
+    err = fat32_set_fat_slot(dev, init_chain[2], FAT32_BAD_CLUSTER);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_traverse_chain(dev, init_chain[0], 1, &traversed_ind);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(init_chain[1], traversed_ind);
+
+    // This is kinda confusing, but we are allowed to traverse the chain even up to a malformed
+    // cluster. An error is only returned if a bad cluster prevents us from being able to
+    // reach our desired offset in the chain.
+    err = fat32_traverse_chain(dev, init_chain[0], 2, &traversed_ind);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(init_chain[2], traversed_ind);
+
+    // i.e. here.
+    err = fat32_traverse_chain(dev, init_chain[0], 3, &traversed_ind);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
     TEST_SUCCEED();
 }
 
@@ -394,6 +414,134 @@ static bool test_read_write(void) {
         TEST_TRUE(mem_cmp(sector_buf[0], sector_buf[1], FAT32_REQ_SECTOR_SIZE));
     }
 
+    // Ok, now we are going to overwrie then read again.
+
+    uint8_t *full_buf = da_malloc(FAT32_REQ_SECTOR_SIZE * chain_sectors);
+    TEST_TRUE(full_buf != NULL);
+
+    for (uint32_t i = 0; i < chain_sectors; i++) {
+        mem_set(full_buf, i, (chain_sectors - i) * FAT32_REQ_SECTOR_SIZE);
+        err = fat32_write(dev, chain, i, chain_sectors - i, full_buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // The resulting state of the chain should be the same as before after that above writes.
+
+    for (uint32_t i = 0; i < chain_sectors; i++) {
+        err = fat32_read(dev, chain, i, 1, sector_buf[0]);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        mem_set(sector_buf[1], (uint8_t)i, FAT32_REQ_SECTOR_SIZE);
+        TEST_TRUE(mem_cmp(sector_buf[0], sector_buf[1], FAT32_REQ_SECTOR_SIZE));
+    }
+
+    da_free(full_buf);
+
+    TEST_SUCCEED();
+}
+
+static bool test_read_write_random(void) {
+    // Ok, now we could try maybe a more funky read write combination??
+
+    // Oooh, maybe a random test!
+
+    fernos_error_t err;
+
+    rand_t r = rand(0);
+
+    const uint32_t num_chain_clusters = 24;
+    const uint32_t num_chain_sectors = dev->sectors_per_cluster * num_chain_clusters;
+
+    uint32_t chain;
+    err = fat32_new_chain(dev, num_chain_clusters, &chain);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // The control buffer is what will be compared against during the test.
+    uint8_t *cntl_buf = da_malloc(num_chain_sectors * FAT32_REQ_SECTOR_SIZE);
+    mem_set(cntl_buf, 0, num_chain_sectors * FAT32_REQ_SECTOR_SIZE);
+
+    // Now make the control sectors and the chain sectors equal.
+    err = fat32_write(dev, chain, 0, num_chain_sectors, cntl_buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    const uint32_t max_trial_sectors = 8;
+    const uint32_t random_trials = 150;
+
+    uint8_t *trial_buf = da_malloc(max_trial_sectors * FAT32_REQ_SECTOR_SIZE);
+    TEST_TRUE(trial_buf != NULL);
+
+    mem_set(trial_buf, 0, max_trial_sectors * FAT32_REQ_SECTOR_SIZE);
+
+    for (uint32_t rt = 0; rt < random_trials; rt++) {
+        const uint32_t sector_offset = next_rand_u32(&r) % max_trial_sectors;
+        const uint32_t trial_sectors = next_rand_u32(&r) % (max_trial_sectors - sector_offset);
+
+        if (next_rand_u1(&r)) { // Write
+            const uint8_t rand_val = next_rand_u8(&r);
+
+            mem_set(trial_buf, rand_val, trial_sectors * FAT32_REQ_SECTOR_SIZE);
+
+            // Write to control.
+            mem_cpy(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE), trial_buf, 
+                    trial_sectors * FAT32_REQ_SECTOR_SIZE);
+
+            // Write to device.
+            err = fat32_write(dev, chain, sector_offset, trial_sectors, trial_buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        } else { // Read
+            err = fat32_read(dev, chain, sector_offset, trial_sectors, trial_buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            TEST_TRUE(mem_cmp(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE), 
+                        trial_buf, trial_sectors * FAT32_REQ_SECTOR_SIZE));
+        }
+    }
+
+    da_free(trial_buf);
+    da_free(cntl_buf);
+
+    TEST_SUCCEED();
+}
+
+static bool test_read_write_bad(void) {
+    fernos_error_t err;
+
+    const uint32_t chain[] = {
+        5, 9, 11, 6
+    };
+    const uint32_t chain_len = sizeof(chain) / sizeof(uint32_t);
+    const uint32_t chain_sectors = chain_len * dev->sectors_per_cluster;
+
+    TEST_TRUE(fat32_store_chain(dev, chain, chain_len));
+
+    uint8_t *buf = da_malloc(chain_sectors * FAT32_REQ_SECTOR_SIZE);
+    TEST_TRUE(buf != NULL);
+
+    err = fat32_write(dev, chain[0], 0, chain_sectors + 1, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+
+    err = fat32_read(dev, chain[0], 0, chain_sectors + 1, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+
+    err = fat32_write(dev, chain[0], chain_sectors, 1, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = fat32_read(dev, chain[0], chain_sectors, 1, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    // Ok, now let's try to malform the chain.
+
+    err = fat32_set_fat_slot(dev, chain[1], FAT32_BAD_CLUSTER);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_write(dev, chain[0], chain_sectors - 1, 1, buf);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    err = fat32_read(dev, chain[0], chain_sectors - 1, 1, buf);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    da_free(buf);
+
     TEST_SUCCEED();
 }
 
@@ -410,6 +558,8 @@ bool test_fat32_device(void) {
     RUN_TEST(test_resize_malformed);
     RUN_TEST(test_traverse_chain);
     RUN_TEST(test_read_write);
+    RUN_TEST(test_read_write_random);
+    RUN_TEST(test_read_write_bad);
     return END_SUITE();
 }
 

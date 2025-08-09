@@ -13,8 +13,8 @@ typedef struct _ata_block_device_t {
     /**
      * This is used as a buffer for the read/write piece functions.
      *
-     * The ATA block device implementation does not provide an efficient read/write piece 
-     * implementation.
+     * The ATA block device does not provide an efficient read/write piece 
+     * implementation. 
      */
     uint8_t piece_buffer[512];
 } ata_block_device_t;

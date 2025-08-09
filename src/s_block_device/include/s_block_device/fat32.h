@@ -756,6 +756,8 @@ fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32
  * `slot_offset` >= the length of the chain, FOS_INVALID_INDEX is returned.
  * (Errors can also be returned if there are issues with the block device)
  *
+ * If a bad cluster is reached, FOS_STATE_MISMATCH is returned.
+ *
  * Otherwise, FOS_SUCCESS is returned, and the requested slot index is written to *slot_stop_ind.
  *
  * It is gauranteed that the value written to `*slot_ind` on success has 0's in the top 4 bits.
@@ -768,6 +770,7 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
  *
  * `dest` must have size at least `num_sectors` * sector size.
  *
+ * If the sector offset is past the end of the chain, FOS_INVALID_INDEX will be returned.
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
  * If the given chain is malformed or some way, or if a bad cluster is hit, FOS_STATE_MISMATCH
  * is returned.
@@ -780,6 +783,7 @@ fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind,
  *
  * `src` must have size at least `num_sectors` * sector size.
  *
+ * If the sector offset is past the end of the chain, FOS_INVALID_INDEX will be returned.
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
  * If the given chain is malformed is some way, or if a bad cluster is hit, FOS_STATE_MISMATCH
  * is returned.
