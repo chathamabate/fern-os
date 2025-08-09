@@ -103,6 +103,31 @@ static bool fat32_store_chain(fat32_device_t *dev, const uint32_t *chain, uint32
     TEST_SUCCEED();
 }
 
+/**
+ * Succeeds when the given chain has the given length.
+ */
+static bool fat32_expect_len(fat32_device_t *dev, uint32_t slot_ind, uint32_t len) {
+    fernos_error_t err;
+
+    uint32_t visited = 0;
+    uint32_t iter = slot_ind;
+
+    while (true) {
+        uint32_t next_iter;
+        err = fat32_get_fat_slot(dev, iter, &next_iter);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        visited++;
+
+        if (visited == len) {
+            TEST_TRUE(FAT32_IS_EOC(next_iter));
+            TEST_SUCCEED();
+        }
+
+        iter = next_iter;
+    }
+}
+
 static bool test_free_valid_chain(void) {
     fernos_error_t err; 
     uint32_t slot_val;
@@ -191,17 +216,7 @@ static bool test_new_chain(void) {
         err = fat32_new_chain(dev, len, &slot_ind);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-        uint32_t iter = slot_ind;
-        for (size_t i = 0; i < len; i++) {
-            uint32_t next_iter;
-
-            err = fat32_get_fat_slot(dev, iter, &next_iter);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
-            iter = next_iter;
-        }
-
-        TEST_EQUAL_HEX(FAT32_EOC, iter);
+        TEST_TRUE(fat32_expect_len(dev, slot_ind, len));
 
         err = fat32_free_chain(dev, slot_ind);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -233,6 +248,98 @@ static bool test_new_chain_big(void) {
     TEST_SUCCEED();
 }
 
+static bool test_extend_chain(void) {
+    fernos_error_t err;
+
+    const uint32_t init_chain[] = {
+        3, 5, 16, 4, 6
+    };
+    const uint32_t init_chain_len = sizeof(init_chain) / sizeof(uint32_t);
+
+    TEST_TRUE(fat32_store_chain(dev, init_chain, init_chain_len));
+
+    uint32_t new_len = init_chain_len + 5;
+    err = fat32_resize_chain(dev, init_chain[0], new_len);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_TRUE(fat32_expect_len(dev, init_chain[0], new_len));
+
+    new_len += 3;
+    err = fat32_resize_chain(dev, init_chain[0], new_len);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_TRUE(fat32_expect_len(dev, init_chain[0], new_len));
+
+    // This one should fail!
+
+    err = fat32_resize_chain(dev, init_chain[0], new_len + dev->num_fat_slots);
+    TEST_EQUAL_HEX(FOS_NO_SPACE, err);
+
+    TEST_TRUE(fat32_expect_len(dev, init_chain[0], new_len));
+
+    TEST_SUCCEED();
+}
+
+static bool test_shrink_chain(void) {
+    fernos_error_t err;
+
+    const uint32_t init_chain[] = {
+        6, 9, 16, 5, 19, 17, 15
+    };
+    const uint32_t init_chain_len = sizeof(init_chain) / sizeof(uint32_t);
+
+    TEST_TRUE(fat32_store_chain(dev, init_chain, init_chain_len));
+
+    TEST_TRUE(init_chain_len > 3);
+    uint32_t new_len = init_chain_len - 3;
+    
+    err = fat32_resize_chain(dev, init_chain[0], new_len);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_TRUE(fat32_expect_len(dev, init_chain[0], new_len));
+
+    // Now let's try freeing the chain.
+    err = fat32_resize_chain(dev, init_chain[0], 0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (uint32_t i = 0; i < init_chain_len; i++) {
+        uint32_t slot_val;
+
+        err = fat32_get_fat_slot(dev, init_chain[i], &slot_val);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_EQUAL_UINT(0, slot_val);
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool test_resize_malformed(void) {
+    fernos_error_t err;
+
+    const uint32_t init_chain[] = {
+        6, 8, 11, 23, 19, 17, 15, 4, 5
+    };
+    const uint32_t init_chain_len = sizeof(init_chain) / sizeof(uint32_t);
+
+    TEST_TRUE(fat32_store_chain(dev, init_chain, init_chain_len));
+
+    err = fat32_set_fat_slot(dev, init_chain[init_chain_len - 1],  FAT32_BAD_CLUSTER);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_resize_chain(dev, init_chain[0], init_chain_len + 5);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    // The behavior of shrinking a malformed chain not the well defined tbh.
+    // err = fat32_resize_chain(dev, init_chain[0], init_chain_len - 1);
+    // TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    
+    TEST_SUCCEED();
+}
+
+static bool test_traverse_chain(void) {
+    TEST_SUCCEED();
+}
 
 bool test_fat32_device(void) {
     BEGIN_SUITE("FAT32 Device");
@@ -242,6 +349,10 @@ bool test_fat32_device(void) {
     RUN_TEST(test_pop_free_fat_slot);
     RUN_TEST(test_new_chain);
     RUN_TEST(test_new_chain_big);
+    RUN_TEST(test_extend_chain);
+    RUN_TEST(test_shrink_chain);
+    RUN_TEST(test_resize_malformed);
+    RUN_TEST(test_traverse_chain);
     return END_SUITE();
 }
 
