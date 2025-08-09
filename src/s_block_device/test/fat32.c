@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "s_util/rand.h"
+#include "s_util/str.h"
 
 #include "s_block_device/block_device.h"
 #include "s_block_device/mem_block_device.h"
@@ -338,6 +339,61 @@ static bool test_resize_malformed(void) {
 }
 
 static bool test_traverse_chain(void) {
+    fernos_error_t err;
+
+    const uint32_t init_chain[] = {
+        30, 23, 40, 12, 5, 6, 19, 4
+    };
+    const uint32_t init_chain_len = sizeof(init_chain) / sizeof(uint32_t);
+
+    TEST_TRUE(fat32_store_chain(dev, init_chain, init_chain_len));
+
+    uint32_t traversed_ind;
+
+    for (uint32_t i = 0; i < init_chain_len; i++) {
+
+        err = fat32_traverse_chain(dev, init_chain[0], i, &traversed_ind);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_EQUAL_UINT(init_chain[i], traversed_ind);
+    }
+
+    err = fat32_traverse_chain(dev, init_chain[0], init_chain_len, &traversed_ind);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    TEST_SUCCEED();
+}
+
+static bool test_read_write(void) {
+    fernos_error_t err;
+
+    uint32_t chain_clusters = 5;
+    uint32_t chain;
+
+    err = fat32_new_chain(dev, chain_clusters, &chain);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    uint32_t chain_sectors = chain_clusters * dev->sectors_per_cluster;
+
+    uint8_t sector_buf[2][FAT32_REQ_SECTOR_SIZE];
+
+    // Maybe just a simple write and read first?
+
+    for (uint32_t i = 0; i < chain_sectors; i++) {
+        mem_set(sector_buf[0], (uint8_t)i, FAT32_REQ_SECTOR_SIZE);
+
+        err = fat32_write(dev, chain, i, 1, sector_buf[0]);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    for (uint32_t i = 0; i < chain_sectors; i++) {
+        err = fat32_read(dev, chain, i, 1, sector_buf[0]);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        mem_set(sector_buf[1], (uint8_t)i, FAT32_REQ_SECTOR_SIZE);
+        TEST_TRUE(mem_cmp(sector_buf[0], sector_buf[1], FAT32_REQ_SECTOR_SIZE));
+    }
+
     TEST_SUCCEED();
 }
 
@@ -353,6 +409,7 @@ bool test_fat32_device(void) {
     RUN_TEST(test_shrink_chain);
     RUN_TEST(test_resize_malformed);
     RUN_TEST(test_traverse_chain);
+    RUN_TEST(test_read_write);
     return END_SUITE();
 }
 

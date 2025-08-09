@@ -769,7 +769,7 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
  * `dest` must have size at least `num_sectors` * sector size.
  *
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
- * If the given chain is malformed or someway, or if a bad cluster is hit, FOS_STATE_MISMATCH
+ * If the given chain is malformed or some way, or if a bad cluster is hit, FOS_STATE_MISMATCH
  * is returned.
  */
 fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
@@ -781,7 +781,7 @@ fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind,
  * `src` must have size at least `num_sectors` * sector size.
  *
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
- * If the given chain is malformed or someway, or if a bad cluster is hit, FOS_STATE_MISMATCH
+ * If the given chain is malformed is some way, or if a bad cluster is hit, FOS_STATE_MISMATCH
  * is returned.
  */
 fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,

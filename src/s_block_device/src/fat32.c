@@ -4,6 +4,8 @@
 #include "s_util/str.h"
 #include "s_util/ansii.h"
 
+#include "k_bios_term/term.h"
+
 uint8_t fat32_checksum(const char *short_fn) {
     uint8_t checksum = 0;
 
@@ -916,19 +918,17 @@ static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind,
             return FOS_STATE_MISMATCH;
         }
 
-        uint8_t sectors_to_process = (num_sectors - sectors_processed);
-
-        if (sectors_to_process > dev->sectors_per_cluster) {
-            sectors_to_process = dev->sectors_per_cluster;
-        }
-
-        uint8_t shift = 0;
-
         // On the first iteration only, we may start from the middle of a cluster instead of the
         // beginning.
+        uint32_t shift = 0;
         if (sectors_processed == 0) {
             shift = sector_offset % dev->sectors_per_cluster;
-            sectors_to_process -= shift;
+        }
+
+        uint8_t sectors_to_process = (num_sectors - sectors_processed);
+
+        if (sectors_to_process > (dev->sectors_per_cluster - shift)) {
+            sectors_to_process = dev->sectors_per_cluster - shift;
         }
 
         const uint32_t abs_sector = dev->bd_offset + dev->data_section_offset + 
