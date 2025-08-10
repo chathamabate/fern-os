@@ -440,6 +440,104 @@ static bool test_read_write(void) {
     TEST_SUCCEED();
 }
 
+static bool test_read_write_multi_chain(void) {
+    fernos_error_t err;
+
+    // Here we have a few chains which are kinda interleved.
+    const uint32_t chains[][6] = {
+        {4, 6, 8, 9, 11, 15},
+        {5, 10, 14, 13, 12, 20},
+        {7, 19, 16, 18, 17, 21},
+    };
+    const uint32_t num_chains = sizeof(chains) / sizeof(chains[0]);
+    const uint32_t clusters_per_chain = sizeof(chains[0]) / sizeof(uint32_t);
+    const uint32_t sectors_per_chain = dev->sectors_per_cluster * clusters_per_chain;
+
+    for (uint32_t i = 0; i < num_chains; i++) {
+        TEST_TRUE(fat32_store_chain(dev, chains[i], clusters_per_chain));
+    }
+
+    uint8_t *buf = da_malloc(sectors_per_chain * FAT32_REQ_SECTOR_SIZE);
+    TEST_TRUE(buf != NULL);
+
+    // Ok, now we are just testing if writing to one chain potentially corrupts another.
+
+    for (uint32_t i = 0; i < num_chains; i++) {
+        mem_set(buf, i, sectors_per_chain * FAT32_REQ_SECTOR_SIZE);
+
+        err = fat32_write(dev, chains[i][0], 0, sectors_per_chain, buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    for (uint32_t i = 0; i < num_chains; i++) {
+        err = fat32_read(dev, chains[i][0], 0, sectors_per_chain, buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        for (uint32_t j = 0; j < sectors_per_chain * FAT32_REQ_SECTOR_SIZE; j++) {
+            TEST_EQUAL_UINT(i, buf[j]);
+        }
+    }
+
+    da_free(buf);
+
+    TEST_SUCCEED();
+}
+
+static bool test_read_write_bad(void) {
+    fernos_error_t err;
+
+    const uint32_t chain[] = {
+        5, 9, 11, 6
+    };
+    const uint32_t chain_len = sizeof(chain) / sizeof(uint32_t);
+    const uint32_t chain_sectors = chain_len * dev->sectors_per_cluster;
+
+    TEST_TRUE(fat32_store_chain(dev, chain, chain_len));
+
+    uint8_t *buf = da_malloc(chain_sectors * FAT32_REQ_SECTOR_SIZE);
+    TEST_TRUE(buf != NULL);
+
+    err = fat32_write(dev, chain[0], 0, chain_sectors + 1, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+
+    err = fat32_read(dev, chain[0], 0, chain_sectors + 1, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+
+    err = fat32_write(dev, chain[0], chain_sectors, 1, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = fat32_read(dev, chain[0], chain_sectors, 1, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    // Ok, now let's try to malform the chain.
+
+    err = fat32_set_fat_slot(dev, chain[1], FAT32_BAD_CLUSTER);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // A range which contains a bad sector.
+    err = fat32_write(dev, chain[0], 0, chain_sectors, buf);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    err = fat32_read(dev, chain[0], 0, chain_sectors, buf);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    // Indexing after a bad cluster.
+    err = fat32_write(dev, chain[0], chain_sectors - 1, 1, buf);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    err = fat32_read(dev, chain[0], chain_sectors - 1, 1, buf);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    da_free(buf);
+
+    TEST_SUCCEED();
+}
+
+static bool test_read_write_piece(void) {
+    TEST_SUCCEED();
+}
+
+// This will likely be adjusted to include read/write_piece functions.
 static bool test_read_write_random(void) {
     // Ok, now we could try maybe a more funky read write combination??
 
@@ -503,47 +601,7 @@ static bool test_read_write_random(void) {
     TEST_SUCCEED();
 }
 
-static bool test_read_write_bad(void) {
-    fernos_error_t err;
-
-    const uint32_t chain[] = {
-        5, 9, 11, 6
-    };
-    const uint32_t chain_len = sizeof(chain) / sizeof(uint32_t);
-    const uint32_t chain_sectors = chain_len * dev->sectors_per_cluster;
-
-    TEST_TRUE(fat32_store_chain(dev, chain, chain_len));
-
-    uint8_t *buf = da_malloc(chain_sectors * FAT32_REQ_SECTOR_SIZE);
-    TEST_TRUE(buf != NULL);
-
-    err = fat32_write(dev, chain[0], 0, chain_sectors + 1, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
-
-    err = fat32_read(dev, chain[0], 0, chain_sectors + 1, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
-
-    err = fat32_write(dev, chain[0], chain_sectors, 1, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
-
-    err = fat32_read(dev, chain[0], chain_sectors, 1, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
-
-    // Ok, now let's try to malform the chain.
-
-    err = fat32_set_fat_slot(dev, chain[1], FAT32_BAD_CLUSTER);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
-    err = fat32_write(dev, chain[0], chain_sectors - 1, 1, buf);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
-
-    err = fat32_read(dev, chain[0], chain_sectors - 1, 1, buf);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
-
-    da_free(buf);
-
-    TEST_SUCCEED();
-}
+// Ok, now what, read/write piece???
 
 bool test_fat32_device(void) {
     BEGIN_SUITE("FAT32 Device");
@@ -558,8 +616,10 @@ bool test_fat32_device(void) {
     RUN_TEST(test_resize_malformed);
     RUN_TEST(test_traverse_chain);
     RUN_TEST(test_read_write);
-    RUN_TEST(test_read_write_random);
+    RUN_TEST(test_read_write_multi_chain);
     RUN_TEST(test_read_write_bad);
+
+    RUN_TEST(test_read_write_random);
     return END_SUITE();
 }
 
