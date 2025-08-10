@@ -315,9 +315,53 @@ end:
     return FOS_SUCCESS;
 }
 
-fernos_error_t fat32_check_names(fat32_device_t *dev, uint32_t slot_ind, 
-        const char *sfn, const uint16_t *lfn) {
-    if (!sfn) {
+fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
+        const char *ext) {
+    if (!name || !ext) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    uint32_t seq_iter = 0;
+
+    while (true) {
+        uint32_t seq_start;
+
+        err = fat32_next_dir_seq(dev, slot_ind, seq_iter, &seq_start);
+        if (err == FOS_EMPTY) {
+            return FOS_SUCCESS;
+        }
+
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        // Ok, now let's get the offset of this sequence's SFN entry.
+        uint32_t sfn_entry_offset;
+
+        err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, &sfn_entry_offset);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        fat32_short_fn_dir_entry_t sfn_entry;
+        err = fat32_read_dir_entry(dev, slot_ind, sfn_entry_offset, (fat32_dir_entry_t *)&sfn_entry);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        if (mem_cmp(name, sfn_entry.short_fn, sizeof(sfn_entry.short_fn)) &&
+                mem_cmp(ext, sfn_entry.extenstion, sizeof(sfn_entry.extenstion))) {
+            return FOS_IN_USE;
+        }
+
+        seq_iter = sfn_entry_offset + 1;
+    }
+}
+
+fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn) {
+    if (!lfn) {
         return FOS_BAD_ARGS;
     }
 
@@ -325,27 +369,25 @@ fernos_error_t fat32_check_names(fat32_device_t *dev, uint32_t slot_ind,
 
     // Calc long filename length.
     uint32_t lfn_len = 0;
-    if (lfn) {
-        while (lfn[lfn_len] != 0) {
-            lfn_len++;
-            if (lfn_len > FAT32_MAX_LFN_LEN) {
-                return FOS_BAD_ARGS;
-            }
+    while (lfn[lfn_len] != 0) {
+        lfn_len++;
+        if (lfn_len > FAT32_MAX_LFN_LEN) {
+            return FOS_BAD_ARGS;
         }
+    }
+
+    if (lfn_len == 0) {
+        return FOS_BAD_ARGS;
     }
 
     // Add one for the NT.
     uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 1];
 
-    uint32_t entry_iter = 0;
-
-    // Is this super fast? Not really.
-    // However, it'll likely be faster than you'd expect. Every call below likely uses
-    // fat32_traverse_chain to skip past directory entries quickly.
+    uint32_t seq_iter = 0;
 
     while (true) {
-        uint32_t seq_start_offset;
-        err = fat32_next_dir_seq(dev, slot_ind, entry_iter, &seq_start_offset); 
+        uint32_t seq_start;
+        err = fat32_next_dir_seq(dev, slot_ind, seq_iter, &seq_start); 
         if (err == FOS_EMPTY) {
             return FOS_SUCCESS;
         }
@@ -354,41 +396,30 @@ fernos_error_t fat32_check_names(fat32_device_t *dev, uint32_t slot_ind,
             return FOS_UNKNWON_ERROR;
         }
 
-        uint32_t seq_sfn_offset;
-        err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start_offset, &seq_sfn_offset);
+        uint32_t sfn_entry_offset;
+        err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, &sfn_entry_offset);
         if (err != FOS_SUCCESS)  {
             return FOS_UNKNWON_ERROR;
         }
 
-        fat32_short_fn_dir_entry_t sfn_entry;
-        err = fat32_read_dir_entry(dev, slot_ind, seq_sfn_offset, 
-                (fat32_dir_entry_t *)&sfn_entry);
-        if (err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
-        }
+        err = fat32_get_dir_seq_lfn(dev, slot_ind, sfn_entry_offset, lfn_buf);
 
-        if (mem_cmp(sfn_entry.short_fn, sfn, sizeof(sfn_entry.short_fn) + sizeof(sfn_entry.extenstion))) {
-            return FOS_IN_USE; // Short file name is already used!
-        }
+        // Remember, FOS_EMPTY means that this sequence doesn't even have a long filename.
+        if (err != FOS_EMPTY) {
+            if (err != FOS_SUCCESS) { // Other errors actually are problematic.
+                return FOS_UNKNWON_ERROR;
+            }
 
-        // Do we have a real LFN to check against?
-        if (lfn_len > 0) {
-            err = fat32_get_dir_seq_lfn(dev, slot_ind, seq_sfn_offset, lfn_buf);
-            // Remember, FOS_EMPTY means that this sequence doesn't even have a long filename.
-            if (err != FOS_EMPTY) {
-                if (err != FOS_SUCCESS) { // Other errors actually are problematic.
-                    return FOS_UNKNWON_ERROR;
-                }
-
-                if (mem_cmp(lfn_buf, lfn, lfn_len + 1)) {
-                    return FOS_IN_USE;
-                }
+            if (mem_cmp(lfn_buf, lfn, lfn_len + 1)) {
+                return FOS_IN_USE;
             }
         }
 
         // Advance past the sequence just processed.
-        entry_iter = seq_sfn_offset + 1;
+        seq_iter = sfn_entry_offset + 1;
     }
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,

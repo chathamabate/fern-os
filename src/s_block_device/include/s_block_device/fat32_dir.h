@@ -86,19 +86,26 @@ fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sfn_entry_offset, uint16_t *lfn);
 
 /**
- * Check if the given name combination is available. 
- * If either `sfn` or `lfn` is used in an existing directory sequence, FOS_IN_USE is returned.
+ * This checks if a short filename is in use in a given directory.
  *
- * NOTE: `sfn` should really be a pointer to the name array in a short_fn entry.
- * This makes sure it is easy to compare directly while searching the directory.
- * Remember, short file names must be space padded.
+ * `name` should be 8 characters. (Space padded)
+ * `ext` should be 3 characters. (Space padded)
  *
- * NOTE: `lfn` can be NULL, in this case, only the short file name is searched for.
- *
- * FOS_SUCCESS means `sfn` and `lfn` are yet to be used in the given directory!
+ * FOS_SUCCESS is returned if the name extension combo is yet to be used.
+ * FOS_IN_USE is returned if the combination already exists in the given directory.
  */
-fernos_error_t fat32_check_names(fat32_device_t *dev, uint32_t slot_ind, 
-        const char *sfn, const uint16_t *lfn);
+fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
+        const char *ext);
+
+/**
+ * This checks if a long filename is in use in a directory.
+ *
+ * `lfn` is a NULL terminated string. Shouldn't have length than FAT32_MAK_LFN_LEN.
+ *
+ * FOS_SUCCESS if the name is yet to be used.
+ * FOS_IN_USE if the name is already in use.
+ */
+fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn);
 
 /**
  * Find a sequence of free entires within a directory which has a length of at least `seq_len`.
@@ -138,4 +145,6 @@ fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t 
  */
 fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset,
         const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn);
+
+// Add a dump function probably.
 
