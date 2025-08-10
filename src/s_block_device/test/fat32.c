@@ -31,7 +31,7 @@ static bool pretest(void) {
     TEST_TRUE(bd != NULL);
 
     fernos_error_t err;
-    err = init_fat32(bd, 0, 1028, 4);
+    err = init_fat32(bd, 0, 1024, 8);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     err = parse_new_da_fat32_device(bd, 0, 0, true, &dev);
@@ -618,7 +618,7 @@ static bool test_read_write_piece_bad(void) {
     TEST_SUCCEED();
 }
 
-// This will likely be adjusted to include read/write_piece functions.
+// Now we must make this random and include multiple chains AND include rw piece functions.
 static bool test_read_write_random(void) {
     // Ok, now we could try maybe a more funky read write combination??
 
@@ -628,23 +628,33 @@ static bool test_read_write_random(void) {
 
     rand_t r = rand(0);
 
+    const uint32_t num_chains = 4;
     const uint32_t num_chain_clusters = 24;
     const uint32_t num_chain_sectors = dev->sectors_per_cluster * num_chain_clusters;
 
-    uint32_t chain;
-    err = fat32_new_chain(dev, num_chain_clusters, &chain);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    // There will be a control buffer which is expected to match the contents of each chain.
+    uint8_t **cntl_bufs = da_malloc(sizeof(uint8_t *) * num_chains);
+    TEST_TRUE(cntl_bufs != NULL);
 
-    // The control buffer is what will be compared against during the test.
-    uint8_t *cntl_buf = da_malloc(num_chain_sectors * FAT32_REQ_SECTOR_SIZE);
-    mem_set(cntl_buf, 0, num_chain_sectors * FAT32_REQ_SECTOR_SIZE);
+    uint32_t *chains = da_malloc(sizeof(uint32_t) * num_chains);
+    TEST_TRUE(chains != NULL);
 
-    // Now make the control sectors and the chain sectors equal.
-    err = fat32_write(dev, chain, 0, num_chain_sectors, cntl_buf);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    for (uint32_t i = 0; i < num_chains; i++) {
+        cntl_bufs[i] = da_malloc(num_chain_sectors * FAT32_REQ_SECTOR_SIZE);
+        TEST_TRUE(cntl_bufs[i] != NULL);
+
+        mem_set(cntl_bufs[i], 0, num_chain_sectors * FAT32_REQ_SECTOR_SIZE);
+
+        err = fat32_new_chain(dev, num_chain_clusters, chains + i);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        // Set the chain to 0 plz.
+        err = fat32_write(dev, chains[i], 0, num_chain_sectors, cntl_bufs[i]);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
 
     const uint32_t max_trial_sectors = 8;
-    const uint32_t random_trials = 150;
+    const uint32_t random_trials = 500;
 
     uint8_t *trial_buf = da_malloc(max_trial_sectors * FAT32_REQ_SECTOR_SIZE);
     TEST_TRUE(trial_buf != NULL);
@@ -652,37 +662,78 @@ static bool test_read_write_random(void) {
     mem_set(trial_buf, 0, max_trial_sectors * FAT32_REQ_SECTOR_SIZE);
 
     for (uint32_t rt = 0; rt < random_trials; rt++) {
-        const uint32_t sector_offset = next_rand_u32(&r) % max_trial_sectors;
-        const uint32_t trial_sectors = next_rand_u32(&r) % (max_trial_sectors - sector_offset);
+        // First off, what chain for this trial?
 
-        if (next_rand_u1(&r)) { // Write
-            const uint8_t rand_val = next_rand_u8(&r);
+        const uint32_t chain_num = next_rand_u32(&r) % num_chains;
 
-            mem_set(trial_buf, rand_val, trial_sectors * FAT32_REQ_SECTOR_SIZE);
+        uint8_t * const cntl_buf = cntl_bufs[chain_num];
+        const uint32_t chain = chains[chain_num];
 
-            // Write to control.
-            mem_cpy(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE), trial_buf, 
-                    trial_sectors * FAT32_REQ_SECTOR_SIZE);
+        const uint32_t sector_offset = next_rand_u32(&r) % num_chain_sectors;
 
-            // Write to device.
-            err = fat32_write(dev, chain, sector_offset, trial_sectors, trial_buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
-        } else { // Read
-            err = fat32_read(dev, chain, sector_offset, trial_sectors, trial_buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        if (next_rand_u1(&r)) { // Normal Read/Write
+            uint32_t trial_sectors = next_rand_u32(&r) % max_trial_sectors;
+            if (trial_sectors > num_chain_sectors - sector_offset) {
+                trial_sectors = num_chain_sectors - sector_offset;
+            }
 
-            TEST_TRUE(mem_cmp(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE), 
-                        trial_buf, trial_sectors * FAT32_REQ_SECTOR_SIZE));
+            if (next_rand_u1(&r)) { // Write
+                const uint8_t rand_val = next_rand_u8(&r);
+
+                mem_set(trial_buf, rand_val, trial_sectors * FAT32_REQ_SECTOR_SIZE);
+
+                // Write to control.
+                mem_cpy(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE), trial_buf, 
+                        trial_sectors * FAT32_REQ_SECTOR_SIZE);
+
+                // Write to device.
+                err = fat32_write(dev, chain, sector_offset, trial_sectors, trial_buf);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            } else { // Read
+                err = fat32_read(dev, chain, sector_offset, trial_sectors, trial_buf);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+                TEST_TRUE(mem_cmp(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE), 
+                            trial_buf, trial_sectors * FAT32_REQ_SECTOR_SIZE));
+            }
+        } else { // Read/Write Piece functions.
+            const uint32_t byte_offset = next_rand_u32(&r) % FAT32_REQ_SECTOR_SIZE;
+            const uint32_t num_bytes = next_rand_u32(&r) % (FAT32_REQ_SECTOR_SIZE - byte_offset);
+
+            if (next_rand_u1(&r)) { // Write Piece
+                const uint8_t rand_val = next_rand_u8(&r);
+
+                mem_set(trial_buf, rand_val, num_bytes);
+
+                // Write piece to control
+                mem_cpy(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE) + byte_offset, 
+                        trial_buf, num_bytes);
+
+                err = fat32_write_piece(dev, chain, sector_offset, byte_offset, num_bytes, 
+                        trial_buf);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            } else { // Read Piece
+                err = fat32_read_piece(dev, chain, sector_offset, byte_offset, num_bytes, 
+                        trial_buf);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+                TEST_TRUE(mem_cmp(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE) + byte_offset, 
+                        trial_buf, num_bytes));
+            }
         }
     }
 
     da_free(trial_buf);
-    da_free(cntl_buf);
+
+    for (uint32_t i = 0; i < num_chains; i++) {
+        da_free(cntl_bufs[i]);
+    }
+
+    da_free(cntl_bufs);
+    da_free(chains);
 
     TEST_SUCCEED();
 }
-
-// Ok, now what, read/write piece???
 
 bool test_fat32_device(void) {
     BEGIN_SUITE("FAT32 Device");
@@ -701,8 +752,6 @@ bool test_fat32_device(void) {
     RUN_TEST(test_read_write_bad);
     RUN_TEST(test_read_write_piece);
     RUN_TEST(test_read_write_piece_bad);
-
-    // Gonna bulk this boy up...
     RUN_TEST(test_read_write_random);
     return END_SUITE();
 }
