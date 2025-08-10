@@ -803,6 +803,7 @@ fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
  * `dest` must have size at least `len`.
  *
  * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
+ * If the byte range doesn't fit in one sector FOS_INVALID_RANGE is returned.
  * If the given slot_ind points to a bad cluster FOS_STATE_MISMATCH is returned.
  */
 fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
@@ -815,6 +816,7 @@ fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
  * `src` must have size at least `len`.
  *
  * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
+ * If the byte range doesn't fit in one sector FOS_INVALID_RANGE is returned.
  * If the given slot_ind points to a bad cluster FOS_STATE_MISMATCH is returned.
  */
 fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,

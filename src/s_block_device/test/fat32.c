@@ -534,6 +534,87 @@ static bool test_read_write_bad(void) {
 }
 
 static bool test_read_write_piece(void) {
+    fernos_error_t err;
+
+    const uint32_t chain[] = {
+        6, 8, 10, 4, 5
+    };
+    const uint32_t chain_len = sizeof(chain) / sizeof(uint32_t);
+    const uint32_t num_sectors = chain_len * dev->sectors_per_cluster;
+
+    TEST_TRUE(fat32_store_chain(dev, chain, chain_len));
+
+    // Nah, this test should'nt be random IMO..
+    
+    const uint32_t skip = 5;
+    uint8_t buf[FAT32_REQ_SECTOR_SIZE];
+
+    for (uint32_t i = 0; i < num_sectors; i++) {
+        for (uint32_t j = 0; j < FAT32_REQ_SECTOR_SIZE; j += skip) {
+            const uint32_t write_amt = j + skip > FAT32_REQ_SECTOR_SIZE 
+                ? FAT32_REQ_SECTOR_SIZE - j : skip;
+
+            mem_set(buf, i + j, skip); 
+            err = fat32_write_piece(dev, chain[0], i, j, 
+                    write_amt, buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        }
+    }
+
+    for (uint32_t i = 0; i < num_sectors; i++) {
+        for (uint32_t j = 0; j < FAT32_REQ_SECTOR_SIZE; j += skip) {
+            const uint32_t read_amt = j + skip > FAT32_REQ_SECTOR_SIZE 
+                ? FAT32_REQ_SECTOR_SIZE - j : skip;
+
+            err = fat32_read_piece(dev, chain[0], i, j, 
+                    read_amt, buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            for (uint32_t k = 0; k < read_amt; k++) {
+                TEST_EQUAL_UINT((uint8_t)(i + j), buf[k]);
+            }
+        }
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool test_read_write_piece_bad(void) {
+    fernos_error_t err;
+
+    const uint32_t chain[] = {
+        9, 8, 4
+    };
+    const uint32_t chain_len = sizeof(chain) / sizeof(uint32_t);
+    const uint32_t num_sectors = chain_len * dev->sectors_per_cluster;
+
+    TEST_TRUE(fat32_store_chain(dev, chain, chain_len));
+
+    uint8_t buf[FAT32_REQ_SECTOR_SIZE];
+
+    err = fat32_write_piece(dev, chain[0], num_sectors, 0, 10, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = fat32_read_piece(dev, chain[0], num_sectors, 0, 10, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = fat32_write_piece(dev, chain[0], num_sectors, FAT32_REQ_SECTOR_SIZE - 1, 10, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+
+    err = fat32_read_piece(dev, chain[0], num_sectors, FAT32_REQ_SECTOR_SIZE - 1, 10, buf);
+    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+
+    // Now maybe a malformed chain plz.
+
+    err = fat32_set_fat_slot(dev, chain[2], FAT32_BAD_CLUSTER);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_write_piece(dev, chain[0], num_sectors - 1, 0, 10, buf);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    err = fat32_read_piece(dev, chain[0], num_sectors - 1, 0, 10, buf);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
     TEST_SUCCEED();
 }
 
@@ -618,7 +699,10 @@ bool test_fat32_device(void) {
     RUN_TEST(test_read_write);
     RUN_TEST(test_read_write_multi_chain);
     RUN_TEST(test_read_write_bad);
+    RUN_TEST(test_read_write_piece);
+    RUN_TEST(test_read_write_piece_bad);
 
+    // Gonna bulk this boy up...
     RUN_TEST(test_read_write_random);
     return END_SUITE();
 }
