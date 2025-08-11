@@ -14,6 +14,14 @@
  */
 
 /**
+ * Create a new directory and write its starting slot index to `*slot_ind`.
+ *
+ * NOTE: This is really very simple under the hood. A "new directory" is really just a single
+ * cluster who's first directory entry is set to 0.
+ */
+fernos_error_t fat32_new_dir(fat32_device_t *dev, uint32_t *slot_ind);
+
+/**
  * Given a directory which starts at cluster `slot_ind`, read out directory entry
  * at `entry_offset`. (This is basically an index into array where each element has size 32-bytes)
  *
@@ -34,6 +42,30 @@ fernos_error_t fat32_read_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
  */
 fernos_error_t fat32_write_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t entry_offset, const fat32_dir_entry_t *entry);
+
+/**
+ * Find a sequence of free entires within a directory which has a length of at least `seq_len`.
+ *
+ * On Success, FOS_SUCCESS is returned, and the starting offset of the sequence is written to
+ * `*entry_offset`.
+ *
+ * NOTE: if an initial search fails to find an adequate sequnce, the directory will be expanded.
+ * If the expansion fails FOS_NO_SPACE will be returned.
+ */
+fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
+        uint32_t *entry_offset);
+
+/**
+ * Given a sequence, set all of it's entries to unused.
+ *
+ * This function pretty much always returns FOS_SUCCESS unless there is some issue writing to
+ * the device.
+ *
+ * This function will stop erasing when the given chain ends. If the chain is malformed.
+ * For example, it has no SFN entry, this is OK. All the LFN entries will be erased up until
+ * the terminator or an unused entry.
+ */
+fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset);
 
 /**
  * Given the offset of an entry within a directory, get the offset of the start of 
@@ -108,30 +140,6 @@ fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const cha
 fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn);
 
 /**
- * Find a sequence of free entires within a directory which has a length of at least `seq_len`.
- *
- * On Success, FOS_SUCCESS is returned, and the starting offset of the sequence is written to
- * `*entry_offset`.
- *
- * NOTE: if an initial search fails to find an adequate sequnce, the directory will be expanded.
- * If the expansion fails FOS_NO_SPACE will be returned.
- */
-fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
-        uint32_t *entry_offset);
-
-/**
- * Given a sequence, set all of it's entries to unused.
- *
- * This function pretty much always returns FOS_SUCCESS unless there is some issue writing to
- * the device.
- *
- * This function will stop erasing when the given chain ends. If the chain is malformed.
- * For example, it has no SFN entry, this is OK. All the LFN entries will be erased up until
- * the terminator or an unused entry.
- */
-fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset);
-
-/**
  * This call forcefully writes the given sequence to a directory starting at `entry_offset`.
  *
  * NOTE: This DOES NOT check the entries it writes over. Only use this call when you KNOW
@@ -146,5 +154,8 @@ fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t 
 fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset,
         const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn);
 
-// Add a dump function probably.
-
+/**
+ * Somewhat up to the implementor what this does.
+ * Just use `pf` to out put some representation of the directory starting at `slot_ind`.
+ */
+void fat32_dump_dir(fat32_device_t *dev, uint32_t slot_ind, void (*pf)(const char *fmt, ...));
