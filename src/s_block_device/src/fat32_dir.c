@@ -726,5 +726,45 @@ void fat32_dump_dir(fat32_device_t *dev, uint32_t slot_ind, void (*pf)(const cha
         return;
     }
 
-    // TODO: fill this bad boy in...
+    fernos_error_t err;
+
+    uint32_t unused_count = 0;
+    uint32_t entry_offset = 0;
+
+    while (true) {
+        fat32_dir_entry_t entry;
+
+        err = fat32_read_dir_entry(dev, slot_ind, entry_offset, &entry);
+        if ((err == FOS_INVALID_INDEX || entry.raw[0] != FAT32_DIR_ENTRY_UNUSED) && unused_count > 0) {
+            // We had a sequence of unused entries which is now over.
+            if (unused_count == 1) {
+                pf("[%u] UNUSED\n", entry_offset - 1);
+            } else {
+                pf("[%u - %u] UNUSED\n", entry_offset - unused_count, entry_offset - 1);
+            }
+        }
+
+        if (err != FOS_SUCCESS) {
+            return; // Some error (Or also just the end of the directory)
+        }
+
+        if (entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
+            return; // We actually reached a terminator.
+        }
+
+        // Ok, we have a valid entry.
+
+        if (entry.raw[0] == FAT32_DIR_ENTRY_UNUSED) {
+            unused_count++;
+        } else if (FT32F_ATTR_IS_LFN(entry.short_fn.attrs)) {
+            // LFN Entry.
+
+            // Ok, I objectively don't want to do this right now...
+        } else {
+            // SFN Entry.
+            
+        }
+
+        entry_offset++;
+    }
 }
