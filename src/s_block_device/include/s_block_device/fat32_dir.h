@@ -140,19 +140,19 @@ fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const cha
 fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn);
 
 /**
- * This call forcefully writes the given sequence to a directory starting at `entry_offset`.
+ * This call alloactes a new directory sequence containing the given lfn and sfn.
  *
- * NOTE: This DOES NOT check the entries it writes over. Only use this call when you KNOW
- * with certainty that where you are writing has enough unused entries to hold the full 
- * sequence.
+ * If the allocation fails, FOS_NO_SPACE is returned.
+ * NOTE: This call DOES NOT check for name uniqueness. You should do that yourself before calling
+ * this function.
  *
  * If you don't want your sequence to have LFN entries, specify `lfn` as NULL.
  * If the given long file name is too long, an error will be returned.
  *
  * Returns FOS_SUCCESS if there is no error writing to the directory.
  */
-fernos_error_t fat32_place_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset,
-        const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn);
+fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
+        const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn, uint32_t *entry_offset);
 
 /**
  * Somewhat up to the implementor what this does.
