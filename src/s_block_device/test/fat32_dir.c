@@ -11,6 +11,7 @@
 #include "s_block_device/fat32.h"
 #include "s_block_device/fat32_dir.h"
 #include "k_bios_term/term.h"
+#include "s_util/rand.h"
 
 static bool pretest(void);
 static bool posttest(void);
@@ -24,6 +25,7 @@ static bool posttest(void);
 
 static size_t pre_al_blocks;
 static fat32_device_t *dev;
+static uint32_t slot_ind; // Index of the directory.
 
 static bool pretest(void) {
     pre_al_blocks = al_num_user_blocks(get_default_allocator());
@@ -36,6 +38,9 @@ static bool pretest(void) {
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     err = parse_new_da_fat32_device(bd, 0, 0, true, &dev);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_new_dir(dev, &slot_ind);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     TEST_SUCCEED();
@@ -53,12 +58,10 @@ static bool posttest(void) {
 static bool test_fat32_new_dir(void) {
     fernos_error_t err;
 
-    uint32_t slot_ind;
-
-    err = fat32_new_dir(dev, &slot_ind);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
     fat32_dir_entry_t entry;
+
+    // This just tests the the call to new_dir from within the pretest outputs a new
+    // directory with the expected format.
 
     err = fat32_read_dir_entry(dev, slot_ind, 0, &entry);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -70,11 +73,6 @@ static bool test_fat32_new_dir(void) {
 
 static bool test_fat32_read_write_dir_entry(void) {
     fernos_error_t err;
-
-    uint32_t slot_ind;
-
-    err = fat32_new_dir(dev, &slot_ind);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     fat32_dir_entry_t entry;
 
@@ -107,10 +105,52 @@ static bool test_fat32_read_write_dir_entry(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fat32_get_free_seq(void) {
+    fernos_error_t err;
+
+    fat32_dir_entry_t dummy_entry = {
+        .short_fn = {
+            .short_fn = {'D', 'U', 'M', 'M', 'Y', ' ', ' ', ' '},
+            .extenstion = {' ' , ' ', ' '},
+            .attrs = 0
+        }
+    };
+
+    rand_t r = rand(0);
+
+    // What we are going to do is to get a bunch of sequences of certain lengths.
+    // Each time, we will randomly place a SFN entry in one of the sequences 
+    // entries.
+
+    for (uint32_t seq_len = 1; seq_len < 10; seq_len += 3) {
+        uint32_t seq_start;
+        err = fat32_get_free_seq(dev, slot_ind, seq_len, &seq_start);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        // Now confirm that this entire sequence is actually unused!
+
+        for (uint32_t i = 0; i < seq_len; i++) {
+            fat32_dir_entry_t entry;
+
+            err = fat32_read_dir_entry(dev, slot_ind, seq_start + i, &entry);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            TEST_EQUAL_HEX(FAT32_DIR_ENTRY_UNUSED, entry.raw[0]);
+        }
+
+        uint32_t rand_ind = next_rand_u32(&r) % seq_len;
+        err = fat32_write_dir_entry(dev, slot_ind, seq_start + rand_ind, &dummy_entry);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    TEST_SUCCEED();
+}
+
 
 bool test_fat32_device_dir_functions(void) {
     BEGIN_SUITE("FAT32 Device Dir Functions");
     RUN_TEST(test_fat32_new_dir);
     RUN_TEST(test_fat32_read_write_dir_entry);
+    RUN_TEST(test_fat32_get_free_seq);
     return END_SUITE();
 }

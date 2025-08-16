@@ -56,6 +56,21 @@ fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32
         uint32_t *entry_offset);
 
 /**
+ * This call alloactes a new directory sequence containing the given lfn and sfn.
+ *
+ * If the allocation fails, FOS_NO_SPACE is returned.
+ * NOTE: This call DOES NOT check for name uniqueness. You should do that yourself before calling
+ * this function.
+ *
+ * If you don't want your sequence to have LFN entries, specify `lfn` as NULL.
+ * If the given long file name is too long, an error will be returned.
+ *
+ * Returns FOS_SUCCESS if there is no error writing to the directory.
+ */
+fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
+        const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn, uint32_t *entry_offset);
+
+/**
  * Given a sequence, set all of it's entries to unused.
  *
  * This function pretty much always returns FOS_SUCCESS unless there is some issue writing to
@@ -138,21 +153,6 @@ fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const cha
  * FOS_IN_USE if the name is already in use.
  */
 fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn);
-
-/**
- * This call alloactes a new directory sequence containing the given lfn and sfn.
- *
- * If the allocation fails, FOS_NO_SPACE is returned.
- * NOTE: This call DOES NOT check for name uniqueness. You should do that yourself before calling
- * this function.
- *
- * If you don't want your sequence to have LFN entries, specify `lfn` as NULL.
- * If the given long file name is too long, an error will be returned.
- *
- * Returns FOS_SUCCESS if there is no error writing to the directory.
- */
-fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
-        const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn, uint32_t *entry_offset);
 
 /**
  * Somewhat up to the implementor what this does.
