@@ -15,7 +15,8 @@ _SRCS 		?= mem_block_device.c cached_block_device.c \
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= block_device.c mem_block_device.c cached_block_device.c fat32.c
+_TEST_SRCS 	?= block_device.c mem_block_device.c cached_block_device.c \
+			   fat32.c fat32_dir.c
 
 -include ../mod_stub.mk
 
