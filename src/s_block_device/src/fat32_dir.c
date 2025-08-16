@@ -757,12 +757,62 @@ void fat32_dump_dir(fat32_device_t *dev, uint32_t slot_ind, void (*pf)(const cha
         if (entry.raw[0] == FAT32_DIR_ENTRY_UNUSED) {
             unused_count++;
         } else if (FT32F_ATTR_IS_LFN(entry.short_fn.attrs)) {
-            // LFN Entry.
+            // LFN Entry. (We are only going to print ascii characters tbh)
+            //
+            // NOTE: In theory I could use the get_dir_seq_lfn function here and just skip
+            // ahead to the SFN entry. But because this is primarly for debugging, 
+            // I'd rather print out the contents of each individual entry.
 
-            // Ok, I objectively don't want to do this right now...
+            char lfn[((sizeof(entry.long_fn.long_fn_0) + sizeof(entry.long_fn.long_fn_1) + sizeof(entry.long_fn.long_fn_2)) / sizeof(uint16_t)) + 1];
+
+            uint32_t i = 0;
+
+            for (uint32_t j = 0; j < sizeof(entry.long_fn.long_fn_0) / sizeof(uint16_t) && entry.long_fn.long_fn_0[j] != 0; j++) {
+                lfn[i++] = (char) (entry.long_fn.long_fn_0[j]) ;
+            }
+
+            if (i == sizeof(entry.long_fn.long_fn_0) / sizeof(uint16_t)) {
+                // Only move onto part 1, if part 0 was fully consumed.
+                for (uint32_t j = 0; j < sizeof(entry.long_fn.long_fn_1) / sizeof(uint16_t) && entry.long_fn.long_fn_1[j] != 0; j++) {
+                    lfn[i++] = (char) (entry.long_fn.long_fn_1[j]) ;
+                }
+            }
+
+            if (i == (sizeof(entry.long_fn.long_fn_0) + sizeof(entry.long_fn.long_fn_1)) / sizeof(uint16_t)) {
+                // Only move onto part 2 if part 0 and 1 were fully consumed.
+                for (uint32_t j = 0; j < sizeof(entry.long_fn.long_fn_2) / sizeof(uint16_t) && entry.long_fn.long_fn_2[j] != 0; j++) {
+                    lfn[i++] = (char) (entry.long_fn.long_fn_2[j]) ;
+                }
+            }
+
+            lfn[i++] = '\0';
+
+            pf("[%u] LFN %s\n", lfn);
+
         } else {
             // SFN Entry.
             
+            // Max size of a short filename + . + extension.
+            char sfn[sizeof(entry.short_fn.short_fn) + 1 + sizeof(entry.short_fn.extenstion) + 1];
+
+            uint32_t i = 0;
+
+            for (uint32_t j = 0; j < sizeof(entry.short_fn.short_fn) && entry.short_fn.short_fn[j] != ' ' ; j++) {
+                sfn[i++] = entry.short_fn.short_fn[j];
+            }
+
+            // Only add an extension if there is one.
+            if (entry.short_fn.extenstion[0] != ' ') {
+                sfn[i++] = '.';
+
+                for (uint32_t j = 0; j < sizeof(entry.short_fn.extenstion) && entry.short_fn.extenstion[j] != ' ' ; j++) {
+                    sfn[i++] = entry.short_fn.extenstion[j];
+                }
+            }
+
+            sfn[i++] = '\0';
+
+            pf("[%u] SFN %s\n", sfn);
         }
 
         entry_offset++;
