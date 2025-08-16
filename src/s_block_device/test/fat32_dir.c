@@ -146,11 +146,49 @@ static bool test_fat32_get_free_seq(void) {
     TEST_SUCCEED();
 }
 
+/*
+ * NOTE: some of the behaviors are kinda intertwined. It's kinda hard to test one
+ * behavior in isolation. So, the "dir_ops" tests are just tests which test a bunch
+ * of endpoints together.
+ */
+
+static bool test_fat32_dir_ops0(void) {
+    // This will make a few sequences, then erase a few??
+
+    fernos_error_t err;
+
+    fat32_short_fn_dir_entry_t sfn_entry = {
+        .short_fn = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+        .extenstion = {'T', ' ', ' '},
+        .attrs = 0
+    };
+    uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 1];
+
+    for (uint32_t i = 0; i < 20; i++) {
+        const uint32_t lfn_len = i + 1;
+        for (uint32_t j = 0; j < lfn_len; j++) {
+            lfn_buf[j] = (uint16_t)('a' + j);
+        }
+        lfn_buf[lfn_len] = '\0';
+
+        sfn_entry.short_fn[0] = 'A' + i;
+        
+        uint32_t entry_offset;
+        err = fat32_new_seq(dev, slot_ind, &sfn_entry, lfn_buf, &entry_offset);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    fat32_dump_dir(dev, slot_ind, term_put_fmt_s);
+
+    TEST_SUCCEED();
+}
+
 
 bool test_fat32_device_dir_functions(void) {
     BEGIN_SUITE("FAT32 Device Dir Functions");
     RUN_TEST(test_fat32_new_dir);
     RUN_TEST(test_fat32_read_write_dir_entry);
     RUN_TEST(test_fat32_get_free_seq);
+    RUN_TEST(test_fat32_dir_ops0);
     return END_SUITE();
 }

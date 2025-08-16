@@ -2,6 +2,9 @@
 #include "s_block_device/fat32_dir.h"
 #include "s_util/str.h"
 
+// DELETE ME!!!!
+#include "k_bios_term/term.h"
+
 /*
  * The directory functions below are slightly looser with cluster error checking than the 
  * above functions. This is because functions below rely on the functions above.
@@ -250,7 +253,6 @@ fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
         return err;
     }
 
-    // Write out LFN entries if there are any.
     if (num_lfn_entries > 0) {
         const uint8_t sfn_check_sum = fat32_checksum(sfn_entry->short_fn);
 
@@ -288,7 +290,7 @@ fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
                 } else if (rel <= 10) {
                     lfn_entry.long_fn_1[rel - 5] = lfn[char_i];
                 } else {
-                    lfn_entry.long_fn_2[rel - 10] = lfn[char_i];
+                    lfn_entry.long_fn_2[rel - 11] = lfn[char_i];
                 }
             }
 
