@@ -311,20 +311,42 @@ fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
 
 fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset) {
     fernos_error_t err;
+    fat32_dir_entry_t entry;
+
+    // Start by just checking the first entry isn't a middle LFN Entry.
+    err = fat32_read_dir_entry(dev, slot_ind, entry_offset, &entry);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    if (entry.raw[0] != FAT32_DIR_ENTRY_TERMINTAOR && entry.raw[0] != FAT32_DIR_ENTRY_UNUSED &&
+            FT32F_ATTR_IS_LFN(entry.short_fn.attrs) && 
+            ((FAT32_LFN_START_PREFIX & entry.raw[0]) != FAT32_LFN_START_PREFIX)) {
+        return FOS_STATE_MISMATCH; // Middle LFN entry!!!
+    }
+
+    // Ok, now we can just do the normal algorithm.
 
     const uint32_t dir_entries_per_cluster = (FAT32_REQ_SECTOR_SIZE * dev->sectors_per_cluster) /
         sizeof(fat32_dir_entry_t);
-    
-    uint32_t slot_iter = slot_ind;
+
+    uint32_t slot_iter;
+    err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, &slot_iter);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    bool first_cluster = true;
 
     while (true) {
         uint32_t start = 0;
-        if (slot_iter == slot_ind) {
-            start = entry_offset;
+
+        if (first_cluster) {
+            start = entry_offset % dir_entries_per_cluster;
+            first_cluster = false;
         }
 
         for (uint32_t i = start; i < dir_entries_per_cluster; i++) {
-            fat32_dir_entry_t entry;
 
             err = fat32_read_dir_entry(dev, slot_iter, i, &entry);
             if (err != FOS_SUCCESS) {
@@ -333,9 +355,8 @@ fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t 
 
             if (entry.raw[0] == FAT32_DIR_ENTRY_UNUSED || 
                     entry.raw[0] == FAT32_DIR_ENTRY_TERMINTAOR) {
-                return FOS_SUCCESS; // We made it to an explicit end!
-                                    // This may imply a malformed chain was erased, but we'll allow
-                                    // it.
+                return FOS_STATE_MISMATCH; // We made it to the end of a sequence without hitting
+                                           // an SFN entry, Malformed Sequence!!!
             }
 
             bool sfn = !FT32F_ATTR_IS_LFN(entry.short_fn.attrs);
@@ -359,8 +380,8 @@ fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t 
         }
 
         if (FAT32_IS_EOC(next_slot_iter) || next_slot_iter < 2 || next_slot_iter >= dev->num_fat_slots) {
-            return FOS_SUCCESS; // Again, the chain could've ended.. or been some invalid value.
-                                // We'll just return SUCCESS, we erased what we could.
+            return FOS_STATE_MISMATCH; // Again, we reached the end of our sequence before 
+                                       // hitting the SFN entry!!
         }
 
         slot_iter = next_slot_iter;
@@ -653,7 +674,6 @@ fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const cha
 
         err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, &sfn_entry_offset);
         if (err != FOS_SUCCESS) {
-            term_put_fmt_s("SS: %u\n", seq_start);
             return FOS_UNKNWON_ERROR;
         }
 

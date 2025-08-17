@@ -73,12 +73,9 @@ fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
 /**
  * Given a sequence, set all of it's entries to unused.
  *
- * This function pretty much always returns FOS_SUCCESS unless there is some issue writing to
- * the device.
- *
- * This function will stop erasing when the given chain ends. If the chain is malformed.
- * For example, it has no SFN entry, this is OK. All the LFN entries will be erased up until
- * the terminator or an unused entry.
+ * This will return an error if the given sequence is malformed in any way.
+ * It will also return an error if entry offset points to an LFN entry which doesn't have
+ * the starting prefix. (FOS_STATE_MISMATCH is returned in both of these cases)
  */
 fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset);
 

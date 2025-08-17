@@ -298,17 +298,6 @@ static bool test_fat32_dir_ops1(void) {
             
             uint32_t sfn_offset;
             err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_starts[seq_starts_ind], &sfn_offset);
-            /* All I can say, is that something is up.
-            if (err != FOS_SUCCESS) {
-                fat32_dir_entry_t te;
-                for (uint32_t i = 0; i < 10; i++) {
-                    fat32_read_dir_entry(dev, slot_ind, seq_starts[seq_starts_ind] + i - 5, &te);
-                    term_put_fmt_s("0x%02X\n", te.raw[0]);
-                }
-
-                term_put_fmt_s("SS: %u\n", seq_starts[seq_starts_ind]);
-            }
-            */
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
             err = fat32_read_dir_entry(dev, slot_ind, sfn_offset, (fat32_dir_entry_t *)&sfn_entry);
@@ -318,37 +307,25 @@ static bool test_fat32_dir_ops1(void) {
                 TEST_EQUAL_HEX((char)('A' + (seq_starts_ind % 26)), sfn_entry.short_fn[ci]);
             }
 
-            err = fat32_get_dir_seq_lfn(dev, slot_ind, sfn_offset, lfn_buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            // Confirm this name is marked IN_USE by the check sfn function.
+            err = fat32_check_sfn(dev, slot_ind, sfn_entry.short_fn, "   ");
+            TEST_EQUAL_HEX(FOS_IN_USE, err);
 
-            for (uint32_t ci = 0; lfn_buf[ci] != 0; ci++) {
-                TEST_EQUAL_HEX((char)('a' + (seq_starts_ind % 26)), lfn_buf[ci]);
+            err = fat32_get_dir_seq_lfn(dev, slot_ind, sfn_offset, lfn_buf);
+            TEST_TRUE(err == FOS_SUCCESS || err == FOS_EMPTY);
+
+            // Some sequences may just have an SFN and no LFN!
+            if (err == FOS_SUCCESS) {
+                for (uint32_t ci = 0; lfn_buf[ci] != 0; ci++) {
+                    TEST_EQUAL_HEX((char)('a' + (seq_starts_ind % 26)), lfn_buf[ci]);
+                }
+
+                // Confirm the lfn is marked in use by the check lfn funciton.
+                err = fat32_check_lfn(dev, slot_ind, lfn_buf);
+                TEST_EQUAL_HEX(FOS_IN_USE, err);
             }
 
-
-            // Now we confirm that the various name checks actually work.
-
-            /*
-            err = fat32_check_sfn(dev, slot_ind, sfn_entry.short_fn, "   ");
-            TEST_EQUAL_HEX(FOS_IN_USE, err);
-
-            err = fat32_check_sfn(dev, slot_ind, sfn_entry.short_fn, "B  ");
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
-            sfn_entry.short_fn[0] = '5';
-
-            err = fat32_check_sfn(dev, slot_ind, sfn_entry.short_fn, "   ");
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
-            err = fat32_check_lfn(dev, slot_ind, lfn_buf);
-            TEST_EQUAL_HEX(FOS_IN_USE, err);
-
-            lfn_buf[0] = '4';
-            err = fat32_check_lfn(dev, slot_ind, lfn_buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
-            */
-
-            // IDK, somethign is wrong, and my head hurts.
+            // Finally erase our sequence.
             err = fat32_erase_seq(dev, slot_ind, seq_starts[seq_starts_ind]);
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
