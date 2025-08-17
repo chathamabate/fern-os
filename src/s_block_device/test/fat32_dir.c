@@ -224,6 +224,49 @@ static bool test_fat32_new_seq(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fat32_erase_seq(void) {
+
+    // This will be an extremely simple test primarily focused on FOS_STATE_MISMATCH
+    // being returned when the sequence is malformed.
+
+    fernos_error_t err;
+
+    uint32_t seq_start;
+
+    fat32_short_fn_dir_entry_t sfn_entry = {
+        .short_fn = {'D', 'U', 'M', 'M', 'Y', ' ', ' ', ' '},
+        .extenstion = {' ' , ' ', ' '},
+        .attrs = 0
+    };
+
+    const char *lfn = "SomeBigAhhhhhName_Woooooooooo.txt";
+    const uint32_t lfn_len = str_len(lfn);
+    const uint32_t num_lfn_entries = FAT32_NUM_LFN_ENTRIES(lfn_len);
+    err = fat32_new_seq_c8(dev, slot_ind, &sfn_entry, lfn, &seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // We shouldn't be allowed to erase from a middle lfn entry.
+    err = fat32_erase_seq(dev, slot_ind, seq_start + 1);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    err = fat32_erase_seq(dev, slot_ind, seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fat32_dir_entry_t entry;
+    for (uint32_t i = 0; i < num_lfn_entries + 1; i++) {
+        err = fat32_read_dir_entry(dev, slot_ind, seq_start + i, &entry);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_EQUAL_HEX(FAT32_DIR_ENTRY_UNUSED, entry.raw[0]);
+    }
+
+    // We also should be allowed to erase from an unused entry.
+    err = fat32_erase_seq(dev, slot_ind, seq_start);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    TEST_SUCCEED();
+}
+
 /*
  * NOTE: some of the behaviors are kinda intertwined. It's kinda hard to test one
  * behavior in isolation. So, the "dir_ops" tests are just tests which test a bunch
@@ -406,6 +449,7 @@ bool test_fat32_device_dir_functions(void) {
     RUN_TEST(test_fat32_read_write_dir_entry);
     RUN_TEST(test_fat32_get_free_seq);
     RUN_TEST(test_fat32_new_seq);
+    RUN_TEST(test_fat32_erase_seq);
     RUN_TEST(test_fat32_dir_ops0);
     RUN_TEST(test_fat32_dir_ops1);
     return END_SUITE();

@@ -83,6 +83,9 @@ fernos_error_t fat32_new_seq_c8(fat32_device_t *dev, uint32_t slot_ind,
  * This will return an error if the given sequence is malformed in any way.
  * It will also return an error if entry offset points to an LFN entry which doesn't have
  * the starting prefix. (FOS_STATE_MISMATCH is returned in both of these cases)
+ *
+ * Also returns FOS_STATE_MISMATCH if the entry given points ot an unused entry or
+ * the directory terminator!
  */
 fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset);
 

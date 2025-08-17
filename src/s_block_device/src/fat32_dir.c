@@ -333,17 +333,6 @@ fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t 
     fernos_error_t err;
     fat32_dir_entry_t entry;
 
-    // Start by just checking the first entry isn't a middle LFN Entry.
-    err = fat32_read_dir_entry(dev, slot_ind, entry_offset, &entry);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    if (entry.raw[0] != FAT32_DIR_ENTRY_TERMINTAOR && entry.raw[0] != FAT32_DIR_ENTRY_UNUSED &&
-            FT32F_ATTR_IS_LFN(entry.short_fn.attrs) && 
-            ((FAT32_LFN_START_PREFIX & entry.raw[0]) != FAT32_LFN_START_PREFIX)) {
-        return FOS_STATE_MISMATCH; // Middle LFN entry!!!
-    }
 
     // Ok, now we can just do the normal algorithm.
 
@@ -354,6 +343,18 @@ fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t 
     err = fat32_traverse_chain(dev, slot_ind, entry_offset / dir_entries_per_cluster, &slot_iter);
     if (err != FOS_SUCCESS) {
         return err;
+    }
+
+    // Start by just checking the first entry isn't a middle LFN Entry.
+    err = fat32_read_dir_entry(dev, slot_iter, entry_offset % dir_entries_per_cluster, &entry);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    if (entry.raw[0] != FAT32_DIR_ENTRY_TERMINTAOR && entry.raw[0] != FAT32_DIR_ENTRY_UNUSED &&
+            FT32F_ATTR_IS_LFN(entry.short_fn.attrs) && 
+            ((FAT32_LFN_START_PREFIX & entry.raw[0]) != FAT32_LFN_START_PREFIX)) {
+        return FOS_STATE_MISMATCH; // Middle LFN entry!!!
     }
 
     bool first_cluster = true;
