@@ -72,6 +72,12 @@ fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
         const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn, uint32_t *entry_offset);
 
 /**
+ * Variant of `fat32_new_seq` which takes a 8-bit width character string.
+ */
+fernos_error_t fat32_new_seq_c8(fat32_device_t *dev, uint32_t slot_ind,
+        const fat32_short_fn_dir_entry_t *sfn_entry, const char *lfn, uint32_t *entry_offset);
+
+/**
  * Given a sequence, set all of it's entries to unused.
  *
  * This will return an error if the given sequence is malformed in any way.
@@ -131,6 +137,12 @@ fernos_error_t fat32_get_dir_seq_lfn(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sfn_entry_offset, uint16_t *lfn);
 
 /**
+ * Same as `fat32_get_dir_seq_lfn` but with 8-bit width characters.
+ */
+fernos_error_t fat32_get_dir_seq_lfn_c8(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sfn_entry_offset, char *lfn);
+
+/**
  * This checks if a short filename is in use in a given directory.
  *
  * `name` should be 8 characters. (Space padded)
@@ -145,12 +157,17 @@ fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const cha
 /**
  * This checks if a long filename is in use in a directory.
  *
- * `lfn` is a NULL terminated string. Shouldn't have length than FAT32_MAK_LFN_LEN.
+ * `lfn` is a NULL terminated string. Shouldn't have length longer than FAT32_MAK_LFN_LEN.
  *
  * FOS_SUCCESS if the name is yet to be used.
  * FOS_IN_USE if the name is already in use.
  */
 fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn);
+
+/**
+ * Same as `fat32_check_lfn` except with 8-bit width characters.
+ */
+fernos_error_t fat32_check_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn);
 
 /**
  * Somewhat up to the implementor what this does.

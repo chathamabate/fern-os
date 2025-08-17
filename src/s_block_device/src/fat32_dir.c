@@ -309,6 +309,26 @@ fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
     return FOS_SUCCESS;
 }
 
+fernos_error_t fat32_new_seq_c8(fat32_device_t *dev, uint32_t slot_ind,
+        const fat32_short_fn_dir_entry_t *sfn_entry, const char *lfn, uint32_t *entry_offset) {
+    uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 1];
+
+    uint32_t lfn_len = 0;
+
+    if (lfn) {
+        while (lfn[lfn_len] != '\0') {
+            lfn_buf[lfn_len] = lfn[lfn_len];
+            if (++lfn_len > FAT32_MAX_LFN_LEN) {
+                return FOS_BAD_ARGS;
+            }
+        }
+    }
+
+    lfn_buf[lfn_len] = 0;
+
+    return fat32_new_seq(dev, slot_ind, sfn_entry, lfn_buf, entry_offset);
+}
+
 fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset) {
     fernos_error_t err;
     fat32_dir_entry_t entry;
@@ -647,6 +667,30 @@ end:
     return FOS_SUCCESS;
 }
 
+fernos_error_t fat32_get_dir_seq_lfn_c8(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sfn_entry_offset, char *lfn) {
+    if (!lfn) {
+        return FOS_BAD_ARGS;
+    }
+
+    uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 1];
+
+    fernos_error_t err;
+
+    err = fat32_get_dir_seq_lfn(dev, slot_ind, sfn_entry_offset, lfn_buf);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    uint32_t i;
+    for (i = 0; lfn_buf[i] != 0; i++) {
+        lfn[i] = (uint8_t)lfn_buf[i];
+    }
+    lfn_buf[i] = '\0';
+
+    return FOS_SUCCESS;
+}
+
 fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
         const char *ext) {
     if (!name || !ext) {
@@ -752,6 +796,25 @@ fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uin
     }
 
     return FOS_SUCCESS;
+}
+
+fernos_error_t fat32_check_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn) {
+    uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 1];
+
+    uint32_t lfn_len = 0;
+
+    if (lfn) {
+        while (lfn[lfn_len] != '\0') {
+            lfn_buf[lfn_len] = lfn[lfn_len];
+            if (++lfn_len > FAT32_MAX_LFN_LEN) {
+                return FOS_BAD_ARGS;
+            }
+        }
+    }
+
+    lfn_buf[lfn_len] = 0;
+
+    return fat32_check_lfn(dev, slot_ind, lfn_buf);
 }
 
 void fat32_dump_dir(fat32_device_t *dev, uint32_t slot_ind, void (*pf)(const char *fmt, ...)) {

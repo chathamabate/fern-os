@@ -167,6 +167,9 @@ static bool test_fat32_new_seq(void) {
     uint32_t entry_offsets[10];
     const uint32_t num_entry_offsets = sizeof(entry_offsets) / sizeof(uint32_t);
 
+    // Here we just allocate a few sequences, than confirm afterwards that they all
+    // appear as expected in the directory.
+
     for (uint32_t i = 0; i < num_entry_offsets; i++) {
         uint32_t lfn_len = i * 50;
         if (lfn_len > FAT32_MAX_LFN_LEN) {
