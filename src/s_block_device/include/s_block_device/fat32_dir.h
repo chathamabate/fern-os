@@ -63,6 +63,7 @@ fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32
  * this function.
  *
  * If you don't want your sequence to have LFN entries, specify `lfn` as NULL.
+ * (or provide a 0 length lfn)
  * If the given long file name is too long, an error will be returned.
  *
  * Returns FOS_SUCCESS if there is no error writing to the directory.
