@@ -173,7 +173,7 @@ static bool test_fat32_dir_ops0(void) {
         for (uint32_t j = 0; j < lfn_len; j++) {
             lfn_buf[j] = (uint16_t)('a' + j);
         }
-        lfn_buf[lfn_len] = '\0';
+        lfn_buf[lfn_len] = 0;
 
         sfn_entry.short_fn[0] = 'A' + i;
         
@@ -199,7 +199,7 @@ static bool test_fat32_dir_ops0(void) {
     for (uint32_t i = 0; i < FAT32_MAX_LFN_LEN; i++) {
         lfn_buf[i] = 'a' + (i % 26);
     }
-    lfn_buf[FAT32_MAX_LFN_LEN] = '\0';
+    lfn_buf[FAT32_MAX_LFN_LEN] = 0;
 
     for (uint32_t i = 0; i < num_entry_offsets; i++) {
         if (entry_offsets[i] == 0xFFFFFFFF) {
@@ -226,15 +226,105 @@ static bool test_fat32_dir_ops0(void) {
         err = fat32_get_dir_seq_lfn(dev, slot_ind, sfn_offset, lfn_buf);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-        for (uint32_t j = 0; lfn_buf[j] != '\0'; j++) {
+        for (uint32_t j = 0; lfn_buf[j] != 0; j++) {
             TEST_TRUE(lfn_buf[j] == 'a' + (j % 26));
         }
 
-        entry_iter = seq_start + 1;
+        entry_iter = sfn_offset + 1;
     }
 
     err = fat32_next_dir_seq(dev, slot_ind, entry_iter, &seq_start);
     TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    TEST_SUCCEED();
+}
+
+static bool test_fat32_dir_ops1(void) {
+    fernos_error_t err;
+
+    fat32_short_fn_dir_entry_t sfn_entry = {
+        .short_fn = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+        .extenstion = {' ' , ' ', ' '},
+        .attrs = 0
+    };
+    uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 1];
+
+    uint32_t seq_starts[100];
+    mem_set(seq_starts, 0xFF, sizeof(seq_starts));
+
+    const uint32_t num_seq_starts = sizeof(seq_starts) / sizeof(uint32_t);
+
+    rand_t r = rand(0);
+
+    for (uint32_t i = 0; i < num_seq_starts * 30; i++) {
+        const uint32_t seq_starts_ind = next_rand_u32(&r) % num_seq_starts;
+
+        if (seq_starts[seq_starts_ind] == 0xFFFFFFFF) {
+            // If we hit an unused cell, allocate!
+            
+            // Ok, we are going to generate a SFN and LFN from the seq_starts_ind.
+            
+            const uint32_t lfn_len = next_rand_u32(&r) % (FAT32_MAX_LFN_LEN + 1);
+            for (uint32_t ci = 0; ci < lfn_len; ci++) {
+                lfn_buf[ci] = 'a' + (seq_starts_ind % 26);
+            }
+            lfn_buf[lfn_len] = 0;
+
+            for (uint32_t ci = 0; ci < sizeof(sfn_entry.short_fn); ci++) {
+                sfn_entry.short_fn[ci] = 'A' + (seq_starts_ind % 26);
+            }
+
+            err = fat32_new_seq(dev, slot_ind, &sfn_entry, lfn_buf, seq_starts + seq_starts_ind);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        } else {
+            // If we hit a used cell, erase!
+
+            // First let's confirm this sequence still holds the expected values.
+            
+            uint32_t sfn_offset;
+            err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_starts[seq_starts_ind], &sfn_offset);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            err = fat32_read_dir_entry(dev, slot_ind, sfn_offset, (fat32_dir_entry_t *)&sfn_entry);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            for (uint32_t ci = 0; ci < sizeof(sfn_entry.short_fn); ci++) {
+                TEST_EQUAL_HEX((char)('A' + (seq_starts_ind % 26)), sfn_entry.short_fn[ci]);
+            }
+
+            err = fat32_get_dir_seq_lfn(dev, slot_ind, sfn_offset, lfn_buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            for (uint32_t ci = 0; lfn_buf[ci] != 0; ci++) {
+                TEST_EQUAL_HEX((char)('a' + (seq_starts_ind % 26)), lfn_buf[ci]);
+            }
+
+            // Now we confirm that the various name checks actually work.
+
+            err = fat32_check_sfn(dev, slot_ind, sfn_entry.short_fn, "   ");
+            TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+            err = fat32_check_sfn(dev, slot_ind, sfn_entry.short_fn, "B  ");
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            sfn_entry.short_fn[0] = '5';
+
+            err = fat32_check_sfn(dev, slot_ind, sfn_entry.short_fn, "   ");
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            err = fat32_check_lfn(dev, slot_ind, lfn_buf);
+            TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+            lfn_buf[0] = '4';
+            err = fat32_check_lfn(dev, slot_ind, lfn_buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            err = fat32_erase_seq(dev, slot_ind, seq_starts[seq_starts_ind]);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            seq_starts[seq_starts_ind] = 0xFFFFFFFF;
+        }
+    }
 
     TEST_SUCCEED();
 }
@@ -246,5 +336,6 @@ bool test_fat32_device_dir_functions(void) {
     RUN_TEST(test_fat32_read_write_dir_entry);
     RUN_TEST(test_fat32_get_free_seq);
     RUN_TEST(test_fat32_dir_ops0);
+    RUN_TEST(test_fat32_dir_ops1);
     return END_SUITE();
 }
