@@ -164,8 +164,12 @@ static bool test_fat32_dir_ops0(void) {
     };
     uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 1];
 
-    for (uint32_t i = 0; i < 20; i++) {
-        const uint32_t lfn_len = i + 1;
+    uint32_t entry_offsets[20];
+    const uint32_t num_entry_offsets = sizeof(entry_offsets) / sizeof(uint32_t);
+    TEST_TRUE(num_entry_offsets <= 26); // We are going to be doing some basic alphabetical stuff.
+
+    for (uint32_t i = 0; i < num_entry_offsets; i++) {
+        const uint32_t lfn_len = (i + 1);
         for (uint32_t j = 0; j < lfn_len; j++) {
             lfn_buf[j] = (uint16_t)('a' + j);
         }
@@ -176,9 +180,61 @@ static bool test_fat32_dir_ops0(void) {
         uint32_t entry_offset;
         err = fat32_new_seq(dev, slot_ind, &sfn_entry, lfn_buf, &entry_offset);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        entry_offsets[i] = entry_offset;
     }
 
-    fat32_dump_dir(dev, slot_ind, term_put_fmt_s);
+    // Free some random seqences.
+    rand_t r = rand(0);
+    for (uint32_t i = 0; i < num_entry_offsets / 2; i++) {
+        const uint32_t entry_to_free = next_rand_u32(&r) % num_entry_offsets;
+        if (entry_offsets[entry_to_free] != 0xFFFFFFFF) {
+            err = fat32_erase_seq(dev, slot_ind, entry_offsets[entry_to_free]);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            entry_offsets[entry_to_free] = 0xFFFFFFFF;
+        }
+    }
+
+    // Ok now we are going for the Big kahuna!
+    for (uint32_t i = 0; i < FAT32_MAX_LFN_LEN; i++) {
+        lfn_buf[i] = 'a' + (i % 26);
+    }
+    lfn_buf[FAT32_MAX_LFN_LEN] = '\0';
+
+    for (uint32_t i = 0; i < num_entry_offsets; i++) {
+        if (entry_offsets[i] == 0xFFFFFFFF) {
+            err = fat32_new_seq(dev, slot_ind, &sfn_entry, lfn_buf, (entry_offsets + i));
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        }
+    }
+
+    // FINALLY, let's iterate over the directory using the next_seq call and confirm all
+    // sequences are valid.
+
+    uint32_t entry_iter = 0;
+    uint32_t seq_start;
+
+    for (uint32_t i = 0; i < num_entry_offsets; i++) {
+        err = fat32_next_dir_seq(dev, slot_ind, entry_iter, &seq_start);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        // Ok, let's get the SFN now.
+        uint32_t sfn_offset;
+        err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, &sfn_offset);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        err = fat32_get_dir_seq_lfn(dev, slot_ind, sfn_offset, lfn_buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        for (uint32_t j = 0; lfn_buf[j] != '\0'; j++) {
+            TEST_TRUE(lfn_buf[j] == 'a' + (j % 26));
+        }
+
+        entry_iter = seq_start + 1;
+    }
+
+    err = fat32_next_dir_seq(dev, slot_ind, entry_iter, &seq_start);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
 
     TEST_SUCCEED();
 }
