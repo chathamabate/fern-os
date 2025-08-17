@@ -653,6 +653,7 @@ fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const cha
 
         err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, &sfn_entry_offset);
         if (err != FOS_SUCCESS) {
+            term_put_fmt_s("SS: %u\n", seq_start);
             return FOS_UNKNWON_ERROR;
         }
 
