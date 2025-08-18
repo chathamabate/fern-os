@@ -26,6 +26,12 @@ static bool posttest(void);
 static size_t pre_al_blocks;
 static fat32_device_t *dev;
 static uint32_t slot_ind; // Index of the directory.
+                          
+static const fat32_short_fn_dir_entry_t dummy_sfn_entry = {
+    .short_fn = {'D', 'U', 'M', 'M', 'Y', ' ', ' ', ' '},
+    .extenstion = {' ' , ' ', ' '},
+    .attrs = 0
+};
 
 static bool pretest(void) {
     pre_al_blocks = al_num_user_blocks(get_default_allocator());
@@ -107,15 +113,6 @@ static bool test_fat32_read_write_dir_entry(void) {
 
 static bool test_fat32_get_free_seq(void) {
     fernos_error_t err;
-
-    fat32_dir_entry_t dummy_entry = {
-        .short_fn = {
-            .short_fn = {'D', 'U', 'M', 'M', 'Y', ' ', ' ', ' '},
-            .extenstion = {' ' , ' ', ' '},
-            .attrs = 0
-        }
-    };
-
     uint32_t seq_start;
 
     rand_t r = rand(0);
@@ -140,7 +137,7 @@ static bool test_fat32_get_free_seq(void) {
         }
 
         uint32_t rand_ind = next_rand_u32(&r) % seq_len;
-        err = fat32_write_dir_entry(dev, slot_ind, seq_start + rand_ind, &dummy_entry);
+        err = fat32_write_dir_entry(dev, slot_ind, seq_start + rand_ind, (const fat32_dir_entry_t *)&dummy_sfn_entry);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
     }
 
@@ -158,12 +155,6 @@ static bool test_fat32_new_seq(void) {
 
     // We are adding 2 so we have space for the bad case.
     uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 2];
-    fat32_short_fn_dir_entry_t sfn_entry = {
-        .short_fn = {'D', 'U', 'M', 'M', 'Y', ' ', ' ', ' '},
-        .extenstion = {' ' , ' ', ' '},
-        .attrs = 0
-    };
-
     uint32_t entry_offsets[10];
     const uint32_t num_entry_offsets = sizeof(entry_offsets) / sizeof(uint32_t);
 
@@ -181,7 +172,7 @@ static bool test_fat32_new_seq(void) {
         }
         lfn_buf[lfn_len] = 0;
 
-        err = fat32_new_seq(dev, slot_ind, &sfn_entry, lfn_buf, entry_offsets + i);
+        err = fat32_new_seq(dev, slot_ind, &dummy_sfn_entry, lfn_buf, entry_offsets + i);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
     }
 
@@ -218,7 +209,7 @@ static bool test_fat32_new_seq(void) {
     }
     lfn_buf[FAT32_MAX_LFN_LEN + 1] = 0;
 
-    err = fat32_new_seq(dev, slot_ind, &sfn_entry, lfn_buf, entry_offsets);
+    err = fat32_new_seq(dev, slot_ind, &dummy_sfn_entry, lfn_buf, entry_offsets);
     TEST_TRUE(err != FOS_SUCCESS);
 
     TEST_SUCCEED();
@@ -231,18 +222,17 @@ static bool test_fat32_erase_seq(void) {
 
     fernos_error_t err;
 
+    // Remember, all directories start with the 0th entry being the dir terminator.
+    err = fat32_erase_seq(dev, slot_ind, 0);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
     uint32_t seq_start;
 
-    fat32_short_fn_dir_entry_t sfn_entry = {
-        .short_fn = {'D', 'U', 'M', 'M', 'Y', ' ', ' ', ' '},
-        .extenstion = {' ' , ' ', ' '},
-        .attrs = 0
-    };
 
     const char *lfn = "SomeBigAhhhhhName_Woooooooooo.txt";
     const uint32_t lfn_len = str_len(lfn);
     const uint32_t num_lfn_entries = FAT32_NUM_LFN_ENTRIES(lfn_len);
-    err = fat32_new_seq_c8(dev, slot_ind, &sfn_entry, lfn, &seq_start);
+    err = fat32_new_seq_c8(dev, slot_ind, &dummy_sfn_entry, lfn, &seq_start);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     // We shouldn't be allowed to erase from a middle lfn entry.
@@ -267,10 +257,134 @@ static bool test_fat32_erase_seq(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fat32_next_dir_seq(void) {
+    fernos_error_t err;
+
+    uint32_t seq_start;
+    uint32_t seq_iter;
+
+    err = fat32_next_dir_seq(dev, slot_ind, 0, &seq_start);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    err = fat32_next_dir_seq(dev, slot_ind, 0x10000000, &seq_start);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    const char *lfn = "AYE_YO_SOM_NAME.txt";
+    const uint32_t lfn_len = str_len(lfn);
+    const uint32_t num_lfn_entries = FAT32_NUM_LFN_ENTRIES(lfn_len);
+
+    err = fat32_new_seq_c8(dev, slot_ind, &dummy_sfn_entry, lfn, &seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_next_dir_seq(dev, slot_ind, 0, &seq_iter);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(seq_start, seq_iter);
+
+    for (uint32_t i = 0; i < num_lfn_entries + 1; i++) {
+        err = fat32_next_dir_seq(dev, slot_ind, seq_start + i, &seq_iter);
+
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_UINT(seq_start + i, seq_iter);
+    }
+
+    err = fat32_next_dir_seq(dev, slot_ind, seq_start + num_lfn_entries + 1, &seq_iter);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    // Now test a sequence which may start after the beginning of the directory.
+
+    uint32_t other_seq_start;
+    err = fat32_new_seq_c8(dev, slot_ind, &dummy_sfn_entry, lfn, &other_seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_erase_seq(dev, slot_ind, seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_next_dir_seq(dev, slot_ind, 0, &seq_iter);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(other_seq_start, seq_iter);
+
+    TEST_SUCCEED();
+}
+
+static bool test_fat32_get_dir_seq_sfn(void) {
+    fernos_error_t err;  
+
+    uint32_t sfn_entry_offset;
+    
+    err = fat32_get_dir_seq_sfn(dev, slot_ind, 0, &sfn_entry_offset);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    uint32_t seq_start;
+
+    const char *lfn = "AYE_YO_SOM_NAME.txt";
+    const uint32_t lfn_len = str_len(lfn);
+    const uint32_t num_lfn_entries = FAT32_NUM_LFN_ENTRIES(lfn_len);
+
+    err = fat32_new_seq_c8(dev, slot_ind, &dummy_sfn_entry, lfn, &seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (uint32_t i = 0; i < num_lfn_entries + 1; i++) {
+        err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start + i, &sfn_entry_offset);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_EQUAL_UINT(seq_start + num_lfn_entries, sfn_entry_offset);
+    }
+
+    err = fat32_erase_seq(dev, slot_ind, seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_get_dir_seq_sfn(dev, slot_ind, 0, &sfn_entry_offset);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    TEST_SUCCEED();
+}
+
+static bool test_fat32_get_dir_seq_lfn(void) {
+    fernos_error_t err;
+
+    const char *lfn = "LongLongLonglongName";
+    const uint32_t lfn_len = str_len(lfn);
+    const uint32_t num_lfn_entries = FAT32_NUM_LFN_ENTRIES(lfn_len);
+
+    uint32_t seq_start;
+
+    err = fat32_new_seq_c8(dev, slot_ind, &dummy_sfn_entry, lfn, &seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    char lfn_buf[FAT32_MAX_LFN_LEN + 1];
+
+    uint32_t sfn_offset;
+    err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, &sfn_offset);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_get_dir_seq_lfn_c8(dev, slot_ind, sfn_offset, lfn_buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_TRUE(mem_cmp(lfn, lfn_buf, lfn_len + 1));
+
+    fat32_dir_entry_t unused = {
+        .raw = {FAT32_DIR_ENTRY_UNUSED}
+    };
+    for (uint32_t i = 0; i < num_lfn_entries; i++) {
+        err = fat32_write_dir_entry(dev, slot_ind, seq_start + i, &unused);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    err = fat32_get_dir_seq_lfn_c8(dev, slot_ind, sfn_offset, lfn_buf);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    TEST_SUCCEED();
+}
+
+static bool test_fat32_check(void) {
+    // One test for both the name testing funcitons.
+
+    TEST_SUCCEED();
+}
+
 /*
- * NOTE: some of the behaviors are kinda intertwined. It's kinda hard to test one
- * behavior in isolation. So, the "dir_ops" tests are just tests which test a bunch
- * of endpoints together.
+ * Below are some complex tests which should exercise almost all the endpoints 
+ * in a comprehensive way.
  */
 
 static bool test_fat32_dir_ops0(void) {
@@ -450,6 +564,10 @@ bool test_fat32_device_dir_functions(void) {
     RUN_TEST(test_fat32_get_free_seq);
     RUN_TEST(test_fat32_new_seq);
     RUN_TEST(test_fat32_erase_seq);
+    RUN_TEST(test_fat32_next_dir_seq);
+    RUN_TEST(test_fat32_get_dir_seq_sfn);
+    RUN_TEST(test_fat32_get_dir_seq_lfn);
+    RUN_TEST(test_fat32_check);
     RUN_TEST(test_fat32_dir_ops0);
     RUN_TEST(test_fat32_dir_ops1);
     return END_SUITE();

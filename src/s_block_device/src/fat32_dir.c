@@ -687,7 +687,7 @@ fernos_error_t fat32_get_dir_seq_lfn_c8(fat32_device_t *dev, uint32_t slot_ind,
     for (i = 0; lfn_buf[i] != 0; i++) {
         lfn[i] = (uint8_t)lfn_buf[i];
     }
-    lfn_buf[i] = '\0';
+    lfn[i] = '\0';
 
     return FOS_SUCCESS;
 }
