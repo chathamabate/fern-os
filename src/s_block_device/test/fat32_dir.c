@@ -46,8 +46,8 @@ static bool pretest(void) {
     err = parse_new_da_fat32_device(bd, 0, 0, true, &dev);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    err = fat32_new_dir(dev, &slot_ind);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    // Almost all of these tests will just work on the root directory.
+    slot_ind = 2;
 
     TEST_SUCCEED();
 }
@@ -64,12 +64,14 @@ static bool posttest(void) {
 static bool test_fat32_new_dir(void) {
     fernos_error_t err;
 
+    uint32_t new_dir_slot_ind;
+
+    err = fat32_new_dir(dev, &new_dir_slot_ind);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
     fat32_dir_entry_t entry;
 
-    // This just tests the the call to new_dir from within the pretest outputs a new
-    // directory with the expected format.
-
-    err = fat32_read_dir_entry(dev, slot_ind, 0, &entry);
+    err = fat32_read_dir_entry(dev, new_dir_slot_ind, 0, &entry);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     TEST_EQUAL_HEX(FAT32_DIR_ENTRY_TERMINTAOR, entry.raw[0]);
@@ -379,6 +381,50 @@ static bool test_fat32_get_dir_seq_lfn(void) {
 static bool test_fat32_check(void) {
     // One test for both the name testing funcitons.
 
+    fernos_error_t err;
+    uint32_t seq_start;
+
+    fat32_short_fn_dir_entry_t sfn_entry = {
+        .short_fn = {'N', 'A', 'M', 'E', ' ', ' ', ' ', ' '},
+        .extenstion = {'T' , 'X', 'T'},
+        .attrs = 0
+    };
+
+    err = fat32_new_seq_c8(dev, slot_ind, &sfn_entry, "SomeLongName", &seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    sfn_entry = (fat32_short_fn_dir_entry_t) {
+        .short_fn = {'O', 'T', 'H', 'E', 'R', '_', '_', '_'},
+        .extenstion = {' ' , ' ', ' '},
+        .attrs = 0
+    };
+
+    err = fat32_new_seq_c8(dev, slot_ind, &sfn_entry, NULL, &seq_start);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_check_sfn(dev, slot_ind, "NAME    ", "TXT");
+    TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+    err = fat32_check_sfn(dev, slot_ind, "NAME    ", "TX");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_check_sfn(dev, slot_ind, "NME    ", "TXT");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fat32_check_sfn(dev, slot_ind, "OTHER___", "   ");
+    TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+    err = fat32_check_sfn(dev, slot_ind, "OTHER__ ", "   ");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // Now for the lfns...
+    
+    err = fat32_check_lfn_c8(dev, slot_ind, "SomeLongName");
+    TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+    err = fat32_check_lfn_c8(dev, slot_ind, "SomeLongNam");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
     TEST_SUCCEED();
 }
 
@@ -555,7 +601,6 @@ static bool test_fat32_dir_ops1(void) {
 
     TEST_SUCCEED();
 }
-
 
 bool test_fat32_device_dir_functions(void) {
     BEGIN_SUITE("FAT32 Device Dir Functions");

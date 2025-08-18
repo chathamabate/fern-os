@@ -201,7 +201,6 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
     fat_sector[1] = 0x0FFFFFFF;
 
     fat_sector[2] = FAT32_EOC; // Root directory.
-    fat_sector[3] = FAT32_EOC; // README.TXT
 
     for (uint32_t f = 0; f < fat_copies; f++) {
         err = bd_write(bd, offset + reserved_sectors + (f * spf), 1, &fat_sector);
@@ -225,85 +224,13 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
 
     const uint32_t data_section_offset = offset + reserved_sectors + (fat_copies * spf);
     
-    fat32_short_fn_dir_entry_t root_dir[512 / sizeof(fat32_short_fn_dir_entry_t)] = {0};
-
-    // Pointer back to self.
-    root_dir[0] = (fat32_short_fn_dir_entry_t) {
-        .short_fn = {'.', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
-        .extenstion = {' ', ' ', ' '},
-        .attrs = FT32F_ATTR_SUBDIR,
-        .reserved = 0,
-
-        // Creation stuff not speicifed.
-
-        .first_cluster_high = 0,
-        
-        .last_write_time = fat32_time(0, 0, 0),
-        .last_access_date = fat32_date(1, 1, 0),
-
-        .first_cluster_low = 2,
-        .files_size = 0
-    };
-
-    char readme_txt[512] = "First FernOS File!";
-    size_t readme_txt_size = str_len(readme_txt) + 1;
-
-    root_dir[1 /*2*/] = (fat32_short_fn_dir_entry_t) {
-        .short_fn = {'R', 'E', 'A', 'D', 'M', 'E', ' ', ' '},
-        .extenstion = {'T', 'X', 'T'},
-        .attrs = 0,
-        .reserved = 0,
-
-        // Creation stuff not speicifed.
-
-        .first_cluster_high = 0,
-        
-        .last_write_time = fat32_time(0, 0, 0),
-        .last_access_date = fat32_date(1, 0, 0),
-
-        .first_cluster_low = 3,
-        .files_size = readme_txt_size
-    };
-
-    // Example Long Filename directory entry!
-    /*
-    ((fat32_long_fn_dir_entry_t *)root_dir)[1] = (fat32_long_fn_dir_entry_t) {
-        .entry_order = 0x40 | 1,
-
-        .long_fn_0 = { 'a', 'b', 'c', '.', 't' },
-
-        .attrs = 0x0F,
-        .type = 0,
-
-        .short_fn_checksum = fat32_checksum(root_dir[2].short_fn),
-
-        .long_fn_1 = { 'x', 't', 0x0, 0xFFFF, 0xFFFF, 0xFFFF },
-
-        .reserved = {0, 0},
-
-        .long_fn_2 = { 0xFFFF, 0xFFFF }
-    };
-    */
+    fat32_dir_entry_t root_dir[512 / sizeof(fat32_dir_entry_t)] = {0};
+    root_dir[0].raw[0] = FAT32_DIR_ENTRY_TERMINTAOR;
 
     // Remember, the root directory as a whole is more than just one sector!
 
     // Write out root directory.
     err = bd_write(bd, data_section_offset, 1, root_dir);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    // Make sure ALL of the root directory is zeroed out!
-    mem_set(root_dir, 0, sizeof(root_dir));
-    for (uint32_t s = 1; s < sectors_per_cluster; s++) {
-        err = bd_write(bd, data_section_offset + s, 1, root_dir);
-        if (err != FOS_SUCCESS) {
-            return err;
-        }
-    }
-
-    // Write out README.TXT
-    err = bd_write(bd, data_section_offset + (1 * sectors_per_cluster), 1, readme_txt);
     if (err != FOS_SUCCESS) {
         return err;
     }

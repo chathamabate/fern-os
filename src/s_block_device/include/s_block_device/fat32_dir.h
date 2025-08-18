@@ -170,7 +170,7 @@ fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uin
 /**
  * Same as `fat32_check_lfn` except with 8-bit width characters.
  */
-fernos_error_t fat32_check_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn);
+fernos_error_t fat32_check_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const char *lfn);
 
 /**
  * Somewhat up to the implementor what this does.

@@ -787,7 +787,7 @@ fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uin
                 return FOS_UNKNWON_ERROR;
             }
 
-            if (mem_cmp(lfn_buf, lfn, lfn_len + 1)) {
+            if (mem_cmp(lfn_buf, lfn, (lfn_len + 1) * sizeof(uint16_t))) {
                 return FOS_IN_USE;
             }
         }
@@ -799,7 +799,7 @@ fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uin
     return FOS_SUCCESS;
 }
 
-fernos_error_t fat32_check_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn) {
+fernos_error_t fat32_check_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const char *lfn) {
     uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 1];
 
     uint32_t lfn_len = 0;
