@@ -72,7 +72,7 @@ HDRS_INSTALL_TARS := $(addprefix hdrs.install.,$(MODS))
 hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
 
 $(HDRS_INSTALL_TARS): hdrs.install.%:
-	make -C $(MODS_DIR)/$* hdrs.install test_hdrs.install
+	make -C $(MODS_DIR)/$* hdrs.install test_hdrs.install 
 
 # Install Libs (For now we'll just always build the test and normal libs)
 
@@ -128,15 +128,19 @@ $(BIN_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 bin: $(BIN_FILE)
 
 TOY_DISK := $(BUILD_DIR)/hdd.img
-$(TOY_DISK):
-	qemu-img create -f raw $(TOY_DISK) 64M
+$(TOY_DISK): | $(BUILD_DIR)
+	qemu-img create -f raw $(TOY_DISK) 1M
+
+# Used for FAT32 testing.
+ t: $(TOY_DISK)
+	mkfs.fat -F 32 -s 2 $(TOY_DISK)
 
 qemu.bin: $(BIN_FILE) | $(TOY_DISK)
 	qemu-system-x86_64 \
 		-display cocoa,zoom-to-fit=on,full-screen=on \
 		-m 4G \
-		-hda $(TOY_DISK) \
 		-kernel $(BIN_FILE) \
+		-drive file=$(TOY_DISK),format=raw,index=0,media=disk \
 		-monitor stdio
 
 # NOTE: When we start working with disk read/write... I'd really like to figure out ISO packaging!
