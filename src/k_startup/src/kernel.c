@@ -144,7 +144,7 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-    test_fat32_device_dir_functions();
+    test_process();
     lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));

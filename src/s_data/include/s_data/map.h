@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "s_util/err.h"
+#include "s_util/hash.h"
 #include "s_mem/allocator.h"
 
 typedef struct _map_t map_t;
@@ -141,9 +142,6 @@ static inline fernos_error_t mp_next_iter(map_t *mp, const void **key, void **va
 typedef struct _chm_node_header_t chm_node_header_t;
 typedef struct _chained_hash_map_t chained_hash_map_t;
 
-typedef bool (*chm_key_eq_ft)(chained_hash_map_t *chm, const void *k0, const void *k1); 
-typedef uint32_t (*chm_key_hash_ft)(chained_hash_map_t *chm, const void *k);
-
 struct _chm_node_header_t {
 
     /*
@@ -176,8 +174,8 @@ struct _chained_hash_map_t {
     /**
      * Hash and equals functions.
      */
-    const chm_key_eq_ft key_eq;
-    const chm_key_hash_ft key_hash;
+    const equator_ft key_eq;
+    const hasher_ft key_hash;
 
     /**
      * Number of entries in the table.
@@ -198,6 +196,6 @@ struct _chained_hash_map_t {
  * Returns NULL if arguments are bad or if there are insufficient resources!
  */
 map_t *new_chained_hash_map(allocator_t *al, size_t key_size, size_t val_size, uint8_t rat_ind, 
-        chm_key_eq_ft k_eq, chm_key_hash_ft k_hash);
+        equator_ft k_eq, hasher_ft k_hash);
 
 

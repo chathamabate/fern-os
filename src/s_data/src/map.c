@@ -30,7 +30,7 @@ const map_impl_t CHM_IMPL = {
 };
 
 map_t *new_chained_hash_map(allocator_t *al, size_t key_size, size_t val_size, uint8_t rat_ind, 
-        chm_key_eq_ft k_eq, chm_key_hash_ft k_hash) {
+        equator_ft k_eq, hasher_ft k_hash) {
     if (key_size == 0 || !k_eq || !k_hash || rat_ind < 2) {
         return NULL;
     }
@@ -51,8 +51,8 @@ map_t *new_chained_hash_map(allocator_t *al, size_t key_size, size_t val_size, u
     *(allocator_t **)&(chm->al) = al;
 
     *(uint8_t *)&(chm->ratio_index) = rat_ind;
-    *(chm_key_eq_ft *)&(chm->key_eq) = k_eq;
-    *(chm_key_hash_ft *)&(chm->key_hash) = k_hash;
+    *(equator_ft *)&(chm->key_eq) = k_eq;
+    *(hasher_ft *)&(chm->key_hash) = k_hash;
 
     chm->cap = INIT_CAP;
 
@@ -148,7 +148,7 @@ static void chm_try_resize(chained_hash_map_t *chm) {
  * Returns NULL if there is no match!
  */
 static chm_node_header_t *chm_get_node(chained_hash_map_t *chm, const void *key) {
-    uint32_t hash = chm->key_hash(chm, key);
+    uint32_t hash = chm->key_hash(key);
     uint32_t table_ind = hash % chm->cap;
 
     chm_node_header_t *iter = chm->table[table_ind];
@@ -157,7 +157,7 @@ static chm_node_header_t *chm_get_node(chained_hash_map_t *chm, const void *key)
         if (iter->hash == hash) {
             // Remember it goes [header] [key] [value] back to back to back.
             const void *iter_key = (const void *)(iter + 1);
-            if (chm->key_eq(chm, iter_key, key)) {
+            if (chm->key_eq(iter_key, key)) {
                 return iter;
             }
         }
@@ -209,7 +209,7 @@ static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {
 
     // Redundant work here, but whatevs.
 
-    uint32_t hash = chm->key_hash(chm, key);
+    uint32_t hash = chm->key_hash(key);
     const void *new_key_ptr = new_node + 1;
     void *new_val_ptr = (uint8_t *)new_key_ptr + chm->super.key_size;
 
