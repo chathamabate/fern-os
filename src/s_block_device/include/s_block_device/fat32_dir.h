@@ -146,31 +146,36 @@ fernos_error_t fat32_get_dir_seq_lfn_c8(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sfn_entry_offset, char *lfn);
 
 /**
- * This checks if a short filename is in use in a given directory.
+ * This looks for an SFN entry with the given name and extension.
  *
  * `name` should be 8 characters. (Space padded)
  * `ext` should be 3 characters. (Space padded)
  *
- * FOS_SUCCESS is returned if the name extension combo is yet to be used.
- * FOS_IN_USE is returned if the combination already exists in the given directory.
+ * FOS_SUCESS is returned if such a sequence/entry is found. In this case, The offset of
+ * the entry is written to `*sfn_offset`.
+ * FOS_EMPTY is returned if there doesn't exist an entry with the given name extension
+ * combo.
  */
-fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
-        const char *ext);
+fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
+        const char *ext, uint32_t *sfn_offset);
 
 /**
- * This checks if a long filename is in use in a directory.
+ * This looks for a sequence with the given LFN.
  *
- * `lfn` is a NULL terminated string. Shouldn't have length longer than FAT32_MAK_LFN_LEN.
+ * `lfn` is a NULL terminated string. Shouldn't have length no longer than FAT32_MAK_LFN_LEN.
  *
- * FOS_SUCCESS if the name is yet to be used.
- * FOS_IN_USE if the name is already in use.
+ * FOS_SUCCESS is returned if a sequence with the given LFN is found. In this case, the 
+ * offset of the sequences SFN entry is written to `*sfn_offset`.
+ * FOS_EMPTY is returned if no sequence with the given LFN can be found.
  */
-fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn);
+fernos_error_t fat32_find_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn,
+        uint32_t *sfn_offset);
 
 /**
- * Same as `fat32_check_lfn` except with 8-bit width characters.
+ * Same as `fat32_find_lfn` except with 8-bit width characters.
  */
-fernos_error_t fat32_check_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const char *lfn);
+fernos_error_t fat32_find_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const char *lfn,
+        uint32_t *sfn_offset);
 
 /**
  * Somewhat up to the implementor what this does.
