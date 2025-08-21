@@ -151,31 +151,31 @@ fernos_error_t fat32_get_dir_seq_lfn_c8(fat32_device_t *dev, uint32_t slot_ind,
  * `name` should be 8 characters. (Space padded)
  * `ext` should be 3 characters. (Space padded)
  *
- * FOS_SUCESS is returned if such a sequence/entry is found. In this case, The offset of
- * the entry is written to `*sfn_offset`.
+ * FOS_SUCESS is returned if such a sequence/entry is found. In this case, if `seq_start` is given,
+ * the offset of the beginning of the sequence is written to `*seq_start`.
  * FOS_EMPTY is returned if there doesn't exist an entry with the given name extension
  * combo.
  */
 fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
-        const char *ext, uint32_t *sfn_offset);
+        const char *ext, uint32_t *seq_start);
 
 /**
  * This looks for a sequence with the given LFN.
  *
  * `lfn` is a NULL terminated string. Shouldn't have length no longer than FAT32_MAK_LFN_LEN.
  *
- * FOS_SUCCESS is returned if a sequence with the given LFN is found. In this case, the 
- * offset of the sequences SFN entry is written to `*sfn_offset`.
+ * FOS_SUCCESS is returned if a sequence with the given LFN is found. In this case, if `seq_start` is given,
+ * the offset of the beginning of the sequence is written to `*seq_start`.
  * FOS_EMPTY is returned if no sequence with the given LFN can be found.
  */
 fernos_error_t fat32_find_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn,
-        uint32_t *sfn_offset);
+        uint32_t *seq_start);
 
 /**
  * Same as `fat32_find_lfn` except with 8-bit width characters.
  */
 fernos_error_t fat32_find_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const char *lfn,
-        uint32_t *sfn_offset);
+        uint32_t *seq_start);
 
 /**
  * Somewhat up to the implementor what this does.

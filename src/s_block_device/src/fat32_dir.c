@@ -690,8 +690,8 @@ fernos_error_t fat32_get_dir_seq_lfn_c8(fat32_device_t *dev, uint32_t slot_ind,
 }
 
 fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
-        const char *ext, uint32_t *sfn_offset) {
-    if (!name || !ext || !sfn_offset) {
+        const char *ext, uint32_t *seq_start) {
+    if (!name || !ext) {
         return FOS_BAD_ARGS;
     }
 
@@ -700,9 +700,9 @@ fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char
     uint32_t seq_iter = 0;
 
     while (true) {
-        uint32_t seq_start;
+        uint32_t temp_seq_start;
 
-        err = fat32_next_dir_seq(dev, slot_ind, seq_iter, &seq_start);
+        err = fat32_next_dir_seq(dev, slot_ind, seq_iter, &temp_seq_start);
         if (err == FOS_EMPTY) {
             return FOS_EMPTY;
         }
@@ -714,7 +714,7 @@ fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char
         // Ok, now let's get the offset of this sequence's SFN entry.
         uint32_t sfn_entry_offset;
 
-        err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, &sfn_entry_offset);
+        err = fat32_get_dir_seq_sfn(dev, slot_ind, temp_seq_start, &sfn_entry_offset);
         if (err != FOS_SUCCESS) {
             return FOS_UNKNWON_ERROR;
         }
@@ -727,7 +727,9 @@ fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char
 
         if (mem_cmp(name, sfn_entry.short_fn, sizeof(sfn_entry.short_fn)) &&
                 mem_cmp(ext, sfn_entry.extenstion, sizeof(sfn_entry.extenstion))) {
-            *sfn_offset = sfn_entry_offset;
+            if (seq_start) {
+                *seq_start = temp_seq_start;
+            }
             return FOS_SUCCESS;
         }
 
@@ -736,8 +738,8 @@ fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char
 }
 
 fernos_error_t fat32_find_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn,
-        uint32_t *sfn_offset) {
-    if (!lfn || !sfn_offset) {
+        uint32_t *seq_start) {
+    if (!lfn) {
         return FOS_BAD_ARGS;
     }
 
@@ -762,8 +764,8 @@ fernos_error_t fat32_find_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint
     uint32_t seq_iter = 0;
 
     while (true) {
-        uint32_t seq_start;
-        err = fat32_next_dir_seq(dev, slot_ind, seq_iter, &seq_start); 
+        uint32_t temp_seq_start;
+        err = fat32_next_dir_seq(dev, slot_ind, seq_iter, &temp_seq_start); 
         if (err == FOS_EMPTY) {
             return FOS_EMPTY;
         }
@@ -773,7 +775,7 @@ fernos_error_t fat32_find_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint
         }
 
         uint32_t sfn_entry_offset;
-        err = fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, &sfn_entry_offset);
+        err = fat32_get_dir_seq_sfn(dev, slot_ind, temp_seq_start, &sfn_entry_offset);
         if (err != FOS_SUCCESS)  {
             return FOS_UNKNWON_ERROR;
         }
@@ -787,7 +789,9 @@ fernos_error_t fat32_find_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint
             }
 
             if (mem_cmp(lfn_buf, lfn, (lfn_len + 1) * sizeof(uint16_t))) {
-                *sfn_offset = sfn_entry_offset;
+                if (seq_start) {
+                    *seq_start = temp_seq_start;
+                }
                 return FOS_SUCCESS;
             }
         }
@@ -800,7 +804,7 @@ fernos_error_t fat32_find_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint
 }
 
 fernos_error_t fat32_find_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const char *lfn,
-        uint32_t *sfn_offset) {
+        uint32_t *seq_start) {
     uint16_t lfn_buf[FAT32_MAX_LFN_LEN + 1];
 
     uint32_t lfn_len = 0;
@@ -816,7 +820,7 @@ fernos_error_t fat32_find_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const c
 
     lfn_buf[lfn_len] = 0;
 
-    return fat32_find_lfn(dev, slot_ind, lfn_buf, sfn_offset);
+    return fat32_find_lfn(dev, slot_ind, lfn_buf, seq_start);
 }
 
 void fat32_dump_dir(fat32_device_t *dev, uint32_t slot_ind, void (*pf)(const char *fmt, ...)) {
