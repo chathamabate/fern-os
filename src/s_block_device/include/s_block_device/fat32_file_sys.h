@@ -1,0 +1,33 @@
+
+#pragma once
+
+#include "s_block_device/fat32.h"
+#include "s_block_device/fat32_dir.h"
+#include "s_block_device/file_sys.h"
+#include "s_mem/allocator.h"
+
+typedef struct _fat32_file_sys_t {
+    file_sys_t super;
+
+    allocator_t * const al;
+
+    fat32_device_t * const dev;
+} fat32_file_sys_t;
+
+/**
+ * Create a new fat32 file system object by parsing a FAT32 formatted block device.
+ * `offset` should be the very beginning of the parition in `bd`. (unit of sectors)
+ *
+ * `dubd` stands for "delete underlying block device". If true, when this file system is deleted,
+ * so will the given block device. Otherwise, the given block device will persist past the lifetime
+ * of the file system object.
+ *
+ * On success, FOS_SUCCESS is returned, the created file system is written to `*fs_out`.
+ */
+fernos_error_t parse_new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset,
+        uint64_t seed, bool dubd, file_sys_t **fs_out);
+
+static inline fernos_error_t parse_new_da_fat32_file_sys(block_device_t *bd, uint32_t offset,
+        uint64_t seed, bool dubd, file_sys_t **fs_out) {
+    return parse_new_fat32_file_sys(get_default_allocator(), bd, offset, seed, dubd, fs_out);
+}

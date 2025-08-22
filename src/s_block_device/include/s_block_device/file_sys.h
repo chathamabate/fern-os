@@ -105,9 +105,13 @@ typedef struct _fs_node_info_t {
     size_t len;
 } fs_node_info_t;
 
-typedef struct _file_sys_t file_sys_t;
+typedef struct _file_sys_impl_t file_sys_impl_t;
 
-struct _file_sys_t {
+typedef struct _file_sys_t {
+    const file_sys_impl_t * const impl;
+} file_sys_t;
+
+struct _file_sys_impl_t {
     // OPTIONAL
     fernos_error_t (*fs_flush)(file_sys_t *fs, fs_node_key_t key);
 
@@ -126,6 +130,8 @@ struct _file_sys_t {
     fernos_error_t (*fs_resize)(file_sys_t *fs, fs_node_key_t file_key, size_t bytes);
 };
 
+
+
 /**
  * Flush! (What this means/does is up to the implementor)
  *
@@ -133,8 +139,8 @@ struct _file_sys_t {
  * Otherwise, this should at least flush the file pointed to by `key`.
  */
 static inline fernos_error_t fs_flush(file_sys_t *fs, fs_node_key_t key) {
-    if (fs->fs_flush) {
-        return fs->fs_flush(fs, key);
+    if (fs->impl->fs_flush) {
+        return fs->impl->fs_flush(fs, key);
     }
 
     return FOS_SUCCESS;
@@ -147,7 +153,7 @@ static inline fernos_error_t fs_flush(file_sys_t *fs, fs_node_key_t key) {
  */
 static inline void delete_file_sys(file_sys_t *fs) {
     if (fs) {
-        fs->delete_file_sys(fs);
+        fs->impl->delete_file_sys(fs);
     }
 }
 
@@ -164,7 +170,7 @@ static inline void delete_file_sys(file_sys_t *fs) {
  */
 static inline fernos_error_t fs_new_key(file_sys_t *fs, fs_node_key_t cwd, 
         const char *path, fs_node_key_t *key) {
-    return fs->fs_new_key(fs, cwd, path, key);
+    return fs->impl->fs_new_key(fs, cwd, path, key);
 }
 
 /**
@@ -173,28 +179,28 @@ static inline fernos_error_t fs_new_key(file_sys_t *fs, fs_node_key_t cwd,
  * This should always succeed!
  */
 static inline void fs_delete_key(file_sys_t *fs, fs_node_key_t key) {
-    fs->fs_delete_key(fs, key);
+    fs->impl->fs_delete_key(fs, key);
 }
 
 /**
  * Get a function pointer which can be used to tell if two keys are semantically equal!
  */
 static inline equator_ft fs_get_key_equator(file_sys_t *fs) {
-    return fs->fs_get_key_equator(fs);
+    return fs->impl->fs_get_key_equator(fs);
 }
 
 /**
  * Get a function pointer which can be used to calculate a key's hash value.
  */
 static inline hasher_ft fs_get_key_hasher(file_sys_t *fs) {
-    return fs->fs_get_key_hasher(fs);
+    return fs->impl->fs_get_key_hasher(fs);
 }
 
 /**
  * Retrieve information about a specific node.
  */
 static inline fernos_error_t fs_get_node_info(file_sys_t *fs, fs_node_key_t key, fs_node_info_t *info) {
-    return fs->fs_get_node_info(fs, key, info);
+    return fs->impl->fs_get_node_info(fs, key, info);
 }
 
 /**
@@ -209,7 +215,7 @@ static inline fernos_error_t fs_get_node_info(file_sys_t *fs, fs_node_key_t key,
  */
 static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, 
         const char *name, fs_node_key_t *key) {
-    return fs->fs_touch(fs, parent_dir, name, key);
+    return fs->impl->fs_touch(fs, parent_dir, name, key);
 }
 
 /**
@@ -224,7 +230,7 @@ static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir,
  */
 static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir, 
         const char *name, fs_node_key_t *key) {
-    return fs->fs_mkdir(fs, parent_dir, name, key);
+    return fs->impl->fs_mkdir(fs, parent_dir, name, key);
 }
 
 /**
@@ -237,7 +243,7 @@ static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir,
  * On success, FOS_SUCCESS is returned and the specified node is deleted from the file system.
  */
 static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, const char *name) {
-    return fs->fs_remove(fs, parent_dir, name);
+    return fs->impl->fs_remove(fs, parent_dir, name);
 }
 
 /**
@@ -252,7 +258,7 @@ static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir,
  */
 static inline fernos_error_t fs_get_child_name(file_sys_t *fs, fs_node_key_t parent_dir, 
         size_t index, char *name) {
-    return fs->fs_get_child_name(fs, parent_dir, index, name);
+    return fs->impl->fs_get_child_name(fs, parent_dir, index, name);
 }
 
 /**
@@ -267,7 +273,7 @@ static inline fernos_error_t fs_get_child_name(file_sys_t *fs, fs_node_key_t par
  */
 static inline fernos_error_t fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, 
         size_t bytes, void *dest) {
-    return fs->fs_read(fs, file_key, offset, bytes, dest);
+    return fs->impl->fs_read(fs, file_key, offset, bytes, dest);
 }
 
 /**
@@ -283,7 +289,7 @@ static inline fernos_error_t fs_read(file_sys_t *fs, fs_node_key_t file_key, siz
  */
 static inline fernos_error_t fs_write(file_sys_t *fs, fs_node_key_t file_key, size_t offset, 
         size_t bytes, const void *src) {
-    return fs->fs_write(fs, file_key, offset, bytes, src);
+    return fs->impl->fs_write(fs, file_key, offset, bytes, src);
 }
 
 /**
@@ -296,5 +302,5 @@ static inline fernos_error_t fs_write(file_sys_t *fs, fs_node_key_t file_key, si
  * On success, FOS_SUCCESS is returned, the given file will have exact size `bytes`.
  */
 static inline fernos_error_t fs_resize(file_sys_t *fs, fs_node_key_t file_key, size_t bytes) {
-    return fs->fs_resize(fs, file_key, bytes);
+    return fs->impl->fs_resize(fs, file_key, bytes);
 }
