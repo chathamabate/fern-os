@@ -1,5 +1,6 @@
 
 #include "s_block_device/file_sys.h"
+#include "s_util/str.h"
 
 static bool fn_char_map_ready = false;
 static bool fn_char_map[256];
@@ -110,6 +111,41 @@ bool is_valid_path(const char *path) {
             fn_start = i + 1;
         } else if (!fn_char_map[(uint8_t)c]) {
             return false; // An invalid character.
+        }
+    }
+}
+
+size_t next_filename(const char *path, char *dest) {
+    size_t fn_start = 0;
+
+    // Skip leading slash.
+    if (path[0] == '/') {
+        fn_start = 1;
+    }
+
+    for (size_t i = fn_start; ; i++) {
+        char c = path[i];
+
+        if (c == '\0' || c == '/') {
+            // Empty Path case.
+            if (i == 0) {
+                dest[0] = '\0';
+                return 0;
+            }
+
+            // Root dir path case.
+            if (i == fn_start) {
+                dest[0] = '\0';
+                return 0;
+            }
+
+            // Otherwise, an actual filename was traversed.
+
+            size_t len = i - fn_start;
+            mem_cpy(dest, &(path[fn_start]), len);
+            dest[len] = '\0';
+
+            return i;
         }
     }
 }

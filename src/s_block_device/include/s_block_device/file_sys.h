@@ -38,6 +38,20 @@ bool is_valid_filename(const char *fn);
 bool is_valid_path(const char *path);
 
 /**
+ * Given a VALID OR EMPTY path, write it's next filename part into `*dest`.
+ * `dest` should point to a buffer with length at least (FS_MAX_FILENAME_LEN + 1).
+ *
+ * Returns the index into path of the first character of the rest path.
+ *
+ * For example `next_filename("/a/b", d)` would write "a" (with NT) into `dest` and
+ * return 2. If the path has no filenames (i.e. an empty string or just "/"), 
+ * '\0' is written to `dest` and 0 is returned.
+ *
+ * Undefined behavior if the path is Non-empty and invalid.
+ */
+size_t next_filename(const char *path, char *dest);
+
+/**
  * A Node key is an immutable piece of data which can be used to efficiently reference a 
  * file or directory.
  * 
