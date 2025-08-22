@@ -33,7 +33,7 @@ bool is_valid_filename(const char *fn) {
         init_fn_char_map();
     }
 
-    for (uint32_t i = 0; i < FS_MAX_FILENAME_LEN; i++) {
+    for (size_t i = 0; ; i++) {
         char c = fn[i];
 
         // Reached the end of the string without issues!
@@ -41,12 +41,75 @@ bool is_valid_filename(const char *fn) {
             return true;
         }
 
+        if (i == FS_MAX_FILENAME_LEN) {
+            return false;
+        }
+
         // Found a bad character!
         if (!fn_char_map[(uint8_t)c]) {
             return false;
         }
     }
+}
 
-    // Only return true if we actually reached the end of the string!
-    return fn[FS_MAX_FILENAME_LEN] == '\0';
+bool is_valid_path(const char *path) {
+    if (!fn_char_map_ready) {
+        init_fn_char_map();
+    }
+
+    // For a path to be valid:
+    // The length of the entire path string must not exceed FS_MAX_PATH_LEN.
+    // A path is just a list of valid filenames separated by SINGLE "/"'s
+    // A path can optionally both end and start with "/"'s
+    // "" is an invalid path. "/" is a valid path.
+
+    // Where to begin iteration from.
+    size_t start = 0;
+
+    // The start of the filenmae we are currently iterating over.
+    size_t fn_start = 0;
+    
+    if (path[0] == '/') {
+        start = 1;
+        fn_start = 1;
+    }
+
+    for (size_t i = start; ; i++) {
+        char c = path[i];
+
+        if (c == '\0') {
+            if (i == 0) {
+                return false; // Empty paths are always invalid.
+            }
+
+            // Was the final name too long? This should work even if the path ends with a 
+            // "/".
+            if (i - fn_start > FS_MAX_FILENAME_LEN) {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (i == FS_MAX_PATH_LEN) {
+            return false; // Our path is too large!
+        }
+
+        if (c == '/') {
+            if (fn_start == i) {
+                // We expected this character to be part of a valid file name!
+                return false;
+            }
+
+            // The name we just completed parsing is too large!
+            if (i - fn_start > FS_MAX_FILENAME_LEN) {
+                return false;
+            }
+
+            // The next filename should start after this slash.
+            fn_start = i + 1;
+        } else if (!fn_char_map[(uint8_t)c]) {
+            return false; // An invalid character.
+        }
+    }
 }

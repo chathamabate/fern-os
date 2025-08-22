@@ -37,7 +37,6 @@ bool is_valid_filename(const char *fn);
  */
 bool is_valid_path(const char *path);
 
-
 /**
  * A Node key is an immutable piece of data which can be used to efficiently reference a 
  * file or directory.
