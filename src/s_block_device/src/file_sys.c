@@ -58,12 +58,6 @@ bool is_valid_path(const char *path) {
         init_fn_char_map();
     }
 
-    // For a path to be valid:
-    // The length of the entire path string must not exceed FS_MAX_PATH_LEN.
-    // A path is just a list of valid filenames separated by SINGLE "/"'s
-    // A path can optionally both end and start with "/"'s
-    // "" is an invalid path. "/" is a valid path.
-
     // Where to begin iteration from.
     size_t start = 0;
 
@@ -148,4 +142,20 @@ size_t next_filename(const char *path, char *dest) {
             return i;
         }
     }
+}
+
+bool is_relative(const char *path) {
+    if (path[0] == '/') {
+        return false;
+    }
+
+    // Since we know path is valid, this means it must have at least 1 filename component
+    // if it's not the root path.
+
+    char fn_buf[FS_MAX_FILENAME_LEN + 1];
+
+    next_filename(path, fn_buf);
+
+    return mem_cmp(fn_buf, ".", 2) || 
+        mem_cmp(fn_buf, "..", 3);
 }

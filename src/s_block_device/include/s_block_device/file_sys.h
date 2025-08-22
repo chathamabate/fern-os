@@ -25,6 +25,12 @@
  * NOTE: The below two functions just check characters and lengths are expected.
  * A filename/path being "valid" has nothing to do with whether or not said
  * filename/path actually points to an existing location.
+ * 
+ *  For a path to be valid:
+ * The length of the entire path string must not exceed FS_MAX_PATH_LEN.
+ * A path is just a list of valid filenames separated by SINGLE "/"'s
+ * A path can optionally both end and start with "/"'s
+ * "" is an invalid path. "/" is a valid path.
  */
 
 /**
@@ -50,6 +56,14 @@ bool is_valid_path(const char *path);
  * Undefined behavior if the path is Non-empty and invalid.
  */
 size_t next_filename(const char *path, char *dest);
+
+/**
+ * Given a valid path, return true iff the path is relative.
+ *
+ * A path is relative iff it doesn't start with '/' AND it's first filename is "." or "..".
+ */
+bool is_relative(const char *path);
+
 
 /**
  * A Node key is an immutable piece of data which can be used to efficiently reference a 
@@ -80,19 +94,50 @@ typedef struct _fs_node_info_t {
     /**
      * For a file, this is the length of the file in bytes.
      * For a directory, this is the number of entries within the directory.
-     * NOTE: All directories have a length of at least 2. (All directories have entries for 
-     * "." and "..")
+     *
+     * NOTE: For directories, this includes its relative entries. For example, an empty non-root
+     * directory will always have length 2 (for "." and "..").
      */
     size_t len;
 } fs_node_info_t;
 
-typedef struct _fs_t {
+typedef struct _file_sys_t {
     uint8_t dummy; 
-} fs_t;
+} file_sys_t;
+
+/**
+ * Flush! (What this means/does is up to the implementor)
+ *
+ * If `key` is NULL, this should flush the entire file system.
+ * Otherwise, this should at least flush the file pointed to by `key`.
+ */
+fernos_error_t fs_flush(fs_node_key_t key);
 
 /**
  * Delete the file system.
+ *
+ * As I want this to always succeed, this DOES NOT FLUSH. Make sure to always flush before deleting!
  */
-void delete_file_sys(fs_t *fs);
+void delete_file_sys(file_sys_t *fs);
+
+/**
+ * Get a new key which references the described file/directory.
+ *
+ * `cwd` will be the "current working directory" key. If `path` is relative, the node search will
+ * start at this directory. 
+ * If you know `path` is absolute, `cwd` can be NULL signifying no relative starting point.
+ *
+ * On success, FOS_SUCCESS is returned and the new key is written to `*key`.
+ * If `path` does not point to an existing file, FOS_EMPTY is returned.
+ * If `path` is relative and `cwd` is NULL, FOS_BAD_ARGS is returned.
+ */
+fernos_error_t fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key);
+
+/**
+ * Delete a key which was allocated using the `fs_new_key` function.
+ *
+ * This should always succeed!
+ */
+void fs_delete_key(file_sys_t *fs, fs_node_key_t key);
 
 
