@@ -130,8 +130,6 @@ struct _file_sys_impl_t {
     fernos_error_t (*fs_resize)(file_sys_t *fs, fs_node_key_t file_key, size_t bytes);
 };
 
-
-
 /**
  * Flush! (What this means/does is up to the implementor)
  *

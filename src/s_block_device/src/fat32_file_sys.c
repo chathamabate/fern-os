@@ -96,6 +96,35 @@ static void delete_fat32_file_sys(file_sys_t *fs) {
 }
 
 static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key) {
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_device_t *dev = fat32_fs->dev;
+
+    if (!path || !key) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (!is_valid_path(path)) {
+        return FOS_BAD_ARGS; // given path must be valid.
+    }
+
+    uint32_t dir_slot_ind;
+
+    if (path[0] == '/') {
+        dir_slot_ind = dev->root_dir_cluster;
+    } else {
+        // relative path.
+
+        if (!cwd) {
+            return FOS_BAD_ARGS;
+        }
+
+        // Ok, how do we even do this BS??
+        // Traversing a path could be a good function..
+        // Although, that's basically what this does tbh...
+        // We could consider doing some other functions first just to get the hang of things???
+    }
+
+    // Oof this is going to be slightly difficult to write.
     return FOS_NOT_IMPLEMENTED;
 }
 
