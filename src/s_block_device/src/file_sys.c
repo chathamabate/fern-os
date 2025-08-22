@@ -143,19 +143,3 @@ size_t next_filename(const char *path, char *dest) {
         }
     }
 }
-
-bool is_relative(const char *path) {
-    if (path[0] == '/') {
-        return false;
-    }
-
-    // Since we know path is valid, this means it must have at least 1 filename component
-    // if it's not the root path.
-
-    char fn_buf[FS_MAX_FILENAME_LEN + 1];
-
-    next_filename(path, fn_buf);
-
-    return mem_cmp(fn_buf, ".", 2) || 
-        mem_cmp(fn_buf, "..", 3);
-}
