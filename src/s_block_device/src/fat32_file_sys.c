@@ -44,14 +44,55 @@ static const file_sys_impl_t FAT32_FS_IMPL = {
 
 fernos_error_t parse_new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset,
         uint64_t seed, bool dubd, file_sys_t **fs_out) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!al || !bd || !fs_out) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    fat32_file_sys_t *fat32_fs = al_malloc(al, sizeof(fat32_file_sys_t));
+    if (!fat32_fs) {
+        return FOS_NO_MEM;
+    }
+
+    fat32_device_t *dev;
+
+    err = parse_new_fat32_device(al, bd, offset, seed, dubd, &dev);
+    if (err != FOS_SUCCESS) {
+        al_free(al, fat32_fs);
+        return err;
+    }
+
+    *(const file_sys_impl_t **)&(fat32_fs->super.impl) = &FAT32_FS_IMPL;
+    *(allocator_t **)&(fat32_fs->al) = al;
+    *(fat32_device_t **)&(fat32_fs->dev) = dev;
+    
+    *fs_out = (file_sys_t *)fat32_fs;
+    return FOS_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_flush(file_sys_t *fs, fs_node_key_t key) {
-    return FOS_NOT_IMPLEMENTED;
+    (void)key;
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+
+    fernos_error_t err;
+
+    if (key == NULL) {
+        // If the a full flush was requested, we will also sync the fats!
+        err = fat32_sync_fats(fat32_fs->dev);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+    
+    return fat32_flush(fat32_fs->dev);
 }
 
 static void delete_fat32_file_sys(file_sys_t *fs) {
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+
+    delete_fat32_device(fat32_fs->dev);
+    al_free(fat32_fs->al, fat32_fs);
 }
 
 static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key) {

@@ -14,6 +14,29 @@ typedef struct _fat32_file_sys_t {
     fat32_device_t * const dev;
 } fat32_file_sys_t;
 
+typedef struct _fat32_fs_node_key_val_t {
+    /**
+     * Index into the FAT of the parent directories starting cluster.
+     *
+     * If this is the root directory, this will be 0.
+     */
+    const uint32_t parent_slot_ind;
+
+    /**
+     * Index into the parent directory of this node's SFN entry.
+     *
+     * If this is the root directory, this will be 0.
+     */
+    const uint32_t sfn_entry_offset;
+
+    /**
+     * Whether or not the node pointed to by this key is a directory.
+     */
+    const bool is_dir;
+} fat32_fs_node_key_val_t;
+
+typedef const fat32_fs_node_key_val_t *fat32_fs_node_key_t;
+
 /**
  * Create a new fat32 file system object by parsing a FAT32 formatted block device.
  * `offset` should be the very beginning of the parition in `bd`. (unit of sectors)
@@ -23,6 +46,7 @@ typedef struct _fat32_file_sys_t {
  * of the file system object.
  *
  * On success, FOS_SUCCESS is returned, the created file system is written to `*fs_out`.
+ * On failure, the given block device will NEVER be deleteed.
  */
 fernos_error_t parse_new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset,
         uint64_t seed, bool dubd, file_sys_t **fs_out);
