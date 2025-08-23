@@ -165,6 +165,8 @@ static inline void delete_file_sys(file_sys_t *fs) {
  * On success, FOS_SUCCESS is returned and the new key is written to `*key`.
  * If `path` does not point to an existing file, FOS_EMPTY is returned.
  * If `path` is relative and `cwd` is NULL, FOS_BAD_ARGS is returned.
+ * If `cwd` is given, and doesn't point to a directory, FOS_STATE_MISMATCH is returned.
+ * If the given `path` points to a file mid-path, FOS_STATE_MISMATCH is returned.
  */
 static inline fernos_error_t fs_new_key(file_sys_t *fs, fs_node_key_t cwd, 
         const char *path, fs_node_key_t *key) {

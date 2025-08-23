@@ -43,7 +43,7 @@ typedef struct _fernos_time_t {
     uint8_t hours;
 
     /**
-     * 0 - 60
+     * 0 - 59
      */
     uint8_t seconds; 
 } fernos_time_t;
@@ -55,3 +55,5 @@ typedef struct _fernos_datetime_t {
     fernos_date_t d;
     fernos_time_t t;
 } fernos_datetime_t;
+
+typedef void (*dt_producer_ft)(fernos_datetime_t *dt);

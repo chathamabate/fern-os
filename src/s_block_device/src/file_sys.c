@@ -39,7 +39,8 @@ bool is_valid_filename(const char *fn) {
 
         // Reached the end of the string without issues!
         if (c == '\0') {
-            return true;
+            // Only valid if are string is non-empty.
+            return i > 0;
         }
 
         if (i == FS_MAX_FILENAME_LEN) {

@@ -5,6 +5,7 @@
 #include "s_block_device/fat32_dir.h"
 #include "s_block_device/file_sys.h"
 #include "s_mem/allocator.h"
+#include "s_util/datetime.h"
 
 typedef struct _fat32_file_sys_t {
     file_sys_t super;
@@ -12,28 +13,44 @@ typedef struct _fat32_file_sys_t {
     allocator_t * const al;
 
     fat32_device_t * const dev;
+
+    const dt_producer_ft now;
 } fat32_file_sys_t;
 
 typedef struct _fat32_fs_node_key_val_t {
     /**
+     * Whether or not the node pointed to by this key is a directory.
+     */
+    const bool is_dir;
+
+    /**
      * Index into the FAT of the parent directories starting cluster.
      *
-     * If this is the root directory, this will be 0.
+     * ONLY USED if `is_dir` is FALSE.
      */
     const uint32_t parent_slot_ind;
 
     /**
      * Index into the parent directory of this node's SFN entry.
      *
-     * If this is the root directory, this will be 0.
+     * ONLY USED if `is_dir` is FALSE.
      */
     const uint32_t sfn_entry_offset;
 
     /**
-     * Whether or not the node pointed to by this key is a directory.
+     * The index into the FAT of the first cluster of this node.
      */
-    const bool is_dir;
+    const uint32_t starting_slot_ind;
 } fat32_fs_node_key_val_t;
+
+/*
+ * NOTE: This implementation is pretty simple.
+ *
+ * Most notably, to avoid some annoying back tracking code, directory timestamps ARE NOT USED.
+ * Created directories will be given timestamps of 0.
+ *
+ * Only actual data files will have their timestamp information updated.
+ */
 
 typedef const fat32_fs_node_key_val_t *fat32_fs_node_key_t;
 
@@ -49,9 +66,9 @@ typedef const fat32_fs_node_key_val_t *fat32_fs_node_key_t;
  * On failure, the given block device will NEVER be deleteed.
  */
 fernos_error_t parse_new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset,
-        uint64_t seed, bool dubd, file_sys_t **fs_out);
+        uint64_t seed, bool dubd, dt_producer_ft now, file_sys_t **fs_out);
 
 static inline fernos_error_t parse_new_da_fat32_file_sys(block_device_t *bd, uint32_t offset,
-        uint64_t seed, bool dubd, file_sys_t **fs_out) {
-    return parse_new_fat32_file_sys(get_default_allocator(), bd, offset, seed, dubd, fs_out);
+        uint64_t seed, bool dubd, dt_producer_ft now, file_sys_t **fs_out) {
+    return parse_new_fat32_file_sys(get_default_allocator(), bd, offset, seed, dubd, now, fs_out);
 }
