@@ -309,6 +309,75 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
 }
 
 static fernos_error_t fat32_fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key) {
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_device_t *dev = fat32_fs->dev;
+
+    if (!name || !parent_dir || !key) {
+        return FOS_BAD_ARGS;
+    }
+
+    fat32_fs_node_key_t pd = (fat32_fs_node_key_t)parent_dir;
+
+    if (!(pd->is_dir)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    // Ok, now we need to check the filename given.
+
+    if (!is_valid_filename(name)) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+    uint32_t seq_start;
+
+    err = fat32_find_lfn_c8(dev, pd->starting_slot_ind, name, &seq_start);
+    if (err == FOS_SUCCESS) {
+        return FOS_IN_USE;
+    }
+
+    if (err != FOS_EMPTY) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    // Now we have a valid filenmae which does not appear in the given directory.
+    // We must write it into the parent directory!
+
+    // Get the current datetime.
+    fernos_datetime_t now;
+    fat32_fs->now(&now);
+
+    fat32_date_t fat32_d;
+    fat32_time_t fat32_t;
+
+    fos_datetime_to_fat32_datetime(now, &fat32_d, &fat32_t);
+
+    fat32_short_fn_dir_entry_t sfn_entry = {
+        .creation_date = fat32_d,
+        .creation_time = fat32_t,
+        .creation_time_hundredths = 0,
+        .files_size = 0,
+        .last_write_date = fat32_d,
+        .last_write_time = fat32_t,
+        .last_access_date = 0, // we aren't going to use last access date in this impl.
+        
+        // We need to fill these in before doing anything else.
+        .short_fn = { 0 },
+        .extenstion = {' ', ' ', ' '},
+
+        .first_cluster_high = 0,
+        .first_cluster_low = 0,
+    };
+
+    while (true) {
+        // Let's generate a random SFN which is yet to be used in the given directory.
+
+        // I think we are going to want to factor out a lot of this tbh...
+        // This will mostly be the same between directory and file creation.
+    }
+
+
+
     return FOS_NOT_IMPLEMENTED;
 }
 
