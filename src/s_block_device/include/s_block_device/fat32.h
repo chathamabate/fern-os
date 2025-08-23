@@ -7,6 +7,7 @@
 #include "s_mem/allocator.h"
 #include "s_data/list.h"
 #include "s_util/rand.h"
+#include "s_util/datetime.h"
 
 /**
  * No slot entry ever uses the upper 4 bits. I believe these are reserved for the OS.
@@ -296,6 +297,18 @@ static inline fat32_date_t fat32_date(uint8_t month, uint8_t day, uint8_t year) 
     return date;
 }
 
+static inline void fat32_date_to_fos_date(fat32_date_t d, fernos_date_t *out) {
+    out->year = 1980 + fat32_date_get_year(d); 
+    out->month = fat32_date_get_month(d);
+    out->day = fat32_date_get_day(d);
+}
+
+static inline void fos_date_to_fat32_date(fernos_date_t d, fat32_date_t *out) {
+    fat32_date_set_year(out, d.year - 1980);
+    fat32_date_set_month(out, d.month);
+    fat32_date_set_day(out, d.day);
+}
+
 /**
  * [0:4] Seconds / 2 (0-29)
  * [5:10] Minutes  (0-59)
@@ -367,6 +380,28 @@ static inline fat32_time_t fat32_time(uint8_t hours, uint8_t mins, uint8_t secs)
     return time;
 }
 
+static inline void fat32_time_to_fos_time(fat32_time_t t, fernos_time_t *out) {
+    out->hours = fat32_time_get_hours(t); 
+    out->minutes = fat32_time_get_mins(t);
+    out->seconds = fat32_time_get_seconds(t) * 2;
+}
+
+static inline void fos_time_to_fat32_time(fernos_time_t t, fat32_time_t *out) {
+    fat32_time_set_hours(out, t.hours);
+    fat32_time_set_mins(out, t.minutes);
+    fat32_time_set_secs(out, t.seconds / 2);
+}
+
+static inline void fat32_datetime_to_fos_datetime(fat32_date_t d, fat32_time_t t, fernos_datetime_t *out) {
+    fat32_date_to_fos_date(d, &(out->d));
+    fat32_time_to_fos_time(t, &(out->t));
+}
+
+static inline void fos_datetime_to_fat32_datetime(fernos_datetime_t dt, fat32_date_t *out_d, fat32_time_t *out_t) {
+    fos_date_to_fat32_date(dt.d, out_d);
+    fos_time_to_fat32_time(dt.t, out_t);
+}
+
 /*
  * Now for Directory entries.
  */
@@ -409,7 +444,7 @@ typedef struct _fat32_short_fn_dir_entry_t {
     uint16_t first_cluster_high;
     
     /**
-     * Required.
+     * Optional
      */
     fat32_time_t last_write_time;
     fat32_date_t last_write_date;

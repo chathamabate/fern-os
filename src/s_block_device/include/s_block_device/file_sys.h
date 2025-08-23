@@ -80,6 +80,8 @@ typedef const void *fs_node_key_t;
 typedef struct _fs_node_info_t {
     /**
      * Datetime of when the node was created.
+     *
+     * OPTIONAL
      */
     fernos_datetime_t creation_dt;
 
@@ -88,11 +90,15 @@ typedef struct _fs_node_info_t {
      *
      * For a file, this is when the file was last written to.
      * For a directory, this is the last time of file within the directory was created or deleted.
+     *
+     * OPTIONAL
      */
     fernos_datetime_t last_edited_dt;
 
     /**
      * True iff this points to a directory node.
+     *
+     * REQUIRED
      */
     bool is_dir;
 
@@ -101,6 +107,8 @@ typedef struct _fs_node_info_t {
      * For a directory, this is the number of entries within the directory.
      *
      * NOTE: For directories, this includes its relative entries. ("." and "..")
+     *
+     * REQUIRED
      */
     size_t len;
 } fs_node_info_t;
@@ -179,7 +187,9 @@ static inline fernos_error_t fs_new_key(file_sys_t *fs, fs_node_key_t cwd,
  * This should always succeed!
  */
 static inline void fs_delete_key(file_sys_t *fs, fs_node_key_t key) {
-    fs->impl->fs_delete_key(fs, key);
+    if (key) {
+        fs->impl->fs_delete_key(fs, key);
+    }
 }
 
 /**

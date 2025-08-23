@@ -158,6 +158,7 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
                 *(uint32_t *)&(nk->sfn_entry_offset) = prev_sfn_offset;
             }
 
+
             *(bool *)&(nk->is_dir) = is_dir;
             *(uint32_t *)&(nk->starting_slot_ind) = curr_ind; 
 
@@ -168,6 +169,8 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
 
         // Ok, otherwise there is more to traverse.
      
+        path_str_offset += path_processed;
+
         if (!is_dir) { // The current node MUST be a directory for us to continue.
             return FOS_STATE_MISMATCH;
         }
@@ -201,16 +204,70 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
 }
 
 static void fat32_fs_delete_key(file_sys_t *fs, fs_node_key_t key) {
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_fs_node_key_t nk = (fat32_fs_node_key_t)key;
+
+    al_free(fat32_fs->al, (void *)nk);
+}
+
+static bool fat32_fs_key_equator(const void *k0, const void *k1) {
+    fat32_fs_node_key_t nk0 = *(const fat32_fs_node_key_t *)k0;
+    fat32_fs_node_key_t nk1 = *(const fat32_fs_node_key_t *)k1;
+
+    // Given both these keys were created using the valid fat32_fs endpoints, 
+    // we can safely just compare each node's starting cluster index.
+    return (nk0->starting_slot_ind == nk1->starting_slot_ind);
 }
 
 static equator_ft fat32_fs_get_key_equator(file_sys_t *fs) {
+    (void)fs;
+
+    return fat32_fs_key_equator;
+}
+
+static uint32_t fat32_fs_key_hasher(const void *k) {
+    fat32_fs_node_key_t nk = *(const fat32_fs_node_key_t *)k;
+
+    // Some random hash function.
+    return (((nk->starting_slot_ind * 31) + 11) * 7) + 3;
 }
 
 static hasher_ft fat32_fs_get_key_hasher(file_sys_t *fs) {
+    (void)fs;
+
+    return fat32_fs_key_hasher;
 }
 
 static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, fs_node_info_t *info) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!key || !info) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_device_t *dev = fat32_fs->dev;
+    fat32_fs_node_key_t nk = (fat32_fs_node_key_t)key;
+
+    if (nk->is_dir) {
+        // Remember this implementation doesn't give directory edited/creation times.
+        info->creation_dt = (fernos_datetime_t) { 0 };
+        info->last_edited_dt = (fernos_datetime_t) { 0 };
+    } else {
+        fat32_dir_entry_t entry;
+
+        err = fat32_read_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, &entry);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        info->creation_dt.d.
+
+    }
+
+    err = fat32_read_dir_entry(fat32_fs->dev, nk->
+
+    return FOS_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key) {

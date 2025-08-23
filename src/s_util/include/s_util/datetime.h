@@ -45,6 +45,11 @@ typedef struct _fernos_time_t {
     /**
      * 0 - 59
      */
+    uint8_t minutes;
+
+    /**
+     * 0 - 59
+     */
     uint8_t seconds; 
 } fernos_time_t;
 
