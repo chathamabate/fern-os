@@ -17,6 +17,11 @@
  * 
  * Protecting the user for funky error cases stemming from concurrent usage is meant to be
  * handled higher up the stack. NOT HERE.
+ *
+ * Also, while not really strictly referenced in this interface, it will be assumed that 
+ * "." refers to "this" directory and ".." refers to the parent directory.
+ * Tests will assume all directories have a "." entry and that all non-root directories have
+ * a ".." entry.
  */
 
 /**
@@ -237,6 +242,8 @@ static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir,
  *
  * On success, FOS_SUCCESS is returned. If `key` is non-NULL, a key for the new subdirecotry will 
  * be created and stored at `*key`.
+ *
+ * NOTE: The created directory should have entries "." and "..".
  */
 static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir, 
         const char *name, fs_node_key_t *key) {
@@ -248,7 +255,8 @@ static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir,
  *
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
  * Returns FOS_INVALID_INDEX if `name` cannot be found within the given directory.
- * Returns FOS_IN_USE if the node being deleted is a non-empty subdirectory.
+ * Returns FOS_IN_USE if the node being deleted is a subdirectory and has 
+ * entries other than "." and "..".
  *
  * On success, FOS_SUCCESS is returned and the specified node is deleted from the file system.
  */
@@ -265,6 +273,8 @@ static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir,
  * Returns FOS_EMPTY if `index` >= the number of child nodes within the directory.
  *
  * On sucess, FOS_SUCCESS is returned, the `index`'th child's name is written out to `name`.
+ *
+ * NOTE: Special directory entries "." and ".." should still be returned by this function.
  */
 static inline fernos_error_t fs_get_child_name(file_sys_t *fs, fs_node_key_t parent_dir, 
         size_t index, char *name) {

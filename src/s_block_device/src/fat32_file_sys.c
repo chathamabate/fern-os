@@ -256,9 +256,38 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
 
         info->is_dir = true;
 
-        // Ok, now we need to determine how many entries are in this directory!
+        // Ok, now we need the "length" of the directory, i.e. the number of sequences 
+        // containing LFN entries. 
 
+        uint32_t dir_len = 0;
+        uint32_t entry_iter = 0;
 
+        while (true) {
+            uint32_t seq_start;
+            err = fat32_next_dir_seq(dev, nk->starting_slot_ind, entry_iter, &seq_start);
+            if (err == FOS_EMPTY) {
+                break;
+            }
+
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+
+            uint32_t sfn_entry_offset;
+            err = fat32_get_dir_seq_sfn(dev, nk->starting_slot_ind, seq_start, &sfn_entry_offset);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+
+            // We only recognize sequences with LFN entries.
+            if (seq_start < sfn_entry_offset) {
+                dir_len++;
+            }
+
+            entry_iter = sfn_entry_offset + 1;
+        }
+
+        info->len = dir_len;
     } else {
         fat32_short_fn_dir_entry_t sfn_entry;
 
