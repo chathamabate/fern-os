@@ -253,19 +253,28 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
         // Remember this implementation doesn't give directory edited/creation times.
         info->creation_dt = (fernos_datetime_t) { 0 };
         info->last_edited_dt = (fernos_datetime_t) { 0 };
-    } else {
-        fat32_dir_entry_t entry;
 
-        err = fat32_read_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, &entry);
+        info->is_dir = true;
+
+        // Ok, now we need to determine how many entries are in this directory!
+
+
+    } else {
+        fat32_short_fn_dir_entry_t sfn_entry;
+
+        err = fat32_read_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, 
+                (fat32_dir_entry_t *)&sfn_entry);
         if (err != FOS_SUCCESS) {
             return err;
         }
 
-        info->creation_dt.d.
+        fat32_datetime_to_fos_datetime(sfn_entry.creation_date, sfn_entry.creation_time, &(info->creation_dt));
+        fat32_datetime_to_fos_datetime(sfn_entry.last_write_date, sfn_entry.last_write_time, &(info->last_edited_dt));
 
+        info->is_dir = false;
+
+        info->len = sfn_entry.files_size;
     }
-
-    err = fat32_read_dir_entry(fat32_fs->dev, nk->
 
     return FOS_SUCCESS;
 }
