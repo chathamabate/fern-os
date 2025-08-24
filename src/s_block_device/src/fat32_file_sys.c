@@ -541,6 +541,11 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
     err = fat32_new_seq_c8(dev, parent_dir->starting_slot_ind, &sfn_entry, name, 
             &entry_offset); 
 
+    uint32_t sfn_entry_offset;
+    if (err == FOS_SUCCESS) {
+        err = fat32_get_dir_seq_sfn(dev, parent_dir->starting_slot_ind, entry_offset, &sfn_entry_offset);
+    }
+
     if (err != FOS_SUCCESS) {
         fat32_free_chain(dev, slot_ind);
         al_free(fat32_fs->al, (void *)nk);
@@ -548,6 +553,14 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
     }
 
     if (key) {
+        if (!subdir) {
+            *(uint32_t *)&(nk->parent_slot_ind) = parent_dir->starting_slot_ind;
+            *(uint32_t *)&(nk->sfn_entry_offset) = sfn_entry_offset;
+        }
+
+        *(bool *)&(nk->is_dir) = subdir;
+        *(uint32_t *)&(nk->starting_slot_ind) = slot_ind; 
+
         *key = (fs_node_key_t)nk;
     }
 
@@ -565,7 +578,104 @@ static fernos_error_t fat32_fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir, c
 }
 
 static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, const char *name) {
-    return FOS_NOT_IMPLEMENTED;
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_device_t *dev = fat32_fs->dev;
+
+    if (!parent_dir || !name) {
+        return FOS_BAD_ARGS;
+    }
+
+    fat32_fs_node_key_t pd = (fat32_fs_node_key_t)parent_dir;
+
+    if (!(pd->is_dir)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    fernos_error_t err;
+
+    uint32_t seq_start;
+    err = fat32_find_lfn_c8(dev, pd->starting_slot_ind, name, &seq_start);
+    if (err == FOS_EMPTY) {
+        return FOS_INVALID_INDEX; // The file you are trying to remove doesn't exist.
+    }
+
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    fat32_short_fn_dir_entry_t sfn_entry;
+
+    uint32_t sfn_offset;
+    err = fat32_get_dir_seq_sfn(dev, pd->starting_slot_ind, 
+            seq_start, &sfn_offset);
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    err = fat32_read_dir_entry(dev, pd->starting_slot_ind, sfn_offset, (fat32_dir_entry_t *)&sfn_entry);
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    uint32_t child_slot_ind = (sfn_entry.first_cluster_high << 16UL) | sfn_entry.first_cluster_low;
+    
+    if (sfn_entry.attrs & FT32F_ATTR_SUBDIR) {
+        // Are we attempting to delete a subdirectory???
+        // Iterate over all sequences within the subdirectory, if a sequence appears
+        // which doesn't have lfn "." or "..", this is a non-empty subdirectory.
+
+        char lfn_buf[FAT32_MAX_LFN_LEN + 1];
+
+        uint32_t sd_entry_iter = 0;
+        while (true) {
+            uint32_t sd_seq_start;
+            err = fat32_next_dir_seq(dev, child_slot_ind, sd_entry_iter, &sd_seq_start);
+            if (err == FOS_EMPTY) {
+                break; // We made it to the end of our directory without issues!
+            }
+
+            if (err != FOS_SUCCESS) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            uint32_t sd_seq_sfn_offset;
+            err = fat32_get_dir_seq_sfn(dev, child_slot_ind, sd_seq_start, &sd_seq_sfn_offset); 
+            if (err != FOS_SUCCESS) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            err = fat32_get_dir_seq_lfn_c8(dev, child_slot_ind, sd_seq_sfn_offset, lfn_buf);
+            if (err != FOS_EMPTY && err != FOS_SUCCESS) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            // remember, get LFN will return FOS_EMPTY if there is no LFN entries for the sequence
+            // we are looking at. In this case we basically just ignore the sequence all together.
+            // It doesn't really conform to how we have decided to use FAT32.
+            if (err == FOS_SUCCESS) {
+                // Do we have an LFN which equals something other than "." or ".."?
+                if (!mem_cmp(lfn_buf, ".", 2) && !mem_cmp(lfn_buf, "..", 3)) {
+                    return FOS_IN_USE;
+                }
+            }
+
+            sd_entry_iter = sd_seq_sfn_offset + 1;
+        }
+    }
+
+    // We have made it here which means we should be able to delete our child node just fine.
+
+    err = fat32_erase_seq(dev, pd->starting_slot_ind, seq_start);
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    err = fat32_free_chain(dev, child_slot_ind);
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    return FOS_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_get_child_name(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, char *name) {
