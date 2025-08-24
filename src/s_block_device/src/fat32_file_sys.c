@@ -463,7 +463,10 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
     }
 
     // Now we have a valid filenmae which does not appear in the given directory.
-    // We must write it into the parent directory!
+    // 1) We must create a unique SFN.
+    // 2) We must allocate a chain in the fat for the nodes data.
+    // 3) We must write the chain's start into the SFN entry, then write that entry into
+    // the parent directory.
 
     // Get the current datetime.
     fernos_datetime_t now;
@@ -475,12 +478,12 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
     fos_datetime_to_fat32_datetime(now, &fat32_d, &fat32_t);
 
     fat32_short_fn_dir_entry_t sfn_entry = {
-        .creation_date = fat32_d,
-        .creation_time = fat32_t,
+        .creation_date = subdir ? 0 : fat32_d,
+        .creation_time = subdir ? 0 : fat32_t,
         .creation_time_hundredths = 0,
         .files_size = 0,
-        .last_write_date = fat32_d,
-        .last_write_time = fat32_t,
+        .last_write_date = subdir ? 0 : fat32_d,
+        .last_write_time = subdir ? 0 : fat32_t,
         .last_access_date = 0, // we aren't going to use last access date in this impl.
         
         .attrs = subdir ? FT32F_ATTR_SUBDIR : 0,
@@ -497,15 +500,58 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
     // Now generate a unique and random SFN.
     err = fat32_fs_gen_unique_sfn(fat32_fs, parent_dir->starting_slot_ind, &sfn_entry);
     if (err != FOS_SUCCESS) {
-        return err;
+        return FOS_UNKNWON_ERROR;
     }
 
     // Let's allocate a cluster chain now.
+
+    // Ok, now we are doing stuff that will potnentially need cleanup if things fail.
+    // For this reason, we are going to allocate the node key first, because this is pretty easy
+    // to clean up later.
     
+    fat32_fs_node_key_t nk = NULL;
+    if (key) {
+        nk = al_malloc(fat32_fs->al, sizeof(fat32_fs_node_key_val_t));
+        if (!nk) {
+            return FOS_NO_MEM;
+        }
+    }
 
+    // Next create the FAT chain.
 
+    uint32_t slot_ind;
 
-    return FOS_NOT_IMPLEMENTED;
+    if (subdir) {
+        err =  fat32_fs_new_subdir_chain(fat32_fs, parent_dir->starting_slot_ind, &slot_ind);
+    } else {
+        err = fat32_new_chain(dev, 1, &slot_ind);
+    }
+
+    if (err != FOS_SUCCESS) {
+        al_free(fat32_fs->al, (void *)nk);
+        return FOS_UNKNWON_ERROR;
+    }
+
+    // We have a chain, we must write its sequence into the parent dir!
+
+    sfn_entry.first_cluster_low = (uint16_t)slot_ind;
+    sfn_entry.first_cluster_high = (uint16_t)(slot_ind >> 16);
+
+    uint32_t entry_offset;
+    err = fat32_new_seq_c8(dev, parent_dir->starting_slot_ind, &sfn_entry, name, 
+            &entry_offset); 
+
+    if (err != FOS_SUCCESS) {
+        fat32_free_chain(dev, slot_ind);
+        al_free(fat32_fs->al, (void *)nk);
+        return FOS_UNKNWON_ERROR;
+    }
+
+    if (key) {
+        *key = (fs_node_key_t)nk;
+    }
+
+    return FOS_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key) {
