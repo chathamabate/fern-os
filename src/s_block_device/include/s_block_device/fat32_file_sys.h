@@ -6,6 +6,7 @@
 #include "s_block_device/file_sys.h"
 #include "s_mem/allocator.h"
 #include "s_util/datetime.h"
+#include "s_util/rand.h"
 
 typedef struct _fat32_file_sys_t {
     file_sys_t super;
@@ -15,6 +16,11 @@ typedef struct _fat32_file_sys_t {
     fat32_device_t * const dev;
 
     const dt_producer_ft now;
+
+    /**
+     * Used for random sfn generation.
+     */
+    rand_t r;
 } fat32_file_sys_t;
 
 typedef struct _fat32_fs_node_key_val_t {

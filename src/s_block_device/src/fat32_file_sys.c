@@ -61,6 +61,11 @@ fernos_error_t parse_new_fat32_file_sys(allocator_t *al, block_device_t *bd, uin
     *(allocator_t **)&(fat32_fs->al) = al;
     *(fat32_device_t **)&(fat32_fs->dev) = dev;
     *(dt_producer_ft *)&(fat32_fs->now) = now;
+
+    // We ultimately use the given seed to create two random number generators.
+    // One in the FAT32 Device, and one here. The one here will get a different seed
+    // than the one in the FAT32 device.
+    fat32_fs->r = rand(seed + 0xABCD0123EEEEFEFEULL);
     
     *fs_out = (file_sys_t *)fat32_fs;
     return FOS_SUCCESS;
@@ -308,22 +313,138 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
     return FOS_SUCCESS;
 }
 
-static fernos_error_t fat32_fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key) {
-    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
-    fat32_device_t *dev = fat32_fs->dev;
-
-    if (!name || !parent_dir || !key) {
+/**
+ * This FAT32 FS implementation doesn't really use the SFN's. Whenever a file/directory is 
+ * created, it is given a parent directory unique random SFN.
+ *
+ * This function generates such an SFN and writes it into `sfn_entry`.
+ *
+ * On success, FOS_SUCCESS is returned.
+ */
+static fernos_error_t fat32_fs_gen_unique_sfn(fat32_file_sys_t *fat32_fs, uint32_t slot_ind, 
+        fat32_short_fn_dir_entry_t *sfn_entry) {
+    if (!sfn_entry) {
         return FOS_BAD_ARGS;
     }
 
-    fat32_fs_node_key_t pd = (fat32_fs_node_key_t)parent_dir;
+    fernos_error_t err;
 
-    if (!(pd->is_dir)) {
+    while (true) {
+        // First generate the random name.
+        for (uint32_t i = 0; i < sizeof(sfn_entry->short_fn); i++) {
+            sfn_entry->short_fn[i] = 'A' + next_rand_u8(&(fat32_fs->r)) % 26;
+        }
+
+        for (uint32_t i = 0; i < sizeof(sfn_entry->extenstion); i++) {
+            sfn_entry->extenstion[i] = 'A' + next_rand_u8(&(fat32_fs->r)) % 26;
+        }
+
+        // next see if it is used.
+
+        uint32_t seq_start;
+
+        err = fat32_find_sfn(fat32_fs->dev, slot_ind, sfn_entry->short_fn, sfn_entry->extenstion, &seq_start);
+
+        if (err == FOS_EMPTY) { // Our name is unique!
+            return FOS_SUCCESS;
+        }
+
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        // Otherwise just repeat.
+    }
+}
+
+/**
+ * Very simple helper Function.
+ *
+ * It allocates a new cluster chain. Inside the cluster chain it places two entries:
+ * The self reference ".", and the parent reference "..".
+ *
+ * Both of these entries will have LFN entries to play nicely with this implementation
+ * as a whole.
+ */
+static fernos_error_t fat32_fs_new_subdir_chain(fat32_file_sys_t *fat32_fs, uint32_t parent_slot_ind, 
+        uint32_t *slot_ind) {
+    if (!slot_ind) {
+        return FOS_BAD_ARGS;
+    }
+
+    fernos_error_t err;
+
+    uint32_t dir_slot_ind;
+
+    err = fat32_new_dir(fat32_fs->dev, &dir_slot_ind);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    // Ok now, let's allocate our two relative entries.
+
+    fat32_short_fn_dir_entry_t sfn_entry = {
+        .attrs = FT32F_ATTR_SUBDIR,
+        .extenstion = {' ', ' ', ' '},
+        .short_fn = {'.', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+        .first_cluster_low = (uint16_t)dir_slot_ind,
+        .first_cluster_high = (uint16_t)(dir_slot_ind >> 16),
+
+        // Remember we aren't working with creation time stuff for directories.
+
+        .files_size = 0
+    };
+
+    uint32_t entry_offset;
+
+    // Create self reference.
+    err = fat32_new_seq_c8(fat32_fs->dev, dir_slot_ind, &sfn_entry, 
+            ".", &entry_offset);
+
+    if (err == FOS_SUCCESS) {
+        // Create parent reference.
+        sfn_entry.short_fn[1] = '.';
+        sfn_entry.first_cluster_low = (uint16_t)parent_slot_ind;
+        sfn_entry.first_cluster_high = (uint16_t)(parent_slot_ind >> 16);
+
+        err = fat32_new_seq_c8(fat32_fs->dev, dir_slot_ind, &sfn_entry, 
+                "..", &entry_offset);
+    }
+
+    if (err != FOS_SUCCESS) {
+        // In case of error, free our chain in the fat.
+        fat32_free_chain(fat32_fs->dev, dir_slot_ind);
+
+        return err;
+    }
+
+    // Otherwise, success!!!
+    *slot_ind = dir_slot_ind;
+
+    return FOS_SUCCESS;
+}
+
+/**
+ * The steps for creating a subdirectory vs. a file will be pretty similar, just going to
+ * combine them into a single function.
+ *
+ * Follows same error return rules as `fs_touch` and `fs_mkdir`.
+ */
+static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_node_key_t parent_dir, const char *name, 
+        bool subdir, fat32_fs_node_key_t *key) {
+    fat32_device_t *dev = fat32_fs->dev;
+
+    if (!name || !parent_dir) {
+        return FOS_BAD_ARGS;
+    }
+
+    if (!(parent_dir->is_dir)) {
         return FOS_STATE_MISMATCH;
     }
 
     // Ok, now we need to check the filename given.
 
+    // Is it valid?
     if (!is_valid_filename(name)) {
         return FOS_BAD_ARGS;
     }
@@ -331,7 +452,8 @@ static fernos_error_t fat32_fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, c
     fernos_error_t err;
     uint32_t seq_start;
 
-    err = fat32_find_lfn_c8(dev, pd->starting_slot_ind, name, &seq_start);
+    // Is it unique?
+    err = fat32_find_lfn_c8(dev, parent_dir->starting_slot_ind, name, &seq_start);
     if (err == FOS_SUCCESS) {
         return FOS_IN_USE;
     }
@@ -361,28 +483,39 @@ static fernos_error_t fat32_fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, c
         .last_write_time = fat32_t,
         .last_access_date = 0, // we aren't going to use last access date in this impl.
         
+        .attrs = subdir ? FT32F_ATTR_SUBDIR : 0,
+
         // We need to fill these in before doing anything else.
         .short_fn = { 0 },
-        .extenstion = {' ', ' ', ' '},
+        .extenstion = { 0 },
 
         .first_cluster_high = 0,
         .first_cluster_low = 0,
+
     };
 
-    while (true) {
-        // Let's generate a random SFN which is yet to be used in the given directory.
-
-        // I think we are going to want to factor out a lot of this tbh...
-        // This will mostly be the same between directory and file creation.
+    // Now generate a unique and random SFN.
+    err = fat32_fs_gen_unique_sfn(fat32_fs, parent_dir->starting_slot_ind, &sfn_entry);
+    if (err != FOS_SUCCESS) {
+        return err;
     }
+
+    // Let's allocate a cluster chain now.
+    
 
 
 
     return FOS_NOT_IMPLEMENTED;
 }
 
+static fernos_error_t fat32_fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key) {
+    return fat32_fs_new_node((fat32_file_sys_t *)fs, (fat32_fs_node_key_t)parent_dir, name, 
+            false, (fat32_fs_node_key_t *)key);
+}
+
 static fernos_error_t fat32_fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key) {
-    return FOS_NOT_IMPLEMENTED;
+    return fat32_fs_new_node((fat32_file_sys_t *)fs, (fat32_fs_node_key_t)parent_dir, name, 
+            true, (fat32_fs_node_key_t *)key);
 }
 
 static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, const char *name) {
