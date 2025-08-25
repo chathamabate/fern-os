@@ -801,6 +801,16 @@ static fernos_error_t fat32_fs_rw(file_sys_t *fs, fs_node_key_t file_key, size_t
         return FOS_STATE_MISMATCH;
     }
 
+    // When reading/writing nothing, we'll just say fuck it and always give 0 a successful return.
+    if (bytes == 0) {
+        return FOS_SUCCESS;
+    }
+
+    // Otherwise, we require a non-null buffer.
+    if (!buf) {
+        return FOS_BAD_ARGS;
+    }
+
     // Now we gotta validate the range we are trying to r/w.
 
     fernos_error_t err;
@@ -818,18 +828,91 @@ static fernos_error_t fat32_fs_rw(file_sys_t *fs, fs_node_key_t file_key, size_t
         return FOS_INVALID_RANGE;
     }
 
+    // How many bytes have been read/written so far.
+    uint32_t processed = 0;
 
+    uint32_t initial_rem = offset % FAT32_REQ_SECTOR_SIZE;
+    if (initial_rem > 0) { // Are we not initially sector aligned?
+        // size of our initial transaction.
+        uint32_t initial_amt = FAT32_REQ_SECTOR_SIZE - initial_rem;
+        if (initial_amt > bytes) {
+            initial_amt = bytes;
+        }
+
+        if (write) {
+            err = fat32_write_piece(dev, nk->starting_slot_ind, offset / FAT32_REQ_SECTOR_SIZE, 
+                    initial_rem, initial_amt, (const void *)buf);
+        } else {
+            err = fat32_read_piece(dev, nk->starting_slot_ind, offset / FAT32_REQ_SECTOR_SIZE, 
+                    initial_rem, initial_amt, buf);
+        }
+
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        processed += initial_amt;
+    }
+
+    // Now let's go to potentially middle sectors.
+
+    if (bytes - processed >= FAT32_REQ_SECTOR_SIZE) {
+        uint32_t num_middle_sectors = (bytes - processed) / FAT32_REQ_SECTOR_SIZE;
+
+        if (write) {
+            err = fat32_write(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE, 
+                    num_middle_sectors, ((uint8_t *)buf + processed));
+        } else {
+            err = fat32_read(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE, 
+                    num_middle_sectors, ((uint8_t *)buf + processed));
+        }
+
+        processed += num_middle_sectors * FAT32_REQ_SECTOR_SIZE;
+    }
+
+    // Final piece (if it exists)
+    if (bytes - processed > 0) {
+        if (write) {
+            err = fat32_write_piece(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE,
+                    0, bytes - processed, (uint8_t *)buf + processed);
+        } else {
+            err = fat32_read_piece(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE,
+                    0, bytes - processed, (uint8_t *)buf + processed);
+        }
+
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+
+    // Don't forget to up date sfn entry if this was a write!
+    if (write) {
+        fernos_datetime_t now;
+        fat32_fs->now(&now);
+
+        fat32_date_t d;
+        fat32_time_t t;
+        fos_datetime_to_fat32_datetime(now, &d, &t);
+
+        sfn_entry.last_write_date = d;
+        sfn_entry.last_write_time = t;
+
+        err = fat32_write_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, 
+                (fat32_dir_entry_t *)&sfn_entry);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
 
     return FOS_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, void *dest) {
-
-    return FOS_NOT_IMPLEMENTED;
+    return fat32_fs_rw(fs, file_key, offset, bytes, false, dest);
 }
 
 static fernos_error_t fat32_fs_write(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, const void *src) {
-    return FOS_NOT_IMPLEMENTED;
+    return fat32_fs_rw(fs, file_key, offset, bytes, true, (void *)src);
 }
 
 static fernos_error_t fat32_fs_resize(file_sys_t *fs, fs_node_key_t file_key, size_t bytes) {
