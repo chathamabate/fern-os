@@ -58,11 +58,10 @@ typedef struct _fat32_fs_node_key_val_t {
  * Only actual data files will have their timestamp information updated.
  *
  * Also, this implementation expects that all directories have a self refernce entry ".".
- * And that all non-root directories have a parent reference entry "..".
+ * And that all non-root directories have a parent reference entry "..". These entries should only
+ * have be single SFN sequences.
  *
- * Additionally, to make implmentation easier, only directory entries with LFNs are recognized.
- * Sequences that are just standalond SFN entries are skipped. This includes the "." and ".."
- * entries, these must have LFN entries containing names "." and "..".
+ * Other than "." and "..", only sequences with LFN entries will be recognized by this implementation.
  */
 
 typedef const fat32_fs_node_key_val_t *fat32_fs_node_key_t;
