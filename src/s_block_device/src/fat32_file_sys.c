@@ -784,8 +784,46 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
     }
 }
 
+/**
+ * Quick factored out helper. This handles reading AND writing depending on the value of `write`.
+ */
+static fernos_error_t fat32_fs_rw(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, 
+        bool write, void *buf) {
+    if (!file_key) {
+        return FOS_BAD_ARGS;
+    }
+
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_device_t *dev = fat32_fs->dev;
+
+    fat32_fs_node_key_t nk = (fat32_fs_node_key_t)file_key;
+    if (nk->is_dir) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    // Now we gotta validate the range we are trying to r/w.
+
+    fernos_error_t err;
+    fat32_short_fn_dir_entry_t sfn_entry;
+
+    err = fat32_read_dir_entry(dev, nk->parent_slot_ind, 
+            nk->sfn_entry_offset, (fat32_dir_entry_t *)&sfn_entry);
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    const uint32_t file_size = sfn_entry.files_size;
+
+    if (offset >= file_size || offset + bytes > file_size || offset + bytes < offset) {
+        return FOS_INVALID_RANGE;
+    }
+
+
+
+    return FOS_SUCCESS;
+}
+
 static fernos_error_t fat32_fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, void *dest) {
-    // We can only really write/read in units of sectors...
 
     return FOS_NOT_IMPLEMENTED;
 }
