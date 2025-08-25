@@ -62,6 +62,7 @@ typedef struct _fat32_fs_node_key_val_t {
  * have be single SFN sequences.
  *
  * Other than "." and "..", only sequences with LFN entries will be recognized by this implementation.
+ * Sequences with LFNs which are invalid will be ignored.
  */
 
 typedef const fat32_fs_node_key_val_t *fat32_fs_node_key_t;

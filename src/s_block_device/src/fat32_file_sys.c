@@ -163,7 +163,6 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
                 *(uint32_t *)&(nk->sfn_entry_offset) = prev_sfn_offset;
             }
 
-
             *(bool *)&(nk->is_dir) = is_dir;
             *(uint32_t *)&(nk->starting_slot_ind) = curr_ind; 
 
@@ -269,6 +268,8 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
     fat32_device_t *dev = fat32_fs->dev;
     fat32_fs_node_key_t nk = (fat32_fs_node_key_t)key;
 
+    char lfn_buf[FAT32_MAX_LFN_LEN + 1];
+
     if (nk->is_dir) {
         // Remember this implementation doesn't give directory edited/creation times.
         info->creation_dt = (fernos_datetime_t) { 0 };
@@ -299,8 +300,13 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
                 return err;
             }
 
-            // We only recognize sequences with LFN entries.
-            if (seq_start < sfn_entry_offset) {
+            // We only count entries which have a valid lfn.
+            err = fat32_get_dir_seq_lfn_c8(dev, nk->starting_slot_ind, sfn_entry_offset, lfn_buf);
+            if (err != FOS_SUCCESS && err != FOS_EMPTY) {
+                return err;
+            }
+
+            if (err == FOS_SUCCESS && is_valid_filename(lfn_buf)) {
                 dir_len++;
             }
 
@@ -648,6 +654,8 @@ static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, 
         // Iterate over all sequences within the subdirectory, if a sequence appears
         // which has lfn entries, this is NOT an empty directory.
 
+        char lfn_buf[FAT32_MAX_LFN_LEN + 1];
+
         uint32_t sd_entry_iter = 0;
         while (true) {
             uint32_t sd_seq_start;
@@ -666,9 +674,13 @@ static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, 
                 return FOS_UNKNWON_ERROR;
             }
 
-            // A sequence with LFN entries is significant and must be deleted manually before
-            // deleteing this subdirectory!
-            if (sd_seq_start < sd_seq_sfn_offset) {
+            err = fat32_get_dir_seq_lfn_c8(dev, child_slot_ind, sd_seq_sfn_offset, lfn_buf);
+            if (err != FOS_SUCCESS && err != FOS_EMPTY) {
+                return FOS_UNKNWON_ERROR;
+            }
+            
+            // We only recognize sequences with valid LFNs.
+            if (err == FOS_SUCCESS && is_valid_filename(lfn_buf)) {
                 return FOS_IN_USE;
             }
 
@@ -692,9 +704,63 @@ static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, 
 }
 
 static fernos_error_t fat32_fs_get_child_name(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, char *name) {
+    if (!name || !parent_dir) {
+        return FOS_BAD_ARGS;
+    }
 
-    // Maybe it's time to take another break??
-    return FOS_NOT_IMPLEMENTED;
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_device_t *dev = fat32_fs->dev;
+
+    fat32_fs_node_key_t pd = (fat32_fs_node_key_t)parent_dir;
+    if (!(pd->is_dir)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    // This is kinda slow, but I am going to stick to this strategy.
+    // Remember, we can only count sequences with valid LFNs,
+    // when stepping over a sequence we must check: 1) does it have an LFN? 2) Is the LFN valid?
+
+    fernos_error_t err;
+    size_t i = 0;
+    char lfn_buf[FAT32_MAX_LFN_LEN + 1];
+    uint32_t entry_iter = 0;
+
+    while (true) {
+        uint32_t seq_start; 
+
+        err = fat32_next_dir_seq(dev, pd->starting_slot_ind, entry_iter, &seq_start);
+        if (err == FOS_EMPTY) { // We reached the end before hitting our index :(
+            return FOS_INVALID_INDEX;
+        }
+
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        uint32_t sfn_offset;
+        err = fat32_get_dir_seq_sfn(dev, pd->starting_slot_ind, seq_start, &sfn_offset);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        err = fat32_get_dir_seq_lfn_c8(dev, pd->starting_slot_ind, sfn_offset, lfn_buf);
+        if (err != FOS_SUCCESS && err != FOS_EMPTY) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        if (err == FOS_SUCCESS && is_valid_filename(lfn_buf)) {
+            // We got a hit! Can we exit now? or must we keep iterating?
+            
+            if (i == index) { 
+                str_cpy(name, lfn_buf);
+                return FOS_SUCCESS;
+            }
+
+            i++;
+        }
+
+        entry_iter = sfn_offset + 1;
+    }
 }
 
 static fernos_error_t fat32_fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, void *dest) {

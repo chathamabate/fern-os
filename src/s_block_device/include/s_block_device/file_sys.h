@@ -270,11 +270,11 @@ static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir,
  * `name` must have size at least `FS_MAX_FILENAME_LEN + 1`.
  *
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
- * Returns FOS_EMPTY if `index` >= the number of child nodes within the directory.
+ * Returns FOS_INVALID_INDEX if `index` >= the number of child nodes within the directory.
  *
  * On sucess, FOS_SUCCESS is returned, the `index`'th child's name is written out to `name`.
  *
- * NOTE: Special directory entries "." and ".." should still be returned by this function.
+ * NOTE: Special directory entries "." and ".." should NOT be returned by this function.
  */
 static inline fernos_error_t fs_get_child_name(file_sys_t *fs, fs_node_key_t parent_dir, 
         size_t index, char *name) {
