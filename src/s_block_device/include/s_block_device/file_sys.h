@@ -137,7 +137,7 @@ struct _file_sys_impl_t {
     fernos_error_t (*fs_touch)(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key);
     fernos_error_t (*fs_mkdir)(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key);
     fernos_error_t (*fs_remove)(file_sys_t *fs, fs_node_key_t parent_dir, const char *name);
-    fernos_error_t (*fs_get_child_name)(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, char *name);
+    fernos_error_t (*fs_get_child_names)(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, size_t num, char names[][FS_MAX_FILENAME_LEN + 1]);
     fernos_error_t (*fs_read)(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, void *dest);
     fernos_error_t (*fs_write)(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, const void *src);
     fernos_error_t (*fs_resize)(file_sys_t *fs, fs_node_key_t file_key, size_t bytes);
@@ -265,20 +265,25 @@ static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir,
 }
 
 /**
- * Retrieve the name of a child node within a directory.
+ * Retrieve the names of a child nodes within a directory.
  *
- * `name` must have size at least `FS_MAX_FILENAME_LEN + 1`.
+ * `names` must have at least `num` rows. (i.e. a total size of `num` * (FS_MAX_FILENAME_LEN + 1))
  *
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
- * Returns FOS_INVALID_INDEX if `index` >= the number of child nodes within the directory.
  *
- * On sucess, FOS_SUCCESS is returned, the `index`'th child's name is written out to `name`.
+ * On sucess, FOS_SUCCESS is returned. In this case, `num` names starting from the child at index
+ * `index` are written into the `names` buffers one at a time. If the number of nodes left
+ * is less than `num`, '\0' is written into each unused buffer.
  *
  * NOTE: Special directory entries "." and ".." should NOT be returned by this function.
+ *
+ * NOTE: Even if the index is larger than the number of entries in the directory,
+ * FOS_SUCCESS should still be returned. In this case, all `names` buffers will be given
+ * empty string values '\0'.
  */
-static inline fernos_error_t fs_get_child_name(file_sys_t *fs, fs_node_key_t parent_dir, 
-        size_t index, char *name) {
-    return fs->impl->fs_get_child_name(fs, parent_dir, index, name);
+static inline fernos_error_t fs_get_child_names(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, 
+        size_t num, char names[][FS_MAX_FILENAME_LEN + 1]) {
+    return fs->impl->fs_get_child_names(fs, parent_dir, index, num, names);
 }
 
 /**

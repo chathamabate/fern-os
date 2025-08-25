@@ -14,7 +14,8 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
 static fernos_error_t fat32_fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key);
 static fernos_error_t fat32_fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key);
 static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, const char *name);
-static fernos_error_t fat32_fs_get_child_name(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, char *name);
+static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, 
+        size_t num, char names[][FS_MAX_FILENAME_LEN + 1]);
 static fernos_error_t fat32_fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, void *dest);
 static fernos_error_t fat32_fs_write(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, const void *src);
 static fernos_error_t fat32_fs_resize(file_sys_t *fs, fs_node_key_t file_key, size_t bytes);
@@ -30,7 +31,7 @@ static const file_sys_impl_t FAT32_FS_IMPL = {
     .fs_touch = fat32_fs_touch,
     .fs_mkdir = fat32_fs_mkdir,
     .fs_remove = fat32_fs_remove,
-    .fs_get_child_name = fat32_fs_get_child_name,
+    .fs_get_child_names = fat32_fs_get_child_names,
     .fs_read = fat32_fs_read,
     .fs_write = fat32_fs_write,
     .fs_resize = fat32_fs_resize,
@@ -703,25 +704,34 @@ static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, 
     return FOS_SUCCESS;
 }
 
-static fernos_error_t fat32_fs_get_child_name(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, char *name) {
-    if (!name || !parent_dir) {
+static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, 
+        size_t num, char names[][FS_MAX_FILENAME_LEN + 1]) {
+    if (!parent_dir) {
         return FOS_BAD_ARGS;
     }
-
-    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
-    fat32_device_t *dev = fat32_fs->dev;
 
     fat32_fs_node_key_t pd = (fat32_fs_node_key_t)parent_dir;
     if (!(pd->is_dir)) {
         return FOS_STATE_MISMATCH;
     }
 
-    // This is kinda slow, but I am going to stick to this strategy.
-    // Remember, we can only count sequences with valid LFNs,
-    // when stepping over a sequence we must check: 1) does it have an LFN? 2) Is the LFN valid?
+    if (num == 0) {
+        return FOS_SUCCESS; // Return success early if no work needs to be done.
+    }
+
+    if (!names) {
+        return FOS_BAD_ARGS;
+    }
+
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_device_t *dev = fat32_fs->dev;
+
 
     fernos_error_t err;
-    size_t i = 0;
+
+    size_t i = 0; // The index of the next valid sequence we visit.
+    size_t written = 0; // The number of names we've written so far to the `names` buffers.
+
     char lfn_buf[FAT32_MAX_LFN_LEN + 1];
     uint32_t entry_iter = 0;
 
@@ -729,8 +739,15 @@ static fernos_error_t fat32_fs_get_child_name(file_sys_t *fs, fs_node_key_t pare
         uint32_t seq_start; 
 
         err = fat32_next_dir_seq(dev, pd->starting_slot_ind, entry_iter, &seq_start);
-        if (err == FOS_EMPTY) { // We reached the end before hitting our index :(
-            return FOS_INVALID_INDEX;
+        if (err == FOS_EMPTY) { 
+            // Ok, we reached the end BEFORE filling all the `names` buffers, nbd, just write out
+            // some '\0's and call it a day.
+            
+            for (size_t j = written; j < num; j++) {
+                names[j][0] = '\0';
+            }
+
+            return FOS_SUCCESS;
         }
 
         if (err != FOS_SUCCESS) {
@@ -751,9 +768,13 @@ static fernos_error_t fat32_fs_get_child_name(file_sys_t *fs, fs_node_key_t pare
         if (err == FOS_SUCCESS && is_valid_filename(lfn_buf)) {
             // We got a hit! Can we exit now? or must we keep iterating?
             
-            if (i == index) { 
-                str_cpy(name, lfn_buf);
-                return FOS_SUCCESS;
+            if (i >= index) {
+                str_cpy(names[written++], lfn_buf);
+
+                // We've filled the `names` buffers.
+                if (written == num) {
+                    return FOS_SUCCESS;
+                }
             }
 
             i++;
@@ -764,6 +785,8 @@ static fernos_error_t fat32_fs_get_child_name(file_sys_t *fs, fs_node_key_t pare
 }
 
 static fernos_error_t fat32_fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, void *dest) {
+    // We can only really write/read in units of sectors...
+
     return FOS_NOT_IMPLEMENTED;
 }
 
