@@ -534,6 +534,10 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
         err = fat32_new_chain(dev, 1, &slot_ind);
     }
 
+    if (err == FOS_NO_SPACE) {
+        return FOS_NO_SPACE;
+    }
+
     if (err != FOS_SUCCESS) {
         return FOS_UNKNWON_ERROR;
     }
@@ -551,6 +555,10 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
 
     if (err != FOS_SUCCESS) {
         fat32_free_chain(dev, slot_ind);
+
+        if (err == FOS_NO_SPACE) {
+            return FOS_NO_SPACE;
+        }
         
         return FOS_UNKNWON_ERROR;
     }
@@ -885,7 +893,66 @@ static fernos_error_t fat32_fs_write(file_sys_t *fs, fs_node_key_t file_key, siz
 }
 
 static fernos_error_t fat32_fs_resize(file_sys_t *fs, fs_node_key_t file_key, size_t bytes) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!file_key) {
+        return FOS_BAD_ARGS;
+    }
+
+    fat32_fs_node_key_t nk = (fat32_fs_node_key_t)file_key;
+
+    if (nk->is_dir) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_device_t *dev = fat32_fs->dev;
+
+    fernos_error_t err;
+    fat32_short_fn_dir_entry_t sfn_entry;
+
+    err = fat32_read_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, 
+            (fat32_dir_entry_t *)&sfn_entry);
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    const uint32_t bytes_per_cluster =  dev->sectors_per_cluster * FAT32_REQ_SECTOR_SIZE;
+
+    uint32_t requested_chain_len = bytes / bytes_per_cluster + (bytes % bytes_per_cluster > 0 ? 1 : 0);
+    if (requested_chain_len == 0) {
+        requested_chain_len = 1; // We will never completely free a chain.
+    }
+
+    err = fat32_resize_chain(dev, nk->starting_slot_ind,  requested_chain_len);
+
+    if (err == FOS_NO_SPACE) {
+        return FOS_NO_SPACE;
+    }
+
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    // Ok, now rewrite out the SFN entry with new size and updated last write time.
+
+    sfn_entry.files_size = bytes; 
+
+    fernos_datetime_t now;
+    fat32_fs->now(&now);
+
+    fat32_date_t d;
+    fat32_time_t t;
+    fos_datetime_to_fat32_datetime(now, &d, &t);
+
+    sfn_entry.last_write_date = d;
+    sfn_entry.last_write_time = t;
+
+    err = fat32_write_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, 
+            (fat32_dir_entry_t *)&sfn_entry);
+    if (err != FOS_SUCCESS) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    return FOS_SUCCESS;
 }
 
 

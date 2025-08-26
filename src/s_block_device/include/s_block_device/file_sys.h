@@ -224,6 +224,7 @@ static inline fernos_error_t fs_get_node_info(file_sys_t *fs, fs_node_key_t key,
  * Returns FOS_BAD_ARGS if `name` is not a valid filename.
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
  * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
+ * Returns FOS_NO_SPACE if there isn't enough space to create the file.
  *
  * On success, FOS_SUCCESS is returned. If `key` is non-NULL, a key for the new file will be created
  * and stored at `*key`.
@@ -239,6 +240,7 @@ static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir,
  * Returns FOS_BAD_ARGS if `name` is not a valid filename.
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
  * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
+ * Returns FOS_NO_SPACE if there isn't enough space to create the directory.
  *
  * On success, FOS_SUCCESS is returned. If `key` is non-NULL, a key for the new subdirecotry will 
  * be created and stored at `*key`.
@@ -323,6 +325,9 @@ static inline fernos_error_t fs_write(file_sys_t *fs, fs_node_key_t file_key, si
  * If `bytes` is 0, the file isn't actually deleted, it just is given a size of 0. This is 
  * to encourage correct handling of node keys. That is, all node keys for a file should be deleted
  * before a file is deleted. 
+ *
+ * Returns FOS_STATE_MISMATCH if `file_key` points to a directory.
+ * Returns FOS_NO_SPACE if there isn't enough space.
  *
  * On success, FOS_SUCCESS is returned, the given file will have exact size `bytes`.
  */
