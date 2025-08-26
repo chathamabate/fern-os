@@ -285,18 +285,12 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
         uint32_t entry_iter = 0;
 
         while (true) {
-            uint32_t seq_start;
-            err = fat32_next_dir_seq(dev, nk->starting_slot_ind, entry_iter, &seq_start);
+            uint32_t sfn_entry_offset;
+            err = fat32_next_dir_seq_sfn(dev, nk->starting_slot_ind, entry_iter, &sfn_entry_offset);
             if (err == FOS_EMPTY) {
                 break;
             }
 
-            if (err != FOS_SUCCESS) {
-                return err;
-            }
-
-            uint32_t sfn_entry_offset;
-            err = fat32_get_dir_seq_sfn(dev, nk->starting_slot_ind, seq_start, &sfn_entry_offset);
             if (err != FOS_SUCCESS) {
                 return err;
             }
@@ -659,18 +653,12 @@ static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, 
 
         uint32_t sd_entry_iter = 0;
         while (true) {
-            uint32_t sd_seq_start;
-            err = fat32_next_dir_seq(dev, child_slot_ind, sd_entry_iter, &sd_seq_start);
-            if (err == FOS_EMPTY) {
-                break; // We made it to the end of our directory without issues!
-            }
-
-            if (err != FOS_SUCCESS) {
-                return FOS_UNKNWON_ERROR;
-            }
-
             uint32_t sd_seq_sfn_offset;
-            err = fat32_get_dir_seq_sfn(dev, child_slot_ind, sd_seq_start, &sd_seq_sfn_offset); 
+            err = fat32_next_dir_seq_sfn(dev, child_slot_ind, sd_entry_iter, &sd_seq_sfn_offset);
+            if (err == FOS_EMPTY) {
+                break;
+            }
+
             if (err != FOS_SUCCESS) {
                 return FOS_UNKNWON_ERROR;
             }
@@ -736,9 +724,8 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
     uint32_t entry_iter = 0;
 
     while (true) {
-        uint32_t seq_start; 
-
-        err = fat32_next_dir_seq(dev, pd->starting_slot_ind, entry_iter, &seq_start);
+        uint32_t sfn_offset;
+        err = fat32_get_dir_seq_sfn(dev, pd->starting_slot_ind, entry_iter, &sfn_offset);
         if (err == FOS_EMPTY) { 
             // Ok, we reached the end BEFORE filling all the `names` buffers, nbd, just write out
             // some '\0's and call it a day.
@@ -750,12 +737,6 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
             return FOS_SUCCESS;
         }
 
-        if (err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
-        }
-
-        uint32_t sfn_offset;
-        err = fat32_get_dir_seq_sfn(dev, pd->starting_slot_ind, seq_start, &sfn_offset);
         if (err != FOS_SUCCESS) {
             return FOS_UNKNWON_ERROR;
         }
@@ -787,8 +768,8 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
 /**
  * Quick factored out helper. This handles reading AND writing depending on the value of `write`.
  */
-static fernos_error_t fat32_fs_rw(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, 
-        bool write, void *buf) {
+static fernos_error_t fat32_fs_read_write(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, 
+        void *buf, bool write) {
     if (!file_key) {
         return FOS_BAD_ARGS;
     }
@@ -839,13 +820,8 @@ static fernos_error_t fat32_fs_rw(file_sys_t *fs, fs_node_key_t file_key, size_t
             initial_amt = bytes;
         }
 
-        if (write) {
-            err = fat32_write_piece(dev, nk->starting_slot_ind, offset / FAT32_REQ_SECTOR_SIZE, 
-                    initial_rem, initial_amt, (const void *)buf);
-        } else {
-            err = fat32_read_piece(dev, nk->starting_slot_ind, offset / FAT32_REQ_SECTOR_SIZE, 
-                    initial_rem, initial_amt, buf);
-        }
+        err = fat32_read_write_piece(dev, nk->starting_slot_ind, offset / FAT32_REQ_SECTOR_SIZE,
+                initial_rem, initial_amt, buf, write);
 
         if (err != FOS_SUCCESS) {
             return err;
@@ -859,12 +835,10 @@ static fernos_error_t fat32_fs_rw(file_sys_t *fs, fs_node_key_t file_key, size_t
     if (bytes - processed >= FAT32_REQ_SECTOR_SIZE) {
         uint32_t num_middle_sectors = (bytes - processed) / FAT32_REQ_SECTOR_SIZE;
 
-        if (write) {
-            err = fat32_write(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE, 
-                    num_middle_sectors, ((uint8_t *)buf + processed));
-        } else {
-            err = fat32_read(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE, 
-                    num_middle_sectors, ((uint8_t *)buf + processed));
+        err = fat32_read_write(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE, 
+                num_middle_sectors, ((uint8_t *)buf + processed), write);
+        if (err != FOS_SUCCESS) {
+            return err;
         }
 
         processed += num_middle_sectors * FAT32_REQ_SECTOR_SIZE;
@@ -872,13 +846,8 @@ static fernos_error_t fat32_fs_rw(file_sys_t *fs, fs_node_key_t file_key, size_t
 
     // Final piece (if it exists)
     if (bytes - processed > 0) {
-        if (write) {
-            err = fat32_write_piece(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE,
-                    0, bytes - processed, (uint8_t *)buf + processed);
-        } else {
-            err = fat32_read_piece(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE,
-                    0, bytes - processed, (uint8_t *)buf + processed);
-        }
+        err = fat32_read_write_piece(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE,
+                0, bytes - processed, (uint8_t *)buf + processed, write);
 
         if (err != FOS_SUCCESS) {
             return err;
@@ -908,11 +877,11 @@ static fernos_error_t fat32_fs_rw(file_sys_t *fs, fs_node_key_t file_key, size_t
 }
 
 static fernos_error_t fat32_fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, void *dest) {
-    return fat32_fs_rw(fs, file_key, offset, bytes, false, dest);
+    return fat32_fs_read_write(fs, file_key, offset, bytes, dest, false);
 }
 
 static fernos_error_t fat32_fs_write(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, const void *src) {
-    return fat32_fs_rw(fs, file_key, offset, bytes, true, (void *)src);
+    return fat32_fs_read_write(fs, file_key, offset, bytes, (void *)src, true);
 }
 
 static fernos_error_t fat32_fs_resize(file_sys_t *fs, fs_node_key_t file_key, size_t bytes) {

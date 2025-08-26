@@ -123,6 +123,34 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t entry_offset, uint32_t *sfn_entry_offset);
 
 /**
+ * Herlper function for advancing to the next SFN entry.
+ * If `entry_offset` already points to an SFN entry, this is what will be written to `*sfn_entry_offset`.
+ *
+ * Returns FOS_EMPTY if `entry_offset` points to the directory terminator, overshoots directory
+ * sectors, or the end of the directory is reached before hitting an SFN.
+ *
+ * FOS_STATE_MISMATCH is returned if a malformed sequence is found.
+ *
+ * (Really just the same rules as the above two functions combined)
+ */
+static inline fernos_error_t fat32_next_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, uint32_t *sfn_entry_offset) {
+    fernos_error_t err;
+
+    uint32_t seq_start;
+    err = fat32_next_dir_seq(dev, slot_ind, entry_offset, &seq_start);
+    if (err == FOS_EMPTY) {
+        return FOS_EMPTY;
+    }
+
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    return fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, sfn_entry_offset);
+}
+
+/**
  * Get a sequence's Long Filename given a pointer to its SFN entry.
  *
  * This function back tracks from the short file name entry over each of the LFN entries.

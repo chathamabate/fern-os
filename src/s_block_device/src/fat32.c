@@ -798,11 +798,7 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
     return FOS_SUCCESS;
 }
 
-/**
- * Returns FOS_INVALID_RANGE if the chain is not large enough!
- * Returns FOS_STATE_MISMATCH if the chain is malformed!
- */
-static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind, 
+fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t sector_offset, uint32_t num_sectors, void *buf, bool write) {
     if (!buf) {
         return FOS_BAD_ARGS;
@@ -896,17 +892,7 @@ static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind,
     }
 }
 
-fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t sector_offset, uint32_t num_sectors, void *dest) {
-    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, dest, false);
-}
-
-fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t num_sectors, const void *src) {
-    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, (void *)src, true);
-}
-
-static fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_ind,
+fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *buf, bool write) {
     if (!buf) {
         return FOS_BAD_ARGS;
@@ -959,16 +945,6 @@ static fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_
     }
 
     return FOS_SUCCESS;
-}
-
-fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest) {
-    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, dest, false);
-}
-
-fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src) {
-    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, (void *)src, true);
 }
 
 void fat32_dump_fat(fat32_device_t *dev, void (*pf)(const char *fmt, ...)) {

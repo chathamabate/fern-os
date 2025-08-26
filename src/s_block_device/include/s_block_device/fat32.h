@@ -804,30 +804,27 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t slot_offset, uint32_t *slot_stop_ind);
 
 /**
- * Read sectors of a chain into `dest`.
+ * Reads or writes sectors of a chain into/from `buf`.
  *
- * `dest` must have size at least `num_sectors` * sector size.
+ * `buf` must have size at least `num_sectors` * sector size.
  *
  * If the sector offset is past the end of the chain, FOS_INVALID_INDEX will be returned.
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
  * If the given chain is malformed or some way, or if a bad cluster is hit, FOS_STATE_MISMATCH
  * is returned.
  */
-fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t sector_offset, uint32_t num_sectors, void *dest);
+fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t sector_offset, uint32_t num_sectors, void *buf, bool write);
 
-/**
- * Write sectors of a chain from `src`.
- *
- * `src` must have size at least `num_sectors` * sector size.
- *
- * If the sector offset is past the end of the chain, FOS_INVALID_INDEX will be returned.
- * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
- * If the given chain is malformed is some way, or if a bad cluster is hit, FOS_STATE_MISMATCH
- * is returned.
- */
-fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t num_sectors, const void *src);
+static inline fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t sector_offset, uint32_t num_sectors, void *dest) {
+    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, dest, false);
+}
+
+static inline fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t num_sectors, const void *src) {
+    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, (void *)src, true);
+}
 
 /*
  * The read/write piece functions below are implemented to use the bd read/write piece functions.
@@ -836,29 +833,27 @@ fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
  */
 
 /**
- * Read bytes from just ONE sector within a chain.
- * 
- * `dest` must have size at least `len`.
- *
- * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
- * If the byte range doesn't fit in one sector FOS_INVALID_RANGE is returned.
- * If the given slot_ind points to a bad cluster FOS_STATE_MISMATCH is returned.
- */
-fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest);
-
-/**
- * Write bytes to just ONE sector within a chain.
+ * Read/Write bytes to just ONE sector within a chain.
  *
  * `len` must be < sector size.
- * `src` must have size at least `len`.
+ * `buf` must have size at least `len`.
  *
  * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
  * If the byte range doesn't fit in one sector FOS_INVALID_RANGE is returned.
  * If the given slot_ind points to a bad cluster FOS_STATE_MISMATCH is returned.
  */
-fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src);
+fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *buf, bool write);
+
+static inline fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest) {
+    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, dest, false);
+}
+
+static inline fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src) {
+    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, (void *)src, true);
+}
 
 /**
  * Print out some string representation of the FAT.
