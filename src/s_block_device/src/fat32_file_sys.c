@@ -147,7 +147,7 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
         uint32_t path_processed = next_filename(&(path[path_str_offset]), fn_buf);
 
         // NOTE: if this runs on the first iteration, we know our path must be "/".
-        if (path_processed == 0) {
+        if (fn_buf[0] == '\0') {
             // We have traversed our path successfully!
 
             fat32_fs_node_key_t nk = al_malloc(fat32_fs->al, sizeof(fat32_fs_node_key_val_t));

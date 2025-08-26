@@ -113,7 +113,7 @@ typedef struct _fs_node_info_t {
      * For a file, this is the length of the file in bytes.
      * For a directory, this is the number of entries within the directory.
      *
-     * NOTE: For directories, this does NOT its relative entries. ("." and "..")
+     * NOTE: For directories, this does NOT include its relative entries. ("." and "..")
      *
      * REQUIRED
      */
