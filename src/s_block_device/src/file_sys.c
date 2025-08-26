@@ -122,19 +122,8 @@ size_t next_filename(const char *path, char *dest) {
         char c = path[i];
 
         if (c == '\0' || c == '/') {
-            // Empty Path case.
-            if (i == 0) {
-                dest[0] = '\0';
-                return 0;
-            }
-
-            // Root dir path case.
-            if (i == fn_start) {
-                dest[0] = '\0';
-                return 0;
-            }
-
-            // Otherwise, an actual filename was traversed.
+            // We've reached the end of the string, or the end of a traversed filename.
+            // This will still work in the case of "" or "/" paths!
 
             size_t len = i - fn_start;
             mem_cpy(dest, &(path[fn_start]), len);

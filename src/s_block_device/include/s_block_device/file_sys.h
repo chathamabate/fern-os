@@ -48,6 +48,8 @@
 
 /**
  * Returns true if the given filename is valid. False otherwise.
+ *
+ * A valid filename contains only characaters a-z, A-Z, 0-9, -, ., _
  */
 bool is_valid_filename(const char *fn);
 

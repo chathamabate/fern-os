@@ -671,7 +671,7 @@ uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sect
  * by this instance.
  *
  * IT IS GAURANTEED that the root dir chain starts at slot index 2. (the 3rd slot in the FAT)
- * AND, that the root directory is empty.
+ * AND, that the root directory starts with one entry: "." (The self reference)
  */
 fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sectors, 
         uint32_t sectors_per_cluster);

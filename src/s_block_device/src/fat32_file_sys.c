@@ -187,11 +187,11 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
 
 
         uint32_t seq_start;
-        if (mem_cmp(fn_buf, ".", 2)) {
+        if (str_eq(fn_buf, ".")) {
             // Technically in this case we could skip reading from the directory and just not
             // do anything, but whatever.
             err = fat32_find_sfn(dev, prev_ind, ".       ", "   ", &seq_start);
-        } else if (mem_cmp(fn_buf, "..", 3)) {
+        } else if (str_eq(fn_buf, "..")) {
             err = fat32_find_sfn(dev, prev_ind, "..      ", "   ", &seq_start);
         } else {
             // Otherwise normal LFN lookup.

@@ -220,12 +220,28 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
         }
     }
 
-    // Write out root directory and readme contents!
-
     const uint32_t data_section_offset = offset + reserved_sectors + (fat_copies * spf);
     
-    fat32_dir_entry_t root_dir[512 / sizeof(fat32_dir_entry_t)] = {0};
-    root_dir[0].raw[0] = FAT32_DIR_ENTRY_TERMINTAOR;
+    fat32_dir_entry_t root_dir[512 / sizeof(fat32_dir_entry_t)] = { 0 };
+
+    // The root directory will start with just the self reference!
+    root_dir[0].short_fn = (fat32_short_fn_dir_entry_t) {
+        .short_fn = {'.', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+        .extenstion = {' ' , ' ' , ' '},
+        .last_write_time = 0,
+        .last_write_date = 0,
+        .creation_time = 0,
+        .creation_date = 0,
+        .creation_time_hundredths = 0,
+        .last_access_date = 0,
+        .attrs = FT32F_ATTR_SUBDIR,
+        .files_size = 0,
+        
+        .first_cluster_low = 2, // Root cluster is 2.
+        .first_cluster_high = 0
+    };
+
+    root_dir[1].raw[0] = FAT32_DIR_ENTRY_TERMINTAOR;
 
     // Remember, the root directory as a whole is more than just one sector!
 
