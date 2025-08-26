@@ -36,6 +36,7 @@
 #include "s_block_device/test/fat32.h"
 #include "s_block_device/test/fat32_dir.h"
 #include "s_block_device/test/file_sys_helpers.h"
+#include "s_block_device/test/fat32_file_sys.h"
 
 #include "k_sys/ata.h"
 
@@ -145,7 +146,7 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-    test_file_sys_helpers();
+    test_fat32_file_sys();
     lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));
