@@ -1,6 +1,7 @@
 
 #include "s_block_device/file_sys.h"
 #include "s_util/str.h"
+#include "s_util/ansii.h"
 
 static bool fn_char_map_ready = false;
 static bool fn_char_map[256];
@@ -132,4 +133,90 @@ size_t next_filename(const char *path, char *dest) {
             return i;
         }
     }
+}
+
+static fernos_error_t fs_dump_tree_helper(file_sys_t *fs, void (*pf)(const char *, ...), fs_node_key_t nk,
+        size_t depth) {
+    fernos_error_t err;
+
+    // This is hard on the stack, so I won't make it sooo big.
+    char names_bufs[2][FS_MAX_FILENAME_LEN + 1];
+    const size_t num_names_bufs = sizeof(names_bufs) / sizeof(names_bufs[0]);
+
+    size_t name_index = 0;
+
+    while (true) {
+        err = fs_get_child_names(fs, nk, name_index, num_names_bufs, names_bufs); 
+
+        // State mismatch should only be returned in the case where `nk` points to 
+        // a file not a directory. This is OK, just don't print anything out.
+        //
+        // This is really here in the case where the first node will call this funciton on is
+        // not a directory. The recursive case below makes sure only to recur when working with 
+        // a subdirectory.
+        if (err == FOS_STATE_MISMATCH) {
+            return FOS_SUCCESS;
+        }
+
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        for (size_t i = 0; i < num_names_bufs; i++) {
+            if (names_bufs[i][0] == '\0') {
+                return FOS_SUCCESS; // We have process all names!
+            }
+
+            fs_node_key_t child_node_key;
+            err = fs_new_key(fs, nk, names_bufs[i], &child_node_key);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+
+            fs_node_info_t info;
+            err = fs_get_node_info(fs, child_node_key, &info);
+
+            // Color coded margin.
+            for (size_t j = 0; j < depth; j++) {
+                switch (j & 1) {
+                case 0:
+                    pf(".");
+                    break;
+                case 1:
+                    pf(ANSII_GREEN_FG "." ANSII_RESET);
+                    break;
+                }
+            }
+
+            if (info.is_dir) {
+                pf(ANSII_BRIGHT_BLUE_FG "%s\n" ANSII_RESET, names_bufs[i]);
+
+                err = fs_dump_tree_helper(fs, pf, child_node_key, depth + 1);
+                if (err != FOS_SUCCESS) {
+                    return err;
+                }
+            } else {
+                pf("%s (size=%u)\n", names_bufs[i], info.len);
+            }
+
+            fs_delete_key(fs, child_node_key);
+        }
+
+        name_index += num_names_bufs;
+    }
+}
+
+void fs_dump_tree(file_sys_t *fs, void (*pf)(const char *, ...), fs_node_key_t cwd, const char *path) {
+    fernos_error_t err;
+
+    fs_node_key_t key;
+
+    err = fs_new_key(fs, cwd, path, &key);
+    if (err != FOS_SUCCESS) {
+        return;
+    }
+    
+    fs_dump_tree_helper(fs, pf, key, 0);
+
+    fs_delete_key(fs, key);
 }

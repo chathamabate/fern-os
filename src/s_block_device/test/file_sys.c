@@ -507,6 +507,41 @@ static bool test_fs_rw2(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fs_random_file_tree(void) {
+    rand_t r = rand(0);
+
+    fernos_error_t err;
+
+    fs_node_key_t dir_keys[100];
+    const size_t dir_keys_cap = sizeof(dir_keys) / sizeof(dir_keys[0]);
+
+    err = fs_new_key(fs, NULL, "/", &(dir_keys[0]));
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    size_t dir_keys_len = 1;
+
+    while (dir_keys_len < dir_keys_cap) {
+        const fs_node_key_t dir_key = dir_keys[next_rand_u32(&r) % dir_keys_len];
+
+        const char new_dir_name[2] = {
+            'a' + next_rand_u8(&r) % 26, '\0'
+        };
+
+        err = fs_mkdir(fs, dir_key, new_dir_name, &(dir_keys[dir_keys_len]));
+        TEST_TRUE(err == FOS_SUCCESS || err == FOS_IN_USE);
+
+        if (err == FOS_SUCCESS) {
+            dir_keys_len++;
+        }
+    }
+
+    for (size_t i = 0; i < dir_keys_len; i++) {
+        fs_delete_key(fs, dir_keys[i]);
+    }
+
+
+    TEST_SUCCEED();
+}
 
 bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     generate_fs = gen;
@@ -519,5 +554,6 @@ bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     RUN_TEST(test_fs_rw0);
     RUN_TEST(test_fs_rw1);
     RUN_TEST(test_fs_rw2);
+    RUN_TEST(test_fs_random_file_tree);
     return END_SUITE();
 }

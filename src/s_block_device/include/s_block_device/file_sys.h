@@ -336,3 +336,15 @@ static inline fernos_error_t fs_write(file_sys_t *fs, fs_node_key_t file_key, si
 static inline fernos_error_t fs_resize(file_sys_t *fs, fs_node_key_t file_key, size_t bytes) {
     return fs->impl->fs_resize(fs, file_key, bytes);
 }
+
+/**
+ * Usually "dump" functions are optional an defined by the implementor.
+ *
+ * In this case, the generic functions above give us enough information to dump a file tree
+ * for any file system implementation.
+ *
+ * This function will just stop if an error is encountered.
+ *
+ * `cwd` and `path` follow the same usage rules of `fs_new_key`. 
+ */
+void fs_dump_tree(file_sys_t *fs, void (*pf)(const char *, ...), fs_node_key_t cwd, const char *path);
