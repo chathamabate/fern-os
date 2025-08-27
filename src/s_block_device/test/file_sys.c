@@ -85,12 +85,71 @@ static bool test_fs_touch_and_mkdir(void) {
         fs_delete_key(fs, dir0_key);
     }
 
+    // Ok, now let's try access a series of expected and unexpected paths.
+
     const char *existing_paths[] = {
-        ""
+        "./a",
+        "/a",
+        "d",
+        "/a/b/C",
+        "b/c/",
+        "./a/../b/.././c/b/E"
     };
     const size_t num_existing_paths = sizeof(existing_paths) / sizeof(existing_paths[0]);
 
-    // Ok, now let's try access a series of expected and unexpected paths.
+    fs_node_key_t key;
+
+    for (size_t i = 0; i < num_existing_paths; i++) {
+        err = fs_new_key(fs, root_key, existing_paths[i], &key);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        fs_delete_key(fs, key);
+    }
+
+    const char *non_existing_paths[] = {
+        "f",
+        "/f",
+        "/a/b/G",
+        "..", // The root dir doesn't have a parent!
+        "a/b/../c/9",
+        "/c/f/B"
+    };
+    const size_t num_non_existing_paths = sizeof(non_existing_paths) / sizeof(non_existing_paths[0]);
+
+    for (size_t i = 0; i < num_non_existing_paths; i++) {
+        err = fs_new_key(fs, root_key, non_existing_paths[i], &key);
+        TEST_EQUAL_HEX(FOS_EMPTY, err);
+    }
+
+    // Finally, let's try out some simple error cases.
+
+    // 1) trying to create a file/directory into a non-sub directory should fail!
+
+    err = fs_new_key(fs, NULL, "/a/b/C", &key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_touch(fs, key, "k", NULL);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    err = fs_mkdir(fs, key, "k", NULL);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    fs_delete_key(fs, key);
+
+    // 2) We should not be able to make a file if one with the same name already exists.
+
+    err = fs_new_key(fs, NULL, "/b/b", &key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_touch(fs, key, "A", NULL);
+    TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+    err = fs_mkdir(fs, key, "A", NULL);
+    TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+    // Maybe we can test exhausting all disk space in a later test.
+
+    fs_delete_key(fs, key);
 
     fs_delete_key(fs, root_key);
 
