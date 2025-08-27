@@ -512,7 +512,7 @@ static bool test_fs_random_file_tree(void) {
 
     fernos_error_t err;
 
-    fs_node_key_t dir_keys[100];
+    fs_node_key_t dir_keys[50];
     const size_t dir_keys_cap = sizeof(dir_keys) / sizeof(dir_keys[0]);
 
     err = fs_new_key(fs, NULL, "/", &(dir_keys[0]));
@@ -520,11 +520,13 @@ static bool test_fs_random_file_tree(void) {
 
     size_t dir_keys_len = 1;
 
+    // Here we make some random directories.
+
     while (dir_keys_len < dir_keys_cap) {
         const fs_node_key_t dir_key = dir_keys[next_rand_u32(&r) % dir_keys_len];
 
         const char new_dir_name[2] = {
-            'a' + next_rand_u8(&r) % 26, '\0'
+            'a' + (next_rand_u8(&r) % 26), '\0'
         };
 
         err = fs_mkdir(fs, dir_key, new_dir_name, &(dir_keys[dir_keys_len]));
@@ -535,10 +537,105 @@ static bool test_fs_random_file_tree(void) {
         }
     }
 
-    for (size_t i = 0; i < dir_keys_len; i++) {
+    // Next let's make some random files.
+
+    uint8_t rw_buf[1024];
+    const size_t rw_buf_size = sizeof(rw_buf) / sizeof(rw_buf[0]);
+
+    hasher_ft hash_func = fs_get_key_hasher(fs);
+    TEST_TRUE(hash_func != NULL);
+
+    const size_t files_to_create = 100;
+    size_t num_files = 0;
+
+    while (num_files < files_to_create) {
+        // Here we know the dirs_keys array is full.
+        const fs_node_key_t dir_key = dir_keys[next_rand_u32(&r) % dir_keys_cap];
+
+        const char new_file_name[6] = {
+            'A' + (next_rand_u8(&r) % 26), '.', 't', 'x', 't', '\0'
+        };
+
+        fs_node_key_t file_key;
+
+        err = fs_touch(fs, dir_key, new_file_name, &file_key);
+        TEST_TRUE(err == FOS_SUCCESS || err == FOS_IN_USE);
+
+        if (err == FOS_SUCCESS) {
+            const uint32_t hash = hash_func(&file_key);
+            const size_t new_size = (hash % rw_buf_size);
+
+            err = fs_resize(fs, file_key, new_size);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            mem_set(rw_buf, (uint8_t)hash, new_size);
+            err = fs_write(fs, file_key, 0, new_size, rw_buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            fs_delete_key(fs, file_key);
+            num_files++;
+        }
+    }
+
+    for (size_t i = 0; i < dir_keys_cap; i++) {
         fs_delete_key(fs, dir_keys[i]);
     }
 
+    // Now we are going to go through each file randomly, confirming each file's contents.
+    // (NOTE: This will most definitely not hit every created file, but that's ok)
+    for (size_t trial = 0; trial < files_to_create; trial++) {
+        fs_node_key_t iter;
+
+        err = fs_new_key(fs, NULL, "/", &iter);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        while (true) {
+            fs_node_info_t info;
+
+            err = fs_get_node_info(fs, iter, &info); 
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            if (!(info.is_dir)) { // Data file.
+                const uint32_t hash = hash_func(&iter); 
+                const uint32_t exp_size = hash % rw_buf_size;
+
+                err = fs_read(fs, iter, 0, exp_size, rw_buf);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+                // Confirm contents.
+                for (size_t i = 0; i < exp_size; i++) {
+                    TEST_EQUAL_UINT((uint8_t)hash, rw_buf[i]);
+                }
+
+                // Success Exit this trial!
+                break;
+            } 
+
+            // Sub directory case.
+
+            if (info.len == 0) { // We reached an empty subdirectory :(
+                break;
+            }
+
+            // Non-empty subdirectory!
+            
+            char name_buf[1][FS_MAX_FILENAME_LEN + 1];
+
+            err = fs_get_child_names(fs, iter, next_rand_u32(&r) % info.len, 1, name_buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            fs_node_key_t next_iter;
+            err = fs_new_key(fs, iter, name_buf[0], &next_iter);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            fs_delete_key(fs, iter);
+            iter = next_iter;
+        }
+
+        fs_delete_key(fs, iter);
+    }
+
+    fs_dump_tree(fs, term_put_fmt_s, NULL, "/");
 
     TEST_SUCCEED();
 }
