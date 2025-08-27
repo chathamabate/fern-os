@@ -722,7 +722,6 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
     fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
     fat32_device_t *dev = fat32_fs->dev;
 
-
     fernos_error_t err;
 
     size_t i = 0; // The index of the next valid sequence we visit.
@@ -733,7 +732,7 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
 
     while (true) {
         uint32_t sfn_offset;
-        err = fat32_get_dir_seq_sfn(dev, pd->starting_slot_ind, entry_iter, &sfn_offset);
+        err = fat32_next_dir_seq_sfn(dev, pd->starting_slot_ind, entry_iter, &sfn_offset);
         if (err == FOS_EMPTY) { 
             // Ok, we reached the end BEFORE filling all the `names` buffers, nbd, just write out
             // some '\0's and call it a day.

@@ -204,7 +204,7 @@ static bool test_fs_remove(void) {
     TEST_SUCCEED();
 }
 
-static bool test_get_child_names(void) {
+static bool test_fs_get_child_names(void) {
     fernos_error_t err;
 
     char names_bufs[3][FS_MAX_FILENAME_LEN + 1];
@@ -234,6 +234,74 @@ static bool test_get_child_names(void) {
         }
     }
 
+    err = fs_get_child_names(fs, root_key, num_files, num_names_bufs, names_bufs);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t i = 0; i < num_names_bufs; i++) {
+        TEST_TRUE(str_eq("", names_bufs[i]));
+    }
+
+    // Now let's try getting the names from a file (which should fail)
+
+    fs_node_key_t file_key;
+
+    err = fs_new_key(fs, root_key, "a", &file_key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_get_child_names(fs, file_key, 0, num_names_bufs, names_bufs);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    fs_delete_key(fs, file_key);
+
+    TEST_SUCCEED();
+}
+
+static bool test_fs_get_node_info(void) {
+    fernos_error_t err;
+
+    fs_node_info_t info;
+
+    err = fs_get_node_info(fs, root_key, &info);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_TRUE(info.is_dir);
+    TEST_EQUAL_UINT(0, info.len);
+
+    err = fs_touch(fs, root_key, "a", NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_node_key_t child_key;
+
+    err = fs_touch(fs, root_key, "b", &child_key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_get_node_info(fs, child_key, &info);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_FALSE(info.is_dir);
+    TEST_EQUAL_UINT(0, info.len); // Files should start with len 0.
+
+    fs_delete_key(fs, child_key);
+
+    err = fs_mkdir(fs, root_key, "c", &child_key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_get_node_info(fs, child_key, &info);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_TRUE(info.is_dir);
+    TEST_EQUAL_UINT(0, info.len); // Make sure "." and ".." are skipped.
+
+    fs_delete_key(fs, child_key);
+
+    // Finally go back to root dir now that it has children.
+
+    err = fs_get_node_info(fs, root_key, &info);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_TRUE(info.is_dir);
+    TEST_EQUAL_UINT(3, info.len);
+
     TEST_SUCCEED();
 }
 
@@ -244,6 +312,7 @@ bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     BEGIN_SUITE(name);
     RUN_TEST(test_fs_touch_and_mkdir);
     RUN_TEST(test_fs_remove);
-    RUN_TEST(test_get_child_names);
+    RUN_TEST(test_fs_get_child_names);
+    RUN_TEST(test_fs_get_node_info);
     return END_SUITE();
 }
