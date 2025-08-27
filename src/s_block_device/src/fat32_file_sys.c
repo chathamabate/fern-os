@@ -200,7 +200,7 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
 
         // Entry couldn't be found.
         if (err == FOS_EMPTY) {
-            return FOS_EMPTY;
+            return FOS_INVALID_INDEX;
         }
 
         if (err != FOS_SUCCESS) {

@@ -3,6 +3,7 @@
 
 #include "k_bios_term/term.h"
 #include "s_mem/allocator.h"
+#include "s_util/str.h"
 
 static bool pretest(void);
 static bool posttest(void);
@@ -17,8 +18,11 @@ static bool posttest(void);
 static file_sys_t *(*generate_fs)(void) = NULL;
 static file_sys_t *fs = NULL;
 static size_t num_al_blocks = 0;
+static fs_node_key_t root_key = NULL;
 
 static bool pretest(void) {
+    fernos_error_t err;
+
     num_al_blocks = al_num_user_blocks(get_default_allocator());
 
     TEST_TRUE(generate_fs != NULL);
@@ -26,11 +30,16 @@ static bool pretest(void) {
     fs = generate_fs();
     TEST_TRUE(fs != NULL);
 
+    err = fs_new_key(fs, NULL, "/", &root_key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
     TEST_SUCCEED();
 }
 
 static bool posttest(void) {
     fernos_error_t err;
+
+    fs_delete_key(fs, root_key);
 
     err = fs_flush(fs, NULL);
     TEST_EQUAL_UINT(FOS_SUCCESS, err);
@@ -48,11 +57,6 @@ static bool test_fs_touch_and_mkdir(void) {
 
     // Maybe we could make a could of subdirectories on root?
     // Put files in those subdirectories???
-
-    fs_node_key_t root_key;
-
-    err = fs_new_key(fs, NULL, "/", &root_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     char name_buf[2] = " ";
 
@@ -118,7 +122,7 @@ static bool test_fs_touch_and_mkdir(void) {
 
     for (size_t i = 0; i < num_non_existing_paths; i++) {
         err = fs_new_key(fs, root_key, non_existing_paths[i], &key);
-        TEST_EQUAL_HEX(FOS_EMPTY, err);
+        TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
     }
 
     // Finally, let's try out some simple error cases.
@@ -156,11 +160,90 @@ static bool test_fs_touch_and_mkdir(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fs_remove(void) {
+    fernos_error_t err;
+
+    fs_node_key_t subdir_key;
+    err = fs_mkdir(fs, root_key, "sub", &subdir_key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    char name_buf[2] = " ";
+    for (char c = 'a'; c <= 'c'; c++) {
+        name_buf[0] = c;
+
+        err = fs_touch(fs, subdir_key, name_buf, NULL);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // At this point, we should not be able to delete the subdir.
+
+    err = fs_remove(fs, root_key, "sub");
+    TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+    err = fs_remove(fs, subdir_key, "a");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_node_key_t dummy_key;
+    err = fs_new_key(fs, subdir_key, "a", &dummy_key);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = fs_remove(fs, subdir_key, "b");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_remove(fs, subdir_key, "c");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_delete_key(fs, subdir_key);
+
+    err = fs_remove(fs, root_key, "sub");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_remove(fs, root_key, "sub");
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    TEST_SUCCEED();
+}
+
+static bool test_get_child_names(void) {
+    fernos_error_t err;
+
+    char names_bufs[3][FS_MAX_FILENAME_LEN + 1];
+    const size_t num_names_bufs = sizeof(names_bufs) / sizeof(names_bufs[0]);
+
+    char name_buf[2] = " ";
+
+    const size_t num_files = 10;
+    for (size_t i = 0; i < num_files; i++) {
+        name_buf[0] = 'a' + i;
+
+        err = fs_touch(fs, root_key, name_buf, NULL);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    for (size_t i = 0; i < num_files; i += num_names_bufs) {
+        err = fs_get_child_names(fs, root_key, i, num_names_bufs, names_bufs);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        for (size_t j = 0; j < num_names_bufs; j++) {
+            if (i + j < num_files) {
+                name_buf[0] = 'a' + i + j;
+                TEST_TRUE(str_eq(name_buf, names_bufs[j]));
+            } else {
+                TEST_TRUE(str_eq("", names_bufs[j]));
+            }
+        }
+    }
+
+    TEST_SUCCEED();
+}
+
 
 bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     generate_fs = gen;
 
     BEGIN_SUITE(name);
     RUN_TEST(test_fs_touch_and_mkdir);
+    RUN_TEST(test_fs_remove);
+    RUN_TEST(test_get_child_names);
     return END_SUITE();
 }
