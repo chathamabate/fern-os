@@ -4,6 +4,7 @@
 #include "k_bios_term/term.h"
 #include "s_mem/allocator.h"
 #include "s_util/str.h"
+#include "s_util/rand.h"
 
 static bool pretest(void);
 static bool posttest(void);
@@ -305,6 +306,207 @@ static bool test_fs_get_node_info(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fs_rw0(void) {
+    fernos_error_t err;
+
+    // Pretty simple write than read.
+    fs_node_key_t key;
+
+    err = fs_touch(fs, root_key, "a.txt", &key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    uint8_t buf[100];
+
+    const size_t file_size = sizeof(buf);
+    err = fs_resize(fs, key, file_size);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t i = 0; i < file_size; i++) {
+        buf[i] = (uint8_t)i;
+    }
+
+    err = fs_write(fs, key, 0, file_size, buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    mem_set(buf, 0, file_size);
+
+    const size_t skip = 11;
+    for (size_t i = 0; i < file_size; i += skip) {
+        const size_t read_amt = i + skip > file_size ? file_size - i : skip;
+        err = fs_read(fs, key, i, read_amt, buf);
+        for (size_t j = 0; j < read_amt; j++) {
+            TEST_EQUAL_UINT(i + j, buf[j]);
+        }
+    }
+
+    fs_delete_key(fs, key);
+
+    // Throwing this in real quick here.
+    err = fs_write(fs, root_key, 0, 10, buf);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    TEST_SUCCEED();
+}
+
+static bool test_fs_rw1(void) {
+    // IDK, maybe try a bigger file now??
+    fernos_error_t err;
+
+    // Pretty simple write than read.
+
+    fs_node_key_t key;
+
+    err = fs_touch(fs, root_key, "a.txt", &key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    const size_t file_size = 4096;
+
+    err = fs_resize(fs, key, file_size);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    uint8_t *big_buf = da_malloc(file_size);
+    TEST_TRUE(big_buf != NULL);
+
+    // 0 out the file.
+    mem_set(big_buf, 0, file_size);
+    err = fs_write(fs, key, 0, file_size, big_buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    mem_set(big_buf, 1, file_size);
+    err = fs_write(fs, key, 1, file_size - 2, big_buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    mem_set(big_buf, 0, file_size);
+    err = fs_read(fs, key, 1, file_size - 2, big_buf + 1);
+
+    TEST_EQUAL_UINT(0, big_buf[0]);
+    for (size_t i = 1; i < file_size - 1; i++) {
+        TEST_EQUAL_UINT(1, big_buf[i]); 
+    }
+    TEST_EQUAL_UINT(0, big_buf[file_size - 1]);
+
+
+    // IDK, I guess resize to smaller?
+
+    err = fs_resize(fs, key, file_size / 2);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_write(fs, key, 0, file_size, big_buf);
+    TEST_EQUAL_HEX(FOS_INVALID_RANGE,  err);
+
+    da_free(big_buf);
+
+    fs_delete_key(fs, key);
+
+    TEST_SUCCEED();
+}
+
+static bool test_fs_rw2(void) {
+    // Random test (i.e. my favorite type of test)
+    rand_t r = rand(0);
+
+    fernos_error_t err;
+
+    fs_node_key_t key;
+
+    err = fs_touch(fs, root_key, "a.txt", &key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    size_t file_size = 100;
+
+    err = fs_resize(fs, key, file_size);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    uint8_t *buf = da_malloc(file_size);
+    TEST_TRUE(buf != NULL);
+
+    mem_set(buf, 0, file_size);
+
+    uint8_t *tx_buf = da_malloc(file_size);
+    TEST_TRUE(tx_buf != NULL);
+
+    mem_set(tx_buf, 0, file_size);
+
+    // Set the file as all 0's to start.
+    err = fs_write(fs, key, 0, file_size, tx_buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t iter = 0; iter < 1000; iter++) {
+        if (next_rand_u1(&r)) { // r/w
+            const size_t tx_offset = next_rand_u32(&r) % file_size;
+            const size_t tx_amt = (next_rand_u32(&r) % (file_size - tx_offset)) + 1;
+
+            if (next_rand_u1(&r)) { // write
+                // Write to our mirror buffer.
+                mem_set(buf + tx_offset, iter % 20, tx_amt); 
+
+                // Transfer to the file.
+                mem_set(tx_buf + tx_offset, iter % 20, tx_amt); 
+                err = fs_write(fs, key, tx_offset, tx_amt, tx_buf + tx_offset);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            } else { // read
+                // Read from file to the tx buf.
+
+                err = fs_read(fs, key, tx_offset, tx_amt, tx_buf + tx_offset);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+                // Compare with mirror buffer.
+                TEST_TRUE(mem_cmp(buf + tx_offset, tx_buf + tx_offset, tx_amt));
+            }
+        } else { // resize
+            size_t new_file_size = file_size;
+
+            if (next_rand_u1(&r)) { // Stretch. (We will favor stretching)
+                new_file_size += 80;
+            } else if (file_size >= 100) { // Shrink.
+                new_file_size -= 20;
+            }
+
+            if (new_file_size != file_size) {
+                buf = da_realloc(buf, new_file_size);
+                TEST_TRUE(buf != NULL);
+
+                tx_buf = da_realloc(tx_buf, new_file_size);
+                TEST_TRUE(buf != NULL);
+
+                err = fs_resize(fs, key, new_file_size);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+                // Make sure new section added is zero'd out.
+                if (new_file_size > file_size) {
+                    mem_set(buf + file_size, 0, new_file_size - file_size);
+                    mem_set(tx_buf + file_size, 0, new_file_size - file_size);
+
+                    err = fs_write(fs, key, file_size, new_file_size - file_size, tx_buf + file_size);
+                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                }
+
+                file_size = new_file_size;
+            }
+        }
+    }
+
+    // One final check of the full file contents.
+    err = fs_read(fs, key, 0, file_size, tx_buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_TRUE(mem_cmp(buf, tx_buf, file_size));
+
+    // Also let's do an info read cause what the hell.
+    fs_node_info_t info;
+
+    err = fs_get_node_info(fs, key, &info);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(file_size, info.len);
+
+    da_free(tx_buf);
+    da_free(buf);
+
+    fs_delete_key(fs, key);
+
+    TEST_SUCCEED();
+}
+
 
 bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     generate_fs = gen;
@@ -314,5 +516,8 @@ bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     RUN_TEST(test_fs_remove);
     RUN_TEST(test_fs_get_child_names);
     RUN_TEST(test_fs_get_node_info);
+    RUN_TEST(test_fs_rw0);
+    RUN_TEST(test_fs_rw1);
+    RUN_TEST(test_fs_rw2);
     return END_SUITE();
 }
