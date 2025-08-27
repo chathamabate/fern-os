@@ -53,6 +53,11 @@ static bool posttest(void) {
     TEST_SUCCEED();
 }
 
+/*
+ * Honestly, this test suite could be better. A file system is such a big thing,
+ * comprehensive testing is difficult.
+ */
+
 static bool test_fs_touch_and_mkdir(void) {
     fernos_error_t err;
 
@@ -635,7 +640,104 @@ static bool test_fs_random_file_tree(void) {
         fs_delete_key(fs, iter);
     }
 
-    fs_dump_tree(fs, term_put_fmt_s, NULL, "/");
+    TEST_SUCCEED();
+}
+
+static bool test_fs_zero_resize(void) {
+    // Resizing to size 0 should succeed and NOT delete the file.
+    // That is what this tests.
+    
+    fernos_error_t err;
+
+    fs_node_key_t child_key;
+    err = fs_touch(fs, root_key, "a.txt", &child_key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_resize(fs, child_key, 100);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_resize(fs, child_key, 0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_delete_key(fs, child_key);
+
+    err = fs_new_key(fs, root_key, "a.txt", &child_key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_delete_key(fs, child_key);
+
+    TEST_SUCCEED();
+}
+
+static bool test_fs_exhaust(void) {
+    // Try salvaging the file system even after using up all disk space.
+
+    fernos_error_t err;
+
+    uint8_t buf[100];
+    const size_t buf_size = sizeof(buf);
+
+    fs_node_key_t og_file_key;
+    err = fs_touch(fs, root_key, "a.txt", &og_file_key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_resize(fs, og_file_key, buf_size);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    mem_set(buf, 1, buf_size);
+    err = fs_write(fs, og_file_key, 0, buf_size, buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    char name_buf[FS_MAX_FILENAME_LEN + 1];
+
+    uint32_t created = 0;
+    while (true) {
+        fs_node_key_t key;
+        str_fmt(name_buf, "%u", created);
+
+        err = fs_touch(fs, root_key, name_buf, &key);
+        if (err == FOS_NO_SPACE) {
+            break;
+        }
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        // Successfully created a file!
+        created++;
+
+        err = fs_resize(fs, key, 2048);
+        fs_delete_key(fs, key);
+
+        if (err == FOS_NO_SPACE) {
+            break;
+        }
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    err = fs_resize(fs, og_file_key, buf_size + 2048);
+    TEST_EQUAL_HEX(FOS_NO_SPACE, err);
+
+    // Confirm reading works even with no space!
+
+    mem_set(buf, 0, buf_size);
+    err = fs_read(fs, og_file_key, 0, buf_size, buf);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t i = 0; i < buf_size; i++) {
+        TEST_EQUAL_UINT(1, buf[i]);
+    }
+
+    // Now delete all created files.
+    for (size_t i = 0; i < created; i++) {
+        str_fmt(name_buf, "%u", i);
+        err = fs_remove(fs, root_key, name_buf);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Should be able to resize fine here after clearing things up.
+    err = fs_resize(fs, og_file_key, buf_size + 2048);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    
+    fs_delete_key(fs, og_file_key);
 
     TEST_SUCCEED();
 }
@@ -652,5 +754,7 @@ bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     RUN_TEST(test_fs_rw1);
     RUN_TEST(test_fs_rw2);
     RUN_TEST(test_fs_random_file_tree);
+    RUN_TEST(test_fs_zero_resize);
+    RUN_TEST(test_fs_exhaust);
     return END_SUITE();
 }
