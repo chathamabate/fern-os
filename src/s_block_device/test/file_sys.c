@@ -311,6 +311,38 @@ static bool test_fs_get_node_info(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fs_hash_and_equate(void) {
+    fernos_error_t err;
+
+    hasher_ft hash_func = fs_get_key_hasher(fs);
+    TEST_TRUE(hash_func != NULL);
+
+    equator_ft equate_func = fs_get_key_equator(fs);
+    TEST_TRUE(equate_func != NULL);
+
+    fs_node_key_t keys[3];
+
+    err = fs_touch(fs, root_key, "a.txt", keys + 0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_new_key(fs, root_key, "a.txt", keys + 1);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_touch(fs, root_key, "b.txt", keys + 2);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_EQUAL_UINT(hash_func(keys + 0), hash_func(keys + 1));
+    TEST_TRUE(equate_func(keys + 0, keys + 1));
+
+    TEST_FALSE(equate_func(keys + 1, keys + 2));
+
+    for (size_t i = 0; i < 3; i++) {
+        fs_delete_key(fs, keys[i]);
+    }
+
+    TEST_SUCCEED();
+}
+
 static bool test_fs_rw0(void) {
     fernos_error_t err;
 
@@ -742,6 +774,124 @@ static bool test_fs_exhaust(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fs_manual_steps(void) {
+    // This test will try out some moves I write up myself (instead of being
+    // random like the above tests)
+
+    typedef enum {
+        STEP_TOUCH, // (void)
+        STEP_MKDIR, // (void)
+        STEP_REMOVE,// (void)
+        STEP_READ,  // (offset, amt, expected_val)
+        STEP_WRITE, // (offset, amt, value_to_write)
+        STEP_RESIZE // (new_size)
+    } step_type_t;
+
+    typedef struct {
+        step_type_t type;
+
+        const char *dir_path;
+        const char *base_name;
+
+        uint32_t args[3];
+    } step_t;
+
+    static const step_t steps[] = {
+        {STEP_TOUCH, "/", "a.bin", {0}},
+        {STEP_MKDIR, ".", "b", {0}},
+        {STEP_TOUCH, "./b", "b.bin", {0}},
+        {STEP_RESIZE, "./b", "b.bin", {100}},
+        {STEP_WRITE, "/b", "b.bin", {0, 20, 5}},
+        {STEP_WRITE, "/b", "b.bin", {20, 80, 4}},
+        {STEP_RESIZE, "/", "a.bin", {200}},
+        {STEP_TOUCH, "/", "c.bin", {0}},
+        {STEP_READ, "./b", "b.bin", {0, 20, 5}},
+        {STEP_WRITE, "./", "a.bin", {0, 200, 1}},
+        {STEP_READ, "./b", "b.bin", {20, 80, 4}},
+        {STEP_REMOVE, "./b", "b.bin", {0}},
+        {STEP_RESIZE, "/", "c.bin", {1000}},
+        {STEP_READ, "./", "a.bin", {0, 200, 1}}
+
+        // Add more if you'd like...
+    };
+    const size_t num_steps = sizeof(steps) / sizeof(steps[0]);
+
+    fernos_error_t err;
+
+    fs_node_key_t dir_key;
+    fs_node_key_t child_key;
+
+    uint8_t buf[1024];
+    const size_t buf_size = sizeof(buf);
+
+    for (size_t step_i = 0; step_i < num_steps; step_i++) {
+        const step_t step = steps[step_i];
+
+        err = fs_new_key(fs, root_key, step.dir_path, &dir_key);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        switch (step.type) {
+        case STEP_TOUCH:
+            err = fs_touch(fs, dir_key, step.base_name, NULL);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            break;
+        case STEP_MKDIR:
+            err = fs_mkdir(fs, dir_key, step.base_name, NULL);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            break;
+        case STEP_REMOVE:
+            err = fs_remove(fs, dir_key, step.base_name);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            break;
+        case STEP_READ:
+            TEST_TRUE(step.args[1] <= buf_size);
+
+            // Fill the buffer with an unexpected value first.
+            mem_set(buf, (uint8_t)(step.args[2]) + 1, step.args[1]);
+             
+            err = fs_new_key(fs, dir_key, step.base_name, &child_key);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            err = fs_read(fs, child_key, step.args[0], step.args[1], buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            fs_delete_key(fs, child_key);
+
+            for (size_t i = 0; i < step.args[1]; i++) {
+                TEST_EQUAL_UINT(step.args[2], buf[i]);
+            }
+
+            break;
+        case STEP_WRITE:
+            TEST_TRUE(step.args[1] <= buf_size);
+            mem_set(buf, (uint8_t)(step.args[2]), step.args[1]);
+
+            err = fs_new_key(fs, dir_key, step.base_name, &child_key);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            err = fs_write(fs, child_key, step.args[0], step.args[1], buf);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            fs_delete_key(fs, child_key);
+
+            break;
+        case STEP_RESIZE:
+            err = fs_new_key(fs, dir_key, step.base_name, &child_key);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            err = fs_resize(fs, child_key, step.args[0]);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            fs_delete_key(fs, child_key);
+            break;
+        }
+
+        fs_delete_key(fs, dir_key);
+    }
+
+    TEST_SUCCEED();
+}
+
 bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     generate_fs = gen;
 
@@ -750,11 +900,13 @@ bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     RUN_TEST(test_fs_remove);
     RUN_TEST(test_fs_get_child_names);
     RUN_TEST(test_fs_get_node_info);
+    RUN_TEST(test_fs_hash_and_equate);
     RUN_TEST(test_fs_rw0);
     RUN_TEST(test_fs_rw1);
     RUN_TEST(test_fs_rw2);
     RUN_TEST(test_fs_random_file_tree);
     RUN_TEST(test_fs_zero_resize);
     RUN_TEST(test_fs_exhaust);
+    RUN_TEST(test_fs_manual_steps);
     return END_SUITE();
 }
