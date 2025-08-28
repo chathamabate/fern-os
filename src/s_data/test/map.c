@@ -313,22 +313,34 @@ bool test_map(const char *name, map_t *(*gen)(size_t ks, size_t vs)) {
     return END_SUITE();
 }
 
-static uint32_t simple_hash(chained_hash_map_t *chm, const void *key) {
+/**
+ * This is kinda a retro fit. Old hash functions used to actually take a pointer to the map too.
+ * This way a single hash function could deduce the key size, and thus be usable for many different
+ * key types. 
+ *
+ * I went away from this design though, so now I am just storing the key size here so that
+ * I don't need to rewrite some of the above testing code.
+ */
+static uint32_t key_size;
+
+static uint32_t simple_hash(const void *key) {
     uint32_t hash = 0;
 
     const uint8_t *key_arr = (const uint8_t *)key;
-    for (size_t i = 0; i < chm->super.key_size; i++) {
+    for (size_t i = 0; i < key_size; i++) {
         hash += key_arr[i] * (i + 7);
     }
 
     return hash;
 }
 
-static bool simple_eq(chained_hash_map_t *chm, const void *k0, const void *k1) {
-    return mem_cmp(k0, k1, chm->super.key_size);
+static bool simple_eq(const void *k0, const void *k1) {
+    return mem_cmp(k0, k1, key_size);
 }
 
 static map_t *chained_hash_map_gen(size_t ks, size_t vs) {
+    key_size = ks;
+
     return new_chained_hash_map(get_default_allocator(), ks, vs, 3, 
             simple_eq, simple_hash);
 }

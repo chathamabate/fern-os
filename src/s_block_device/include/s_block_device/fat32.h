@@ -7,6 +7,7 @@
 #include "s_mem/allocator.h"
 #include "s_data/list.h"
 #include "s_util/rand.h"
+#include "s_util/datetime.h"
 
 /**
  * No slot entry ever uses the upper 4 bits. I believe these are reserved for the OS.
@@ -296,6 +297,18 @@ static inline fat32_date_t fat32_date(uint8_t month, uint8_t day, uint8_t year) 
     return date;
 }
 
+static inline void fat32_date_to_fos_date(fat32_date_t d, fernos_date_t *out) {
+    out->year = 1980 + fat32_date_get_year(d); 
+    out->month = fat32_date_get_month(d);
+    out->day = fat32_date_get_day(d);
+}
+
+static inline void fos_date_to_fat32_date(fernos_date_t d, fat32_date_t *out) {
+    fat32_date_set_year(out, d.year - 1980);
+    fat32_date_set_month(out, d.month);
+    fat32_date_set_day(out, d.day);
+}
+
 /**
  * [0:4] Seconds / 2 (0-29)
  * [5:10] Minutes  (0-59)
@@ -367,6 +380,28 @@ static inline fat32_time_t fat32_time(uint8_t hours, uint8_t mins, uint8_t secs)
     return time;
 }
 
+static inline void fat32_time_to_fos_time(fat32_time_t t, fernos_time_t *out) {
+    out->hours = fat32_time_get_hours(t); 
+    out->minutes = fat32_time_get_mins(t);
+    out->seconds = fat32_time_get_seconds(t) * 2;
+}
+
+static inline void fos_time_to_fat32_time(fernos_time_t t, fat32_time_t *out) {
+    fat32_time_set_hours(out, t.hours);
+    fat32_time_set_mins(out, t.minutes);
+    fat32_time_set_secs(out, t.seconds / 2);
+}
+
+static inline void fat32_datetime_to_fos_datetime(fat32_date_t d, fat32_time_t t, fernos_datetime_t *out) {
+    fat32_date_to_fos_date(d, &(out->d));
+    fat32_time_to_fos_time(t, &(out->t));
+}
+
+static inline void fos_datetime_to_fat32_datetime(fernos_datetime_t dt, fat32_date_t *out_d, fat32_time_t *out_t) {
+    fos_date_to_fat32_date(dt.d, out_d);
+    fos_time_to_fat32_time(dt.t, out_t);
+}
+
 /*
  * Now for Directory entries.
  */
@@ -409,7 +444,7 @@ typedef struct _fat32_short_fn_dir_entry_t {
     uint16_t first_cluster_high;
     
     /**
-     * Required.
+     * Optional
      */
     fat32_time_t last_write_time;
     fat32_date_t last_write_date;
@@ -636,7 +671,7 @@ uint32_t compute_sectors_per_fat(uint32_t total_sectors, uint16_t bytes_per_sect
  * by this instance.
  *
  * IT IS GAURANTEED that the root dir chain starts at slot index 2. (the 3rd slot in the FAT)
- * AND, that the root directory is empty.
+ * AND, that the root directory starts with one entry: "." (The self reference)
  */
 fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sectors, 
         uint32_t sectors_per_cluster);
@@ -769,30 +804,27 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t slot_offset, uint32_t *slot_stop_ind);
 
 /**
- * Read sectors of a chain into `dest`.
+ * Reads or writes sectors of a chain into/from `buf`.
  *
- * `dest` must have size at least `num_sectors` * sector size.
+ * `buf` must have size at least `num_sectors` * sector size.
  *
  * If the sector offset is past the end of the chain, FOS_INVALID_INDEX will be returned.
  * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
  * If the given chain is malformed or some way, or if a bad cluster is hit, FOS_STATE_MISMATCH
  * is returned.
  */
-fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t sector_offset, uint32_t num_sectors, void *dest);
+fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t sector_offset, uint32_t num_sectors, void *buf, bool write);
 
-/**
- * Write sectors of a chain from `src`.
- *
- * `src` must have size at least `num_sectors` * sector size.
- *
- * If the sector offset is past the end of the chain, FOS_INVALID_INDEX will be returned.
- * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
- * If the given chain is malformed is some way, or if a bad cluster is hit, FOS_STATE_MISMATCH
- * is returned.
- */
-fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t num_sectors, const void *src);
+static inline fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
+        uint32_t sector_offset, uint32_t num_sectors, void *dest) {
+    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, dest, false);
+}
+
+static inline fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t num_sectors, const void *src) {
+    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, (void *)src, true);
+}
 
 /*
  * The read/write piece functions below are implemented to use the bd read/write piece functions.
@@ -801,29 +833,27 @@ fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
  */
 
 /**
- * Read bytes from just ONE sector within a chain.
- * 
- * `dest` must have size at least `len`.
- *
- * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
- * If the byte range doesn't fit in one sector FOS_INVALID_RANGE is returned.
- * If the given slot_ind points to a bad cluster FOS_STATE_MISMATCH is returned.
- */
-fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest);
-
-/**
- * Write bytes to just ONE sector within a chain.
+ * Read/Write bytes to just ONE sector within a chain.
  *
  * `len` must be < sector size.
- * `src` must have size at least `len`.
+ * `buf` must have size at least `len`.
  *
  * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
  * If the byte range doesn't fit in one sector FOS_INVALID_RANGE is returned.
  * If the given slot_ind points to a bad cluster FOS_STATE_MISMATCH is returned.
  */
-fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src);
+fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *buf, bool write);
+
+static inline fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest) {
+    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, dest, false);
+}
+
+static inline fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src) {
+    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, (void *)src, true);
+}
 
 /**
  * Print out some string representation of the FAT.

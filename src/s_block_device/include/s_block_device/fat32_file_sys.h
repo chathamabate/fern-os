@@ -1,98 +1,87 @@
 
 #pragma once
 
-#include <stdint.h>
 #include "s_block_device/fat32.h"
-#include "s_util/misc.h"
-#include "s_block_device/block_device.h"
+#include "s_block_device/fat32_dir.h"
 #include "s_block_device/file_sys.h"
 #include "s_mem/allocator.h"
-#include "s_data/map.h"
-
-
-/*
- * Now for actual file system stuff.
- */
+#include "s_util/datetime.h"
+#include "s_util/rand.h"
 
 typedef struct _fat32_file_sys_t {
     file_sys_t super;
 
-
     allocator_t * const al;
 
-    block_device_t * const bd;
-    const fat32_info_t info;
-    
+    fat32_device_t * const dev;
+
+    const dt_producer_ft now;
+
     /**
-     * A File's first cluster index is unique across ALL files. Thus, that is the key used
-     * for this map. The values are the pointers to the allocated handles themselves.
-     *
-     * This implementation will never hold more than one copy of a handle. 
+     * Used for random sfn generation.
      */
-    map_t * const handle_map;
+    rand_t r;
 } fat32_file_sys_t;
 
-typedef struct _fat32_file_sys_handle_t {
+typedef struct _fat32_fs_node_key_val_t {
     /**
-     * The starting cluster of this file's parent directory.
+     * Whether or not the node pointed to by this key is a directory.
+     */
+    const bool is_dir;
+
+    /**
+     * Index into the FAT of the parent directories starting cluster.
      *
-     * 0 if this handle is for the root directory.
+     * ONLY USED if `is_dir` is FALSE.
      */
-    const uint32_t parent_dir_cluster;
+    const uint32_t parent_slot_ind;
 
     /**
-     * Index of this file's first entry in the parent directory.
+     * Index into the parent directory of this node's SFN entry.
      *
-     * Remember, this is index within the directory sectors. 
-     * This is different than the index passed into fs_find/rm
-     *
-     * Undefined Value if this handle is for the root directory.
+     * ONLY USED if `is_dir` is FALSE.
      */
-    const uint32_t first_entry_index;
+    const uint32_t sfn_entry_offset;
 
     /**
-     * The starting cluster of this file.
+     * The index into the FAT of the first cluster of this node.
      */
-    const uint32_t first_file_cluster;
+    const uint32_t starting_slot_ind;
+} fat32_fs_node_key_val_t;
 
-    /**
-     * Is this a write handle?
-     */
-    const bool write;
+/*
+ * NOTE: This implementation is pretty simple.
+ *
+ * Most notably, to avoid some annoying back tracking code, directory timestamps ARE NOT USED.
+ * Created directories will be given timestamps of 0.
+ *
+ * Only actual data files will have their timestamp information updated.
+ *
+ * Also, this implementation expects that all directories have a self refernce entry ".".
+ * And that all non-root directories have a parent reference entry "..". These entries should only
+ * have be single SFN sequences.
+ *
+ * Other than "." and "..", only sequences with LFN entries will be recognized by this implementation.
+ * Sequences with LFNs which are invalid will be ignored.
+ */
 
-    /**
-     * This denotes the number of people currently using this handle. Should always be 1 for
-     * write handles. When this reaches 0, the handle will likely be destroyed.
-     */
-    uint32_t users;
-
-    /**
-     * Is this a directory handle?
-     */
-    const bool dir;
-
-    /**
-     * Length in bytes of the file. If this is a directory, this value should always be a multiple
-     * of the cluster size.
-     */
-    uint32_t len;
-} fat32_file_sys_handle_t;
+typedef const fat32_fs_node_key_val_t *fat32_fs_node_key_t;
 
 /**
- * Create a FAT32 file system object.
+ * Create a new fat32 file system object by parsing a FAT32 formatted block device.
+ * `offset` should be the very beginning of the parition in `bd`. (unit of sectors)
  *
- * This assumes that a valid FAT32 parition begins at `offset_sector` within the given `bd`.
- * This DOES NOT intialize FAT32 on the block device.
- * This requires a block device with sector size 512!
+ * `dubd` stands for "delete underlying block device". If true, when this file system is deleted,
+ * so will the given block device. Otherwise, the given block device will persist past the lifetime
+ * of the file system object.
  *
- * The created file system DOES NOT own the given block device.
- * When the created file system is deleted, the given block device will persist.
- *
- * Returns NULL on error.
+ * On success, FOS_SUCCESS is returned, the created file system is written to `*fs_out`.
+ * On failure, the given block device will NEVER be deleteed.
  */
-file_sys_t *new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset_sector);
+fernos_error_t parse_new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset,
+        uint64_t seed, bool dubd, dt_producer_ft now, file_sys_t **fs_out);
 
-static inline file_sys_t *new_da_fat32_file_sys(block_device_t *bd, uint32_t offset_sector) {
-    return new_fat32_file_sys(get_default_allocator(), bd, offset_sector);
+static inline fernos_error_t parse_new_da_fat32_file_sys(block_device_t *bd, uint32_t offset,
+        uint64_t seed, bool dubd, dt_producer_ft now, file_sys_t **fs_out) {
+    return parse_new_fat32_file_sys(get_default_allocator(), bd, offset, seed, dubd, now, fs_out);
 }
-

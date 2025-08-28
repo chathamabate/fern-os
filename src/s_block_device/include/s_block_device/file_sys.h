@@ -1,282 +1,350 @@
 
 #pragma once
 
-#include "s_util/err.h"
-#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "s_util/err.h"
+#include "s_util/hash.h"
 #include "s_util/datetime.h"
+#include <stdbool.h>
 
 /*
- * A file system is a tree of directories and files. 
+ * Below lies a generic file system interface.
+ *
+ * NOTE: implementations of this interface are meant to assume sensible sequential usage.
+ *
+ * For example, we'd expect the user to never attempt to write to a file which has been deleted.
  * 
- * A directory is a file which contains references to other files.
- * A file is just a chunk of arbitrary data.
+ * Protecting the user for funky error cases stemming from concurrent usage is meant to be
+ * handled higher up the stack. NOT HERE.
  *
- * The name of any file is just a string of ascii characters in the character class:
- * 'a'-'z', 'A'-'Z', '0'-'9', '_', '-', '.'.
- *
- * The maximum length of any filename is FS_MAX_FILENAME_LEN.
- *
- * For the rest of this file, a file can either be a directory or a non-directory.
- * If there is a situation where an input/output cannot be a directory, "non-directory file"
- * will be used in the docstring..
+ * Also, while not really strictly referenced in this interface, it will be assumed that 
+ * "." refers to "this" directory and ".." refers to the parent directory.
+ * Tests will assume all directories have a "." entry and that all non-root directories have
+ * a ".." entry.
  */
 
-#define FS_MAX_FILENAME_LEN     (60U)
+/**
+ * Maximum length of a filename. (Not including NT)
+ */
+#define FS_MAX_FILENAME_LEN (127U)
 
 /**
- * Determine if a filename is valid.
+ * Maximum length of a path. (Including "/"'s, Not including NT)
+ */
+#define FS_MAX_PATH_LEN (4096 - 1)
+
+/*
+ * NOTE: The below two functions just check characters and lengths are expected.
+ * A filename/path being "valid" has nothing to do with whether or not said
+ * filename/path actually points to an existing location.
+ * 
+ *  For a path to be valid:
+ * The length of the entire path string must not exceed FS_MAX_PATH_LEN.
+ * A path is just a list of valid filenames separated by SINGLE "/"'s
+ * A path can optionally both end and start with "/"'s
+ * "" is an invalid path. "/" is a valid path.
+ */
+
+/**
+ * Returns true if the given filename is valid. False otherwise.
+ *
+ * A valid filename contains only characaters a-z, A-Z, 0-9, -, ., _
  */
 bool is_valid_filename(const char *fn);
 
 /**
- * This structure denotes information which should be accesible for all files.
+ * Returns true if the given path is valid. False otherwise.
  */
-typedef struct _file_sys_info_t {
-    /**
-     * REQUIRED!
-     */
-    char name[FS_MAX_FILENAME_LEN + 1];
+bool is_valid_path(const char *path);
 
+/**
+ * Given a VALID OR EMPTY path, write it's next filename part into `*dest`.
+ * `dest` should point to a buffer with length at least (FS_MAX_FILENAME_LEN + 1).
+ *
+ * Returns the index into path of the first character of the rest path.
+ *
+ * For example `next_filename("/a/b", d)` would write "a" (with NT) into `dest` and
+ * return 2. If the path has no filenames (i.e. an empty string or just "/"), 
+ * '\0' is written to `dest` and 0 is returned.
+ *
+ * Undefined behavior if the path is Non-empty and invalid.
+ */
+size_t next_filename(const char *path, char *dest);
+
+/**
+ * A Node key is an immutable piece of data which can be used to efficiently reference a 
+ * file or directory.
+ * 
+ * Values of this type should always be passed around via pointers. (With actual data likely
+ * living on some sort of heap)
+ */
+typedef const void *fs_node_key_t;
+
+/**
+ * Information which is retrieveable for any node (i.e. files or directories alike)
+ */
+typedef struct _fs_node_info_t {
     /**
-     * Both creation DT and last write DT are optional. If your FS doesn't support them, you
-     * can just write dummy values here.
+     * Datetime of when the node was created.
+     *
+     * OPTIONAL
      */
     fernos_datetime_t creation_dt;
-    fernos_datetime_t last_write_dt;
 
     /**
-     * REQUIRED! Is this directory or a non-directory?
+     * Datetime of when the node was last edited.
+     *
+     * For a file, this is when the file was last written to.
+     * For a directory, this is the last time of file within the directory was created or deleted.
+     *
+     * OPTIONAL
+     */
+    fernos_datetime_t last_edited_dt;
+
+    /**
+     * True iff this points to a directory node.
+     *
+     * REQUIRED
      */
     bool is_dir;
 
     /**
-     * REQUIRED! 
+     * For a file, this is the length of the file in bytes.
+     * For a directory, this is the number of entries within the directory.
      *
-     * If this is a directory, len should be the number of entries in the directory.
-     * If this is a non-directory file, len should be the number of bytes in the file.
+     * NOTE: For directories, this does NOT include its relative entries. ("." and "..")
+     *
+     * REQUIRED
      */
     size_t len;
-} file_sys_info_t;
+} fs_node_info_t;
 
-/**
- * A handle is an implementation specific way of referencing a file.
- *
- * A handle is given to the user via various calls below, and all handles must be returned to the
- * file system. 
- *
- * A handle is gauranteed to be a pointer.
- *
- * VERY IMPORTANT:
- *
- * A file system implementation should support the following constants:
- *
- * 1) All file handles are either read or write handles.
- * 2) A write handle is a read handle, but a read handle is NOT a write handle.
- * 3) Multiple read handles can exist at once for one file, but only one write handle can
- * exist at once for a single file. (No read only handles can exist when a write handle exists)
- *
- * The idea here is that write handles exist for modification and reading, whereas, readonly 
- * handles exist only for reading. The file system should internally keep track of outstanding
- * handles and their modes.
- *
- * Functions below marked "READ OPERATION" will be usable by both read and write handles.
- * Functions marked "WRITE OPERATION" will be usable ONLY by write handles.
- * Using a handle of the incorrect type should yield a FOS_STATE_MISMATCH error.
- *
- * Operations which retrieve a handle should return FOS_IN_USE if outstanding handles prevent
- * the return of a new handle. (For example, trying to get a read handle when a write handle
- * already exists)
- *
- * ALSO NOTE: Your implementation of these functions need not include some sort of thread safety.
- * (They can! but they don't need to) The reader/writer paradigm is meant to just keep you 
- * screwing up the disk unintentially when multiple handles are checked out. 
- */
-typedef void *file_sys_handle_t;
-
-
-typedef struct _file_sys_t file_sys_t;
 typedef struct _file_sys_impl_t file_sys_impl_t;
 
-struct _file_sys_impl_t {
-    void (*delete_file_system)(file_sys_t *fs);
-    void (*fs_return_handle)(file_sys_t *fs, file_sys_handle_t hndl);
-    fernos_error_t (*fs_find_root_dir)(file_sys_t *fs, bool write, file_sys_handle_t *out);
-    fernos_error_t (*fs_get_info)(file_sys_t *fs, file_sys_handle_t hndl, file_sys_info_t *out);
-    fernos_error_t (*fs_is_write_handle)(file_sys_t *fs, file_sys_handle_t hndl, bool *out);
-    fernos_error_t (*fs_find)(file_sys_t *fs, file_sys_handle_t dir_hndl, size_t index, bool write, file_sys_handle_t *out);
-    fernos_error_t (*fs_get_parent_dir)(file_sys_t *fs, file_sys_handle_t hndl, bool write, file_sys_handle_t *out);
-    fernos_error_t (*fs_mkdir)(file_sys_t *fs, file_sys_handle_t dir, const char *fn, file_sys_handle_t *out);
-    fernos_error_t (*fs_touch)(file_sys_t *fs, file_sys_handle_t dir, const char *fn, file_sys_handle_t *out);
-    fernos_error_t (*fs_rm)(file_sys_t *fs, file_sys_handle_t dir, size_t index);
-    fernos_error_t (*fs_read)(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len, void *dest, size_t *readden);
-    fernos_error_t (*fs_write)(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len, const void *src, size_t *written);
-};
-
-struct _file_sys_t {
+typedef struct _file_sys_t {
     const file_sys_impl_t * const impl;
+} file_sys_t;
+
+struct _file_sys_impl_t {
+    // OPTIONAL
+    fernos_error_t (*fs_flush)(file_sys_t *fs, fs_node_key_t key);
+
+    void (*delete_file_sys)(file_sys_t *fs);
+    fernos_error_t (*fs_new_key)(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key);
+    void (*fs_delete_key)(file_sys_t *fs, fs_node_key_t key);
+    equator_ft (*fs_get_key_equator)(file_sys_t *fs);
+    hasher_ft (*fs_get_key_hasher)(file_sys_t *fs);
+    fernos_error_t (*fs_get_node_info)(file_sys_t *fs, fs_node_key_t key, fs_node_info_t *info);
+    fernos_error_t (*fs_touch)(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key);
+    fernos_error_t (*fs_mkdir)(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key);
+    fernos_error_t (*fs_remove)(file_sys_t *fs, fs_node_key_t parent_dir, const char *name);
+    fernos_error_t (*fs_get_child_names)(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, size_t num, char names[][FS_MAX_FILENAME_LEN + 1]);
+    fernos_error_t (*fs_read)(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, void *dest);
+    fernos_error_t (*fs_write)(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, const void *src);
+    fernos_error_t (*fs_resize)(file_sys_t *fs, fs_node_key_t file_key, size_t bytes);
 };
 
 /**
- * Delete a file system.
+ * Flush! (What this means/does is up to the implementor)
+ *
+ * If `key` is NULL, this should flush the entire file system.
+ * Otherwise, this should at least flush the file pointed to by `key`.
  */
-static inline void delete_file_system(file_sys_t *fs) {
+static inline fernos_error_t fs_flush(file_sys_t *fs, fs_node_key_t key) {
+    if (fs->impl->fs_flush) {
+        return fs->impl->fs_flush(fs, key);
+    }
+
+    return FOS_SUCCESS;
+}
+
+/**
+ * Delete the file system.
+ *
+ * As I want this to always succeed, this DOES NOT FLUSH. Make sure to always flush before deleting!
+ */
+static inline void delete_file_sys(file_sys_t *fs) {
     if (fs) {
-        fs->impl->delete_file_system(fs);
+        fs->impl->delete_file_sys(fs);
     }
 }
 
 /**
- * Return a handle to the file system.
+ * Get a new key which references the described file/directory.
+ *
+ * `cwd` will be the "current working directory" key. If `path` is relative, the node search will
+ * start at this directory. 
+ * If you know `path` is absolute, `cwd` can be NULL signifying no relative starting point.
+ *
+ * On success, FOS_SUCCESS is returned and the new key is written to `*key`.
+ * If `path` does not point to an existing file, FOS_INVALID_INDEX s returned.
+ * If `path` is relative and `cwd` is NULL, FOS_BAD_ARGS is returned.
+ * If `cwd` is given, and doesn't point to a directory, FOS_STATE_MISMATCH is returned.
+ * If the given `path` points to a file mid-path, FOS_STATE_MISMATCH is returned.
  */
-static inline void fs_return_handle(file_sys_t *fs, file_sys_handle_t hndl) {
-    fs->impl->fs_return_handle(fs, hndl);
+static inline fernos_error_t fs_new_key(file_sys_t *fs, fs_node_key_t cwd, 
+        const char *path, fs_node_key_t *key) {
+    return fs->impl->fs_new_key(fs, cwd, path, key);
 }
 
 /**
- * Retrieve a handle for the root directory.
+ * Delete a key which was allocated using the `fs_new_key` function.
  *
- * The root directory should always exist within the file system!
- *
- * Use `write` to say whether you want the handle in readonly or write mode.
- *
- * NOTE: This handle needs to be returned after use just like any other handle!
+ * This should always succeed!
  */
-static inline fernos_error_t fs_find_root_dir(file_sys_t *fs, bool write, file_sys_handle_t *out) {
-    return fs->impl->fs_find_root_dir(fs, write, out);
+static inline void fs_delete_key(file_sys_t *fs, fs_node_key_t key) {
+    if (key) {
+        fs->impl->fs_delete_key(fs, key);
+    }
 }
 
 /**
- * READ OPERATION
- *
- * Get information about a given file.
- *
- * On error, the value of *out is undefined.
+ * Get a function pointer which can be used to tell if two keys are semantically equal!
  */
-static inline fernos_error_t fs_get_info(file_sys_t *fs, file_sys_handle_t hndl, file_sys_info_t *out) {
-    return fs->impl->fs_get_info(fs, hndl, out);
+static inline equator_ft fs_get_key_equator(file_sys_t *fs) {
+    return fs->impl->fs_get_key_equator(fs);
 }
 
 /**
- * Determine if a given handle is a readonly handle or a write handle.
+ * Get a function pointer which can be used to calculate a key's hash value.
  */
-static inline fernos_error_t fs_is_write_handle(file_sys_t *fs, file_sys_handle_t hndl, bool *out) {
-    return fs->impl->fs_is_write_handle(fs, hndl, out);
+static inline hasher_ft fs_get_key_hasher(file_sys_t *fs) {
+    return fs->impl->fs_get_key_hasher(fs);
 }
 
 /**
- * READ OPERATION
- *
- * Get the handle of a file within a directory.
- *
- * A directory holds a list of entries. Index is used to pick a certain entry. 
- *
- * It is gauranteed that indeces go from 0 to len - 1.
- *
- * If you wanted to delete all the files in a directory, you could delete index 0 len times. 
- * This would be valid.
- *
- * NOTE: the index of a specific file within a directory can change. (For example if earlier
- * files are deleted from the directory) So, never assume that a file always holds a specific 
- * index. The idea here is that you can iterate over the entries of a directory easily, and use
- * fs_get_info above to determine if the file you retrieved has the name you are looking for.
- *
- * NOTE: I thought about saying NULL is always written to the out handle on error, but in another 
- * implementation, NULL might actually have some significance.
+ * Retrieve information about a specific node.
  */
-static inline fernos_error_t fs_find(file_sys_t *fs, file_sys_handle_t dir_hndl, 
-        size_t index, bool write, file_sys_handle_t *out) {
-    return fs->impl->fs_find(fs, dir_hndl, index, write, out);
+static inline fernos_error_t fs_get_node_info(file_sys_t *fs, fs_node_key_t key, fs_node_info_t *info) {
+    return fs->impl->fs_get_node_info(fs, key, info);
 }
 
 /**
- * READ OPERATION 
+ * Create a new file within a directory.
  *
- * Get the parent directory of a file.
+ * Returns FOS_BAD_ARGS if `name` is not a valid filename.
+ * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
+ * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
+ * Returns FOS_NO_SPACE if there isn't enough space to create the file.
  *
- * The retrieved handle is written to *out.
- *
- * Returns an error if hndl points to the root directory.
+ * On success, FOS_SUCCESS is returned. If `key` is non-NULL, a key for the new file will be created
+ * and stored at `*key`.
  */
-static inline fernos_error_t fs_get_parent_dir(file_sys_t *fs, file_sys_handle_t hndl, bool write, 
-        file_sys_handle_t *out) {
-    return fs->impl->fs_get_parent_dir(fs, hndl, write, out);
+static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, 
+        const char *name, fs_node_key_t *key) {
+    return fs->impl->fs_touch(fs, parent_dir, name, key);
 }
 
 /**
- * WRITE OPERATION
+ * Create a subdiretory.
  *
- * Create a new directory with the given name.
+ * Returns FOS_BAD_ARGS if `name` is not a valid filename.
+ * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
+ * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
+ * Returns FOS_NO_SPACE if there isn't enough space to create the directory.
  *
- * out is an optional parameter. If provided, on success, a handle is created for the new directory
- * and written to *out (The created handle will be a write handle).
+ * On success, FOS_SUCCESS is returned. If `key` is non-NULL, a key for the new subdirecotry will 
+ * be created and stored at `*key`.
+ *
+ * NOTE: The created directory should have entries "." and "..".
  */
-static inline fernos_error_t fs_mkdir(file_sys_t *fs, file_sys_handle_t dir, 
-        const char *fn, file_sys_handle_t *out) {
-    return fs->impl->fs_mkdir(fs, dir, fn, out);
+static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir, 
+        const char *name, fs_node_key_t *key) {
+    return fs->impl->fs_mkdir(fs, parent_dir, name, key);
 }
 
 /**
- * WRITE OPERATION
+ * Remove a file or subdirectory.
  *
- * Create a new non-directory file with the given name.
+ * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
+ * Returns FOS_INVALID_INDEX if `name` cannot be found within the given directory.
+ * Returns FOS_IN_USE if the node being deleted is a subdirectory and has 
+ * entries other than "." and "..".
  *
- * out is an optional parameter. If provided, on success, a handle is created for the new file
- * and written to *out.
+ * On success, FOS_SUCCESS is returned and the specified node is deleted from the file system.
  */
-static inline fernos_error_t fs_touch(file_sys_t *fs, file_sys_handle_t dir, 
-        const char *fn, file_sys_handle_t *out) {
-    return fs->impl->fs_touch(fs, dir, fn, out);
+static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, const char *name) {
+    return fs->impl->fs_remove(fs, parent_dir, name);
 }
 
 /**
- * WRITE OPERATION
+ * Retrieve the names of a child nodes within a directory.
  *
- * Delete a file.
+ * `names` must have at least `num` rows. (i.e. a total size of `num` * (FS_MAX_FILENAME_LEN + 1))
  *
- * Return FOS_IN_USE if the file trying to be deleted has any outstanding handles!
- * Returns FOS_STATE_MISMATCH if the index given points to a non-empty subdirectory!
+ * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
+ *
+ * On sucess, FOS_SUCCESS is returned. In this case, `num` names starting from the child at index
+ * `index` are written into the `names` buffers one at a time. If the number of nodes left
+ * is less than `num`, '\0' is written into each unused buffer.
+ *
+ * NOTE: Special directory entries "." and ".." should NOT be returned by this function.
+ *
+ * NOTE: Even if the index is larger than the number of entries in the directory,
+ * FOS_SUCCESS should still be returned. In this case, all `names` buffers will be given
+ * empty string values '\0'.
  */
-static inline fernos_error_t fs_rm(file_sys_t *fs, file_sys_handle_t dir, size_t index) {
-    return fs->impl->fs_rm(fs, dir, index);
-}
-
-/*
- * Read and write operations below are only permitted on non-directory files!
- */
-
-/**
- * READ OPERATION
- *
- * Read data from a file. 
- *
- * On Success, FOS_SUCCESS is returned and the number of bytes read are written to *readden.
- * A partial read is still a success!!! So always check readden to confirm.
- *
- * readden should be a required argument.
- *
- * Returns an error if the given handle points to a directory.
- */
-static inline fernos_error_t fs_read(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len,
-        void *dest, size_t *readden) {
-    return fs->impl->fs_read(fs, hndl, offset, len, dest, readden);
+static inline fernos_error_t fs_get_child_names(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, 
+        size_t num, char names[][FS_MAX_FILENAME_LEN + 1]) {
+    return fs->impl->fs_get_child_names(fs, parent_dir, index, num, names);
 }
 
 /**
- * WRITE OPERATION
+ * Read bytes from a file.
  *
- * Write data to a file.
+ * `dest` must have size at least `bytes`.
  *
- * If the write operation overshoots the end of the file, the file system should attempt to
- * grow the file to the necessary size.
+ * Returns FOS_STATE_MISTMATCH if `file_key` points to a directory.
+ * Returns FOS_INVALID_RANGE if `offset` or `offset + bytes` overshoot the end of the file.
  *
- * Just like `fs_read` above, the total number of bytes written is place in *written on success.
- * Any bytes being written at all is a success, so always check *written.
+ * On success, FOS_SUCCESS is returned, exactly `bytes` bytes will be written to dest.
  */
-static inline fernos_error_t fs_write(file_sys_t *fs, file_sys_handle_t hndl, size_t offset, size_t len,
-        const void *src, size_t *written) {
-    return fs->impl->fs_write(fs, hndl, offset, len, src, written);
+static inline fernos_error_t fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, 
+        size_t bytes, void *dest) {
+    return fs->impl->fs_read(fs, file_key, offset, bytes, dest);
 }
 
+/**
+ * Write bytes to a file.
+ *
+ * `src` must have size at least `bytes`.
+ *
+ * Returns FOS_STATE_MISTMATCH if `file_key` points to a directory.
+ * Returns FOS_INVALID_RANGE if `offset` or `offset + bytes` overshoot the end of the file.
+ *
+ * On success, FOS_SUCCESS is returned, exactly `bytes` bytes will be written to the given file
+ * from `src` starting at offset `offset` within the file.
+ */
+static inline fernos_error_t fs_write(file_sys_t *fs, fs_node_key_t file_key, size_t offset, 
+        size_t bytes, const void *src) {
+    return fs->impl->fs_write(fs, file_key, offset, bytes, src);
+}
 
+/**
+ * Resize a file to exactly `bytes` bytes.
+ *
+ * If `bytes` is 0, the file isn't actually deleted, it just is given a size of 0. This is 
+ * to encourage correct handling of node keys. That is, all node keys for a file should be deleted
+ * before a file is deleted. 
+ *
+ * Returns FOS_STATE_MISMATCH if `file_key` points to a directory.
+ * Returns FOS_NO_SPACE if there isn't enough space.
+ *
+ * On success, FOS_SUCCESS is returned, the given file will have exact size `bytes`.
+ */
+static inline fernos_error_t fs_resize(file_sys_t *fs, fs_node_key_t file_key, size_t bytes) {
+    return fs->impl->fs_resize(fs, file_key, bytes);
+}
+
+/**
+ * Usually "dump" functions are optional an defined by the implementor.
+ *
+ * In this case, the generic functions above give us enough information to dump a file tree
+ * for any file system implementation.
+ *
+ * This function will just stop if an error is encountered.
+ *
+ * `cwd` and `path` follow the same usage rules of `fs_new_key`. 
+ */
+void fs_dump_tree(file_sys_t *fs, void (*pf)(const char *, ...), fs_node_key_t cwd, const char *path);

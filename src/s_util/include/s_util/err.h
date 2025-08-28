@@ -74,6 +74,11 @@ typedef uint16_t fernos_error_t;
  */
 #define FOS_NO_SPACE           (14)
 
+/**
+ * A requested behavior is valid, but not allowed.
+ */
+#define FOS_NOT_PERMITTED      (15)
+
 
 
 

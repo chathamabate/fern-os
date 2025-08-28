@@ -220,12 +220,28 @@ fernos_error_t init_fat32(block_device_t *bd, uint32_t offset, uint32_t num_sect
         }
     }
 
-    // Write out root directory and readme contents!
-
     const uint32_t data_section_offset = offset + reserved_sectors + (fat_copies * spf);
     
-    fat32_dir_entry_t root_dir[512 / sizeof(fat32_dir_entry_t)] = {0};
-    root_dir[0].raw[0] = FAT32_DIR_ENTRY_TERMINTAOR;
+    fat32_dir_entry_t root_dir[512 / sizeof(fat32_dir_entry_t)] = { 0 };
+
+    // The root directory will start with just the self reference!
+    root_dir[0].short_fn = (fat32_short_fn_dir_entry_t) {
+        .short_fn = {'.', ' ', ' ', ' ', ' ', ' ', ' ', ' '},
+        .extenstion = {' ' , ' ' , ' '},
+        .last_write_time = 0,
+        .last_write_date = 0,
+        .creation_time = 0,
+        .creation_date = 0,
+        .creation_time_hundredths = 0,
+        .last_access_date = 0,
+        .attrs = FT32F_ATTR_SUBDIR,
+        .files_size = 0,
+        
+        .first_cluster_low = 2, // Root cluster is 2.
+        .first_cluster_high = 0
+    };
+
+    root_dir[1].raw[0] = FAT32_DIR_ENTRY_TERMINTAOR;
 
     // Remember, the root directory as a whole is more than just one sector!
 
@@ -798,11 +814,7 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
     return FOS_SUCCESS;
 }
 
-/**
- * Returns FOS_INVALID_RANGE if the chain is not large enough!
- * Returns FOS_STATE_MISMATCH if the chain is malformed!
- */
-static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind, 
+fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind, 
         uint32_t sector_offset, uint32_t num_sectors, void *buf, bool write) {
     if (!buf) {
         return FOS_BAD_ARGS;
@@ -896,17 +908,7 @@ static fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind,
     }
 }
 
-fernos_error_t fat32_read(fat32_device_t *dev, uint32_t slot_ind, 
-        uint32_t sector_offset, uint32_t num_sectors, void *dest) {
-    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, dest, false);
-}
-
-fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t num_sectors, const void *src) {
-    return fat32_read_write(dev, slot_ind, sector_offset, num_sectors, (void *)src, true);
-}
-
-static fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_ind,
+fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *buf, bool write) {
     if (!buf) {
         return FOS_BAD_ARGS;
@@ -959,16 +961,6 @@ static fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_
     }
 
     return FOS_SUCCESS;
-}
-
-fernos_error_t fat32_read_piece(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *dest) {
-    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, dest, false);
-}
-
-fernos_error_t fat32_write_piece(fat32_device_t *dev, uint32_t slot_ind,
-        uint32_t sector_offset, uint32_t byte_offset, uint32_t len, const void *src) {
-    return fat32_read_write_piece(dev, slot_ind, sector_offset, byte_offset, len, (void *)src, true);
 }
 
 void fat32_dump_fat(fat32_device_t *dev, void (*pf)(const char *fmt, ...)) {

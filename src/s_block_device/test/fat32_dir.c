@@ -378,11 +378,11 @@ static bool test_fat32_get_dir_seq_lfn(void) {
     TEST_SUCCEED();
 }
 
-static bool test_fat32_check(void) {
+static bool test_fat32_find(void) {
     // One test for both the name testing funcitons.
 
     fernos_error_t err;
-    uint32_t seq_start;
+    uint32_t seq_starts[2];
 
     fat32_short_fn_dir_entry_t sfn_entry = {
         .short_fn = {'N', 'A', 'M', 'E', ' ', ' ', ' ', ' '},
@@ -390,7 +390,7 @@ static bool test_fat32_check(void) {
         .attrs = 0
     };
 
-    err = fat32_new_seq_c8(dev, slot_ind, &sfn_entry, "SomeLongName", &seq_start);
+    err = fat32_new_seq_c8(dev, slot_ind, &sfn_entry, "SomeLongName", &(seq_starts[0]));
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     sfn_entry = (fat32_short_fn_dir_entry_t) {
@@ -399,31 +399,36 @@ static bool test_fat32_check(void) {
         .attrs = 0
     };
 
-    err = fat32_new_seq_c8(dev, slot_ind, &sfn_entry, NULL, &seq_start);
+    err = fat32_new_seq_c8(dev, slot_ind, &sfn_entry, NULL, &(seq_starts[1]));
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    err = fat32_check_sfn(dev, slot_ind, "NAME    ", "TXT");
-    TEST_EQUAL_HEX(FOS_IN_USE, err);
+    uint32_t found_seq_start;
 
-    err = fat32_check_sfn(dev, slot_ind, "NAME    ", "TX");
+    err = fat32_find_sfn(dev, slot_ind, "NAME    ", "TXT", &found_seq_start);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(seq_starts[0], found_seq_start);
 
-    err = fat32_check_sfn(dev, slot_ind, "NME    ", "TXT");
+    err = fat32_find_sfn(dev, slot_ind, "NAME    ", "TX", NULL);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    err = fat32_find_sfn(dev, slot_ind, "NME    ", "TXT", NULL);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    err = fat32_find_sfn(dev, slot_ind, "OTHER___", "   ", &found_seq_start);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(seq_starts[1], found_seq_start);
 
-    err = fat32_check_sfn(dev, slot_ind, "OTHER___", "   ");
-    TEST_EQUAL_HEX(FOS_IN_USE, err);
-
-    err = fat32_check_sfn(dev, slot_ind, "OTHER__ ", "   ");
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    err = fat32_find_sfn(dev, slot_ind, "OTHER__ ", "   ", NULL);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
 
     // Now for the lfns...
     
-    err = fat32_check_lfn_c8(dev, slot_ind, "SomeLongName");
-    TEST_EQUAL_HEX(FOS_IN_USE, err);
-
-    err = fat32_check_lfn_c8(dev, slot_ind, "SomeLongNam");
+    err = fat32_find_lfn_c8(dev, slot_ind, "SomeLongName", &found_seq_start);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(seq_starts[0], found_seq_start);
+
+    err = fat32_find_lfn_c8(dev, slot_ind, "SomeLongNam", NULL);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
 
     TEST_SUCCEED();
 }
@@ -574,8 +579,10 @@ static bool test_fat32_dir_ops1(void) {
             }
 
             // Confirm this name is marked IN_USE by the check sfn function.
-            err = fat32_check_sfn(dev, slot_ind, sfn_entry.short_fn, "   ");
-            TEST_EQUAL_HEX(FOS_IN_USE, err);
+            err = fat32_find_sfn(dev, slot_ind, sfn_entry.short_fn, "   ", NULL);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err); // We will not check the actual sequence start 
+                                              // because right now there maybe be multiple sequences
+                                              // with the same short_fn.
 
             err = fat32_get_dir_seq_lfn(dev, slot_ind, sfn_offset, lfn_buf);
             TEST_TRUE(err == FOS_SUCCESS || err == FOS_EMPTY);
@@ -587,8 +594,8 @@ static bool test_fat32_dir_ops1(void) {
                 }
 
                 // Confirm the lfn is marked in use by the check lfn funciton.
-                err = fat32_check_lfn(dev, slot_ind, lfn_buf);
-                TEST_EQUAL_HEX(FOS_IN_USE, err);
+                err = fat32_find_lfn(dev, slot_ind, lfn_buf, NULL);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
             }
 
             // Finally erase our sequence.
@@ -612,7 +619,7 @@ bool test_fat32_device_dir_functions(void) {
     RUN_TEST(test_fat32_next_dir_seq);
     RUN_TEST(test_fat32_get_dir_seq_sfn);
     RUN_TEST(test_fat32_get_dir_seq_lfn);
-    RUN_TEST(test_fat32_check);
+    RUN_TEST(test_fat32_find);
     RUN_TEST(test_fat32_dir_ops0);
     RUN_TEST(test_fat32_dir_ops1);
     return END_SUITE();

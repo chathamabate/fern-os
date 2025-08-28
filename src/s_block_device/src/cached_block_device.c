@@ -26,13 +26,11 @@ static const block_device_impl_t CBD_IMPL = {
     .delete_block_device = delete_cached_block_device
 };
 
-static bool size_t_eq_f(chained_hash_map_t *chm, const void *k0, const void *k1) {
-    (void)chm;
+static bool size_t_eq_f(const void *k0, const void *k1) {
     return *(const size_t *)k0 == *(const size_t *)k1;
 }
 
-static uint32_t size_t_hash_f(chained_hash_map_t *chm, const void *k) {
-    (void)chm;
+static uint32_t size_t_hash_f(const void *k) {
     // Kinda arbitrary hash function.
     return (((((*(const size_t *)k) * 3) + 2) * 17) + 1) * 13;
 }

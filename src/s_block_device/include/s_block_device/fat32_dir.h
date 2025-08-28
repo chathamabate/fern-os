@@ -123,6 +123,34 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t entry_offset, uint32_t *sfn_entry_offset);
 
 /**
+ * Herlper function for advancing to the next SFN entry.
+ * If `entry_offset` already points to an SFN entry, this is what will be written to `*sfn_entry_offset`.
+ *
+ * Returns FOS_EMPTY if `entry_offset` points to the directory terminator, overshoots directory
+ * sectors, or the end of the directory is reached before hitting an SFN.
+ *
+ * FOS_STATE_MISMATCH is returned if a malformed sequence is found.
+ *
+ * (Really just the same rules as the above two functions combined)
+ */
+static inline fernos_error_t fat32_next_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
+        uint32_t entry_offset, uint32_t *sfn_entry_offset) {
+    fernos_error_t err;
+
+    uint32_t seq_start;
+    err = fat32_next_dir_seq(dev, slot_ind, entry_offset, &seq_start);
+    if (err == FOS_EMPTY) {
+        return FOS_EMPTY;
+    }
+
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    return fat32_get_dir_seq_sfn(dev, slot_ind, seq_start, sfn_entry_offset);
+}
+
+/**
  * Get a sequence's Long Filename given a pointer to its SFN entry.
  *
  * This function back tracks from the short file name entry over each of the LFN entries.
@@ -146,31 +174,36 @@ fernos_error_t fat32_get_dir_seq_lfn_c8(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sfn_entry_offset, char *lfn);
 
 /**
- * This checks if a short filename is in use in a given directory.
+ * This looks for an SFN entry with the given name and extension.
  *
  * `name` should be 8 characters. (Space padded)
  * `ext` should be 3 characters. (Space padded)
  *
- * FOS_SUCCESS is returned if the name extension combo is yet to be used.
- * FOS_IN_USE is returned if the combination already exists in the given directory.
+ * FOS_SUCESS is returned if such a sequence/entry is found. In this case, if `seq_start` is given,
+ * the offset of the beginning of the sequence is written to `*seq_start`.
+ * FOS_EMPTY is returned if there doesn't exist an entry with the given name extension
+ * combo.
  */
-fernos_error_t fat32_check_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
-        const char *ext);
+fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
+        const char *ext, uint32_t *seq_start);
 
 /**
- * This checks if a long filename is in use in a directory.
+ * This looks for a sequence with the given LFN.
  *
- * `lfn` is a NULL terminated string. Shouldn't have length longer than FAT32_MAK_LFN_LEN.
+ * `lfn` is a NULL terminated string. Shouldn't have length no longer than FAT32_MAK_LFN_LEN.
  *
- * FOS_SUCCESS if the name is yet to be used.
- * FOS_IN_USE if the name is already in use.
+ * FOS_SUCCESS is returned if a sequence with the given LFN is found. In this case, if `seq_start` is given,
+ * the offset of the beginning of the sequence is written to `*seq_start`.
+ * FOS_EMPTY is returned if no sequence with the given LFN can be found.
  */
-fernos_error_t fat32_check_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn);
+fernos_error_t fat32_find_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn,
+        uint32_t *seq_start);
 
 /**
- * Same as `fat32_check_lfn` except with 8-bit width characters.
+ * Same as `fat32_find_lfn` except with 8-bit width characters.
  */
-fernos_error_t fat32_check_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const char *lfn);
+fernos_error_t fat32_find_lfn_c8(fat32_device_t *dev, uint32_t slot_ind, const char *lfn,
+        uint32_t *seq_start);
 
 /**
  * Somewhat up to the implementor what this does.

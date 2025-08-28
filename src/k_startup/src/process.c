@@ -9,14 +9,11 @@
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
 
-static bool fm_key_eq(chained_hash_map_t *futexes, const void *k0, const void *k1) {
-    (void)futexes;
+static bool fm_key_eq(const void *k0, const void *k1) {
     return *(const futex_t **)k0 == *(const futex_t **)k1;
 }
 
-static uint32_t fm_key_hash(chained_hash_map_t *futexes, const void *k) {
-    (void)futexes;
-
+static uint32_t fm_key_hash(const void *k) {
     const futex_t *futex = *(const futex_t **)k;
 
     // Kinda just a random hash function here.

@@ -35,6 +35,8 @@
 #include "s_block_device/fat32_dir.h"
 #include "s_block_device/test/fat32.h"
 #include "s_block_device/test/fat32_dir.h"
+#include "s_block_device/test/file_sys_helpers.h"
+#include "s_block_device/test/fat32_file_sys.h"
 
 #include "k_sys/ata.h"
 
