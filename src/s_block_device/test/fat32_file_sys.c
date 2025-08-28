@@ -44,9 +44,29 @@ bool test_fat32_file_sys(void) {
 
 #include "k_bios_term/term.h"
 
+static bool pretest(void);
+static bool posttest(void);
+
+#define PRETEST() pretest()
+#define POSTTEST() posttest()
+
 #define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
 
 #include "s_util/test.h"
+
+static size_t num_user_al_blocks;
+
+static bool pretest(void) {
+    num_user_al_blocks = al_num_user_blocks(get_default_allocator());
+    TEST_SUCCEED();
+}
+
+static bool posttest(void) {
+    size_t post_num_user_al_blocks = al_num_user_blocks(get_default_allocator());
+    TEST_EQUAL_UINT(num_user_al_blocks, post_num_user_al_blocks);
+
+    TEST_SUCCEED();
+}
 
 static bool test_bad_names(void) {
     // Test how the FAT32 FS reacts to the presence of invalid names within the 
