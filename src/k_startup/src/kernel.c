@@ -146,8 +146,5 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
-    test_fat32_file_sys();
-    lock_up();
-
     return_to_ctx(&(kernel->curr_thread->ctx));
 }

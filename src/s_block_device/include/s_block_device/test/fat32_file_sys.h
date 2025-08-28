@@ -8,3 +8,11 @@
  * implementation.
  */
 bool test_fat32_file_sys(void);
+
+/**
+ * There are some implementation specific aspects of how the fat32_fs
+ * interacts with a fat32 device.
+ *
+ * That is what this suite tests.
+ */
+bool test_fat32_file_sys_impl(void);
