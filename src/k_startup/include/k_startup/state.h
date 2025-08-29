@@ -8,6 +8,8 @@
 #include "k_startup/fwd_defs.h"
 #include "s_bridge/ctx.h"
 
+#include "s_block_device/file_sys.h"
+
 /*
  * Design NOTES:
  *
@@ -32,7 +34,7 @@ struct _kernel_state_t {
     /**
      * Allocator to be used by the kernel!
      */
-    allocator_t *al;
+    allocator_t * const al;
 
     /**
      * The currently executing thread.
@@ -48,7 +50,7 @@ struct _kernel_state_t {
     /**
      * Every process will have a globally unique ID!
      */
-    id_table_t *proc_table;
+    id_table_t * const proc_table;
 
     /**
      * When the root proecess exits, the whole kernel should exit!
@@ -64,11 +66,21 @@ struct _kernel_state_t {
     /**
      * Threads that call the sleep system call will be placed in this queue.
      */
-    timed_wait_queue_t *sleep_q;
+    timed_wait_queue_t * const sleep_q;
+
+    /*
+     * File System Stuff!!
+     */
+
+    file_sys_t *fs;
 };
 
 /**
- * Create a kernel state with basically no details.
+ * Create a kernel state!
+ *
+ * `user_main` should be the entry point for the first user process.
+ * `user_pd` should be the physical address of the first user process's 
+ * page directory..
  *
  * Returns NULL on error.
  */

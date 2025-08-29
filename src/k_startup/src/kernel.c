@@ -82,6 +82,13 @@ static fernos_error_t init_kernel_heap(void) {
 kernel_state_t *kernel = NULL;
 
 static fernos_error_t init_kernel_state(void) {
+
+    // You know, setting up the kernel stat here, instead of in some special kernel state function
+    // feels hacky. But honestly is it really the end of the world.
+    // 
+    // Notice no real cleanup is done in the error case, I guess I was thinking that if things go wrong
+    // it is implied the system just locks up.
+
     kernel = new_da_kernel_state();
     if (!kernel) {
         return FOS_NO_MEM;
@@ -92,7 +99,7 @@ static fernos_error_t init_kernel_state(void) {
         return FOS_NO_MEM;
     }
 
-    uint32_t user_pd = pop_initial_user_info();
+    phys_addr_t user_pd = pop_initial_user_info();
     if (user_pd == NULL_PHYS_ADDR) {
         return FOS_UNKNWON_ERROR;
     }
@@ -105,11 +112,15 @@ static fernos_error_t init_kernel_state(void) {
     kernel->root_proc = proc;
     idtb_set(kernel->proc_table, pid, proc);
 
+    // The first thread spawned will not get a void * arg, nor will it return one.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
     thread_t *thr = proc_new_thread(kernel->root_proc, 
             (thread_entry_t)user_main, NULL);
     if (!thr) {
         return FOS_UNKNWON_ERROR;
     }
+#pragma GCC diagnostic pop
 
     // Finally, schedule our first thread!
     ks_schedule_thread(kernel, thr);
@@ -117,7 +128,6 @@ static fernos_error_t init_kernel_state(void) {
     // Now we are actually getting somewhere, we should be able to add the sleep queue now!
 
     return FOS_SUCCESS;
-
 }
 
 void start_kernel(void) {

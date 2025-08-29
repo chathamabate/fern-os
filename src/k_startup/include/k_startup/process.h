@@ -13,7 +13,7 @@ struct _process_t {
     /**
      * Allocator used to alloc this process.
      */
-    allocator_t *al;
+    allocator_t * al;
 
     /**
      * If this is true, this is a zombie process, no threads are scheduled.

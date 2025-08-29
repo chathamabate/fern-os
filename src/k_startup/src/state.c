@@ -45,13 +45,13 @@ kernel_state_t *new_kernel_state(allocator_t *al) {
         return NULL;
     }
 
-    ks->al = al;
+    *(allocator_t **)&(ks->al) = al;
     ks->curr_thread = NULL;
-    ks->proc_table = pt;
+    *(id_table_t **)&(ks->proc_table) = pt;
     ks->root_proc = NULL;
 
     ks->curr_tick = 0;
-    ks->sleep_q = twq;
+    *(timed_wait_queue_t **)&(ks->sleep_q) = twq;
 
     return ks;
 }

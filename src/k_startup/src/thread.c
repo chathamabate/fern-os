@@ -43,7 +43,7 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
     thr->tid = tid;
     thr->stack_base = NULL;
 
-    thr->proc = proc;
+    *(process_t **)&(thr->proc) = proc;
     thr->wq = NULL;
     thr->u_wait_ctx = NULL;
     thr->exit_ret_val = NULL;
@@ -84,7 +84,7 @@ thread_t *new_thread_copy(thread_t *thr, process_t *new_proc) {
     copy->tid = thr->tid;
     copy->stack_base = thr->stack_base;
 
-    copy->proc = new_proc;
+    *(process_t **)&(copy->proc) = new_proc;
     copy->wq = NULL;
     copy->u_wait_ctx = NULL;
 

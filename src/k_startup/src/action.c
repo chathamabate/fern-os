@@ -88,6 +88,10 @@ void fos_gpf_action(user_ctx_t *ctx) {
 }
 
 void fos_pf_action(user_ctx_t *ctx) {
+    // NOTE: I believe right now if you blow the kernel stack, the system just straight up
+    // crashes. So don't do that. Maybe in the future I could set up some cool double fault 
+    // handler with some special stack.
+
     if (ctx->cr3 == get_kernel_pd()) {
         out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
                 "Kernel Locking up in PF Action");
@@ -122,6 +126,8 @@ void fos_timer_action(user_ctx_t *ctx) {
 
 void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t arg1, 
         uint32_t arg2, uint32_t arg3) {
+    (void)arg3; // Delete when we have a system call which actually uses arg3!
+                
     ks_save_ctx(kernel, ctx);
     fernos_error_t err = FOS_SUCCESS;
 

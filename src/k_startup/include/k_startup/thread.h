@@ -61,7 +61,7 @@ struct _thread_t {
     /**
      * The process this thread executes out of.
      */
-    process_t *proc;
+    process_t * const proc;
 
     /**
      * When a thread is in the waiting state, this field is populated.

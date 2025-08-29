@@ -10,7 +10,7 @@
 
 proc_exit_status_t user_main(void) {
     // Your code here.
-
+    test_syscall();
 
     return PROC_ES_SUCCESS;
 }
