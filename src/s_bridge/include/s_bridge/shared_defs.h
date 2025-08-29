@@ -101,6 +101,12 @@ typedef struct _thread_join_ret_t {
  */
 typedef int32_t futex_t;
 
+/**
+ * In kernel space we'll use the fs_node_key_t type often. 
+ *
+ * However, the user will only ever be given file_handle_t values.
+ */
+typedef id_t file_handle_t;
 
 /**
  * Exit statuses of a process.

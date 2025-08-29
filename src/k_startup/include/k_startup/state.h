@@ -7,6 +7,7 @@
 #include "s_mem/allocator.h"
 #include "k_startup/fwd_defs.h"
 #include "s_bridge/ctx.h"
+#include "s_data/map.h"
 
 #include "s_block_device/file_sys.h"
 
@@ -30,6 +31,8 @@
  * NOT THE OTHER DIRECTION!
  */
 
+typedef struct _kernel_file_state_t kernel_file_state_t;
+
 struct _kernel_state_t {
     /**
      * Allocator to be used by the kernel!
@@ -42,8 +45,6 @@ struct _kernel_state_t {
      * NOTE: The schedule forms a cyclic doubly linked list.
      *
      * During a context switch curr_thread is set to curr_thread->next.
-     *
-     * TODO: What should happen when there is no current thread??
      */
     thread_t *curr_thread;
 
@@ -72,8 +73,21 @@ struct _kernel_state_t {
      * File System Stuff!!
      */
 
-    file_sys_t *fs;
+    file_sys_t * const fs;
+
+    /**
+     * This is a map of fs_node_key_t -> kernel_file_state_t *
+     *
+     * Every file which is currently accessible by at least 1 thread will have an entry in 
+     * this map!
+     */
+    map_t * const open_files;
 };
+
+struct _kernel_file_state_t {
+    uint8_t dummy;
+};
+
 
 /**
  * Create a kernel state!

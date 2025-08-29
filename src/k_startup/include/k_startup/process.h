@@ -6,8 +6,11 @@
 #include "s_mem/allocator.h"
 #include "s_data/wait_queue.h"
 #include "s_data/map.h"
+#include "s_block_device/file_sys.h"
 
 #include <stdbool.h>
+
+typedef struct _file_handle_state_t file_handle_state_t;
 
 struct _process_t {
     /**
@@ -115,6 +118,30 @@ struct _process_t {
      * This is a map from userspace addresses (futex_t *)'s -> basic_wait_queue's
      */
     map_t *futexes;
+
+
+    // Ok, what about file system stuff?
+    // You know, like file descriptors???/node keys???
+    // Will there even be "file descriptors"?
+    // I think there needs to be descriptors, this way it is easy to have multiple handles for
+    // the same file.
+    // one k
+
+    // Now, why would I need a bijection??
+    // Couldn't I just have an id table.
+    // Relatively true tbh...?? Right???
+};
+
+struct _file_handle_state_t {
+    /**
+     * The node key used by this handle.
+     */
+    const fs_node_key_t nk;
+
+    /**
+     * The position in the file to read/write to next.
+     */
+    size_t pos;
 };
 
 /**
