@@ -234,7 +234,6 @@ static bool test_complex_process(void) {
 
         thr->state = THREAD_STATE_WAITING;
         thr->wq = (wait_queue_t *)wq;
-        thr->u_wait_ctx = NULL;
     }
 
     delete_process(proc);

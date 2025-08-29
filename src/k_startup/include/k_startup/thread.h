@@ -70,12 +70,15 @@ struct _thread_t {
     wait_queue_t *wq;
 
     /**
-     * When a thread is woken up, you'll likely want to return write some information to its
-     * memory space. This pointer is just an arbitrary user pointer for this use.
+     * When a thread is woken up, you'll likely want to know some information about why it went
+     * to sleep. For example, maybe you were trying to read to some userspace buffer.
      *
-     * When the thread is not in a waiting state, this field should always be NULL.
+     * These fields may be used differently depending on why a thread went to sleep!
+     *
+     * NOTE: This field used to be a single userspace pointer. I have upgraded it to a set
+     * of arbitrary values to allow for more flexibility.
      */
-    void *u_wait_ctx;
+    uint32_t wait_ctx[6];
 
     /**
      * The context to use when switching back to this thread.

@@ -8,6 +8,7 @@
 #include "k_startup/page.h"
 
 #include "k_bios_term/term.h"
+#include "s_util/str.h"
 
 /*
  * Some helper macros for returning from these calls in both the kernel space and the user thread.
@@ -272,7 +273,8 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
         } else if (worker->state == THREAD_STATE_WAITING) {
             wq_remove((wait_queue_t *)(worker->wq), worker);
             worker->wq = NULL;
-            worker->u_wait_ctx = NULL;
+            // Clearing the wait context isn't really necessary, but whatever.
+            mem_set(worker->wait_ctx, 0, sizeof(worker->wait_ctx)); 
             worker->state = THREAD_STATE_DETATCHED;
         }
     }
@@ -474,10 +476,11 @@ static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t 
         // Clear our bit real quick.
         proc->sig_vec &= ~(1 << sid);
 
-        sig_id_t *u_sid = woken_thread->u_wait_ctx;
+        // When waiting for a signal, just the first wait context field is used.
+        sig_id_t *u_sid = (sig_id_t *)(woken_thread->wait_ctx[0]);
 
         // Detach thread.
-        woken_thread->u_wait_ctx = NULL;
+        woken_thread->wait_ctx[0] = 0;
         woken_thread->wq = NULL;
         woken_thread->state = THREAD_STATE_DETATCHED;
 
@@ -613,7 +616,7 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
     ks_deschedule_thread(ks, thr);
     thr->wq = (wait_queue_t *)(proc->signal_queue);
     thr->state = THREAD_STATE_WAITING;
-    thr->u_wait_ctx = u_sid;
+    thr->wait_ctx[0] = (uint32_t)u_sid;
 
     return FOS_SUCCESS;
 }
@@ -729,8 +732,8 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     // write return values, then schedule it!
 
     joining_thread->wq = NULL;
-    thread_join_ret_t *u_ret_ptr = (thread_join_ret_t *)(joining_thread->u_wait_ctx);
-    joining_thread->u_wait_ctx = NULL;
+    thread_join_ret_t *u_ret_ptr = (thread_join_ret_t *)(joining_thread->wait_ctx[0]);
+    joining_thread->wait_ctx[0] = 0;
     joining_thread->state = THREAD_STATE_DETATCHED;
 
     if (u_ret_ptr) {
@@ -809,7 +812,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
 
     ks_deschedule_thread(ks, thr);
     thr->wq = (wait_queue_t *)(proc->join_queue);
-    thr->u_wait_ctx = u_join_ret; // Save where we will eventually return to!
+    thr->wait_ctx[0] = (uint32_t)u_join_ret; // Save where we will eventually return to!
     thr->state = THREAD_STATE_WAITING;
 
     return FOS_SUCCESS;
@@ -904,7 +907,7 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     ks_deschedule_thread(ks, thr);
 
     thr->wq = (wait_queue_t *)wq;
-    thr->u_wait_ctx = NULL; // No context info needed for waiting on a futex.
+    // No context info needed for waiting on a futex.
     thr->state = THREAD_STATE_WAITING;
 
     return FOS_SUCCESS;

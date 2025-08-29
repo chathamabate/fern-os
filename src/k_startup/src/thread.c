@@ -11,6 +11,7 @@
 #include "u_startup/main.h"
 #include "k_startup/page.h"
 #include "k_bios_term/term.h"
+#include "s_util/str.h"
 
 thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg) {
     if (tid >= FOS_MAX_THREADS_PER_PROC) {
@@ -45,7 +46,7 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
 
     *(process_t **)&(thr->proc) = proc;
     thr->wq = NULL;
-    thr->u_wait_ctx = NULL;
+    mem_set(thr->wait_ctx, 0, sizeof(thr->wait_ctx));
     thr->exit_ret_val = NULL;
 
     thr->ctx = (user_ctx_t) {
@@ -86,7 +87,7 @@ thread_t *new_thread_copy(thread_t *thr, process_t *new_proc) {
 
     *(process_t **)&(copy->proc) = new_proc;
     copy->wq = NULL;
-    copy->u_wait_ctx = NULL;
+    mem_set(copy->wait_ctx, 0, sizeof(copy->wait_ctx));
 
     mem_cpy(&(copy->ctx), &(thr->ctx), sizeof(user_ctx_t));
     copy->ctx.cr3 = new_proc->pd;
