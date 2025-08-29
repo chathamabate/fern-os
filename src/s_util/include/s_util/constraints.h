@@ -108,6 +108,13 @@
 #define FOS_STACK_AREA_MAX_SIZE (M_256M)
 
 /**
+ * EDITABLE
+ *
+ * This is the number of entries in a process's file handle ID table.
+ */
+#define FOS_MAX_FILE_HANDLES_PER_PROC (32U)
+
+/**
  * Confirm values listed above make sense.
  */
 fernos_error_t validate_constraints(void);

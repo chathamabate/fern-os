@@ -16,7 +16,7 @@ struct _process_t {
     /**
      * Allocator used to alloc this process.
      */
-    allocator_t * al;
+    allocator_t *al;
 
     /**
      * If this is true, this is a zombie process, no threads are scheduled.
@@ -119,22 +119,21 @@ struct _process_t {
      */
     map_t *futexes;
 
-
-    // Ok, what about file system stuff?
-    // You know, like file descriptors???/node keys???
-    // Will there even be "file descriptors"?
-    // I think there needs to be descriptors, this way it is easy to have multiple handles for
-    // the same file.
-    // one k
-
-    // Now, why would I need a bijection??
-    // Couldn't I just have an id table.
-    // Relatively true tbh...?? Right???
+    /**
+     * Each entry in this table holds a pointer to a file_handle_state_t * which is 
+     * dynamically allocated by this process's allocator.
+     */
+    id_table_t *file_handle_table;
 };
 
 struct _file_handle_state_t {
     /**
      * The node key used by this handle.
+     *
+     * NOTE VERY IMPORTANT!! This node key is NOT owned by this structure.
+     * On deletion, node keys are not deleted! We'd expect the kernel to keep track of all
+     * allocated node keys some where else. (This works because all node keys are really just 
+     * pointers)
      */
     const fs_node_key_t nk;
 
@@ -168,6 +167,9 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  *
  * NOTE: futexes and join queue are NOT copied! And The given process `proc` is not edited in
  * ANY WAY! It is your responsibility to register this new process as a child in the old.
+ *
+ * NOTE: All file handles ARE copied. HOWEVER remember that more work will likely need to be
+ * done by the kernel to handle these new file handle copies.
  *
  * Returns NULL if there are insufficient resources or if the arguments are bad.
  *
@@ -241,4 +243,9 @@ basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex);
  * Make sure all waiting threads are dealt with before calling this function.
  */
 void proc_deregister_futex(process_t *proc, futex_t *u_futex);
+
+/**
+ *
+ */
+fernos_error_t proc_new_file_handle(process_t *proc, fs_node_key_t nk);
 

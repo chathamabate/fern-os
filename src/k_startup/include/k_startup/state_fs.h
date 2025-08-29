@@ -2,10 +2,14 @@
 #pragma once
 
 #include "k_startup/fwd_defs.h"
+#include "k_startup/state.h"
 #include "s_data/wait_queue.h"
 
 /*
  * Kernel State mechanisms the relate to the file system.
+ *
+ * This is really just an extension of the `state.h/c` files.
+ * Kinda like a "partial" class in C#.
  */
 
 struct _kernel_file_state_t {
