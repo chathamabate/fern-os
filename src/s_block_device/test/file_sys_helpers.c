@@ -139,10 +139,56 @@ static bool test_next_filename(void) {
     TEST_SUCCEED();
 }
 
+static bool test_separate_path(void) {
+    fernos_error_t err;
+
+    struct {
+        const char *path;
+        const char *exp_dir;
+        const char *exp_basename;
+    } success_cases[] = {
+        {"a", "./", "a"},
+        {"/a", "/", "a"},
+        {"/a/b/c", "/a/b/", "c"},
+        {"./a/.././b", "./a/.././", "b"},
+        {"a/b/c", "a/b/", "c"}
+    };
+    const size_t num_success_cases = sizeof(success_cases) / sizeof(success_cases[0]);
+
+    char dir[FS_MAX_PATH_LEN + 1];
+    char basename[FS_MAX_FILENAME_LEN + 1];
+
+    for (size_t i = 0; i < num_success_cases; i++) {
+        err = separate_path(success_cases[i].path, dir, basename); 
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_TRUE(str_eq(success_cases[i].exp_dir, dir)); 
+        TEST_TRUE(str_eq(success_cases[i].exp_basename, basename)); 
+    }
+
+    const char *bad_cases[] = {
+        ".",
+        "..",
+        ".././",
+        "../.",
+        "a/",
+        "/a/b/c/.."
+    };
+    const size_t num_bad_cases = sizeof(bad_cases) / sizeof(bad_cases[0]);
+
+    for (size_t i = 0; i < num_bad_cases; i++) {
+        err = separate_path(bad_cases[i], dir, basename); 
+        TEST_TRUE(err != FOS_SUCCESS);
+    }
+
+    TEST_SUCCEED();
+}
+
 bool test_file_sys_helpers(void) {
     BEGIN_SUITE("File Sys Helpers");
     RUN_TEST(test_is_valid_filename);
     RUN_TEST(test_is_valid_path);
     RUN_TEST(test_next_filename);
+    RUN_TEST(test_separate_path);
     return END_SUITE();
 }
