@@ -120,6 +120,8 @@ static bool test_many_threads(void) {
 }
 
 static bool test_fork_process(void) {
+    fernos_error_t err;
+
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
@@ -132,6 +134,15 @@ static bool test_fork_process(void) {
     thread_t *secondary_thread = proc_new_thread(proc, fake_entry, NULL);
     TEST_TRUE(secondary_thread != NULL);
 
+    file_handle_t fh[2];
+    err = proc_register_file_handle(proc, (fs_node_key_t)1, &(fh[0]));
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = proc_register_file_handle(proc, (fs_node_key_t)2, &(fh[1]));
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    proc_deregister_file_handle(proc, fh[0]);
+
     process_t *child_proc = new_process_fork(proc, secondary_thread, 1);
     TEST_TRUE(child_proc != NULL);
 
@@ -143,6 +154,18 @@ static bool test_fork_process(void) {
     TEST_TRUE(NULL != idtb_get(child_proc->thread_table, secondary_thread->tid));
 
     TEST_EQUAL_HEX(secondary_thread->tid, child_proc->main_thread->tid);
+
+    // Confirm file handles are correct.
+
+    file_handle_state_t *fh_state;
+
+    fh_state = idtb_get(proc->file_handle_table, fh[0]);
+    TEST_TRUE(fh_state == NULL);
+
+    fh_state = idtb_get(proc->file_handle_table, fh[1]);
+    TEST_TRUE(fh_state != NULL);
+
+    TEST_TRUE(fh_state->nk == (fs_node_key_t)2);
 
     delete_process(child_proc);
     delete_process(proc);
@@ -235,6 +258,15 @@ static bool test_complex_process(void) {
         thr->state = THREAD_STATE_WAITING;
         thr->wq = (wait_queue_t *)wq;
     }
+
+    // Now add some file handles.
+
+    file_handle_t fh;
+    err = proc_register_file_handle(proc, (fs_node_key_t)1, &fh);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = proc_register_file_handle(proc, (fs_node_key_t)2, &fh);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     delete_process(proc);
     TEST_SUCCEED();

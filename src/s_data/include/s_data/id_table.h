@@ -118,6 +118,8 @@ fernos_error_t idtb_request_id(id_table_t *idtb, id_t id);
 
 /**
  * This pops an ID from the free list and marks its cell as allocated.
+ *
+ * Returns NULL ID on insufficient resources.
  */
 id_t idtb_pop_id(id_table_t *idtb);
 

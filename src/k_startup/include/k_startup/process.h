@@ -245,7 +245,16 @@ basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex);
 void proc_deregister_futex(process_t *proc, futex_t *u_futex);
 
 /**
+ * Create a new file handle entry with the given node key.
  *
+ * On success, the created file handle is written to `*fh`.
  */
-fernos_error_t proc_new_file_handle(process_t *proc, fs_node_key_t nk);
+fernos_error_t proc_register_file_handle(process_t *proc, fs_node_key_t nk, file_handle_t *fh);
+
+/**
+ * Clean up the resources of a file handle.
+ */
+void proc_deregister_file_handle(process_t *proc, file_handle_t fh);
+
+
 

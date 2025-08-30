@@ -47,10 +47,17 @@ struct _kernel_file_state_t {
      *
      * A Thread which is placed in this queue MUST have the following wait context:
      *
-     * thr->wait_context[0] = (uint32_t) offset in file to read from
+     * thr->wait_context[0] = (file_handle_t) The file handle used for this read request.
      * thr->wait_context[1] = (user void *) user buffer to read to
      * thr->wait_context[2] = (uint32_t) amount to attempt to read into buffer
      * thr->wait_context[3] = (user uint32_t *) where to write the actual amount read
+     *
+     * (The position in the given file handle will be used)
      */
     timed_wait_queue_t *twq;
 };
+
+/**
+ * 
+ */
+fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, file_handle_t *u_fh);

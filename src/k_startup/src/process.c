@@ -354,3 +354,38 @@ void proc_deregister_futex(process_t *proc, futex_t *u_futex) {
 
     delete_wait_queue((wait_queue_t *)*bwq);
 }
+
+fernos_error_t proc_register_file_handle(process_t *proc, fs_node_key_t nk, file_handle_t *fh) {
+    if (!fh || !nk) {
+        return FOS_BAD_ARGS;
+    }
+
+    file_handle_state_t *new_state = al_malloc(proc->al, sizeof(file_handle_state_t));
+    if (!new_state) {
+        return FOS_NO_MEM;
+    }
+
+    *(fs_node_key_t *)&(new_state->nk) = nk;
+    new_state->pos = 0;
+
+    const file_handle_t NULL_FH = idtb_null_id(proc->file_handle_table);
+    file_handle_t new_fh = idtb_pop_id(proc->file_handle_table);
+    if (new_fh == NULL_FH) {
+        al_free(proc->al, new_state);
+        return FOS_EMPTY;
+    }
+
+    idtb_set(proc->file_handle_table, new_fh, new_state);
+
+    *fh = new_fh;
+
+    return FOS_SUCCESS;
+}
+
+void proc_deregister_file_handle(process_t *proc, file_handle_t fh) {
+    file_handle_state_t *fh_state = idtb_get(proc->file_handle_table, fh);
+    if (fh_state) {
+        al_free(proc->al, fh_state);
+        idtb_push_id(proc->file_handle_table, fh);
+    }
+}
