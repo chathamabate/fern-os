@@ -250,6 +250,17 @@ static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir,
 }
 
 /**
+ * This is a wrapper around `fs_touch`.
+ *
+ * basename(path) will attempted to be created in dir(path).
+ * FOS_BAD_ARGS is returned if there is an error separating the basename and directory components
+ * of `path`.
+ *
+ * dir(path) will be passed into `fs_new_key` to create a temporary key for calling `fs_touch`.
+ */
+fernos_error_t fs_touch_path(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key);
+
+/**
  * Create a subdiretory.
  *
  * Returns FOS_BAD_ARGS if `name` is not a valid filename OR if `name` = "." or ".."
@@ -268,6 +279,17 @@ static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir,
 }
 
 /**
+ * This is a wrapper around `fs_mkdir`.
+ *
+ * basename(path) will attempted to be created as a subdirectory dir(path).
+ * FOS_BAD_ARGS is returned if there is an error separating the basename and directory components
+ * of `path`.
+ *
+ * dir(path) will be passed into `fs_new_key` to create a temporary key for calling `fs_mkdir`.
+ */
+fernos_error_t fs_mkdir_path(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key);
+
+/**
  * Remove a file or subdirectory.
  *
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
@@ -280,6 +302,17 @@ static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir,
 static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, const char *name) {
     return fs->impl->fs_remove(fs, parent_dir, name);
 }
+
+/**
+ * This is a wrapper around `fs_remove`.
+ *
+ * This attempts to remove basename(path) from dir(path).
+ * FOS_BAD_ARGS is returned if there is an error separating the basename and directory components
+ * of `path`.
+ *
+ * dir(path) will be passed into `fs_new_key` to create a temporary key for calling `fs_remove`.
+ */
+fernos_error_t fs_remove_path(file_sys_t *fs, fs_node_key_t cwd, const char *path);
 
 /**
  * Retrieve the names of a child nodes within a directory.

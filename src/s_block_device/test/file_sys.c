@@ -829,7 +829,7 @@ static bool test_fs_manual_steps(void) {
         {STEP_READ, "./b", "b.bin", {0, 20, 5}},
         {STEP_WRITE, "./", "a.bin", {0, 200, 1}},
         {STEP_READ, "./b", "b.bin", {20, 80, 4}},
-        {STEP_REMOVE, "./b", "b.bin", {0}},
+        {STEP_REMOVE, "./b/", "b.bin", {0}},
         {STEP_RESIZE, "/", "c.bin", {1000}},
         {STEP_READ, "./", "a.bin", {0, 200, 1}}
 
@@ -913,6 +913,37 @@ static bool test_fs_manual_steps(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fs_path_helpers(void) {
+    // Confirm the default path wrapper functions work as expected.
+    // This test is pretty lazy tbh. IDK, the wrapper are pretty simple and all the same.
+
+    fernos_error_t err;
+
+    err = fs_touch_path(fs, NULL, "/a.txt", NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_touch_path(fs, root_key, "./b.txt", NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_node_key_t key;
+
+    err = fs_mkdir_path(fs, root_key, "./c", &key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_touch_path(fs, root_key, "./c/b.txt", NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_touch_path(fs, root_key, "./d/b.txt", NULL);
+    TEST_TRUE(FOS_SUCCESS != err);
+
+    err = fs_remove_path(fs, key, "b.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_delete_key(fs, key);
+
+    TEST_SUCCEED();
+}
+
 bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     generate_fs = gen;
 
@@ -929,5 +960,6 @@ bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     RUN_TEST(test_fs_zero_resize);
     RUN_TEST(test_fs_exhaust);
     RUN_TEST(test_fs_manual_steps);
+    RUN_TEST(test_fs_path_helpers);
     return END_SUITE();
 }
