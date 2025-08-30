@@ -73,6 +73,19 @@ bool is_valid_path(const char *path);
 size_t next_filename(const char *path, char *dest);
 
 /**
+ * Given a VALID path separate it's basename and directory components. 
+ *
+ * This returns FOS_BAD_ARGS if `path` does not end with a significant filename.
+ * (By "significant" I mean a filename other than "." or "..")
+ *
+ * This will also fail if the given path ends with a "/".
+ *
+ * `dir` should be a buffer with size at least FS_MAX_PATH_LEN + 1
+ * `basename` should be a buffer with size at least FS_MAX_FILENAME_LEN + 1
+ */
+fernos_error_t separate_path(const char *path, char *dir, char *basename);
+
+/**
  * A Node key is an immutable piece of data which can be used to efficiently reference a 
  * file or directory.
  * 
@@ -223,7 +236,7 @@ static inline fernos_error_t fs_get_node_info(file_sys_t *fs, fs_node_key_t key,
 /**
  * Create a new file within a directory.
  *
- * Returns FOS_BAD_ARGS if `name` is not a valid filename.
+ * Returns FOS_BAD_ARGS if `name` is not a valid filename OR if `name` = "." or ".."
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
  * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
  * Returns FOS_NO_SPACE if there isn't enough space to create the file.
@@ -239,7 +252,7 @@ static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir,
 /**
  * Create a subdiretory.
  *
- * Returns FOS_BAD_ARGS if `name` is not a valid filename.
+ * Returns FOS_BAD_ARGS if `name` is not a valid filename OR if `name` = "." or ".."
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
  * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
  * Returns FOS_NO_SPACE if there isn't enough space to create the directory.

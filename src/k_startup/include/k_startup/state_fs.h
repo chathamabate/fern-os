@@ -57,6 +57,27 @@ struct _kernel_file_state_t {
     timed_wait_queue_t *twq;
 };
 
+/*
+ * NOTE: All processes will have a notion of a "current working directory". When a relative
+ * path is handed to any of the below functions, it is interpreted as relative to the calling
+ * processes CWD.
+ *
+ * ALSO NOTE: Many of the below calls require user pointers to strings. Because we can't deduce
+ * the length of userspace strings easily, these calls also require that the length of the string
+ * is provided. Each string pointer should point to a null terminated buffer with size
+ * `length + 1`.
+ */
+
+/**
+ * Create a new file.
+ *
+ * User Errors:
+ * FOS_BAD_ARGS if `u_path` is not a valid path.
+ * FOS_STATE_MISMATCH if `dir_name(u_path)` 
+ *
+ */
+fernos_error_t ks_fs_touch(kernel_state_t *ks, char *u_path, size_t u_path_len, file_handle_t *u_fh);
+
 /**
  * 
  */

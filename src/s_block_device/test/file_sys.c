@@ -61,6 +61,19 @@ static bool posttest(void) {
 static bool test_fs_touch_and_mkdir(void) {
     fernos_error_t err;
 
+    // First, let's let's just try these unique cases.
+    // Know that "." and ".." ARE valid filenames technically,
+    // however, you are not allowed to created files/subdirectories with their name!
+    err = fs_touch(fs, root_key, ".", NULL);
+    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+    err = fs_touch(fs, root_key, "..", NULL);
+    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+
+    err = fs_mkdir(fs, root_key, ".", NULL);
+    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+    err = fs_mkdir(fs, root_key, "..", NULL);
+    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+
     // Maybe we could make a could of subdirectories on root?
     // Put files in those subdirectories???
 
@@ -198,6 +211,14 @@ static bool test_fs_remove(void) {
 
     err = fs_remove(fs, subdir_key, "c");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // While "." and ".." likely exist and are valid in the given directory,
+    // they should never be removeable!
+    err = fs_remove(fs, subdir_key, ".");
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = fs_remove(fs, subdir_key, "..");
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
 
     fs_delete_key(fs, subdir_key);
 

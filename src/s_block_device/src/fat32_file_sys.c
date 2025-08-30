@@ -464,8 +464,8 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
 
     // Ok, now we need to check the filename given.
 
-    // Is it valid?
-    if (!is_valid_filename(name)) {
+    // Is it valid? (and not . or ..)
+    if (!is_valid_filename(name) || str_eq(name, ".") || str_eq(name, "..")) {
         return FOS_BAD_ARGS;
     }
 

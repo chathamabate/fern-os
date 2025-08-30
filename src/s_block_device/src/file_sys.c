@@ -220,3 +220,41 @@ void fs_dump_tree(file_sys_t *fs, void (*pf)(const char *, ...), fs_node_key_t c
 
     fs_delete_key(fs, key);
 }
+
+fernos_error_t separate_path(const char *path, char *dir, char *basename) {
+    if (!path || !dir || !basename) {
+        return FOS_BAD_ARGS;
+    }
+
+    size_t path_len; // length of the path.
+    size_t last_slash = FS_MAX_PATH_LEN; // Index of the path's last "/".
+    
+    for (path_len = 0; path[path_len] != '\0'; path_len++) {
+        if (path[path_len] == '/') {
+            last_slash = path_len;
+        }
+    }
+
+    // This function requires that path is non-empty! So no need to check again.
+
+    const size_t basename_start = last_slash == FS_MAX_PATH_LEN ? 0 : last_slash + 1;
+
+    if (basename_start == path_len) {
+        return FOS_BAD_ARGS; // path ends in a slash :(
+    }
+
+    if (str_eq(".", path + basename_start) || str_eq("..", path + basename_start)) {
+        return FOS_BAD_ARGS; // ends with "." or ".." :,(
+    }
+
+    if (basename_start == 0) {
+        str_cpy(dir, "./");
+    } else {
+        mem_cpy(dir, path, last_slash + 1); 
+        dir[last_slash + 1] = '\0';
+    }
+
+    str_cpy(basename, path + basename_start);
+
+    return FOS_SUCCESS;
+}
