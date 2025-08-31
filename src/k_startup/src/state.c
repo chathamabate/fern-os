@@ -439,6 +439,8 @@ static fernos_error_t ks_cleanup_proc_nks(kernel_state_t *ks, process_t *proc) {
 
             delete_wait_queue((wait_queue_t *)(node_state->twq));
             al_free(ks->al, node_state);
+
+            fs_delete_key(ks->fs, nk);
         }
     }
 
@@ -454,8 +456,14 @@ static fernos_error_t ks_cleanup_proc_nks(kernel_state_t *ks, process_t *proc) {
             return FOS_STATE_MISMATCH;
         }
 
-        delete_wait_queue((wait_queue_t *)(cwd_node_state->twq));
+        if (cwd_node_state->twq) {
+            return FOS_STATE_MISMATCH; // directories should NEVER have a wait queue
+                                       // allocated!
+        }
+
         al_free(ks->al, cwd_node_state);
+
+        fs_delete_key(ks->fs, nk);
     }
 
     return FOS_SUCCESS;

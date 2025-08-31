@@ -45,7 +45,7 @@ static bool test_new_and_delete(void) {
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     delete_process(proc);
@@ -57,7 +57,7 @@ static bool test_new_thread(void) {
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     thread_t *thr0 = proc_new_thread(proc, fake_entry, NULL);
@@ -79,7 +79,7 @@ static bool test_many_threads(void) {
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     for (size_t i = 0; i < FOS_MAX_THREADS_PER_PROC; i++) {
@@ -125,7 +125,7 @@ static bool test_fork_process(void) {
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     thread_t *main_thread = proc_new_thread(proc, fake_entry, NULL);
@@ -189,7 +189,7 @@ static bool test_simple_futex(void) {
     futex_t *u_futex0 = (futex_t *)M_4K;
     futex_t *u_futex1 = (futex_t *)M_4K - 1;
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     err = proc_register_futex(proc, u_futex0);
@@ -227,7 +227,7 @@ static bool test_complex_process(void) {
     futex_t *u_futex0 = (futex_t *)M_4K;
     futex_t *u_futex1 = (futex_t *)M_4K + 1;
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     thread_t *threads[10];

@@ -35,8 +35,11 @@
 #include "s_block_device/fat32_dir.h"
 #include "s_block_device/test/fat32.h"
 #include "s_block_device/test/fat32_dir.h"
+#include "s_block_device/fat32_file_sys.h"
+#include "s_block_device/file_sys.h"
 #include "s_block_device/test/file_sys_helpers.h"
 #include "s_block_device/test/fat32_file_sys.h"
+#include "k_startup/state_fs.h"
 
 #include "k_sys/ata.h"
 
@@ -79,9 +82,29 @@ static fernos_error_t init_kernel_heap(void) {
     return FOS_SUCCESS;
 }
 
+static void now(fernos_datetime_t *dt) {
+    *dt = (fernos_datetime_t) { 0 };
+}
+
 kernel_state_t *kernel = NULL;
 
-static fernos_error_t init_kernel_state(void) {
+static void init_kernel_state(void) {
+    fernos_error_t err;
+
+    block_device_t *bd = new_da_cached_block_device(
+        get_ata_block_device(),
+        512, 0, true
+    );
+
+    if (!bd) {
+        setup_fatal("Failed to created block device");
+    }
+
+    file_sys_t *fs;
+    err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
+    if (err != FOS_SUCCESS) {
+        setup_fatal("Failed to parse FAT32 from disk");
+    }
 
     // You know, setting up the kernel stat here, instead of in some special kernel state function
     // feels hacky. But honestly is it really the end of the world.
@@ -89,24 +112,44 @@ static fernos_error_t init_kernel_state(void) {
     // Notice no real cleanup is done in the error case, I guess I was thinking that if things go wrong
     // it is implied the system just locks up.
 
-    kernel = new_da_kernel_state();
+    kernel = new_da_kernel_state(fs);
     if (!kernel) {
-        return FOS_NO_MEM;
+        setup_fatal("Failed to allocate kernel state");
     }
 
     proc_id_t pid = idtb_pop_id(kernel->proc_table);
     if (pid == idtb_null_id(kernel->proc_table)) {
-        return FOS_NO_MEM;
+        setup_fatal("Failed to pop root pid");
     }
 
     phys_addr_t user_pd = pop_initial_user_info();
     if (user_pd == NULL_PHYS_ADDR) {
-        return FOS_UNKNWON_ERROR;
+        setup_fatal("Failed to get user PD");
     }
 
-    process_t *proc = new_da_process(pid, user_pd, NULL);
+    // Let's register the root key into the kenrel state.
+    fs_node_key_t root_key;
+    err = fs_new_key(fs, NULL, "/", &root_key);
+    if (err != FOS_SUCCESS) {
+        setup_fatal("Failed to get root dir key");
+    }
+
+    kernel_fs_node_state_t *node_state = al_malloc(get_default_allocator(), sizeof(kernel_fs_node_state_t));
+    if (!node_state) {
+        setup_fatal("Failed to allocate state for root dir key");
+    }
+
+    node_state->references = 1;
+    node_state->twq = NULL;
+
+    err = mp_put(kernel->open_files, &root_key, &node_state);
+    if (err != FOS_SUCCESS) {
+        setup_fatal("Failed to place root dir key");
+    }
+
+    process_t *proc = new_da_process(pid, user_pd, NULL, root_key);
     if (!proc) {
-        return FOS_NO_MEM;
+        setup_fatal("Failed to allocate first process");
     }
 
     kernel->root_proc = proc;
@@ -118,16 +161,12 @@ static fernos_error_t init_kernel_state(void) {
     thread_t *thr = proc_new_thread(kernel->root_proc, 
             (thread_entry_t)user_main, NULL);
     if (!thr) {
-        return FOS_UNKNWON_ERROR;
+        setup_fatal("Failed to allocate first thread");
     }
 #pragma GCC diagnostic pop
 
     // Finally, schedule our first thread!
     ks_schedule_thread(kernel, thr);
-
-    // Now we are actually getting somewhere, we should be able to add the sleep queue now!
-
-    return FOS_SUCCESS;
 }
 
 void start_kernel(void) {
@@ -147,7 +186,7 @@ void start_kernel(void) {
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
 
-    try_setup_step(init_kernel_state(), "Failed to setup kernel state");
+    init_kernel_state();
 
     // Now put in the real actions.
     set_gpf_action(fos_gpf_action);
@@ -155,9 +194,6 @@ void start_kernel(void) {
 
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
-
-    test_fat32_file_sys();
-    lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }
