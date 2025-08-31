@@ -332,7 +332,7 @@ static bool test_fs_get_node_info(void) {
     TEST_SUCCEED();
 }
 
-static bool test_fs_hash_and_equate(void) {
+static bool test_fs_hash_equate_and_copy(void) {
     fernos_error_t err;
 
     hasher_ft hash_func = fs_get_key_hasher(fs);
@@ -341,7 +341,7 @@ static bool test_fs_hash_and_equate(void) {
     equator_ft equate_func = fs_get_key_equator(fs);
     TEST_TRUE(equate_func != NULL);
 
-    fs_node_key_t keys[3];
+    fs_node_key_t keys[4];
 
     err = fs_touch(fs, root_key, "a.txt", keys + 0);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -352,12 +352,18 @@ static bool test_fs_hash_and_equate(void) {
     err = fs_touch(fs, root_key, "b.txt", keys + 2);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+    keys[3] = fs_new_key_copy(fs, keys[2]);
+    TEST_TRUE(keys[3] != NULL);
+
     TEST_EQUAL_UINT(hash_func(keys + 0), hash_func(keys + 1));
     TEST_TRUE(equate_func(keys + 0, keys + 1));
 
     TEST_FALSE(equate_func(keys + 1, keys + 2));
 
-    for (size_t i = 0; i < 3; i++) {
+    TEST_EQUAL_UINT(hash_func(keys + 2), hash_func(keys + 3));
+    TEST_TRUE(equate_func(keys + 2, keys + 3));
+
+    for (size_t i = 0; i < 4; i++) {
         fs_delete_key(fs, keys[i]);
     }
 
@@ -952,7 +958,7 @@ bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     RUN_TEST(test_fs_remove);
     RUN_TEST(test_fs_get_child_names);
     RUN_TEST(test_fs_get_node_info);
-    RUN_TEST(test_fs_hash_and_equate);
+    RUN_TEST(test_fs_hash_equate_and_copy);
     RUN_TEST(test_fs_rw0);
     RUN_TEST(test_fs_rw1);
     RUN_TEST(test_fs_rw2);

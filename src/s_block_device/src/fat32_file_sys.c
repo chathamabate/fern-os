@@ -7,6 +7,7 @@
 static fernos_error_t fat32_fs_flush(file_sys_t *fs, fs_node_key_t key);
 static void delete_fat32_file_sys(file_sys_t *fs);
 static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key);
+static inline fs_node_key_t fat32_fs_new_key_copy(file_sys_t *fs, fs_node_key_t key);
 static void fat32_fs_delete_key(file_sys_t *fs, fs_node_key_t key);
 static equator_ft fat32_fs_get_key_equator(file_sys_t *fs);
 static hasher_ft fat32_fs_get_key_hasher(file_sys_t *fs);
@@ -24,6 +25,7 @@ static const file_sys_impl_t FAT32_FS_IMPL = {
     .fs_flush = fat32_fs_flush,
     .delete_file_sys = delete_fat32_file_sys,
     .fs_new_key = fat32_fs_new_key,
+    .fs_new_key_copy = fat32_fs_new_key_copy,
     .fs_delete_key = fat32_fs_delete_key,
     .fs_get_key_equator = fat32_fs_get_key_equator,
     .fs_get_key_hasher = fat32_fs_get_key_hasher,
@@ -221,6 +223,22 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
         is_dir = (FT32F_ATTR_SUBDIR & entry.short_fn.attrs) == FT32F_ATTR_SUBDIR;
         curr_ind = (entry.short_fn.first_cluster_high << 16) | (entry.short_fn.first_cluster_low);
     }
+}
+
+static inline fs_node_key_t fat32_fs_new_key_copy(file_sys_t *fs, fs_node_key_t key) {
+    if (!key) {
+        return NULL;
+    }
+
+    fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
+    fat32_fs_node_key_t nk = (fat32_fs_node_key_t)key;
+    
+    fat32_fs_node_key_t copy = al_malloc(fat32_fs->al, sizeof(fat32_fs_node_key_val_t));
+    if (copy) {
+        mem_cpy((void *)copy, nk, sizeof(fat32_fs_node_key_val_t));
+    }
+
+    return copy;
 }
 
 static void fat32_fs_delete_key(file_sys_t *fs, fs_node_key_t key) {

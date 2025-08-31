@@ -145,6 +145,7 @@ struct _file_sys_impl_t {
 
     void (*delete_file_sys)(file_sys_t *fs);
     fernos_error_t (*fs_new_key)(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key);
+    fs_node_key_t (*fs_new_key_copy)(file_sys_t *fs, fs_node_key_t key);
     void (*fs_delete_key)(file_sys_t *fs, fs_node_key_t key);
     equator_ft (*fs_get_key_equator)(file_sys_t *fs);
     hasher_ft (*fs_get_key_hasher)(file_sys_t *fs);
@@ -199,6 +200,21 @@ static inline void delete_file_sys(file_sys_t *fs) {
 static inline fernos_error_t fs_new_key(file_sys_t *fs, fs_node_key_t cwd, 
         const char *path, fs_node_key_t *key) {
     return fs->impl->fs_new_key(fs, cwd, path, key);
+}
+
+/**
+ * What this actually does is kinda up to the implementor.
+ *
+ * The intention is that a node key is a pointer to some dynamic object, and by calling this
+ * function some new dynamic object is created and its pointer is returned.
+ *
+ * HOWEVER, it may also be suitable for this to just to return the very key given. Maybe
+ * in the case where keys are immutable and indesctructable? Or maybe internally reference counted?
+ *
+ * If something goes wrong, this should return NULL.
+ */
+static inline fs_node_key_t fs_new_key_copy(file_sys_t *fs, fs_node_key_t key) {
+    return fs->impl->fs_new_key_copy(fs, key);
 }
 
 /**
