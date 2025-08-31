@@ -74,10 +74,10 @@ struct _kernel_state_t {
     file_sys_t * const fs;
 
     /**
-     * This is a map of fs_node_key_t -> kernel_file_state_t *
+     * This is a map of fs_node_key_t -> kernel_fs_node_state_t *
      *
-     * Every file which is currently accessible by at least 1 thread will have an entry in 
-     * this map!
+     * EVERY fs_node_key in use by the kernel will have an entry in this map.
+     * (This includes directory node keys which are not directly accessibly by the user)
      */
     map_t * const open_files;
 };

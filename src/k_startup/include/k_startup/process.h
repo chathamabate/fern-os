@@ -139,6 +139,10 @@ struct _file_handle_state_t {
 
     /**
      * The position in the file to read/write to next.
+     *
+     * NOTE: The user will only be able to write/read from bytes [0, SIZE_MAX - 1].
+     * When pos = SIZE_MAX, this signifies the file is at it's maximum size and cannot
+     * be written to or read from any more without calling seek.
      */
     size_t pos;
 };
