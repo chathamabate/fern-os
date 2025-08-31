@@ -103,28 +103,22 @@ static void init_kernel_state(void) {
     file_sys_t *fs;
     err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
     if (err != FOS_SUCCESS) {
-        setup_fatal("Failed to parse FAT32 from disk");
-    }
+        err = init_fat32(bd, 0, bd_num_sectors(bd), 8);
+        if (err != FOS_SUCCESS) {
+            setup_fatal("Failed to init FAT32");
+        }
 
-    // You know, setting up the kernel stat here, instead of in some special kernel state function
-    // feels hacky. But honestly is it really the end of the world.
-    // 
-    // Notice no real cleanup is done in the error case, I guess I was thinking that if things go wrong
-    // it is implied the system just locks up.
+        // NOTE: This is a temporary fix and VERY VERY dangerous. 
+        // It basically resets the entire disk if it fails to parse it the first time.
+        err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
+        if (err != FOS_SUCCESS) {
+            setup_fatal("Failed to create FAT32 FS");
+        }
+    }
 
     kernel = new_da_kernel_state(fs);
     if (!kernel) {
         setup_fatal("Failed to allocate kernel state");
-    }
-
-    proc_id_t pid = idtb_pop_id(kernel->proc_table);
-    if (pid == idtb_null_id(kernel->proc_table)) {
-        setup_fatal("Failed to pop root pid");
-    }
-
-    phys_addr_t user_pd = pop_initial_user_info();
-    if (user_pd == NULL_PHYS_ADDR) {
-        setup_fatal("Failed to get user PD");
     }
 
     // Let's register the root key into the kenrel state.
@@ -139,12 +133,24 @@ static void init_kernel_state(void) {
         setup_fatal("Failed to allocate state for root dir key");
     }
 
-    node_state->references = 1;
+    node_state->references = 1; // The user process will be the first reference.
     node_state->twq = NULL;
 
     err = mp_put(kernel->open_files, &root_key, &node_state);
     if (err != FOS_SUCCESS) {
         setup_fatal("Failed to place root dir key");
+    }
+
+    // Let's setup our first user process.
+
+    proc_id_t pid = idtb_pop_id(kernel->proc_table);
+    if (pid == idtb_null_id(kernel->proc_table)) {
+        setup_fatal("Failed to pop root pid");
+    }
+
+    phys_addr_t user_pd = pop_initial_user_info();
+    if (user_pd == NULL_PHYS_ADDR) {
+        setup_fatal("Failed to get user PD");
     }
 
     process_t *proc = new_da_process(pid, user_pd, NULL, root_key);
