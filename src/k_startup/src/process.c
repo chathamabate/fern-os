@@ -21,7 +21,11 @@ static uint32_t fm_key_hash(const void *k) {
     return (((uint32_t)futex + 1373) * 7) + 2;
 }
 
-process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent) {
+process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd) {
+    if (!cwd) {
+        return NULL;
+    }
+
     process_t *proc = al_malloc(al, sizeof(process_t));
     list_t *children = new_linked_list(al, sizeof(process_t *));
     list_t *zchildren = new_linked_list(al, sizeof(process_t *));
@@ -67,6 +71,7 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
 
     proc->futexes = futexes;
 
+    proc->cwd = cwd;
     proc->file_handle_table = file_handle_table;
 
     return proc;
@@ -100,7 +105,7 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
         }
     }
 
-    process_t *child = new_process(proc->al, cpid, new_pd, proc);
+    process_t *child = new_process(proc->al, cpid, new_pd, proc, proc->cwd);
 
     if (!child) {
         delete_page_directory(new_pd);

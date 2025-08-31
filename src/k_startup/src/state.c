@@ -6,6 +6,7 @@
 #include "k_startup/thread.h"
 #include "k_startup/process.h"
 #include "k_startup/page.h"
+#include "k_startup/state_fs.h"
 
 #include "k_bios_term/term.h"
 #include "s_util/str.h"
@@ -34,15 +35,22 @@
 /**
  * Creates a new kernel state with basically no fleshed out details.
  */
-kernel_state_t *new_kernel_state(allocator_t *al) {
+kernel_state_t *new_kernel_state(allocator_t *al, file_sys_t *fs) {
+    if (!fs) {
+        return NULL;
+    }
+
     kernel_state_t *ks = al_malloc(al, sizeof(kernel_state_t));
     id_table_t *pt = new_id_table(al, FOS_MAX_PROCS);
     timed_wait_queue_t *twq = new_timed_wait_queue(al);
+    map_t *open_files = new_chained_hash_map(al, sizeof(fs_node_key_t), sizeof(kernel_fs_node_state_t *),
+            3, fs_get_key_equator(fs), fs_get_key_hasher(fs));
 
-    if (!ks || !pt || !twq) {
+    if (!ks || !pt || !twq || !open_files) {
         al_free(al, ks);
         delete_id_table(pt);
         delete_wait_queue((wait_queue_t *)twq);
+        delete_map(open_files);
         return NULL;
     }
 
@@ -53,6 +61,9 @@ kernel_state_t *new_kernel_state(allocator_t *al) {
 
     ks->curr_tick = 0;
     *(timed_wait_queue_t **)&(ks->sleep_q) = twq;
+
+    *(file_sys_t **)&(ks->fs) = fs;
+    *(map_t **)&(ks->open_files) = open_files;
 
     return ks;
 }
@@ -180,10 +191,51 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
 
 static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid);
 
+/**
+ * Given a newly forked process, increment the reference counts of all file node keys
+ * mentioned in this new child.
+ *
+ * Remember, since this process must've been created via a fork, we can assume our `open_files`
+ * map already has entries for every node key present in `child`.
+ */
+fernos_error_t ks_register_fork_nks(kernel_state_t *ks, process_t *child) {
+    // Ok, before we return, we must remember now to increase the reference counts
+    // of all file handles (including the cwd) found in this new process.
+
+    idtb_reset_iterator(child->file_handle_table);
+    for (file_handle_t fh = idtb_get_iter(child->file_handle_table);
+            fh != idtb_null_id(child->file_handle_table); 
+            fh = idtb_next(child->file_handle_table)) {
+        file_handle_state_t *fh_state = idtb_get(child->file_handle_table, fh);
+        if (!fh_state) {
+            return FOS_STATE_MISMATCH; // If this happens something is very wrong.
+        }
+
+        fs_node_key_t nk = fh_state->nk;
+        kernel_fs_node_state_t **node_state = mp_get(ks->open_files, &nk);
+        if (!node_state || !(*node_state)) {
+            return FOS_STATE_MISMATCH; // If this happens some things is very very wrong.
+        }
+        (*node_state)->references++;
+    }
+
+    // Now, don't forget the cwd either!
+
+    kernel_fs_node_state_t **cwd_node_state = mp_get(ks->open_files, &(child->cwd));
+    if (!cwd_node_state || !(*cwd_node_state)) {
+        return FOS_STATE_MISMATCH;
+    }
+    (*cwd_node_state)->references++;
+
+    return FOS_SUCCESS;
+}
+
 fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
+
+    fernos_error_t err;
 
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
@@ -234,6 +286,14 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
 
     child->main_thread->ctx.eax = FOS_SUCCESS;
     ks_schedule_thread(ks, child->main_thread);
+
+    // Now increment the handle reference counts.
+    err = ks_register_fork_nks(ks, child);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    // Finally I think we are done!
 
     if (u_cpid) {
         proc_id_t temp_pid;
@@ -349,6 +409,58 @@ fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
     return ks_exit_proc_p(ks, ks->curr_thread->proc, status);
 }
 
+/**
+ * Given a process which is likely about to be deleted. Decrement the reference counts of
+ * all fs node keys which are used by the process.
+ */
+static fernos_error_t ks_cleanup_proc_nks(kernel_state_t *ks, process_t *proc) {
+    fs_node_key_t nk;
+
+    idtb_reset_iterator(proc->file_handle_table);
+    for (file_handle_t fh = idtb_get_iter(proc->file_handle_table);
+            fh != idtb_null_id(proc->file_handle_table); 
+            fh = idtb_next(proc->file_handle_table)) {
+        file_handle_state_t *fh_state = idtb_get(proc->file_handle_table, fh);
+        if (!fh_state) {
+            return FOS_STATE_MISMATCH; // If this happens something is very wrong.
+        }
+
+        nk = fh_state->nk;
+        kernel_fs_node_state_t **node_state_p = mp_get(ks->open_files, &nk);
+        if (!node_state_p || !(*node_state_p)) {
+            return FOS_STATE_MISMATCH; // If this happens something is very very wrong.
+        }
+
+        kernel_fs_node_state_t *node_state = *node_state_p;
+        if (--(node_state->references) == 0) {
+            if (!mp_remove(ks->open_files, &nk)) {
+                return FOS_STATE_MISMATCH;
+            }
+
+            delete_wait_queue((wait_queue_t *)(node_state->twq));
+            al_free(ks->al, node_state);
+        }
+    }
+
+    // Now, don't forget the cwd either!
+
+    kernel_fs_node_state_t **cwd_node_state_p = mp_get(ks->open_files, &(proc->cwd));
+    if (!cwd_node_state_p || !(*cwd_node_state_p)) {
+        return FOS_STATE_MISMATCH;
+    }
+    kernel_fs_node_state_t *cwd_node_state = *cwd_node_state_p;
+    if (--(cwd_node_state->references) == 0) {
+        if (!mp_remove(ks->open_files, &nk)) {
+            return FOS_STATE_MISMATCH;
+        }
+
+        delete_wait_queue((wait_queue_t *)(cwd_node_state->twq));
+        al_free(ks->al, cwd_node_state);
+    }
+
+    return FOS_SUCCESS;
+}
+
 fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, 
         proc_id_t *u_rcpid, proc_exit_status_t *u_rces) {
     fernos_error_t err;
@@ -415,6 +527,12 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     if (user_err == FOS_SUCCESS) {
         // REAP!
         
+        err = ks_cleanup_proc_nks(ks, rproc);
+        if (err != FOS_SUCCESS) {
+            return err; // Failing to cleanup the file handles is seen as a fatal error.
+        }
+
+        // Reaping should also clean up file handles within the process being reaped!
         rcpid = rproc->pid;
         rces = rproc->exit_status;
 

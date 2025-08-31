@@ -120,6 +120,17 @@ struct _process_t {
     map_t *futexes;
 
     /**
+     * The current working directory of this process.
+     *
+     * Just like the node keys found in `file_handle_table` below, this key should be managed by
+     * the kernel state, NOT HERE. (This just means, we can shallow copy around this value
+     * all we want, it is the kernel state's reponsibility to keep track)
+     *
+     * This should NEVER be NULL.
+     */
+    fs_node_key_t cwd;
+
+    /**
      * Each entry in this table holds a pointer to a file_handle_state_t * which is 
      * dynamically allocated by this process's allocator.
      */
@@ -154,10 +165,10 @@ struct _file_handle_state_t {
  *
  * If any allocation fails, NULL is returned.
  */
-process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent);
+process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd);
 
-static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent) {
-    return new_process(get_default_allocator(), pid, pd, parent);
+static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd) {
+    return new_process(get_default_allocator(), pid, pd, parent, cwd);
 }
 
 /**

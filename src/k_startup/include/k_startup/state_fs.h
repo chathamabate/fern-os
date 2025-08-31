@@ -24,20 +24,6 @@ struct _kernel_fs_node_state_t {
     uint32_t references;
 
     /**
-     * When a user attempts to delete a file it will only actually be deleted after all currently
-     * open handles are closed. So, if the file is still in use by other users when deletion is
-     * requested, this field is set to true.
-     *
-     * When this file is true, the referenced file cannot be openned again. When all handles
-     * are returned, this file will be entirely deleted.
-     *
-     * NOTE: For directories, this field isn't really used. When trying to delete a directory
-     * which is the CWD of other processes, an error is returned. A directory can only be
-     * deleted if it's node_key has no references and the directory itself is empty.
-     */
-    bool set_to_delete;
-
-    /**
      * While files have nothing to do with times, we are actually going to use a "timed" wait
      * queue here to keep track of threads waiting for data to abe added to a file.
      *
@@ -147,11 +133,24 @@ fernos_error_t ks_fs_seek(kernel_state_t *ks, file_handle_t fh, size_t pos);
  * in the calling thread.
  *
  * The total number of bytes written is written to `*written`.
- * FOS_SUCCESS does NOT mean all bytes were written!!!
+ * FOS_SUCCESS does NOT mean all bytes were written!!! (This will likely write in chunks to 
+ * prevent being in the kernel for too long)
  */
-fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_src, size_t len, size_t *written);
+fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_src, size_t len, size_t *u_written);
 
 /**
- * Blocking ready baybEE.
+ * Blocking read.
+ *
+ * Read from a file into userspace buffer `u_dst`.
+ *
+ * If the position of `fh` = len(file), this function blocks the current thread until more data 
+ * is added to the file. If any data at all can be read, it is immediately written to `u_dst`
+ * and FOS_SUCCESS is returned.
+ *
+ * If the position of `fh` = SIZE_MAX, FOS_SUCCESS is return and 0 is written to `*u_readden`.
+ *
+ * Just like with `ks_fs_write`, FOS_SUCCESS does NOT mean `len` bytes were read. 
+ * On Success, always check what is written to `u_readden` to confirm the actual number of 
+ * read bytes.
  */
-fernos_error_t ks_fs_read(kernel_state_t *ks, 
+fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, size_t len, size_t *u_readden);

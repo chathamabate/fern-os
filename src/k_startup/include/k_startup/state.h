@@ -85,16 +85,12 @@ struct _kernel_state_t {
 /**
  * Create a kernel state!
  *
- * `user_main` should be the entry point for the first user process.
- * `user_pd` should be the physical address of the first user process's 
- * page directory..
- *
  * Returns NULL on error.
  */
-kernel_state_t *new_kernel_state(allocator_t *al);
+kernel_state_t *new_kernel_state(allocator_t *al, file_sys_t *fs);
 
-static inline kernel_state_t *new_da_kernel_state(void) {
-    return new_kernel_state(get_default_allocator());
+static inline kernel_state_t *new_da_kernel_state(file_sys_t *fs) {
+    return new_kernel_state(get_default_allocator(), fs);
 }
 
 /**
