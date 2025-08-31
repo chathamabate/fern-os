@@ -76,8 +76,9 @@ static fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) 
     fernos_error_t err;
 
     // DAMN so many fucking gotchas...
+    // I think what we do is that if a reference count goes to zero, we wake up all sleeping threads?
+    // That's what I think we need to do!!!
 
-    kernel_fs_node_state_t *
 }
 
 fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_path_len) {

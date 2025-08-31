@@ -14,7 +14,7 @@ typedef struct _map_impl_t map_impl_t;
 struct _map_impl_t {
     void (*delete_map)(map_t *mp);
 
-    void *(*mp_get)(map_t *mp, const void *key);
+    fernos_error_t (*mp_get_kvp)(map_t *mp, const void *key, const void **key_out, void **val_out);
     fernos_error_t (*mp_put)(map_t *mp, const void *key, const void *value);
 
     bool (*mp_remove)(map_t *mp, const void *key);
@@ -64,12 +64,30 @@ static inline void delete_map(map_t *mp) {
 }
 
 /**
+ * (A later addition to this interface)
+ *
+ * Given a key, if the key is mapped, FOS_SUCCESS is returned. If `key_out` is given a pointer
+ * to the key's cell in the map is written to `*key_out`. If `val_out` is given, a pointer to
+ * the value's cell is written to `*val_out`.
+ *
+ * If the given key is not mapped. FOS_EMPTY is returned.
+ */
+static inline fernos_error_t mp_get_kvp(map_t *mp, const void *key, const void **key_out, void **val_out) {
+    return mp->impl->mp_get_kvp(mp, key, key_out, val_out);
+}
+
+/**
  * Get a pointer to a key's corresponding value.
  *
  * Returns NULL if the given key is not present in the map, or if key is NULL.
+ *
+ * (This used to be a function the implementor would need write, however, this has been replaced
+ * with the more powerful endpoint above)
  */
 static inline void *mp_get(map_t *mp, const void *key) {
-    return mp->impl->mp_get(mp, key);
+    void *val;
+    fernos_error_t err = mp_get_kvp(mp, key, NULL, &val);
+    return err == FOS_SUCCESS ? val : NULL;
 }
 
 /**
