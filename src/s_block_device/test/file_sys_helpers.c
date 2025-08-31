@@ -167,6 +167,7 @@ static bool test_separate_path(void) {
     }
 
     const char *bad_cases[] = {
+        "/",
         ".",
         "..",
         ".././",

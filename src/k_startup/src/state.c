@@ -11,26 +11,6 @@
 #include "k_bios_term/term.h"
 #include "s_util/str.h"
 
-/*
- * Some helper macros for returning from these calls in both the kernel space and the user thread.
- */
-
-#define DUAL_RET(thr, u_err, k_err) \
-    do { \
-        (thr)->ctx.eax = u_err; \
-        return (k_err); \
-    } while (0)
-
-#define DUAL_RET_COND(cond, thr, u_err, k_err) \
-    if (cond) { \
-        DUAL_RET(thr, u_err, k_err); \
-    }
-
-#define DUAL_RET_FOS_ERR(err, thr) \
-    if (err != FOS_SUCCESS) { \
-        (thr)->ctx.eax = (err);  \
-        return FOS_SUCCESS; \
-    }
 
 /**
  * Creates a new kernel state with basically no fleshed out details.
@@ -198,7 +178,7 @@ static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t 
  * Remember, since this process must've been created via a fork, we can assume our `open_files`
  * map already has entries for every node key present in `child`.
  */
-fernos_error_t ks_register_fork_nks(kernel_state_t *ks, process_t *child) {
+static fernos_error_t ks_register_fork_nks(kernel_state_t *ks, process_t *child) {
     // Ok, before we return, we must remember now to increase the reference counts
     // of all file handles (including the cwd) found in this new process.
 

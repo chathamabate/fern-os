@@ -201,5 +201,8 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
 
+    test_file_sys_helpers();
+    lock_up();
+
     return_to_ctx(&(kernel->curr_thread->ctx));
 }

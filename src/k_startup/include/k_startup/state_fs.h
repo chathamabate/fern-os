@@ -81,6 +81,16 @@ fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path
 fernos_error_t ks_fs_mkdir(kernel_state_t *ks, const char *u_path, size_t u_path_len);
 
 /**
+ * Remove a file or directory.
+ *
+ * If this node trying to be deleted is currently refercence by any process, FOS_IN_USE
+ * is returned.
+ *
+ * FOS_IN_USE is also returned when trying to delete a non-empty directory.
+ */
+fernos_error_t ks_fs_remove(kernel_state_t *ks, const char *u_path, size_t u_path_len);
+
+/**
  * Attempt to get information about a file or directory.
  *
  * On success, the information is written to userspace at `*u_info`.

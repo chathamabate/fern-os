@@ -12,6 +12,27 @@
 #include "s_block_device/file_sys.h"
 
 /*
+ * Some helper macros for returning from these calls in both the kernel space and the user thread.
+ */
+
+#define DUAL_RET(thr, u_err, k_err) \
+    do { \
+        (thr)->ctx.eax = u_err; \
+        return (k_err); \
+    } while (0)
+
+#define DUAL_RET_COND(cond, thr, u_err, k_err) \
+    if (cond) { \
+        DUAL_RET(thr, u_err, k_err); \
+    }
+
+#define DUAL_RET_FOS_ERR(err, thr) \
+    if (err != FOS_SUCCESS) { \
+        (thr)->ctx.eax = (err);  \
+        return FOS_SUCCESS; \
+    }
+
+/*
  * Design NOTES:
  *
  * The structures within the kenrel are inherently cyclic. For example a process needs
