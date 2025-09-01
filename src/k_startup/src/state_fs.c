@@ -9,76 +9,113 @@
 #include "k_startup/page_helpers.h"
 #include "s_block_device/file_sys.h"
 
-/**
- * Increment a given node key's reference count in the kernels file map.
- * NOTE VERY IMPORTANT: `nk` must point to a node key that has just been newly allocated.
- * An semantically equal node key can already live in the kernel state (in the case this file/dir
- * is already referenced), but the key itself must be different. 
- *
- * (This function will delete the given key if it already appears in the file map)
- *
- * FOS_STATE_MISMATCH being returned means something is seriously wrong with `ks`.
- * Other error can be returned to the calling thread.
- */
-static fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t *nk) {
+fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk) {
     fernos_error_t err;
 
-    if (!nk || !(*nk)) {
+    if (!nk) {
         return FOS_BAD_ARGS;
     }
 
-    kernel_fs_node_state_t **nk_state_p = mp_get(ks->open_files, nk);
-    kernel_fs_node_state_t *nk_state;
+    kernel_fs_node_state_t *node_state = mp_get(ks->nk_map, &nk);
 
-    if (!nk_state_p) {
-        // The given key does not appear yet, so let's give it an entry!
-        nk_state = al_malloc(ks->al, sizeof(kernel_fs_node_state_t));
-        if (!nk_state) {
-            return FOS_NO_MEM;
-        }
-
-        nk_state->references = 1;
-        nk_state->twq = NULL; // No wait queue for a directory!
-
-        // Here the given node key is consumed by being placed directly in the map.
-        err = mp_put(ks->open_files, nk, &nk_state);
-
+    if (!node_state) { // New entry!
+        fs_node_info_t info;
+        err = fs_get_node_info(ks->fs, nk, &info);
         if (err != FOS_SUCCESS) {
             return FOS_UNKNWON_ERROR;
         }
-    } else {
-        nk_state = *nk_state_p;
-        if (!nk_state) {
-            return FOS_STATE_MISMATCH;
+
+        fs_node_key_t nk_copy = fs_new_key_copy(ks->fs, nk);
+        node_state = al_malloc(ks->al, sizeof(kernel_fs_node_state_t));
+        timed_wait_queue_t *twq = info.is_dir ? NULL : new_timed_wait_queue(ks->al);
+
+        if (nk_copy && node_state && (info.is_dir || twq)) {
+            node_state->twq = twq;
+            node_state->references = 1;
+
+            err = mp_put(ks->nk_map, &nk_copy, &node_state);
         }
 
-        nk_state->twq++;
+        if (!nk_copy || !node_state || (!(info.is_dir) && !twq) || err != FOS_SUCCESS) {
+            if (nk_copy) {
+                mp_remove(ks->nk_map, &nk_copy);
+            }
 
-        // Here our node key is already in the map, so we can delete the one given!
-        fs_delete_key(ks->fs, *nk);
+            delete_wait_queue((wait_queue_t *)twq);
+            fs_delete_key(ks->fs, nk_copy);
+            al_free(ks->al, node_state);
+
+            return FOS_NO_MEM;
+        }
+
+        return FOS_SUCCESS;
     }
 
-    *nk = NULL;
+    // Otherwise, the entry already exists!
+    // Just increase the reference count.
+    node_state->references++;
+
     return FOS_SUCCESS;
 }
 
-/**
- * Decrement a node key's reference count in the kernel file map.
- * FOS_STATE_MISMATCH is returned if `nk` cannot be found in the file map
- * (signifying a fatal kernel error)
- *
- * Unlike with `ks_fs_register_nk`, this function does not consume `nk` in anyway.
- * However, if the reference count of `nk` reaches zero, it's entry in the kernel state is
- * entirely deleted. SO, if `nk` is a node key which is managed by the kernel, it may 
- * be have been deleted during this function call.
- */
-static fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
+fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
+    if (!nk) {
+        return FOS_BAD_ARGS;
+    }
+
     fernos_error_t err;
 
-    // DAMN so many fucking gotchas...
-    // I think what we do is that if a reference count goes to zero, we wake up all sleeping threads?
-    // That's what I think we need to do!!!
+    fs_node_key_t *key_p;
+    kernel_fs_node_state_t **state_p;
 
+    err = mp_get_kvp(ks->nk_map, &nk, (const void **)&key_p, (void **)&state_p);
+    if (err != FOS_SUCCESS) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    fs_node_key_t key = *key_p;
+    kernel_fs_node_state_t *state = *state_p;
+
+    if (!key || !state) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    if (--(state->references) == 0) {
+        // Cleanup time!
+
+        // First remove our entry from the nk map.
+        mp_remove(ks->nk_map, &key);
+
+        // Also delete the mapped key, (NOT THE KEY INPUT TO THIS FUNCTION)
+        fs_delete_key(ks->fs, key);
+
+        // Now deal with the leftover state.
+
+        if (state->twq) {
+            // The way we are using the timed queue here, this should ALWAYS wake up
+            // all waiting threads.
+            twq_notify(state->twq, UINT32_MAX);
+
+            thread_t *woken_thread;
+            while ((err = twq_pop(state->twq, (void **)&woken_thread)) == FOS_SUCCESS) {
+                woken_thread->wq = NULL;
+                woken_thread->ctx.eax = FOS_STATE_MISMATCH;
+                woken_thread->state = THREAD_STATE_DETATCHED;
+
+                ks_schedule_thread(ks, woken_thread);
+            }
+
+            if (err != FOS_EMPTY) {
+                return FOS_UNKNWON_ERROR;
+            }
+
+            delete_wait_queue((wait_queue_t *)(state->twq));
+        }
+
+        al_free(ks->al, state);
+    }
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_path_len) {

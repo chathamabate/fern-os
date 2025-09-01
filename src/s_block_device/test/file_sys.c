@@ -476,6 +476,9 @@ static bool test_fs_rw2(void) {
     err = fs_touch(fs, root_key, "a.txt", &key);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+    fs_node_key_t key_copy = fs_new_key_copy(fs, key);
+    TEST_TRUE(key_copy != NULL);
+
     size_t file_size = 100;
 
     err = fs_resize(fs, key, file_size);
@@ -511,7 +514,9 @@ static bool test_fs_rw2(void) {
             } else { // read
                 // Read from file to the tx buf.
 
-                err = fs_read(fs, key, tx_offset, tx_amt, tx_buf + tx_offset);
+                // Reading from the key copy should not result in any issues.
+                // I just threw this in here to get more coverage on the copy key code.
+                err = fs_read(fs, key_copy, tx_offset, tx_amt, tx_buf + tx_offset);
                 TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
                 // Compare with mirror buffer.
@@ -566,6 +571,7 @@ static bool test_fs_rw2(void) {
     da_free(tx_buf);
     da_free(buf);
 
+    fs_delete_key(fs, key_copy);
     fs_delete_key(fs, key);
 
     TEST_SUCCEED();

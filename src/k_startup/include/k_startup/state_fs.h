@@ -47,6 +47,36 @@ struct _kernel_fs_node_state_t {
     timed_wait_queue_t *twq;
 };
 
+
+/**
+ * Register a node key with the kernel state.
+ *
+ * If `nk` already appears in the kernel node key map, it's corresponding entry has its
+ * reference count incremented.
+ *
+ * If `nk` does not appear in the map. `nk` is copied to create a new node key which is then placed
+ * in the map. 
+ *
+ * The given node key `nk` is NEVER consumed by this function.
+ */
+fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk);
+
+/**
+ * Deregister a node key with the kernel state.
+ *
+ * If `nk` appears in the kernel node key map, it's corresponding value has its reference count
+ * decremented.
+ *
+ * If `nk`'s reference count becomes zero, It's entry in the map is deleted. All threads which
+ * were waiting on the node key will be woken up with error code FOS_STATE_MISMATCH.
+ *
+ * The given node key `nk` is NEVER consumed by this function.
+ *
+ * While this is a destructor like function it returns an error in the situation
+ * where the kernel state/`nk` is not as expected.
+ */
+fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk);
+
 /*
  * NOTE: All processes will have a notion of a "current working directory". When a relative
  * path is handed to any of the below functions, it is interpreted as relative to the calling

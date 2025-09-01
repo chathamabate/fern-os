@@ -100,7 +100,7 @@ struct _kernel_state_t {
      * EVERY fs_node_key in use by the kernel will have an entry in this map.
      * (This includes directory node keys which are not directly accessibly by the user)
      */
-    map_t * const open_files;
+    map_t * const nk_map;
 };
 
 /**
