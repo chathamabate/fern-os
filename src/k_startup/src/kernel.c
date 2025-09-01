@@ -136,7 +136,7 @@ static void init_kernel_state(void) {
     node_state->references = 1; // The user process will be the first reference.
     node_state->twq = NULL;
 
-    err = mp_put(kernel->open_files, &root_key, &node_state);
+    err = mp_put(kernel->nk_map, &root_key, &node_state);
     if (err != FOS_SUCCESS) {
         setup_fatal("Failed to place root dir key");
     }

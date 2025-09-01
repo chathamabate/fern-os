@@ -118,6 +118,33 @@ fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
     return FOS_SUCCESS;
 }
 
+fernos_error_t ks_fs_deregister_proc_nks(kernel_state_t *ks, process_t *proc) {
+
+    fernos_error_t err;
+
+    idtb_reset_iterator(proc->file_handle_table);
+    for (file_handle_t fh = idtb_get_iter(proc->file_handle_table);
+            fh != idtb_null_id(proc->file_handle_table); 
+            fh = idtb_next(proc->file_handle_table)) {
+        file_handle_state_t *fh_state = idtb_get(proc->file_handle_table, fh);
+        if (!fh_state) {
+            return FOS_STATE_MISMATCH; // If this happens something is very wrong.
+        }
+
+        err = ks_fs_deregister_nk(ks, fh_state->nk);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+
+    err = ks_fs_deregister_nk(ks, proc->cwd);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    return FOS_SUCCESS;
+}
+
 fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_path_len) {
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;

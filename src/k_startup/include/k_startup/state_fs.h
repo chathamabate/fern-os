@@ -77,6 +77,11 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk);
  */
 fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk);
 
+/**
+ * Deregister all node keys reference by a given process.
+ */
+fernos_error_t ks_fs_deregister_proc_nks(kernel_state_t *ks, process_t *proc);
+
 /*
  * NOTE: All processes will have a notion of a "current working directory". When a relative
  * path is handed to any of the below functions, it is interpreted as relative to the calling
