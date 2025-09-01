@@ -58,8 +58,11 @@ struct _kernel_fs_node_state_t {
  * in the map. 
  *
  * The given node key `nk` is NEVER consumed by this function.
+ *
+ * If `kernel_nk` is non-NULL. The copy of `nk` which is used by the kernel will be written to
+ * `*kernel_nk`.
  */
-fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk);
+fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_key_t *kernel_nk);
 
 /**
  * Deregister a node key with the kernel state.

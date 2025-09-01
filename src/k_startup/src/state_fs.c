@@ -9,16 +9,25 @@
 #include "k_startup/page_helpers.h"
 #include "s_block_device/file_sys.h"
 
-fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk) {
+fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_key_t *kernel_nk) {
     fernos_error_t err;
 
     if (!nk) {
         return FOS_BAD_ARGS;
     }
 
-    kernel_fs_node_state_t *node_state = mp_get(ks->nk_map, &nk);
+    const fs_node_key_t *key_p;
+    kernel_fs_node_state_t **node_state_p;
 
-    if (!node_state) { // New entry!
+    err = mp_get_kvp(ks->nk_map, &nk, (const void **)&key_p, (void **)&node_state_p);
+    if (err != FOS_SUCCESS && err != FOS_EMPTY) {
+        return err;
+    }
+
+    fs_node_key_t key;
+    kernel_fs_node_state_t *node_state;
+
+    if (err == FOS_EMPTY) { // New entry!
         fs_node_info_t info;
         err = fs_get_node_info(ks->fs, nk, &info);
         if (err != FOS_SUCCESS) {
@@ -48,12 +57,21 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk) {
             return FOS_NO_MEM;
         }
 
-        return FOS_SUCCESS;
+        key = nk_copy;
+    } else {
+        key = *key_p;
+        node_state = *node_state_p;
+
+        if (!key || !node_state) {
+            return FOS_STATE_MISMATCH; // Something very wrong here if this happens.
+        }
+
+        node_state->references++;
     }
 
-    // Otherwise, the entry already exists!
-    // Just increase the reference count.
-    node_state->references++;
+    if (kernel_nk) {
+        *kernel_nk = key;
+    }
 
     return FOS_SUCCESS;
 }
@@ -119,7 +137,6 @@ fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
 }
 
 fernos_error_t ks_fs_deregister_proc_nks(kernel_state_t *ks, process_t *proc) {
-
     fernos_error_t err;
 
     idtb_reset_iterator(proc->file_handle_table);

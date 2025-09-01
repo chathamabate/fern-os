@@ -296,6 +296,8 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     fernos_error_t err;
 
     if (ks->root_proc == proc) {
+        fs_flush(ks->fs, NULL); // Flush full file system on kernel exit.
+                                         
         term_put_fmt_s("\n[System Exited with Status 0x%X]\n", status);
         lock_up();
     }
