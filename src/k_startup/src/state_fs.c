@@ -224,7 +224,7 @@ fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_pat
 
     proc->cwd = kernel_nk;
 
-    return FOS_SUCCESS; 
+    DUAL_RET(ks->curr_thread, FOS_SUCCESS, FOS_SUCCESS);
 }
 
 typedef enum _ks_fs_path_io_action_t {
@@ -253,6 +253,9 @@ static fernos_error_t ks_fs_path_io(kernel_state_t *ks, const char *u_path, size
     err = mem_cpy_from_user(path, proc->pd, u_path, u_path_len + 1, NULL);
     DUAL_RET_FOS_ERR(err, ks->curr_thread);
 
+    // Used for removal.
+    fs_node_key_t nk;
+
     switch (action) {
     case KS_FS_MKDIR:
         err = fs_mkdir_path(ks->fs, proc->cwd, path, NULL);
@@ -261,6 +264,20 @@ static fernos_error_t ks_fs_path_io(kernel_state_t *ks, const char *u_path, size
         err = fs_touch_path(ks->fs, proc->cwd, path, NULL);
         break;
     case KS_FS_REMOVE:
+        // Slight oversight when making this function. remove is slightly different than mkdir and touch.
+        // We need to make sure the given key is not referenced by the kernel before deleting!
+
+        err = fs_new_key(ks->fs, proc->cwd, path, &nk);
+        DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+        // If a node key has an entry in the map, it MUST be referenced at least once!
+        bool in_use = mp_get(ks->nk_map, &nk) != NULL;
+        fs_delete_key(ks->fs, nk);
+
+        if (in_use) {
+            DUAL_RET(ks->curr_thread, FOS_IN_USE, FOS_SUCCESS);
+        }
+
         err = fs_remove_path(ks->fs, proc->cwd, path);
         break;
     default:

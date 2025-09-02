@@ -21,12 +21,12 @@
  *
  * returns FOS_STATE_MISMATCH if path doesn't point to a directory.
  */
-fernos_error_t sc_fs_set_wd(const char *path, size_t path_len);
+fernos_error_t sc_fs_set_wd(const char *path);
 
 /**
  * Create a new file.
  */
-fernos_error_t sc_fs_touch(const char *path, size_t path_len);
+fernos_error_t sc_fs_touch(const char *path);
 
 /**
  * Create a new directory.
@@ -34,7 +34,7 @@ fernos_error_t sc_fs_touch(const char *path, size_t path_len);
  * This only creates the final component of the path. If there are directories within the path
  * which don't exist yet, this will fail.
  */
-fernos_error_t sc_fs_mkdir(const char *path, size_t path_len);
+fernos_error_t sc_fs_mkdir(const char *path);
 
 /**
  * Remove a file or directory.
@@ -44,14 +44,14 @@ fernos_error_t sc_fs_mkdir(const char *path, size_t path_len);
  *
  * FOS_IN_USE is also returned when trying to delete a non-empty directory.
  */
-fernos_error_t sc_fs_remove(const char *path, size_t path_len);
+fernos_error_t sc_fs_remove(const char *path);
 
 /**
  * Attempt to get information about a file or directory.
  *
  * On success, the information is written to `*info`.
  */
-fernos_error_t sc_fs_get_info(const char *path, size_t path_len, fs_node_info_t *info);
+fernos_error_t sc_fs_get_info(const char *path, fs_node_info_t *info);
 
 /**
  * Get the name of a node within a directory at a given index.
@@ -63,7 +63,7 @@ fernos_error_t sc_fs_get_info(const char *path, size_t path_len, fs_node_info_t 
  * On success, FOS_SUCCESS is returned in the calling thread, and the child's name is written
  * to `*child_name` in userspace.
  */
-fernos_error_t sc_fs_get_child_name(const char *path, size_t path_len, 
+fernos_error_t sc_fs_get_child_name(const char *path, 
         size_t index, char *child_name);
 
 /**
@@ -72,7 +72,7 @@ fernos_error_t sc_fs_get_child_name(const char *path, size_t path_len,
  * When a file is opened, it's corresponding handle will start at position 0. (i.e. the 
  * beginning of the file)
  */
-fernos_error_t sc_fs_open(const char *path, size_t path_len, file_handle_t *fh);
+fernos_error_t sc_fs_open(const char *path, file_handle_t *fh);
 
 /**
  * Return a file handle to the operating system. After this call, the file handle stored in `fh`
@@ -111,6 +111,12 @@ fernos_error_t sc_fs_seek(file_handle_t fh, size_t pos);
 fernos_error_t sc_fs_write(file_handle_t fh, const void *src, size_t len, size_t *written);
 
 /**
+ * Wrapper around `sc_fs_write`. It will write in a loop until all bytes from 
+ * `src` are written, or an error is thrown.
+ */
+fernos_error_t sc_fs_write_full(file_handle_t fh, const void *src, size_t len);
+
+/**
  * Blocking read.
  *
  * Read from a file into userspace buffer `dst`.
@@ -126,6 +132,12 @@ fernos_error_t sc_fs_write(file_handle_t fh, const void *src, size_t len, size_t
  * read bytes.
  */
 fernos_error_t sc_fs_read(file_handle_t fh, void *dst, size_t len, size_t *readden);
+
+/**
+ * Wrapper around `sc_fs_read`. It reads in a loop until `len` bytes are read into `dst`.
+ * (Or an error is returned)
+ */
+fernos_error_t sc_fs_read_full(file_handle_t fh, void *dst, size_t len);
 
 /**
  * Flush!
