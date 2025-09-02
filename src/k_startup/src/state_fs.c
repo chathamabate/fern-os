@@ -9,6 +9,7 @@
 #include "k_startup/page_helpers.h"
 #include "s_block_device/file_sys.h"
 #include "s_util/str.h"
+#include "s_util/constraints.h"
 
 fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_key_t *kernel_nk) {
     fernos_error_t err;
@@ -553,6 +554,8 @@ fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_s
     // This could potentially result in faulty data read in the case where the write fails.
     // But whatever.
     if (bytes_left < bytes_to_write) {
+        const size_t bytes_appended = bytes_to_write - bytes_left;
+
         fernos_error_t tmp_err;
 
         kernel_fs_node_state_t *node_state = mp_get(ks->nk_map, &(state->nk));
@@ -562,7 +565,7 @@ fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_s
 
         tmp_err = bwq_notify_all(node_state->bwq);
         if (tmp_err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
+            return FOS_UNKNWON_ERROR; // We'll say this is a fatal error for now.
         }
 
         thread_t *woken_thr;
@@ -578,8 +581,10 @@ fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_s
             size_t * const u_readden =  (size_t *)(woken_thr->wait_ctx[3]);
 
             mem_set(woken_thr->wait_ctx, 0, sizeof(woken_thr->wait_ctx));
-            
-            const size_t bytes_appended = bytes_to_write - bytes_left;
+
+            if (woken_handle_state->pos != old_len) {
+                return FOS_STATE_MISMATCH; // Sanity check.
+            }
 
             // We know for a fact that `bytes_appended < KS_FS_MAX_TX_LEN`
             // We also know that the position of all waiting handles = the old length of the file!
@@ -598,7 +603,8 @@ fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_s
             }
 
             if (err == FOS_SUCCESS) {
-                woken_handle_state->pos += bytes_to_read;
+                // += here could be kinda dangerous if the user uses file handles incorrectly.
+                woken_handle_state->pos = old_len + bytes_to_read;
             }
 
             woken_thr->ctx.eax = err;
@@ -700,5 +706,29 @@ fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, siz
     waiting_thr->state = THREAD_STATE_WAITING;
     
     return FOS_SUCCESS;
+}
+
+fernos_error_t ks_fs_flush(kernel_state_t *ks, file_handle_t fh) {
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+    
+    fernos_error_t err;
+
+    process_t *proc = ks->curr_thread->proc;
+
+    if (fh == FOS_MAX_FILE_HANDLES_PER_PROC) {
+        err = fs_flush(ks->fs, NULL);
+        DUAL_RET(ks->curr_thread, err, FOS_SUCCESS);
+    }
+
+    file_handle_state_t *state = idtb_get(proc->file_handle_table, fh);
+
+    if (!state) {
+        DUAL_RET(ks->curr_thread, FOS_INVALID_INDEX, FOS_SUCCESS);
+    }
+
+    err = fs_flush(ks->fs, state->nk);
+    DUAL_RET(ks->curr_thread, err, FOS_SUCCESS);
 }
 

@@ -216,3 +216,12 @@ fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_s
  * read bytes.
  */
 fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, size_t len, size_t *u_readden);
+
+
+/**
+ * Flush!
+ *
+ * If `fh == FOS_MAX_FILE_HANDLES_PER_PROC`, this will flush the entire kernel file
+ * system. (Again, what "flushing" actually means depends on what file system is being used)
+ */
+fernos_error_t ks_fs_flush(kernel_state_t *ks, file_handle_t fh);
