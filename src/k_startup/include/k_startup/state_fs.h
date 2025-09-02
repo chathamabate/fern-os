@@ -40,7 +40,6 @@ struct _kernel_fs_node_state_t {
     basic_wait_queue_t *bwq;
 };
 
-
 /**
  * Register a node key with the kernel state.
  *
@@ -102,12 +101,12 @@ fernos_error_t ks_fs_deregister_proc_nks(kernel_state_t *ks, process_t *proc);
  *
  * Paths which are relative are interpreted as relative to the current working directory.
  */
-fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_path_len);
+KS_SYSCALL fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_path_len);
 
 /**
  * Create a new file.
  */
-fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path_len);
+KS_SYSCALL fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path_len);
 
 /**
  * Create a new directory.
@@ -115,7 +114,7 @@ fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path
  * This only creates the final component of the path. If there are directories within the path
  * which don't exist yet, this will fail.
  */
-fernos_error_t ks_fs_mkdir(kernel_state_t *ks, const char *u_path, size_t u_path_len);
+KS_SYSCALL fernos_error_t ks_fs_mkdir(kernel_state_t *ks, const char *u_path, size_t u_path_len);
 
 /**
  * Remove a file or directory.
@@ -125,14 +124,15 @@ fernos_error_t ks_fs_mkdir(kernel_state_t *ks, const char *u_path, size_t u_path
  *
  * FOS_IN_USE is also returned when trying to delete a non-empty directory.
  */
-fernos_error_t ks_fs_remove(kernel_state_t *ks, const char *u_path, size_t u_path_len);
+KS_SYSCALL fernos_error_t ks_fs_remove(kernel_state_t *ks, const char *u_path, size_t u_path_len);
 
 /**
  * Attempt to get information about a file or directory.
  *
  * On success, the information is written to userspace at `*u_info`.
  */
-fernos_error_t ks_fs_get_info(kernel_state_t *ks, const char *u_path, size_t u_path_len, fs_node_info_t *u_info);
+KS_SYSCALL fernos_error_t ks_fs_get_info(kernel_state_t *ks, const char *u_path, size_t u_path_len, 
+        fs_node_info_t *u_info);
 
 /**
  * Get the name of a node within a directory at a given index.
@@ -144,7 +144,7 @@ fernos_error_t ks_fs_get_info(kernel_state_t *ks, const char *u_path, size_t u_p
  * On success, FOS_SUCCESS is returned in the calling thread, and the child's name is written
  * to `*u_child_name` in userspace.
  */
-fernos_error_t ks_fs_get_child_name(kernel_state_t *ks, const char *u_path, size_t u_path_len, 
+KS_SYSCALL fernos_error_t ks_fs_get_child_name(kernel_state_t *ks, const char *u_path, size_t u_path_len, 
         size_t index, char *u_child_name);
 
 /**
@@ -153,7 +153,7 @@ fernos_error_t ks_fs_get_child_name(kernel_state_t *ks, const char *u_path, size
  * When a file is opened, it's corresponding handle will start at position 0. (i.e. the 
  * beginning of the file)
  */
-fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, file_handle_t *u_fh);
+KS_SYSCALL fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, file_handle_t *u_fh);
 
 /**
  * Return a file handle to the operating system. After this call, the file handle stored in `fh`
@@ -162,7 +162,7 @@ fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, f
  * This DOES correspond to a system call. HOWEVER, the calling thread doesn't get a return
  * value. The error code here is just so the kernel knows if some fatal state was found.
  */
-fernos_error_t ks_fs_close(kernel_state_t *ks, file_handle_t fh);
+KS_SYSCALL fernos_error_t ks_fs_close(kernel_state_t *ks, file_handle_t fh);
 
 /**
  * Move a handle's position.
@@ -175,7 +175,7 @@ fernos_error_t ks_fs_close(kernel_state_t *ks, file_handle_t fh);
  *
  * Returns FOS_INVALID_INDEX if `fh` cannot be found (To calling thread)
  */
-fernos_error_t ks_fs_seek(kernel_state_t *ks, file_handle_t fh, size_t pos);
+KS_SYSCALL fernos_error_t ks_fs_seek(kernel_state_t *ks, file_handle_t fh, size_t pos);
 
 /**
  * In one transaction, read/write, this is the maximum number of bytes transferable
@@ -198,7 +198,8 @@ fernos_error_t ks_fs_seek(kernel_state_t *ks, file_handle_t fh, size_t pos);
  * FOS_SUCCESS does NOT mean all bytes were written!!! (This will likely write in chunks to 
  * prevent being in the kernel for too long)
  */
-fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_src, size_t len, size_t *u_written);
+KS_SYSCALL fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_src, 
+        size_t len, size_t *u_written);
 
 /**
  * Blocking read.
@@ -215,8 +216,8 @@ fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_s
  * On Success, always check what is written to `u_readden` to confirm the actual number of 
  * read bytes.
  */
-fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, size_t len, size_t *u_readden);
-
+KS_SYSCALL fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, size_t len, 
+        size_t *u_readden);
 
 /**
  * Flush!
@@ -224,4 +225,4 @@ fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, siz
  * If `fh == FOS_MAX_FILE_HANDLES_PER_PROC`, this will flush the entire kernel file
  * system. (Again, what "flushing" actually means depends on what file system is being used)
  */
-fernos_error_t ks_fs_flush(kernel_state_t *ks, file_handle_t fh);
+KS_SYSCALL fernos_error_t ks_fs_flush(kernel_state_t *ks, file_handle_t fh);

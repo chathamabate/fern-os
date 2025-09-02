@@ -121,6 +121,7 @@ fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
             thread_t *woken_thread;
             while ((err = bwq_pop(state->bwq, (void **)&woken_thread)) == FOS_SUCCESS) {
                 woken_thread->wq = NULL;
+                mem_set(woken_thread->wait_ctx, 0, sizeof(woken_thread->wait_ctx));
                 woken_thread->ctx.eax = FOS_STATE_MISMATCH;
                 woken_thread->state = THREAD_STATE_DETATCHED;
 
@@ -558,10 +559,12 @@ fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_s
 
         fernos_error_t tmp_err;
 
-        kernel_fs_node_state_t *node_state = mp_get(ks->nk_map, &(state->nk));
-        if (!node_state) {
+        kernel_fs_node_state_t **node_state_p = mp_get(ks->nk_map, &(state->nk));
+        if (!node_state_p || !(*node_state_p)) {
             return FOS_STATE_MISMATCH;
         }
+
+        kernel_fs_node_state_t *node_state = *node_state_p;
 
         tmp_err = bwq_notify_all(node_state->bwq);
         if (tmp_err != FOS_SUCCESS) {

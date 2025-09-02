@@ -185,7 +185,7 @@ static fernos_error_t ks_register_fork_nks(kernel_state_t *ks, process_t *child)
             fh = idtb_next(child->file_handle_table)) {
         file_handle_state_t *fh_state = idtb_get(child->file_handle_table, fh);
         if (!fh_state) {
-            return FOS_STATE_MISMATCH; // If this happens something is very wrong.
+            return FOS_ABORT_SYSTEM;
         }
 
         // Here we will not use the `register_nk` helper because we know each node key must
@@ -195,7 +195,7 @@ static fernos_error_t ks_register_fork_nks(kernel_state_t *ks, process_t *child)
         fs_node_key_t nk = fh_state->nk;
         kernel_fs_node_state_t **node_state = mp_get(ks->nk_map, &nk);
         if (!node_state || !(*node_state)) {
-            return FOS_STATE_MISMATCH; // If this happens some things is very very wrong.
+            return FOS_ABORT_SYSTEM;
         }
         (*node_state)->references++;
     }
@@ -204,7 +204,7 @@ static fernos_error_t ks_register_fork_nks(kernel_state_t *ks, process_t *child)
 
     kernel_fs_node_state_t **cwd_node_state = mp_get(ks->nk_map, &(child->cwd));
     if (!cwd_node_state || !(*cwd_node_state)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_ABORT_SYSTEM;
     }
     (*cwd_node_state)->references++;
 
@@ -271,7 +271,7 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     // Now increment the handle reference counts.
     err = ks_register_fork_nks(ks, child);
     if (err != FOS_SUCCESS) {
-        return err;
+        return err; // Pretty bad if this fails.
     }
 
     // Finally I think we are done!

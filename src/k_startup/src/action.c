@@ -14,6 +14,7 @@
 #include "k_startup/kernel.h"
 #include <stdint.h>
 #include "k_startup/state.h"
+#include "k_startup/state_fs.h"
 #include "k_sys/debug.h"
 #include "s_data/wait_queue.h"
 #include "k_startup/thread.h"
@@ -126,8 +127,6 @@ void fos_timer_action(user_ctx_t *ctx) {
 
 void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t arg1, 
         uint32_t arg2, uint32_t arg3) {
-    (void)arg3; // Delete when we have a system call which actually uses arg3!
-                
     ks_save_ctx(kernel, ctx);
     fernos_error_t err = FOS_SUCCESS;
 
@@ -188,6 +187,31 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     case SCID_FUTEX_WAKE:
         err = ks_wake_futex(kernel, (futex_t *)arg0, (bool)arg1);
         break;
+
+	case SCID_FS_SET_WD:
+        err = ks_fs_set_wd(kernel, (const char *)arg0, (size_t)arg1);
+        break;
+        
+	case SCID_FS_TOUCH:
+        err = ks_fs_touch(kernel, (const char *)arg0, (size_t)arg1);
+        break;
+        
+	case SCID_FS_MKDIR:
+        err = ks_fs_mkdir(kernel, (const char *)arg0, (size_t)arg1);
+        break;
+
+	case SCID_FS_REMOVE:
+        err = ks_fs_remove(kernel, (const char *)arg0, (size_t)arg1);
+        break;
+
+	case SCID_FS_GET_INFO:
+	case SCID_FS_GET_CHILD_NAME:
+	case SCID_FS_OPEN:
+	case SCID_FS_CLOSE:
+	case SCID_FS_SEEK:
+	case SCID_FS_WRITE:
+	case SCID_FS_READ:
+	case SCID_FS_FLUSH:
 
     case SCID_TERM_PUT_S:
         if (!arg0) {
