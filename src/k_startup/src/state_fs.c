@@ -489,9 +489,130 @@ fernos_error_t ks_fs_seek(kernel_state_t *ks, file_handle_t fh, size_t pos) {
     DUAL_RET(ks->curr_thread, FOS_SUCCESS, FOS_SUCCESS);
 }
 
-
 fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_src, size_t len, size_t *u_written) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    DUAL_RET_COND(!u_src || !u_written, ks->curr_thread, FOS_BAD_ARGS, FOS_SUCCESS);
+
+    fernos_error_t err;
+    process_t *proc = ks->curr_thread->proc;
+
+    file_handle_state_t *state = idtb_get(proc->file_handle_table, fh);
+    DUAL_RET_COND(!state, ks->curr_thread, FOS_INVALID_INDEX, FOS_SUCCESS);
+
+    if (state->pos == SIZE_MAX) { // Can exit early if there is no way the file can be expanded.
+        DUAL_RET(ks->curr_thread, FOS_NO_SPACE, FOS_SUCCESS);
+    }
+
+    fs_node_info_t info;
+    err = fs_get_node_info(ks->fs, state->nk, &info);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    if (info.is_dir) { // Quick sanity check!
+        return FOS_STATE_MISMATCH;
+    }
+
+    const size_t old_len = info.len;
+
+    if (state->pos > old_len) {
+        // Another quick sanity check. (This should never happen!)
+        return FOS_STATE_MISMATCH;
+    }
+
+    // Ok, expansion may be necessary!
+    
+    size_t bytes_to_write = len;
+    if (state->pos + bytes_to_write < state->pos) { // check wrap.
+        bytes_to_write = SIZE_MAX - state->pos;
+    }
+
+    if (bytes_to_write > KS_FS_TX_MAX_LEN) {
+        bytes_to_write = KS_FS_TX_MAX_LEN;
+    }
+
+    uint8_t tx_buf[KS_FS_TX_MAX_LEN];
+    err = mem_cpy_from_user(tx_buf, proc->pd, u_src, bytes_to_write, NULL);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    const size_t bytes_left = old_len - state->pos;
+
+    if (bytes_left < bytes_to_write) { // expansion is needed.
+        err = fs_resize(ks->fs, state->nk, state->pos + bytes_to_write);
+        DUAL_RET_FOS_ERR(err, ks->curr_thread);
+    }
+
+    err = fs_write(ks->fs, state->nk, state->pos, bytes_to_write, tx_buf);
+    
+    // We are about to potentially schedule some threads, so `curr_thread` will no longer be usable reliably.
+    thread_t *calling_thread = ks->curr_thread;
+
+    // Ok, so, if we had to expand our file, that means we must wake up all our blocked reading threads!
+    // We do this regardless of whether or not the above write succeeded or not.
+    // This could potentially result in faulty data read in the case where the write fails.
+    // But whatever.
+    if (bytes_left < bytes_to_write) {
+        fernos_error_t tmp_err;
+
+        kernel_fs_node_state_t *node_state = mp_get(ks->nk_map, &(state->nk));
+        if (!node_state) {
+            return FOS_STATE_MISMATCH;
+        }
+
+        tmp_err = bwq_notify_all(node_state->bwq);
+        if (tmp_err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR;
+        }
+
+        thread_t *woken_thr;
+        while ((tmp_err = bwq_pop(node_state->bwq, (void **)&woken_thr)) == FOS_SUCCESS) {
+            woken_thr->wq = NULL;
+            woken_thr->state = THREAD_STATE_DETATCHED;
+
+            // Ok, read out the wait context please.
+
+            file_handle_state_t * const woken_handle_state = (file_handle_state_t *)(woken_thr->wait_ctx[0]);
+            void * const u_dst = (void *)(woken_thr->wait_ctx[1]);
+            size_t bytes_to_read = (size_t)(woken_thr->wait_ctx[2]);
+            size_t * const u_readden =  (size_t *)(woken_thr->wait_ctx[3]);
+
+            mem_set(woken_thr->wait_ctx, 0, sizeof(woken_thr->wait_ctx));
+            
+            const size_t bytes_appended = bytes_to_write - bytes_left;
+
+            // We know for a fact that `bytes_appended < KS_FS_MAX_TX_LEN`
+            // We also know that the position of all waiting handles = the old length of the file!
+            if (bytes_to_read > bytes_appended) {
+                bytes_to_read = bytes_appended;
+            }
+
+            err = fs_read(ks->fs, woken_handle_state->nk, old_len, bytes_to_read, tx_buf);
+
+            if (err == FOS_SUCCESS) {
+                err = mem_cpy_to_user(woken_thr->proc->pd, u_dst, tx_buf, bytes_to_read, NULL);
+            }
+
+            if (err == FOS_SUCCESS) {
+                err = mem_cpy_to_user(woken_thr->proc->pd, u_readden, &bytes_to_read, sizeof(size_t), NULL);
+            }
+
+            if (err == FOS_SUCCESS) {
+                woken_handle_state->pos += bytes_to_read;
+            }
+
+            woken_thr->ctx.eax = err;
+
+            ks_schedule_thread(ks, woken_thr);
+        }
+    }
+
+    // Otherwise, we finish up our write!
+
+    DUAL_RET_FOS_ERR(err, calling_thread); // NOTE an error here would be pretty bad tbh.
+
+    err = mem_cpy_to_user(calling_thread->proc->pd, u_written, &bytes_to_write, sizeof(size_t), NULL);
+    DUAL_RET(calling_thread, err, FOS_SUCCESS);
 }
 
 fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, size_t len, size_t *u_readden) {
@@ -572,7 +693,7 @@ fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, siz
     ks_deschedule_thread(ks, waiting_thr);
 
     waiting_thr->wq = (wait_queue_t *)(node_state->bwq);
-    waiting_thr->wait_ctx[0] = (uint32_t)fh;
+    waiting_thr->wait_ctx[0] = (uint32_t)state;
     waiting_thr->wait_ctx[1] = (uint32_t)u_dst;
     waiting_thr->wait_ctx[2] = len;
     waiting_thr->wait_ctx[3] = (uint32_t)u_readden;

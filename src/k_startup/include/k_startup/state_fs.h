@@ -26,7 +26,7 @@ struct _kernel_fs_node_state_t {
     /**
      * This will contain all threads which are waiting for this file to expand.
      *
-     * thr->wait_context[0] = (file_handle_t) The file handle used for this read request.
+     * thr->wait_context[0] = (file_handle_state_t *) The pointer to the file handle's state.
      * thr->wait_context[1] = (user void *) user buffer to read to
      * thr->wait_context[2] = (uint32_t) amount to attempt to read into buffer
      * thr->wait_context[3] = (user uint32_t *) where to write the actual amount read
