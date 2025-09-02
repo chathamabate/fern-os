@@ -358,7 +358,7 @@ fernos_error_t ks_fs_get_child_name(kernel_state_t *ks, const char *u_path, size
     DUAL_RET(ks->curr_thread, err, FOS_SUCCESS);
 }
 
-fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, file_handle_t *u_fh) {
+fernos_error_t ks_fs_open(kernel_state_t *ks, const char *u_path, size_t u_path_len, file_handle_t *u_fh) {
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
@@ -689,10 +689,12 @@ fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, siz
 
     // Blocking case!
 
-    kernel_fs_node_state_t *node_state = mp_get(ks->nk_map, &(state->nk));
-    if (!node_state) {
+    kernel_fs_node_state_t **node_state_p = mp_get(ks->nk_map, &(state->nk));
+    if (!node_state_p || !(*node_state_p)) {
         return FOS_STATE_MISMATCH;
     }
+
+    kernel_fs_node_state_t *node_state = *node_state_p;
 
     thread_t *waiting_thr = ks->curr_thread;
 

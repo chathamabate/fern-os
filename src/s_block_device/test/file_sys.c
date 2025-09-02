@@ -455,7 +455,10 @@ static bool test_fs_rw1(void) {
     err = fs_resize(fs, key, file_size / 2);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    err = fs_write(fs, key, 0, file_size, big_buf);
+    err = fs_write(fs, key, 0, (file_size / 2) + 1, big_buf);
+    TEST_EQUAL_HEX(FOS_INVALID_RANGE,  err);
+
+    err = fs_write(fs, key, 1, (file_size / 2), big_buf);
     TEST_EQUAL_HEX(FOS_INVALID_RANGE,  err);
 
     da_free(big_buf);
@@ -549,6 +552,15 @@ static bool test_fs_rw2(void) {
                     err = fs_write(fs, key, file_size, new_file_size - file_size, tx_buf + file_size);
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
                 }
+
+                // lastly, just as a sanity check, let's confirm that resizing always updates
+                // the node info correctly!
+
+                fs_node_info_t info;
+                err = fs_get_node_info(fs, key, &info);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+                TEST_EQUAL_UINT(new_file_size, info.len);
 
                 file_size = new_file_size;
             }

@@ -128,18 +128,13 @@ static void init_kernel_state(void) {
         setup_fatal("Failed to get root dir key");
     }
 
-    kernel_fs_node_state_t *node_state = al_malloc(get_default_allocator(), sizeof(kernel_fs_node_state_t));
-    if (!node_state) {
-        setup_fatal("Failed to allocate state for root dir key");
-    }
-
-    node_state->references = 1; // The user process will be the first reference.
-    node_state->twq = NULL;
-
-    err = mp_put(kernel->nk_map, &root_key, &node_state);
+    fs_node_key_t kernel_root_key;
+    err = ks_fs_register_nk(kernel, root_key, &kernel_root_key);
     if (err != FOS_SUCCESS) {
-        setup_fatal("Failed to place root dir key");
+        setup_fatal("Failed to register root key!");
     }
+
+    fs_delete_key(kernel->fs, root_key);
 
     // Let's setup our first user process.
 
@@ -153,7 +148,7 @@ static void init_kernel_state(void) {
         setup_fatal("Failed to get user PD");
     }
 
-    process_t *proc = new_da_process(pid, user_pd, NULL, root_key);
+    process_t *proc = new_da_process(pid, user_pd, NULL, kernel_root_key);
     if (!proc) {
         setup_fatal("Failed to allocate first process");
     }
@@ -200,9 +195,6 @@ void start_kernel(void) {
 
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
-
-    test_fat32_file_sys();
-    lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }

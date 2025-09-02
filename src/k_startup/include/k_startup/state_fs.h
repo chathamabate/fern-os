@@ -153,7 +153,7 @@ KS_SYSCALL fernos_error_t ks_fs_get_child_name(kernel_state_t *ks, const char *u
  * When a file is opened, it's corresponding handle will start at position 0. (i.e. the 
  * beginning of the file)
  */
-KS_SYSCALL fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, file_handle_t *u_fh);
+KS_SYSCALL fernos_error_t ks_fs_open(kernel_state_t *ks, const char *u_path, size_t u_path_len, file_handle_t *u_fh);
 
 /**
  * Return a file handle to the operating system. After this call, the file handle stored in `fh`
