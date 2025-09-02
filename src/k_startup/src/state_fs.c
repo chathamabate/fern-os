@@ -179,10 +179,8 @@ fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_pat
 
     char path[FS_MAX_PATH_LEN + 1];
 
-    err = mem_cpy_from_user(path, proc->pd, u_path, u_path_len, NULL);
+    err = mem_cpy_from_user(path, proc->pd, u_path, u_path_len + 1, NULL);
     DUAL_RET_FOS_ERR(err, ks->curr_thread);
-
-    path[u_path_len] = '\0';
 
     // Get a node key for the given path.
     // Confirm that it points to a directory!
@@ -199,14 +197,54 @@ fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_pat
         DUAL_RET(ks->curr_thread, err != FOS_SUCCESS ? err : FOS_STATE_MISMATCH, FOS_SUCCESS);
     }
 
+    // Ok we have a node key which *could* become a valid cwd.
+    // Let's attempt to register it with the kernel, then, replace the old cwd with this one.
 
+    fs_node_key_t kernel_nk;
 
+    err = ks_fs_register_nk(ks, nk, &kernel_nk);
 
-    return FOS_NOT_IMPLEMENTED;
+    // No matter what happens, we don't need the original nk anymore.
+    fs_delete_key(ks->fs, nk);
+
+    if (err != FOS_SUCCESS) {
+        DUAL_RET(ks->curr_thread, FOS_UNKNWON_ERROR, FOS_SUCCESS); 
+    }
+
+    err = ks_fs_deregister_nk(ks, proc->cwd);
+    if (err != FOS_SUCCESS) {
+        return err; // Deregister only fails in the case of some fatal kernel problem.
+    }
+
+    proc->cwd = kernel_nk;
+
+    return FOS_SUCCESS; 
 }
 
 fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path_len, file_handle_t *u_fh) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    fernos_error_t err;
+
+    process_t *proc = ks->curr_thread->proc;
+
+    // Path length is too long or not given.
+    DUAL_RET_COND(
+        !u_path || u_path_len > FS_MAX_PATH_LEN, ks->curr_thread,
+        FOS_BAD_ARGS, FOS_SUCCESS
+    );
+
+    char path[FS_MAX_PATH_LEN + 1];
+
+    err = mem_cpy_from_user(path, proc->pd, u_path, u_path_len + 1, NULL);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    // And we gotta deal with making file handles... agh... I can barely think.
+    err = fs_touch();
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_fs_mkdir(kernel_state_t *ks, const char *u_path, size_t u_path_len) {
