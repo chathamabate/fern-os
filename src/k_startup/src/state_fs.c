@@ -8,6 +8,7 @@
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
 #include "s_block_device/file_sys.h"
+#include "s_util/str.h"
 
 fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_key_t *kernel_nk) {
     fernos_error_t err;
@@ -279,22 +280,197 @@ fernos_error_t ks_fs_remove(kernel_state_t *ks, const char *u_path, size_t u_pat
 }
 
 fernos_error_t ks_fs_get_info(kernel_state_t *ks, const char *u_path, size_t u_path_len, fs_node_info_t *u_info) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    fernos_error_t err;
+
+    process_t *proc = ks->curr_thread->proc;
+
+    // Path length is too long or not given.
+    DUAL_RET_COND(
+        !u_path || u_path_len > FS_MAX_PATH_LEN || !u_info, 
+        ks->curr_thread, FOS_BAD_ARGS, FOS_SUCCESS
+    );
+
+    char path[FS_MAX_PATH_LEN + 1];
+
+    err = mem_cpy_from_user(path, proc->pd, u_path, u_path_len + 1, NULL);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    fs_node_key_t nk;
+
+    err = fs_new_key(ks->fs, proc->cwd, path, &nk);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    fs_node_info_t info;
+    err = fs_get_node_info(ks->fs, nk, &info);
+
+    // Delete 'nk' no matter what happens.
+    fs_delete_key(ks->fs, nk);
+
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    err = mem_cpy_to_user(proc->pd, u_info, &info, sizeof(fs_node_info_t), NULL);
+    DUAL_RET(ks->curr_thread, err, FOS_SUCCESS);
 }
 
 fernos_error_t ks_fs_get_child_name(kernel_state_t *ks, const char *u_path, size_t u_path_len, size_t index, char *u_child_name) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    fernos_error_t err;
+
+    process_t *proc = ks->curr_thread->proc;
+
+    // Path length is too long or not given.
+    DUAL_RET_COND(
+        !u_path || u_path_len > FS_MAX_PATH_LEN || !u_child_name, 
+        ks->curr_thread, FOS_BAD_ARGS, FOS_SUCCESS
+    );
+
+    char path[FS_MAX_PATH_LEN + 1];
+
+    err = mem_cpy_from_user(path, proc->pd, u_path, u_path_len + 1, NULL);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    fs_node_key_t nk;
+
+    err = fs_new_key(ks->fs, proc->cwd, path, &nk);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    // We are going to reuse the path buffer because what the hell.
+    err = fs_get_child_names(ks->fs, nk, index, 1, (char (*)[FS_MAX_FILENAME_LEN + 1])path);
+
+    // Delete 'nk' no matter what happens.
+    fs_delete_key(ks->fs, nk);
+
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    size_t name_len = str_len(path);
+
+    err = mem_cpy_to_user(proc->pd, u_child_name, path, name_len + 1, NULL);
+    DUAL_RET(ks->curr_thread, err, FOS_SUCCESS);
 }
 
 fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, file_handle_t *u_fh) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    fernos_error_t err;
+    process_t *proc = ks->curr_thread->proc;
+
+    // Path length is too long or not given.
+    DUAL_RET_COND(
+        !u_path || u_path_len > FS_MAX_PATH_LEN || !u_fh, 
+        ks->curr_thread, FOS_BAD_ARGS, FOS_SUCCESS
+    );
+
+    char path[FS_MAX_PATH_LEN + 1];
+
+    err = mem_cpy_from_user(path, proc->pd, u_path, u_path_len + 1, NULL);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    const file_handle_t NULL_FH = idtb_null_id(proc->file_handle_table);
+    file_handle_t fh = NULL_FH;
+    file_handle_state_t *fh_state = NULL;
+    fs_node_key_t nk = NULL;
+    fs_node_info_t info;
+
+    err = fs_new_key(ks->fs, proc->cwd, path, &nk);
+
+    if (err == FOS_SUCCESS) {
+        err = fs_get_node_info(ks->fs, nk, &info);
+    }
+
+    if (err == FOS_SUCCESS && info.is_dir) {
+        err = FOS_STATE_MISMATCH; 
+    }
+
+    if (err == FOS_SUCCESS) {
+        fh = idtb_pop_id(proc->file_handle_table);
+        if (fh == NULL_FH) {
+            err = FOS_EMPTY; // We have no more space in the handle table!
+        }
+    }
+
+    if (err == FOS_SUCCESS) {
+        // We'll just try the copy before actually putting things into the handle table just to make clean up easier!
+        err = mem_cpy_to_user(proc->pd, u_fh, &fh, sizeof(file_handle_t), NULL);
+    }
+
+    if (err == FOS_SUCCESS) {
+        fh_state = al_malloc(proc->al, sizeof(file_handle_state_t));
+        if (!fh_state) {
+            err = FOS_NO_MEM;
+        }
+    } 
+
+    if (err == FOS_SUCCESS) {
+        // SUCCESS!
+        *(fs_node_key_t *)&fh_state->nk = nk;
+        fh_state->pos = 0;
+
+        idtb_set(proc->file_handle_table, fh, fh_state);
+    } else {
+        // Otherwise.... Cleanup!!!
+        
+        al_free(proc->al, fh_state);
+        idtb_push_id(proc->file_handle_table, fh);
+        fs_delete_key(ks->fs, nk);
+    }
+
+    DUAL_RET(ks->curr_thread, err, FOS_SUCCESS);
 }
 
-void ks_fs_close(kernel_state_t *ks, file_handle_t fh) {
+fernos_error_t ks_fs_close(kernel_state_t *ks, file_handle_t fh) {
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    fernos_error_t err;
+    process_t *proc = ks->curr_thread->proc;
+
+    file_handle_state_t *state = idtb_get(proc->file_handle_table, fh);
+    if (!state) {
+        return FOS_SUCCESS; // This is OK, remember no current thread return.
+    }
+
+    err = ks_fs_deregister_nk(ks, state->nk);
+    if (err == FOS_ABORT_SYSTEM) {
+        return FOS_UNKNWON_ERROR;
+    }
+
+    fs_delete_key(ks->fs, state->nk);
+    al_free(proc->al, state);
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_fs_seek(kernel_state_t *ks, file_handle_t fh, size_t pos) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    fernos_error_t err;
+    process_t *proc = ks->curr_thread->proc;
+
+    file_handle_state_t *state = idtb_get(proc->file_handle_table, fh);
+    DUAL_RET_COND(!state, ks->curr_thread, FOS_INVALID_INDEX, FOS_SUCCESS);
+
+    fs_node_info_t info;
+    err = fs_get_node_info(ks->fs, state->nk, &info);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    if (info.is_dir) { // Quick sanity check!
+        return FOS_STATE_MISMATCH;
+    }
+
+    state->pos = pos > info.len ? info.len : pos;
+    DUAL_RET(ks->curr_thread, FOS_SUCCESS, FOS_SUCCESS);
 }
 
 fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_src, size_t len, size_t *u_written) {

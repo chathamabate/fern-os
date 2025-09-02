@@ -165,8 +165,11 @@ fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, f
 /**
  * Return a file handle to the operating system. After this call, the file handle stored in `fh`
  * is no longer usable.
+ *
+ * This DOES correspond to a system call. HOWEVER, the calling thread doesn't get a return
+ * value. The error code here is just so the kernel knows if some fatal state was found.
  */
-void ks_fs_close(kernel_state_t *ks, file_handle_t fh);
+fernos_error_t ks_fs_close(kernel_state_t *ks, file_handle_t fh);
 
 /**
  * Move a handle's position.
@@ -176,6 +179,8 @@ void ks_fs_close(kernel_state_t *ks, file_handle_t fh);
  * Using SIZE_MAX as the position will thus always bring the handle position to the end of the
  * file. (Remember, we will enforce the max file size of SIZE_MAX, and thus a maximum addressable
  * byte of SIZE_MAX - 1)
+ *
+ * Returns FOS_INVALID_INDEX if `fh` cannot be found (To calling thread)
  */
 fernos_error_t ks_fs_seek(kernel_state_t *ks, file_handle_t fh, size_t pos);
 

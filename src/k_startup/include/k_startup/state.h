@@ -59,7 +59,7 @@
  * to the calling userspace thread, and an error which should shut down the system.
  * When a helper function encounters some unexpected fatal state, it should return 
  * FOS_ABORT_SYSTEM. Then users of the function know when an error is allowed, and when an error
- * is fatal.
+ * is fatal. (See the node key functions in state_fs.c)
  */
 
 struct _kernel_state_t {
