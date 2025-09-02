@@ -691,7 +691,7 @@ fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     thr->wq = (wait_queue_t *)(ks->sleep_q);
     thr->state = THREAD_STATE_WAITING;
 
-    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 

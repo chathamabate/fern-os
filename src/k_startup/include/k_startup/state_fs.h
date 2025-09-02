@@ -24,27 +24,20 @@ struct _kernel_fs_node_state_t {
     uint32_t references;
 
     /**
-     * While files have nothing to do with times, we are actually going to use a "timed" wait
-     * queue here to keep track of threads waiting for data to abe added to a file.
-     *
-     * The "time" will actually be the length of the file! As data is written to the file,
-     * this queue will be notified with the new length each time!
-     *
-     * NOTE: This strategy would causes issues if we allow users to shrink files. Right now,
-     * users will only be allowed to extend files for this reason.
-     *
-     * A Thread which is placed in this queue MUST have the following wait context:
+     * This will contain all threads which are waiting for this file to expand.
      *
      * thr->wait_context[0] = (file_handle_t) The file handle used for this read request.
      * thr->wait_context[1] = (user void *) user buffer to read to
      * thr->wait_context[2] = (uint32_t) amount to attempt to read into buffer
      * thr->wait_context[3] = (user uint32_t *) where to write the actual amount read
      *
-     * (The position in the given file handle will be used)
+     * (The position in the given file handle will be used, although all threads waiting in this
+     * queue will be reading from the same position. Remember, attempting to read from a position
+     * before the end of the file will never block!)
      *
      * NOTE: For directory states, this field will be NULL.
      */
-    timed_wait_queue_t *twq;
+    basic_wait_queue_t *bwq;
 };
 
 
@@ -183,6 +176,16 @@ fernos_error_t ks_fs_close(kernel_state_t *ks, file_handle_t fh);
  * Returns FOS_INVALID_INDEX if `fh` cannot be found (To calling thread)
  */
 fernos_error_t ks_fs_seek(kernel_state_t *ks, file_handle_t fh, size_t pos);
+
+/**
+ * In one transaction, read/write, this is the maximum number of bytes transferable
+ * in a single system call. Requesting more than this number will NOT cause an error.
+ * The request will simply be rounded down.
+ *
+ * This is to minimize time in the kernel, and also to avoid big dynamic allocations
+ * during reads/writes.
+ */
+#define KS_FS_TX_MAX_LEN (2048U)
 
 /**
  * Write the contents of `u_src` to the referenced file.

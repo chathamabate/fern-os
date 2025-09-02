@@ -37,21 +37,21 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_k
 
         fs_node_key_t nk_copy = fs_new_key_copy(ks->fs, nk);
         node_state = al_malloc(ks->al, sizeof(kernel_fs_node_state_t));
-        timed_wait_queue_t *twq = info.is_dir ? NULL : new_timed_wait_queue(ks->al);
+        basic_wait_queue_t *bwq = info.is_dir ? NULL : new_basic_wait_queue(ks->al);
 
-        if (nk_copy && node_state && (info.is_dir || twq)) {
-            node_state->twq = twq;
+        if (nk_copy && node_state && (info.is_dir || bwq)) {
+            node_state->bwq = bwq;
             node_state->references = 1;
 
             err = mp_put(ks->nk_map, &nk_copy, &node_state);
         }
 
-        if (!nk_copy || !node_state || (!(info.is_dir) && !twq) || err != FOS_SUCCESS) {
+        if (!nk_copy || !node_state || (!(info.is_dir) && !bwq) || err != FOS_SUCCESS) {
             if (nk_copy) {
                 mp_remove(ks->nk_map, &nk_copy);
             }
 
-            delete_wait_queue((wait_queue_t *)twq);
+            delete_wait_queue((wait_queue_t *)bwq);
             fs_delete_key(ks->fs, nk_copy);
             al_free(ks->al, node_state);
 
@@ -111,13 +111,14 @@ fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
 
         // Now deal with the leftover state.
 
-        if (state->twq) {
-            // The way we are using the timed queue here, this should ALWAYS wake up
-            // all waiting threads.
-            twq_notify(state->twq, UINT32_MAX);
+        if (state->bwq) {
+            err = bwq_notify_all(state->bwq);
+            if (err != FOS_SUCCESS) {
+                return FOS_ABORT_SYSTEM;
+            }
 
             thread_t *woken_thread;
-            while ((err = twq_pop(state->twq, (void **)&woken_thread)) == FOS_SUCCESS) {
+            while ((err = bwq_pop(state->bwq, (void **)&woken_thread)) == FOS_SUCCESS) {
                 woken_thread->wq = NULL;
                 woken_thread->ctx.eax = FOS_STATE_MISMATCH;
                 woken_thread->state = THREAD_STATE_DETATCHED;
@@ -127,7 +128,7 @@ fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
 
             // When the while loop above exits, err is gauranteed to be FOS_EMPTY.
                 
-            delete_wait_queue((wait_queue_t *)(state->twq));
+            delete_wait_queue((wait_queue_t *)(state->bwq));
         }
 
         al_free(ks->al, state);
@@ -378,12 +379,23 @@ fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, f
     file_handle_t fh = NULL_FH;
     file_handle_state_t *fh_state = NULL;
     fs_node_key_t nk = NULL;
+    fs_node_key_t kernel_nk = NULL;
     fs_node_info_t info;
 
     err = fs_new_key(ks->fs, proc->cwd, path, &nk);
 
     if (err == FOS_SUCCESS) {
-        err = fs_get_node_info(ks->fs, nk, &info);
+        err = ks_fs_register_nk(ks, nk, &kernel_nk);
+        if (err == FOS_ABORT_SYSTEM) { // In case of non-user recoverable error!
+            return err;
+        }
+    }
+
+    // No matter the status, we don't need nk after this point!
+    fs_delete_key(ks->fs, nk);
+
+    if (err == FOS_SUCCESS) {
+        err = fs_get_node_info(ks->fs, kernel_nk, &info);
     }
 
     if (err == FOS_SUCCESS && info.is_dir) {
@@ -411,7 +423,7 @@ fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, f
 
     if (err == FOS_SUCCESS) {
         // SUCCESS!
-        *(fs_node_key_t *)&fh_state->nk = nk;
+        *(fs_node_key_t *)&fh_state->nk = kernel_nk;
         fh_state->pos = 0;
 
         idtb_set(proc->file_handle_table, fh, fh_state);
@@ -420,7 +432,11 @@ fernos_error_t ks_fs_open(kernel_state_t *ks, char *u_path, size_t u_path_len, f
         
         al_free(proc->al, fh_state);
         idtb_push_id(proc->file_handle_table, fh);
-        fs_delete_key(ks->fs, nk);
+        if (kernel_nk && ks_fs_deregister_nk(ks, kernel_nk) == FOS_ABORT_SYSTEM) {
+            // NOTE: since we are using the very key which IS registered with the kernel,
+            // we don't need to delete it. `ks_fs_deregister_nk` will do that for us.
+            return FOS_ABORT_SYSTEM;
+        }
     }
 
     DUAL_RET(ks->curr_thread, err, FOS_SUCCESS);
@@ -473,11 +489,95 @@ fernos_error_t ks_fs_seek(kernel_state_t *ks, file_handle_t fh, size_t pos) {
     DUAL_RET(ks->curr_thread, FOS_SUCCESS, FOS_SUCCESS);
 }
 
+
 fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_src, size_t len, size_t *u_written) {
     return FOS_NOT_IMPLEMENTED;
 }
 
 fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void *u_dst, size_t len, size_t *u_readden) {
-    return FOS_NOT_IMPLEMENTED;
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    DUAL_RET_COND(!u_dst || !u_readden, ks->curr_thread, FOS_BAD_ARGS, FOS_SUCCESS);
+
+    fernos_error_t err;
+    process_t *proc = ks->curr_thread->proc;
+
+    file_handle_state_t *state = idtb_get(proc->file_handle_table, fh);
+    DUAL_RET_COND(!state, ks->curr_thread, FOS_INVALID_INDEX, FOS_SUCCESS);
+
+    fs_node_info_t info;
+    err = fs_get_node_info(ks->fs, state->nk, &info);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    if (info.is_dir) { // Quick sanity check!
+        return FOS_STATE_MISMATCH;
+    }
+
+    uint8_t rx_buf[KS_FS_TX_MAX_LEN];
+
+    if (state->pos > info.len) {
+        return FOS_STATE_MISMATCH; // This should never ever happen!
+    }
+
+    if (state->pos < info.len) { // We can return right now!
+        const size_t bytes_left = info.len - state->pos;
+        size_t bytes_to_read = len;
+
+        if (bytes_to_read > bytes_left) {
+            bytes_to_read = bytes_left;
+        }
+
+        if (bytes_to_read > KS_FS_TX_MAX_LEN) {
+            bytes_to_read = KS_FS_TX_MAX_LEN;
+        }
+
+        err = fs_read(ks->fs, state->nk, state->pos, bytes_to_read, rx_buf);
+        DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+        err = mem_cpy_to_user(proc->pd, u_dst, rx_buf, bytes_to_read, NULL);
+        DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+        err = mem_cpy_to_user(proc->pd, u_readden, &bytes_to_read, sizeof(size_t), NULL);
+        DUAL_RET_FOS_ERR(err, ks->curr_thread);
+        
+        // SUCCESS!
+
+        state->pos += bytes_to_read;
+
+        DUAL_RET(ks->curr_thread, FOS_SUCCESS, FOS_SUCCESS);
+    }
+
+    // pos == len (usually means blocking)
+
+    if (state->pos == SIZE_MAX) { // In this case, the file will not grow any larger ever!
+        const size_t zero = 0;
+        err = mem_cpy_to_user(proc->pd, u_readden, &zero, sizeof(size_t), NULL);
+        DUAL_RET(ks->curr_thread, err, FOS_SUCCESS);
+    }
+
+    // Blocking case!
+
+    kernel_fs_node_state_t *node_state = mp_get(ks->nk_map, &(state->nk));
+    if (!node_state) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    thread_t *waiting_thr = ks->curr_thread;
+
+    err = bwq_enqueue(node_state->bwq, waiting_thr);
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
+
+    ks_deschedule_thread(ks, waiting_thr);
+
+    waiting_thr->wq = (wait_queue_t *)(node_state->bwq);
+    waiting_thr->wait_ctx[0] = (uint32_t)fh;
+    waiting_thr->wait_ctx[1] = (uint32_t)u_dst;
+    waiting_thr->wait_ctx[2] = len;
+    waiting_thr->wait_ctx[3] = (uint32_t)u_readden;
+    waiting_thr->state = THREAD_STATE_WAITING;
+    
+    return FOS_SUCCESS;
 }
 
