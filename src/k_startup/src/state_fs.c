@@ -13,7 +13,7 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_k
     fernos_error_t err;
 
     if (!nk) {
-        return FOS_BAD_ARGS;
+        return FOS_ABORT_SYSTEM; // Incorrect usage inside the kernel!
     }
 
     const fs_node_key_t *key_p;
@@ -21,7 +21,7 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_k
 
     err = mp_get_kvp(ks->nk_map, &nk, (const void **)&key_p, (void **)&node_state_p);
     if (err != FOS_SUCCESS && err != FOS_EMPTY) {
-        return err;
+        return FOS_ABORT_SYSTEM;
     }
 
     fs_node_key_t key;
@@ -30,7 +30,7 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_k
     if (err == FOS_EMPTY) { // New entry!
         fs_node_info_t info;
         err = fs_get_node_info(ks->fs, nk, &info);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_SUCCESS) { // Maybe a disk error could happen, which is allowable!
             return FOS_UNKNWON_ERROR;
         }
 
@@ -63,7 +63,8 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_k
         node_state = *node_state_p;
 
         if (!key || !node_state) {
-            return FOS_STATE_MISMATCH; // Something very wrong here if this happens.
+            // The map is malformed if this is the case!
+            return FOS_ABORT_SYSTEM;
         }
 
         node_state->references++;
@@ -78,7 +79,7 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_k
 
 fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
     if (!nk) {
-        return FOS_BAD_ARGS;
+        return FOS_ABORT_SYSTEM;
     }
 
     fernos_error_t err;
@@ -88,14 +89,14 @@ fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
 
     err = mp_get_kvp(ks->nk_map, &nk, (const void **)&key_p, (void **)&state_p);
     if (err != FOS_SUCCESS) {
-        return FOS_STATE_MISMATCH;
+        return FOS_ABORT_SYSTEM; // The given key is expected to be in the map here!
     }
 
     fs_node_key_t key = *key_p;
     kernel_fs_node_state_t *state = *state_p;
 
     if (!key || !state) {
-        return FOS_STATE_MISMATCH;
+        return FOS_ABORT_SYSTEM;
     }
 
     if (--(state->references) == 0) {
@@ -123,10 +124,8 @@ fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk) {
                 ks_schedule_thread(ks, woken_thread);
             }
 
-            if (err != FOS_EMPTY) {
-                return FOS_UNKNWON_ERROR;
-            }
-
+            // When the while loop above exits, err is gauranteed to be FOS_EMPTY.
+                
             delete_wait_queue((wait_queue_t *)(state->twq));
         }
 
@@ -145,18 +144,18 @@ fernos_error_t ks_fs_deregister_proc_nks(kernel_state_t *ks, process_t *proc) {
             fh = idtb_next(proc->file_handle_table)) {
         file_handle_state_t *fh_state = idtb_get(proc->file_handle_table, fh);
         if (!fh_state) {
-            return FOS_STATE_MISMATCH; // If this happens something is very wrong.
+            return FOS_ABORT_SYSTEM; // File handle table is malformed!
         }
 
         err = ks_fs_deregister_nk(ks, fh_state->nk);
         if (err != FOS_SUCCESS) {
-            return err;
+            return FOS_ABORT_SYSTEM;
         }
     }
 
     err = ks_fs_deregister_nk(ks, proc->cwd);
     if (err != FOS_SUCCESS) {
-        return err;
+        return FOS_ABORT_SYSTEM;
     }
 
     return FOS_SUCCESS;
@@ -207,9 +206,12 @@ fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_pat
     // No matter what happens, we don't need the original nk anymore.
     fs_delete_key(ks->fs, nk);
 
-    if (err != FOS_SUCCESS) {
-        DUAL_RET(ks->curr_thread, FOS_UNKNWON_ERROR, FOS_SUCCESS); 
+    if (err == FOS_ABORT_SYSTEM) {
+        return FOS_ABORT_SYSTEM;
     }
+
+    // Other errors are acceptable for userspace.
+    DUAL_RET_FOS_ERR(err, ks->curr_thread);
 
     err = ks_fs_deregister_nk(ks, proc->cwd);
     if (err != FOS_SUCCESS) {
@@ -221,7 +223,13 @@ fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_pat
     return FOS_SUCCESS; 
 }
 
-fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path_len, file_handle_t *u_fh) {
+typedef enum _ks_fs_path_io_action_t {
+    KS_FS_MKDIR,
+    KS_FS_TOUCH,
+    KS_FS_REMOVE,
+} ks_fs_path_io_action_t;
+
+static fernos_error_t ks_fs_path_io(kernel_state_t *ks, const char *u_path, size_t u_path_len, ks_fs_path_io_action_t action) {
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
@@ -241,18 +249,33 @@ fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path
     err = mem_cpy_from_user(path, proc->pd, u_path, u_path_len + 1, NULL);
     DUAL_RET_FOS_ERR(err, ks->curr_thread);
 
-    // And we gotta deal with making file handles... agh... I can barely think.
-    err = fs_touch();
+    switch (action) {
+    case KS_FS_MKDIR:
+        err = fs_mkdir_path(ks->fs, proc->cwd, path, NULL);
+        break;
+    case KS_FS_TOUCH:
+        err = fs_touch_path(ks->fs, proc->cwd, path, NULL);
+        break;
+    case KS_FS_REMOVE:
+        err = fs_remove_path(ks->fs, proc->cwd, path);
+        break;
+    default:
+        return FOS_BAD_ARGS;
+    }
 
-    return FOS_SUCCESS;
+    DUAL_RET(ks->curr_thread, err, FOS_SUCCESS);
+}
+
+fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path_len) {
+    return ks_fs_path_io(ks, u_path, u_path_len, KS_FS_TOUCH);
 }
 
 fernos_error_t ks_fs_mkdir(kernel_state_t *ks, const char *u_path, size_t u_path_len) {
-    return FOS_NOT_IMPLEMENTED;
+    return ks_fs_path_io(ks, u_path, u_path_len, KS_FS_MKDIR);
 }
 
 fernos_error_t ks_fs_remove(kernel_state_t *ks, const char *u_path, size_t u_path_len) {
-    return FOS_NOT_IMPLEMENTED;
+    return ks_fs_path_io(ks, u_path, u_path_len, KS_FS_REMOVE);
 }
 
 fernos_error_t ks_fs_get_info(kernel_state_t *ks, const char *u_path, size_t u_path_len, fs_node_info_t *u_info) {

@@ -61,6 +61,11 @@ struct _kernel_fs_node_state_t {
  *
  * If `kernel_nk` is non-NULL. The copy of `nk` which is used by the kernel will be written to
  * `*kernel_nk`.
+ *
+ * returns FOS_ABORT_SYSTEM in the case where this call encounters some unexpected state.
+ * (i.e. it is used incorrectly within the kernel)
+ *
+ * Other errors, mean something non-fatal went wrong, for example, we just don't have enough memory.
  */
 fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_key_t *kernel_nk);
 
@@ -77,6 +82,9 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_k
  *
  * While this is a destructor like function it returns an error in the situation
  * where the kernel state/`nk` is not as expected.
+ *
+ * Will always succeed unless some unexpected state is encountered,
+ * then FOS_ABORT_SYSTEM is returned.
  */
 fernos_error_t ks_fs_deregister_nk(kernel_state_t *ks, fs_node_key_t nk);
 
@@ -105,10 +113,8 @@ fernos_error_t ks_fs_set_wd(kernel_state_t *ks, const char *u_path, size_t u_pat
 
 /**
  * Create a new file.
- *
- * if `u_fh` is non-null, a new handle is created for the file, and written to `*u_fh`.
  */
-fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path_len, file_handle_t *u_fh);
+fernos_error_t ks_fs_touch(kernel_state_t *ks, const char *u_path, size_t u_path_len);
 
 /**
  * Create a new directory.

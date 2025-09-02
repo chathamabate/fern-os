@@ -50,6 +50,16 @@
  * Kernel State -- Can Modify -- > Processes -- Can Modify -- > Threads
  *
  * NOT THE OTHER DIRECTION!
+ *
+ * Addition (9/1/2025) NOTE that many of these functions are designed specifically to correspond
+ * to system calls. Others may simply be helpers which are used within the system call 
+ * implementations. When a system call style function (One that acts on the current thread) returns
+ * anything other than FOS_SUCCESS (in kernel space), the kernel shuts down.
+ * The helper functions need a way of differentiating between an error which can be returned
+ * to the calling userspace thread, and an error which should shut down the system.
+ * When a helper function encounters some unexpected fatal state, it should return 
+ * FOS_ABORT_SYSTEM. Then users of the function know when an error is allowed, and when an error
+ * is fatal.
  */
 
 struct _kernel_state_t {
