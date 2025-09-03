@@ -10,6 +10,9 @@
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
 
+// DELETE ME
+#include "k_bios_term/term.h"
+
 static bool fm_key_eq(const void *k0, const void *k1) {
     return *(const futex_t **)k0 == *(const futex_t **)k1;
 }

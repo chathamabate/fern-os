@@ -11,6 +11,9 @@
 #include "s_util/str.h"
 #include "s_util/constraints.h"
 
+// DELETE ME!
+#include "k_bios_term/term.h"
+
 fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_key_t *kernel_nk) {
     fernos_error_t err;
 
@@ -37,6 +40,7 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_k
         }
 
         fs_node_key_t nk_copy = fs_new_key_copy(ks->fs, nk);
+        term_put_fmt_s("%u\n", fs_get_key_hasher(ks->fs)(&nk_copy));
         node_state = al_malloc(ks->al, sizeof(kernel_fs_node_state_t));
         basic_wait_queue_t *bwq = info.is_dir ? NULL : new_basic_wait_queue(ks->al);
 
@@ -474,6 +478,9 @@ fernos_error_t ks_fs_close(kernel_state_t *ks, file_handle_t fh) {
         return FOS_SUCCESS; // This is OK, remember no current thread return.
     }
 
+    // We got our state, Let's remove file handle from the id table plz.
+    idtb_push_id(proc->file_handle_table, fh);
+
     err = ks_fs_deregister_nk(ks, state->nk);
     if (err == FOS_ABORT_SYSTEM) {
         return FOS_UNKNWON_ERROR;
@@ -481,6 +488,8 @@ fernos_error_t ks_fs_close(kernel_state_t *ks, file_handle_t fh) {
 
     fs_delete_key(ks->fs, state->nk);
     al_free(proc->al, state);
+
+
 
     return FOS_SUCCESS;
 }
