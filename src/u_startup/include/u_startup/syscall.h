@@ -31,6 +31,7 @@ int32_t trigger_syscall(uint32_t id, uint32_t arg0, uint32_t arg1, uint32_t arg2
  * Only the calling thread is copied over into the child process.
  * Multithreading state is not copied (i.e. Futexes and the join queue)
  * Signal vector is not copied. The created process starts with no received signals.
+ * Deep copies of each file handle are made for the child process!
  *
  * On error, an error is returned just in the calling process.
  *
@@ -52,6 +53,7 @@ fernos_error_t sc_proc_fork(proc_id_t *cpid);
  *
  * All living children of this process are now orphans, they are adopted by the root process.
  * All zombie children of this process are now zombie orphas, also adopted by the root process.
+ * All open file handles will remain open until this process is reaped.
  *
  * NOTE: if zombie orphans are added to the root process, the root process will also get a
  * FSIG_CHLD.
@@ -73,6 +75,7 @@ void sc_proc_exit(proc_exit_status_t status);
  * FOS_EMPTY is returned to the user.
  *
  * When a process is "reaped", its exit status is retrieved, and its resources are freed!
+ * All previously opened file handles are closed!
  *
  * If `rcpid` is given, the pid of the reaped child is written to *rcpid.
  * If `rces` is given, the exit status of the reaped child is written to *rces.

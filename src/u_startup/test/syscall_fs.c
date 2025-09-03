@@ -156,10 +156,75 @@ static bool test_multithread_rw(void) {
     TEST_SUCCEED();
 }
 
+static bool test_multiprocess_rw(void) {
+    fernos_error_t err;
+
+    // Trying an absolute path because what the hell.
+    err = sc_fs_touch(TEMP_TEST_DIR_PATH "/a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    file_handle_t fh;
+
+    err = sc_fs_open("./a.txt", &fh);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    uint8_t buf[100];
+
+    mem_set(buf, 5, sizeof(buf));
+
+    // Let's start by advancing the position of the file handle to confirm
+    // the file handle copy works as expected!
+
+    err = sc_fs_write_full(fh, buf, sizeof(buf));
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    proc_id_t cpid;
+
+    err = sc_proc_fork(&cpid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    if (cpid == FOS_MAX_PROCS) { // Child process!
+        for (size_t i = 0; i < 10; i++) {
+            err = sc_fs_read_full(fh, buf, sizeof(buf));
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            for (size_t j = 0; j < sizeof(buf); j++) {
+                TEST_EQUAL_UINT(i, buf[j]);
+            }
+        }
+
+        // We will exit WITHOUT closing our file handle. This is to test that
+        // the file handle is closed automatically during a reap.
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // Parent process!
+    for (size_t i = 0; i < 10; i++) {
+        mem_set(buf, i, sizeof(buf));
+
+        err = sc_fs_write_full(fh, buf, sizeof(buf));
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    err = sc_signal_wait(1 <<  FSIG_CHLD, NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_proc_reap(cpid, NULL, NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    sc_fs_close(fh);
+
+    err = sc_fs_remove("./a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_SUCCEED();
+}
+
 
 bool test_syscall_fs(void) {
     BEGIN_SUITE("FS Syscalls");
     RUN_TEST(test_simple_rw);
     RUN_TEST(test_multithread_rw);
+    RUN_TEST(test_multiprocess_rw);
     return END_SUITE();
 }
