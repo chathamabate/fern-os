@@ -637,6 +637,8 @@ fernos_error_t ks_fs_write(kernel_state_t *ks, file_handle_t fh, const void *u_s
 
     DUAL_RET_FOS_ERR(err, calling_thread); // NOTE an error here would be pretty bad tbh.
 
+    state->pos += bytes_to_write;
+
     err = mem_cpy_to_user(calling_thread->proc->pd, u_written, &bytes_to_write, sizeof(size_t), NULL);
     DUAL_RET(calling_thread, err, FOS_SUCCESS);
 }

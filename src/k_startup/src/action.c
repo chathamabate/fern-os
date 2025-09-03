@@ -213,7 +213,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         break;
 
 	case SCID_FS_OPEN:
-        err = ks_fs_open(kernel, (const char *)arg0, (size_t)arg1, (file_handle_t *)arg3);
+        err = ks_fs_open(kernel, (const char *)arg0, (size_t)arg1, (file_handle_t *)arg2);
         break;
 
 	case SCID_FS_CLOSE:

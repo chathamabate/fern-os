@@ -100,7 +100,7 @@ fernos_error_t sc_fs_read_full(file_handle_t fh, void *dst, size_t len) {
     size_t readden = 0;
     while (readden < len) {
         size_t tmp_readden;
-        err = sc_fs_write(fh, (uint8_t *)dst + readden, len - readden, &tmp_readden);
+        err = sc_fs_read(fh, (uint8_t *)dst + readden, len - readden, &tmp_readden);
         if (err != FOS_SUCCESS) {
             return err;
         }
