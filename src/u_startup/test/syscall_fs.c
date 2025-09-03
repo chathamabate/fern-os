@@ -29,8 +29,14 @@ static bool posttest(void);
  */
 #define TEMP_TEST_DIR_PATH "/syscall_fs_test"
 
+sig_vector_t old_sv;
+
 static bool pretest(void) {
     fernos_error_t err;
+
+    // Since we will be working with child processes, we will allow the 
+    // child signal in root.
+    old_sv = sc_signal_allow(1 << FSIG_CHLD);
 
     err = sc_fs_mkdir(TEMP_TEST_DIR_PATH);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -49,6 +55,8 @@ static bool posttest(void) {
 
     err = sc_fs_remove(TEMP_TEST_DIR_PATH);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    sc_signal_allow(old_sv);
 
     TEST_SUCCEED();
 }
@@ -159,6 +167,8 @@ static bool test_multithread_rw(void) {
 static bool test_multiprocess_rw(void) {
     fernos_error_t err;
 
+    // Pretty simple test, write from parent, read from child.
+
     // Trying an absolute path because what the hell.
     err = sc_fs_touch(TEMP_TEST_DIR_PATH "/a.txt");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -179,7 +189,6 @@ static bool test_multiprocess_rw(void) {
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     proc_id_t cpid;
-
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
@@ -204,6 +213,8 @@ static bool test_multiprocess_rw(void) {
 
         err = sc_fs_write_full(fh, buf, sizeof(buf));
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        sc_thread_sleep(1);
     }
 
     err = sc_signal_wait(1 <<  FSIG_CHLD, NULL);
@@ -220,11 +231,118 @@ static bool test_multiprocess_rw(void) {
     TEST_SUCCEED();
 }
 
+static void *test_multithread_and_process_rw_worker(void *arg) {
+    (void)arg;
+
+    fernos_error_t err;
+
+    file_handle_t b_fh;
+    err = sc_fs_open("./b.txt", &b_fh);
+
+    uint8_t buf[100];
+
+    for (size_t i = 0; i < 10; i++) {
+        err = sc_fs_read_full(b_fh, buf, sizeof(buf));
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        for (size_t j = 0; j < sizeof(buf); j++) {
+            TEST_EQUAL_UINT(i + 1, buf[j]);
+        }
+    }
+
+    sc_fs_close(b_fh);
+
+    return NULL;
+}
+
+static bool test_multithread_and_process_rw(void) {
+    //  (root proc)           (child proc)
+    //     worker0  --> "a.txt"  ---
+    //                             |
+    //     worker1  <-- "b.txt"  <--
+
+    fernos_error_t err;
+
+    err = sc_fs_touch("./a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_touch("./b.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    file_handle_t a_fh;
+
+    uint8_t buf[100];
+
+    err = sc_fs_open("./a.txt", &a_fh);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    proc_id_t cpid;
+    err = sc_proc_fork(&cpid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    if (cpid == FOS_MAX_PROCS) { // Child process
+        file_handle_t b_fh;
+
+        err = sc_fs_open("./b.txt", &b_fh);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        for (size_t i = 0; i < 10; i++) {
+            err = sc_fs_read_full(a_fh, buf, sizeof(buf));
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            for (size_t j = 0; j < sizeof(buf); j++) {
+                buf[j]++;
+            }
+
+            err = sc_fs_write_full(b_fh, buf, sizeof(buf));
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        }
+
+        sc_fs_close(a_fh);
+        sc_fs_close(b_fh);
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // Parent process.
+    
+    err = sc_thread_spawn(NULL, test_multithread_and_process_rw_worker, NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t i = 0; i < 10; i++) {
+        mem_set(buf, i, sizeof(buf));
+
+        err = sc_fs_write_full(a_fh, buf, sizeof(buf));
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    err = sc_signal_wait(full_join_vector(), NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_proc_reap(cpid, NULL, NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // Wait for middle man process to exit before joining on worker thread.
+
+    err = sc_thread_join(full_join_vector(), NULL, NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    sc_fs_close(a_fh);
+
+    err = sc_fs_remove("./a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_remove("./b.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_SUCCEED();
+}
 
 bool test_syscall_fs(void) {
     BEGIN_SUITE("FS Syscalls");
     RUN_TEST(test_simple_rw);
     RUN_TEST(test_multithread_rw);
     RUN_TEST(test_multiprocess_rw);
+    RUN_TEST(test_multithread_and_process_rw);
     return END_SUITE();
 }

@@ -216,8 +216,6 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
         return FOS_STATE_MISMATCH;
     }
 
-    term_put_s("FORKING\n");
-
     fernos_error_t err;
 
     thread_t *thr = ks->curr_thread;

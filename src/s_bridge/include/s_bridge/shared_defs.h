@@ -119,11 +119,7 @@ typedef uint32_t proc_exit_status_t;
 #define PROC_ES_FAILURE (0x2U)
 #define PROC_ES_GPF (0x3U) // Exit due to a general protection fault.
 #define PROC_ES_PF  (0x4U) // Exit due to a page fault.
-
-/**
- * The process exited because an unallowed signal was received.
- */
-#define PROC_ES_SIGNAL  (0x3U)
+#define PROC_ES_SIGNAL  (0x5U) // An unallowed signal was received.
 
 /*
  * Syscall IDs.

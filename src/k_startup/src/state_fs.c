@@ -40,7 +40,6 @@ fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_k
         }
 
         fs_node_key_t nk_copy = fs_new_key_copy(ks->fs, nk);
-        term_put_fmt_s("%u\n", fs_get_key_hasher(ks->fs)(&nk_copy));
         node_state = al_malloc(ks->al, sizeof(kernel_fs_node_state_t));
         basic_wait_queue_t *bwq = info.is_dir ? NULL : new_basic_wait_queue(ks->al);
 
