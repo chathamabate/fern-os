@@ -73,8 +73,42 @@ fernos_error_t sc_fs_write(file_handle_t fh, const void *src, size_t len, size_t
     return trigger_syscall(SCID_FS_WRITE, (uint32_t)fh, (uint32_t)src, len, (uint32_t)written);
 }
 
+fernos_error_t sc_fs_write_full(file_handle_t fh, const void *src, size_t len) {
+    fernos_error_t err;
+
+    size_t written = 0;
+    while (written < len) {
+        size_t tmp_written;
+        err = sc_fs_write(fh, (const uint8_t *)src + written, len - written, &tmp_written);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        written += tmp_written;
+    }
+
+    return FOS_SUCCESS;
+}
+
 fernos_error_t sc_fs_read(file_handle_t fh, void *dst, size_t len, size_t *readden) {
     return trigger_syscall(SCID_FS_READ, (uint32_t)fh, (uint32_t)dst, len, (uint32_t)readden);
+}
+
+fernos_error_t sc_fs_read_full(file_handle_t fh, void *dst, size_t len) {
+    fernos_error_t err;
+
+    size_t readden = 0;
+    while (readden < len) {
+        size_t tmp_readden;
+        err = sc_fs_write(fh, (uint8_t *)dst + readden, len - readden, &tmp_readden);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        readden += tmp_readden;
+    }
+
+    return FOS_SUCCESS;
 }
 
 fernos_error_t sc_fs_flush(file_handle_t fh) {

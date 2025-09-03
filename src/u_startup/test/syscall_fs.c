@@ -53,24 +53,6 @@ static bool posttest(void) {
     TEST_SUCCEED();
 }
 
-static bool try_write_full(file_handle_t fh, const void *src, size_t len) {
-    fernos_error_t err;
-
-    size_t written = 0;
-    while (written < len) {
-        size_t act_written;
-
-        err = sc_fs_write(fh, (const uint8_t *)src + written, len - written, &act_written);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
-
-        written += act_written;
-    }
-
-    TEST_SUCCEED();
-}
-
-static bool try_read_full(file_handle_t fh, void *dest, 
-
 static bool test_simple_rw(void) {
     fernos_error_t err;
 
@@ -84,9 +66,21 @@ static bool test_simple_rw(void) {
 
     const char *msg = "Hello FS";
 
-    TEST_TRUE(try_write_full(fh, msg, str_len(msg + 1)));
+    err = sc_fs_write_full(fh, msg, str_len(msg) + 1);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     err = sc_fs_seek(fh, 0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    char rx_buf[50];
+    err = sc_fs_read_full(fh, rx_buf, str_len(msg) + 1);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    
+    TEST_TRUE(str_eq(msg, rx_buf));
+
+    sc_fs_close(fh);
+
+    err = sc_fs_remove("./a.txt");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     TEST_SUCCEED();
