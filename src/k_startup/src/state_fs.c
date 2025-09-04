@@ -485,10 +485,9 @@ fernos_error_t ks_fs_close(kernel_state_t *ks, file_handle_t fh) {
         return FOS_UNKNWON_ERROR;
     }
 
-    fs_delete_key(ks->fs, state->nk);
+    // REMEMBER!!! The key pointer is shared!! We rely on ks_fs_deregister above
+    // to delete it when necessary.
     al_free(proc->al, state);
-
-
 
     return FOS_SUCCESS;
 }

@@ -56,6 +56,9 @@ static bool posttest(void) {
     err = sc_fs_remove(TEMP_TEST_DIR_PATH);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+    err = sc_fs_flush(FOS_MAX_FILE_HANDLES_PER_PROC);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
     sc_signal_allow(old_sv);
 
     TEST_SUCCEED();
@@ -316,7 +319,7 @@ static bool test_multithread_and_process_rw(void) {
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
     }
 
-    err = sc_signal_wait(full_join_vector(), NULL);
+    err = sc_signal_wait(1 << FSIG_CHLD, NULL);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     err = sc_proc_reap(cpid, NULL, NULL);
@@ -338,11 +341,136 @@ static bool test_multithread_and_process_rw(void) {
     TEST_SUCCEED();
 }
 
+static void *test_early_close_worker(void *arg) {
+    file_handle_t fh = (file_handle_t)arg;
+
+    uint32_t i;
+
+    fernos_error_t err;
+
+    err = sc_fs_read_full(fh, &i, sizeof(i));
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    // Trying to read from a handle which doesn't exist!
+    err = sc_fs_read_full(fh, &i, sizeof(i));
+    TEST_TRUE(err != FOS_SUCCESS);
+
+    return NULL;
+}
+
+static bool test_early_close(void) {
+    fernos_error_t err;
+
+    // Here we test that closing all handles before a read is done causes an
+    // early wakeup! (With FOS_STATE_MISMATCH as the return)
+
+    err = sc_fs_touch("./a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    file_handle_t fh;
+    err = sc_fs_open("./a.txt", &fh);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_thread_spawn(NULL, test_early_close_worker, (void *)fh);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // Ok, this isn't really the best made test, we are assuming that by the time
+    // time we wake up, the worker will have started to wait on data over `fh`.
+    // This might not always be gauranteed. However, the read call will ALWAYS fail.
+    sc_thread_sleep(5);
+
+    // Close the very handle the worker is reading from :(
+    sc_fs_close(fh);
+
+    err = sc_thread_join(full_join_vector(), NULL, NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_remove("./a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_SUCCEED();
+}
+
+static bool test_many_handles(void) {
+    // Test pushing the handle limit.
+
+    fernos_error_t err;
+
+    file_handle_t handles[FOS_MAX_FILE_HANDLES_PER_PROC];
+
+    err = sc_fs_touch("./a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t i = 0; i < FOS_MAX_FILE_HANDLES_PER_PROC; i++) {
+        err = sc_fs_open("./a.txt", handles + i);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    proc_id_t cpid;
+
+    err = sc_proc_fork(&cpid);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // We are going to do this in BOTH PROCESSES!
+    file_handle_t bad_handle;
+    err = sc_fs_open("./a.txt", &bad_handle);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+    uint8_t buf[FOS_MAX_FILE_HANDLES_PER_PROC];
+
+    if (cpid == FOS_MAX_PROCS) {
+        // Alright this is going to be a bit tricky!
+        // Remember, that all handles have their OWN positions!!!
+        for (size_t i = 0; i < FOS_MAX_FILE_HANDLES_PER_PROC; i++) {
+            mem_set(buf, i, i + 1);
+
+            err = sc_fs_write_full(handles[i], buf, i + 1);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            sc_fs_close(handles[i]);
+        }
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+
+    for (size_t i = 0; i < FOS_MAX_FILE_HANDLES_PER_PROC; i++) {
+        err = sc_fs_read_full(handles[i], buf, i + 1);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Only piece of data we can actually confirm!
+    TEST_EQUAL_UINT(buf[FOS_MAX_FILE_HANDLES_PER_PROC - 1], FOS_MAX_FILE_HANDLES_PER_PROC - 1);
+
+    for (size_t i = 0; i < FOS_MAX_FILE_HANDLES_PER_PROC; i++) {
+        sc_fs_close(handles[i]);
+    }
+
+    // There should be space at the very end!
+    err = sc_fs_open("./a.txt", handles + 0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    sc_fs_close(handles[0]);
+
+    err = sc_signal_wait(1 << FSIG_CHLD, NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_proc_reap(cpid, NULL, NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_remove("./a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_fs(void) {
     BEGIN_SUITE("FS Syscalls");
     RUN_TEST(test_simple_rw);
     RUN_TEST(test_multithread_rw);
     RUN_TEST(test_multiprocess_rw);
     RUN_TEST(test_multithread_and_process_rw);
+    RUN_TEST(test_early_close);
+    RUN_TEST(test_many_handles);
     return END_SUITE();
 }

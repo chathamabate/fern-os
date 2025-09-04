@@ -71,6 +71,9 @@ fernos_error_t sc_fs_get_child_name(const char *path,
  * 
  * When a file is opened, it's corresponding handle will start at position 0. (i.e. the 
  * beginning of the file)
+ *
+ * FOS_EMPTY is returned when we are out of space in the file handle table for this
+ * process!
  */
 fernos_error_t sc_fs_open(const char *path, file_handle_t *fh);
 
