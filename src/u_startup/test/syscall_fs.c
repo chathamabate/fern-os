@@ -429,18 +429,32 @@ static bool test_many_handles(void) {
 
             sc_fs_close(handles[i]);
         }
+        
+        // This confirms that all of our handles started at position 0.
+
+        fs_node_info_t info;
+        err = sc_fs_get_info("./a.txt", &info);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        TEST_EQUAL_UINT(FOS_MAX_FILE_HANDLES_PER_PROC, info.len);
 
         sc_proc_exit(PROC_ES_SUCCESS);
     }
 
+    // The below logic will only work if we have more than one handle.
+    TEST_TRUE(FOS_MAX_FILE_HANDLES_PER_PROC > 1);
 
     for (size_t i = 0; i < FOS_MAX_FILE_HANDLES_PER_PROC; i++) {
-        err = sc_fs_read_full(handles[i], buf, i + 1);
+        err = sc_fs_read_full(handles[i], buf, FOS_MAX_FILE_HANDLES_PER_PROC);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
     }
 
-    // Only piece of data we can actually confirm!
-    TEST_EQUAL_UINT(buf[FOS_MAX_FILE_HANDLES_PER_PROC - 1], FOS_MAX_FILE_HANDLES_PER_PROC - 1);
+    // Since we read the full buffer each time, after the second read, we can gaurantee
+    // we are reading the entire file in its final state.
+
+    for (size_t i = 0 ; i < sizeof(buf); i++) {
+        TEST_EQUAL_UINT(FOS_MAX_FILE_HANDLES_PER_PROC - 1, buf[i]);
+    }
 
     for (size_t i = 0; i < FOS_MAX_FILE_HANDLES_PER_PROC; i++) {
         sc_fs_close(handles[i]);
