@@ -3,6 +3,8 @@
 #include "u_startup/syscall_fs.h"
 #include "s_util/constraints.h"
 #include "s_util/str.h"
+#include <stdarg.h>
+#include "s_data/map.h"
 
 #define LOGF_METHOD(...) sc_term_put_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
@@ -27,7 +29,8 @@ static bool posttest(void);
  * Each test will start in an empty instance of this directory. 
  * At the end of each test, this directory will be deleted.
  */
-#define TEMP_TEST_DIR_PATH "/syscall_fs_test"
+#define _TEMP_TEST_DIR_PATH "syscall_fs_test"
+#define TEMP_TEST_DIR_PATH "/" _TEMP_TEST_DIR_PATH 
 
 sig_vector_t old_sv;
 
@@ -441,16 +444,16 @@ static bool test_many_handles(void) {
         sc_proc_exit(PROC_ES_SUCCESS);
     }
 
-    // The below logic will only work if we have more than one handle.
     TEST_TRUE(FOS_MAX_FILE_HANDLES_PER_PROC > 1);
 
-    for (size_t i = 0; i < FOS_MAX_FILE_HANDLES_PER_PROC; i++) {
-        err = sc_fs_read_full(handles[i], buf, FOS_MAX_FILE_HANDLES_PER_PROC);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
-    }
+    err = sc_fs_read_full(handles[0], buf, FOS_MAX_FILE_HANDLES_PER_PROC);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     // Since we read the full buffer each time, after the second read, we can gaurantee
     // we are reading the entire file in its final state.
+    
+    err = sc_fs_read_full(handles[1], buf, FOS_MAX_FILE_HANDLES_PER_PROC);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     for (size_t i = 0 ; i < sizeof(buf); i++) {
         TEST_EQUAL_UINT(FOS_MAX_FILE_HANDLES_PER_PROC - 1, buf[i]);
@@ -478,6 +481,48 @@ static bool test_many_handles(void) {
     TEST_SUCCEED();
 }
 
+static bool test_dir_functions(void) {
+    // Test functions like mkdir, set_wd, and get child name.
+
+    fernos_error_t err;
+
+    err = sc_fs_mkdir("./other_dir");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_touch("a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    char name_bufs[2][FS_MAX_FILENAME_LEN + 1];
+    
+    err = sc_fs_get_child_name(".", 0, name_bufs[0]);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_get_child_name(".", 1, name_bufs[1]);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_TRUE(!str_eq(name_bufs[0], name_bufs[1]));
+    for (size_t i = 0; i < 2; i++) {
+        TEST_TRUE(str_eq("a.txt", name_bufs[i]) || str_eq("other_dir", name_bufs[i]));
+    }
+
+    err = sc_fs_get_child_name(".", 2, name_bufs[0]);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = sc_fs_remove("a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_set_wd("..");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_remove(_TEMP_TEST_DIR_PATH "/other_dir");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_set_wd(_TEMP_TEST_DIR_PATH);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_fs(void) {
     BEGIN_SUITE("FS Syscalls");
     RUN_TEST(test_simple_rw);
@@ -486,5 +531,6 @@ bool test_syscall_fs(void) {
     RUN_TEST(test_multithread_and_process_rw);
     RUN_TEST(test_early_close);
     RUN_TEST(test_many_handles);
+    RUN_TEST(test_dir_functions);
     return END_SUITE();
 }
