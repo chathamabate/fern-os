@@ -444,8 +444,6 @@ static bool test_many_handles(void) {
         sc_proc_exit(PROC_ES_SUCCESS);
     }
 
-    TEST_TRUE(FOS_MAX_FILE_HANDLES_PER_PROC > 1);
-
     err = sc_fs_read_full(handles[0], buf, FOS_MAX_FILE_HANDLES_PER_PROC);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
@@ -519,6 +517,54 @@ static bool test_dir_functions(void) {
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     err = sc_fs_set_wd(_TEMP_TEST_DIR_PATH);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_SUCCEED();
+}
+
+static bool test_big_file(void) {
+    // This test is almost identical to an earlier test in this file, except
+    // it writes and reads a 1MB file. (Which it actually does surprisingly fast imo)
+
+    fernos_error_t err;
+
+    err = sc_fs_mkdir("b");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_touch("b/a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    file_handle_t fh;
+
+    err = sc_fs_open("b/a.txt", &fh);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    
+    uint8_t big_buf[10097];
+    for (size_t i = 0; i < 100; i++) {
+        mem_set(big_buf, (uint8_t)i, sizeof(big_buf));
+
+        err = sc_fs_write_full(fh, big_buf, sizeof(big_buf));
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    err = sc_fs_seek(fh, 0);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    for (size_t i = 0; i < 100; i++) {
+        err = sc_fs_read_full(fh, big_buf, sizeof(big_buf));
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        for (size_t j = 0; j < sizeof(big_buf); j++) {
+            TEST_EQUAL_UINT(i, big_buf[j]);
+        }
+    }
+
+    sc_fs_close(fh);
+
+    err = sc_fs_remove("b/a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = sc_fs_remove("b");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     TEST_SUCCEED();
@@ -619,6 +665,7 @@ bool test_syscall_fs(void) {
     RUN_TEST(test_early_close);
     RUN_TEST(test_many_handles);
     RUN_TEST(test_dir_functions);
+    RUN_TEST(test_big_file);
     RUN_TEST(test_bad_fs_calls);
     return END_SUITE();
 }
