@@ -64,12 +64,13 @@ fernos_error_t sc_fs_get_info(const char *path, fs_node_info_t *info);
  *
  * `child_name` should be a buffer in with size at least `FS_MAX_FILENAME_LEN + 1`.
  *
- * If `index` overshoots the end of the directory, FOS_INVALID_INDEX is returned in the calling thread.
- *
  * returns FOS_INVALID_INDEX if the given path does not exist.
  * returns FOS_STATE_MISMATCH if given path leads to a file.
  * On success, FOS_SUCCESS is returned in the calling thread, and the child's name is written
  * to `*child_name` in userspace.
+ *
+ * If `index` overshoots the end of the directory, FOS_SUCCESS is still returned, but
+ * `\0` is written to `child_name`.
  */
 fernos_error_t sc_fs_get_child_name(const char *path, 
         size_t index, char *child_name);

@@ -505,7 +505,8 @@ static bool test_dir_functions(void) {
     }
 
     err = sc_fs_get_child_name(".", 2, name_bufs[0]);
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_TRUE(name_bufs[0][0] == '\0');
 
     err = sc_fs_remove("a.txt");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);

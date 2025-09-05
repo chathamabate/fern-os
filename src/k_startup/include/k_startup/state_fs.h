@@ -139,10 +139,11 @@ KS_SYSCALL fernos_error_t ks_fs_get_info(kernel_state_t *ks, const char *u_path,
  *
  * `u_child_name` should be a buffer in userspace with size at least `FS_MAX_FILENAME_LEN + 1`.
  *
- * If `index` overshoots the end of the directory, FOS_INVALID is returned in the calling thread.
- *
  * On success, FOS_SUCCESS is returned in the calling thread, and the child's name is written
  * to `*u_child_name` in userspace.
+ *
+ * If `index` overshoots the number of entries in the given directory, FOS_SUCCESS is STILL returned.
+ * In this case, just '\0' is written to `u_child_name`.
  */
 KS_SYSCALL fernos_error_t ks_fs_get_child_name(kernel_state_t *ks, const char *u_path, size_t u_path_len, 
         size_t index, char *u_child_name);

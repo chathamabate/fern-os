@@ -363,9 +363,6 @@ fernos_error_t ks_fs_get_child_name(kernel_state_t *ks, const char *u_path, size
 
     // We are going to reuse the path buffer because what the hell.
     err = fs_get_child_names(ks->fs, nk, index, 1, (char (*)[FS_MAX_FILENAME_LEN + 1])path);
-    if (err == FOS_SUCCESS && path[0] == '\0') {
-        err = FOS_INVALID_INDEX;
-    }
 
     // Delete 'nk' no matter what happens.
     fs_delete_key(ks->fs, nk);
