@@ -135,6 +135,128 @@ size_t next_filename(const char *path, char *dest) {
     }
 }
 
+fernos_error_t separate_path(const char *path, char *dir, char *basename) {
+    if (!path || !dir || !basename) {
+        return FOS_BAD_ARGS;
+    }
+
+    size_t path_len; // length of the path.
+    size_t last_slash = FS_MAX_PATH_LEN; // Index of the path's last "/".
+    
+    for (path_len = 0; path[path_len] != '\0'; path_len++) {
+        if (path[path_len] == '/') {
+            last_slash = path_len;
+        }
+    }
+
+    // This function requires that path is non-empty! So no need to check again.
+
+    const size_t basename_start = last_slash == FS_MAX_PATH_LEN ? 0 : last_slash + 1;
+
+    if (basename_start == path_len) {
+        return FOS_BAD_ARGS; // path ends in a slash :(
+    }
+
+    if (str_eq(".", path + basename_start) || str_eq("..", path + basename_start)) {
+        return FOS_BAD_ARGS; // ends with "." or ".." :,(
+    }
+
+    if (basename_start == 0) {
+        str_cpy(dir, "./");
+    } else {
+        mem_cpy(dir, path, last_slash + 1); 
+        dir[last_slash + 1] = '\0';
+    }
+
+    str_cpy(basename, path + basename_start);
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t fs_touch_path(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key) {
+    fernos_error_t err;
+
+    if (!path || !is_valid_path(path)) {
+        return FOS_BAD_ARGS;
+    }
+    
+    char dir[FS_MAX_PATH_LEN + 1];
+    char basename[FS_MAX_FILENAME_LEN + 1];
+
+    err = separate_path(path, dir, basename);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    fs_node_key_t parent_key;
+    err = fs_new_key(fs, cwd, dir, &parent_key);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    err = fs_touch(fs, parent_key, basename, key);
+
+    fs_delete_key(fs, parent_key);
+
+    return err;
+}
+
+fernos_error_t fs_mkdir_path(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key) {
+    fernos_error_t err;
+
+    if (!path || !is_valid_path(path)) {
+        return FOS_BAD_ARGS;
+    }
+    
+    char dir[FS_MAX_PATH_LEN + 1];
+    char basename[FS_MAX_FILENAME_LEN + 1];
+
+    err = separate_path(path, dir, basename);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    fs_node_key_t parent_key;
+    err = fs_new_key(fs, cwd, dir, &parent_key);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    err = fs_mkdir(fs, parent_key, basename, key);
+
+    fs_delete_key(fs, parent_key);
+
+    return err;
+}
+
+fernos_error_t fs_remove_path(file_sys_t *fs, fs_node_key_t cwd, const char *path) {
+    fernos_error_t err;
+
+    if (!path || !is_valid_path(path)) {
+        return FOS_BAD_ARGS;
+    }
+    
+    char dir[FS_MAX_PATH_LEN + 1];
+    char basename[FS_MAX_FILENAME_LEN + 1];
+
+    err = separate_path(path, dir, basename);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    fs_node_key_t parent_key;
+    err = fs_new_key(fs, cwd, dir, &parent_key);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    err = fs_remove(fs, parent_key, basename);
+
+    fs_delete_key(fs, parent_key);
+
+    return err;
+}
+
 static fernos_error_t fs_dump_tree_helper(file_sys_t *fs, void (*pf)(const char *, ...), fs_node_key_t nk,
         size_t depth) {
     fernos_error_t err;
@@ -220,3 +342,4 @@ void fs_dump_tree(file_sys_t *fs, void (*pf)(const char *, ...), fs_node_key_t c
 
     fs_delete_key(fs, key);
 }
+

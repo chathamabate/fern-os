@@ -101,6 +101,12 @@ typedef struct _thread_join_ret_t {
  */
 typedef int32_t futex_t;
 
+/**
+ * In kernel space we'll use the fs_node_key_t type often. 
+ *
+ * However, the user will only ever be given file_handle_t values.
+ */
+typedef id_t file_handle_t;
 
 /**
  * Exit statuses of a process.
@@ -113,11 +119,7 @@ typedef uint32_t proc_exit_status_t;
 #define PROC_ES_FAILURE (0x2U)
 #define PROC_ES_GPF (0x3U) // Exit due to a general protection fault.
 #define PROC_ES_PF  (0x4U) // Exit due to a page fault.
-
-/**
- * The process exited because an unallowed signal was received.
- */
-#define PROC_ES_SIGNAL  (0x3U)
+#define PROC_ES_SIGNAL  (0x5U) // An unallowed signal was received.
 
 /*
  * Syscall IDs.
@@ -140,10 +142,24 @@ typedef uint32_t proc_exit_status_t;
 #define SCID_THREAD_JOIN  (0x103U)
 
 /* Futex Syscalls */
-#define SCID_FUTEX_REGISTER   (0x200)
-#define SCID_FUTEX_DEREGISTER (0x201)
-#define SCID_FUTEX_WAIT       (0x202)
-#define SCID_FUTEX_WAKE       (0x203)
+#define SCID_FUTEX_REGISTER   (0x200U)
+#define SCID_FUTEX_DEREGISTER (0x201U)
+#define SCID_FUTEX_WAIT       (0x202U)
+#define SCID_FUTEX_WAKE       (0x203U)
+
+/* FS Syscalls */
+#define SCID_FS_SET_WD          (0x300U)
+#define SCID_FS_TOUCH           (0x301U)
+#define SCID_FS_MKDIR           (0x302U)
+#define SCID_FS_REMOVE          (0x303U)
+#define SCID_FS_GET_INFO        (0x304U)
+#define SCID_FS_GET_CHILD_NAME  (0x305U)
+#define SCID_FS_OPEN            (0x306U)
+#define SCID_FS_CLOSE           (0x307U)
+#define SCID_FS_SEEK            (0x308U)
+#define SCID_FS_WRITE           (0x309U)
+#define SCID_FS_READ            (0x30AU)
+#define SCID_FS_FLUSH           (0x30BU)
 
 /* Term Puts syscalls */
 #define SCID_TERM_PUT_S (0x400U)

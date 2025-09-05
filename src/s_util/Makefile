@@ -7,7 +7,7 @@
 MOD_NAME 	?= s_util
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= str.c misc.c constraints.c rand.c
+_SRCS 		?= str.c misc.c constraints.c rand.c hash.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= str.s

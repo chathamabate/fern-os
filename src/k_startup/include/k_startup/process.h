@@ -6,8 +6,11 @@
 #include "s_mem/allocator.h"
 #include "s_data/wait_queue.h"
 #include "s_data/map.h"
+#include "s_block_device/file_sys.h"
 
 #include <stdbool.h>
+
+typedef struct _file_handle_state_t file_handle_state_t;
 
 struct _process_t {
     /**
@@ -115,6 +118,44 @@ struct _process_t {
      * This is a map from userspace addresses (futex_t *)'s -> basic_wait_queue's
      */
     map_t *futexes;
+
+    /**
+     * The current working directory of this process.
+     *
+     * Just like the node keys found in `file_handle_table` below, this key should be managed by
+     * the kernel state, NOT HERE. (This just means, we can shallow copy around this value
+     * all we want, it is the kernel state's reponsibility to keep track)
+     *
+     * This should NEVER be NULL.
+     */
+    fs_node_key_t cwd;
+
+    /**
+     * Each entry in this table holds a pointer to a file_handle_state_t * which is 
+     * dynamically allocated by this process's allocator.
+     */
+    id_table_t *file_handle_table;
+};
+
+struct _file_handle_state_t {
+    /**
+     * The node key used by this handle.
+     *
+     * NOTE VERY IMPORTANT!! This node key is NOT owned by this structure.
+     * On deletion, node keys are not deleted! We'd expect the kernel to keep track of all
+     * allocated node keys some where else. (This works because all node keys are really just 
+     * pointers)
+     */
+    const fs_node_key_t nk;
+
+    /**
+     * The position in the file to read/write to next.
+     *
+     * NOTE: The user will only be able to write/read from bytes [0, SIZE_MAX - 1].
+     * When pos = SIZE_MAX, this signifies the file is at it's maximum size and cannot
+     * be written to or read from any more without calling seek.
+     */
+    size_t pos;
 };
 
 /**
@@ -124,10 +165,10 @@ struct _process_t {
  *
  * If any allocation fails, NULL is returned.
  */
-process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent);
+process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd);
 
-static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent) {
-    return new_process(get_default_allocator(), pid, pd, parent);
+static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd) {
+    return new_process(get_default_allocator(), pid, pd, parent, cwd);
 }
 
 /**
@@ -141,6 +182,9 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  *
  * NOTE: futexes and join queue are NOT copied! And The given process `proc` is not edited in
  * ANY WAY! It is your responsibility to register this new process as a child in the old.
+ *
+ * NOTE: All file handles ARE copied. HOWEVER remember that more work will likely need to be
+ * done by the kernel to handle these new file handle copies.
  *
  * Returns NULL if there are insufficient resources or if the arguments are bad.
  *
@@ -214,4 +258,18 @@ basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex);
  * Make sure all waiting threads are dealt with before calling this function.
  */
 void proc_deregister_futex(process_t *proc, futex_t *u_futex);
+
+/**
+ * Create a new file handle entry with the given node key.
+ *
+ * On success, the created file handle is written to `*fh`.
+ */
+fernos_error_t proc_register_file_handle(process_t *proc, fs_node_key_t nk, file_handle_t *fh);
+
+/**
+ * Clean up the resources of a file handle.
+ */
+void proc_deregister_file_handle(process_t *proc, file_handle_t fh);
+
+
 

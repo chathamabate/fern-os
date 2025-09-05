@@ -61,6 +61,19 @@ static bool posttest(void) {
 static bool test_fs_touch_and_mkdir(void) {
     fernos_error_t err;
 
+    // First, let's let's just try these unique cases.
+    // Know that "." and ".." ARE valid filenames technically,
+    // however, you are not allowed to created files/subdirectories with their name!
+    err = fs_touch(fs, root_key, ".", NULL);
+    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+    err = fs_touch(fs, root_key, "..", NULL);
+    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+
+    err = fs_mkdir(fs, root_key, ".", NULL);
+    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+    err = fs_mkdir(fs, root_key, "..", NULL);
+    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+
     // Maybe we could make a could of subdirectories on root?
     // Put files in those subdirectories???
 
@@ -199,6 +212,14 @@ static bool test_fs_remove(void) {
     err = fs_remove(fs, subdir_key, "c");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+    // While "." and ".." likely exist and are valid in the given directory,
+    // they should never be removeable!
+    err = fs_remove(fs, subdir_key, ".");
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = fs_remove(fs, subdir_key, "..");
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
     fs_delete_key(fs, subdir_key);
 
     err = fs_remove(fs, root_key, "sub");
@@ -311,7 +332,7 @@ static bool test_fs_get_node_info(void) {
     TEST_SUCCEED();
 }
 
-static bool test_fs_hash_and_equate(void) {
+static bool test_fs_hash_equate_and_copy(void) {
     fernos_error_t err;
 
     hasher_ft hash_func = fs_get_key_hasher(fs);
@@ -320,7 +341,7 @@ static bool test_fs_hash_and_equate(void) {
     equator_ft equate_func = fs_get_key_equator(fs);
     TEST_TRUE(equate_func != NULL);
 
-    fs_node_key_t keys[3];
+    fs_node_key_t keys[4];
 
     err = fs_touch(fs, root_key, "a.txt", keys + 0);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -331,12 +352,18 @@ static bool test_fs_hash_and_equate(void) {
     err = fs_touch(fs, root_key, "b.txt", keys + 2);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+    keys[3] = fs_new_key_copy(fs, keys[2]);
+    TEST_TRUE(keys[3] != NULL);
+
     TEST_EQUAL_UINT(hash_func(keys + 0), hash_func(keys + 1));
     TEST_TRUE(equate_func(keys + 0, keys + 1));
 
     TEST_FALSE(equate_func(keys + 1, keys + 2));
 
-    for (size_t i = 0; i < 3; i++) {
+    TEST_EQUAL_UINT(hash_func(keys + 2), hash_func(keys + 3));
+    TEST_TRUE(equate_func(keys + 2, keys + 3));
+
+    for (size_t i = 0; i < 4; i++) {
         fs_delete_key(fs, keys[i]);
     }
 
@@ -428,7 +455,10 @@ static bool test_fs_rw1(void) {
     err = fs_resize(fs, key, file_size / 2);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    err = fs_write(fs, key, 0, file_size, big_buf);
+    err = fs_write(fs, key, 0, (file_size / 2) + 1, big_buf);
+    TEST_EQUAL_HEX(FOS_INVALID_RANGE,  err);
+
+    err = fs_write(fs, key, 1, (file_size / 2), big_buf);
     TEST_EQUAL_HEX(FOS_INVALID_RANGE,  err);
 
     da_free(big_buf);
@@ -448,6 +478,9 @@ static bool test_fs_rw2(void) {
 
     err = fs_touch(fs, root_key, "a.txt", &key);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_node_key_t key_copy = fs_new_key_copy(fs, key);
+    TEST_TRUE(key_copy != NULL);
 
     size_t file_size = 100;
 
@@ -484,7 +517,9 @@ static bool test_fs_rw2(void) {
             } else { // read
                 // Read from file to the tx buf.
 
-                err = fs_read(fs, key, tx_offset, tx_amt, tx_buf + tx_offset);
+                // Reading from the key copy should not result in any issues.
+                // I just threw this in here to get more coverage on the copy key code.
+                err = fs_read(fs, key_copy, tx_offset, tx_amt, tx_buf + tx_offset);
                 TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
                 // Compare with mirror buffer.
@@ -518,6 +553,15 @@ static bool test_fs_rw2(void) {
                     TEST_EQUAL_HEX(FOS_SUCCESS, err);
                 }
 
+                // lastly, just as a sanity check, let's confirm that resizing always updates
+                // the node info correctly!
+
+                fs_node_info_t info;
+                err = fs_get_node_info(fs, key, &info);
+                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+                TEST_EQUAL_UINT(new_file_size, info.len);
+
                 file_size = new_file_size;
             }
         }
@@ -539,6 +583,7 @@ static bool test_fs_rw2(void) {
     da_free(tx_buf);
     da_free(buf);
 
+    fs_delete_key(fs, key_copy);
     fs_delete_key(fs, key);
 
     TEST_SUCCEED();
@@ -808,7 +853,7 @@ static bool test_fs_manual_steps(void) {
         {STEP_READ, "./b", "b.bin", {0, 20, 5}},
         {STEP_WRITE, "./", "a.bin", {0, 200, 1}},
         {STEP_READ, "./b", "b.bin", {20, 80, 4}},
-        {STEP_REMOVE, "./b", "b.bin", {0}},
+        {STEP_REMOVE, "./b/", "b.bin", {0}},
         {STEP_RESIZE, "/", "c.bin", {1000}},
         {STEP_READ, "./", "a.bin", {0, 200, 1}}
 
@@ -892,6 +937,37 @@ static bool test_fs_manual_steps(void) {
     TEST_SUCCEED();
 }
 
+static bool test_fs_path_helpers(void) {
+    // Confirm the default path wrapper functions work as expected.
+    // This test is pretty lazy tbh. IDK, the wrapper are pretty simple and all the same.
+
+    fernos_error_t err;
+
+    err = fs_touch_path(fs, NULL, "/a.txt", NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_touch_path(fs, root_key, "./b.txt", NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_node_key_t key;
+
+    err = fs_mkdir_path(fs, root_key, "./c", &key);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_touch_path(fs, root_key, "./c/b.txt", NULL);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = fs_touch_path(fs, root_key, "./d/b.txt", NULL);
+    TEST_TRUE(FOS_SUCCESS != err);
+
+    err = fs_remove_path(fs, key, "b.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    fs_delete_key(fs, key);
+
+    TEST_SUCCEED();
+}
+
 bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     generate_fs = gen;
 
@@ -900,7 +976,7 @@ bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     RUN_TEST(test_fs_remove);
     RUN_TEST(test_fs_get_child_names);
     RUN_TEST(test_fs_get_node_info);
-    RUN_TEST(test_fs_hash_and_equate);
+    RUN_TEST(test_fs_hash_equate_and_copy);
     RUN_TEST(test_fs_rw0);
     RUN_TEST(test_fs_rw1);
     RUN_TEST(test_fs_rw2);
@@ -908,5 +984,6 @@ bool test_file_sys(const char *name, file_sys_t *(*gen)(void)) {
     RUN_TEST(test_fs_zero_resize);
     RUN_TEST(test_fs_exhaust);
     RUN_TEST(test_fs_manual_steps);
+    RUN_TEST(test_fs_path_helpers);
     return END_SUITE();
 }

@@ -33,6 +33,8 @@ static bool posttest(void) {
 }
 
 static bool test_map_simple_put_and_get(void) {
+    fernos_error_t err;
+
     map_t *mp = gen_map(sizeof(uint32_t), sizeof(uint32_t));
     TEST_TRUE(mp != NULL);
 
@@ -45,9 +47,14 @@ static bool test_map_simple_put_and_get(void) {
 
         // Test that after every addition, previously added entries are still intact.
         for (uint32_t j = 0; j <= i; j++) {
-            uint32_t *act_val = mp_get(mp, &j);
-            TEST_TRUE(act_val != NULL);
-            TEST_EQUAL_UINT(j * 2, *act_val);
+            const uint32_t *key;
+            uint32_t *val;
+
+            err = mp_get_kvp(mp, &j, (const void **)&key, (void **)&val);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            TEST_EQUAL_UINT(j, *key);
+            TEST_EQUAL_UINT(j * 2, *val);
         }
     }
 
@@ -94,6 +101,8 @@ static bool test_map_simple_overwrite(void) {
 }
 
 static bool test_map_simple_remove(void) {
+    fernos_error_t err;
+
     map_t *mp = gen_map(sizeof(uint32_t), sizeof(uint8_t));
     TEST_TRUE(mp != NULL);
 
@@ -116,13 +125,17 @@ static bool test_map_simple_remove(void) {
     TEST_FALSE(mp_remove(mp, NULL));
 
     for (uint32_t i = START_NUM; i < END_NUM; i++) {
-        uint8_t *act_val = (uint8_t *)mp_get(mp, &i);
+        const uint32_t *key;
+        uint8_t *val;
+
+        err = mp_get_kvp(mp, &i, (const void **)&key, (void **)&val);
 
         if (i & 1) {
-            TEST_TRUE(act_val != NULL);
-            TEST_EQUAL_UINT((uint8_t)(i + 3), *act_val);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_UINT(i, *key);
+            TEST_EQUAL_UINT((uint8_t)(i + 3), *val);
         } else {
-            TEST_EQUAL_HEX(NULL, act_val);
+            TEST_EQUAL_HEX(FOS_EMPTY, err);
         }
     }
 

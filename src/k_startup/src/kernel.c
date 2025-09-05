@@ -35,8 +35,11 @@
 #include "s_block_device/fat32_dir.h"
 #include "s_block_device/test/fat32.h"
 #include "s_block_device/test/fat32_dir.h"
+#include "s_block_device/fat32_file_sys.h"
+#include "s_block_device/file_sys.h"
 #include "s_block_device/test/file_sys_helpers.h"
 #include "s_block_device/test/fat32_file_sys.h"
+#include "k_startup/state_fs.h"
 
 #include "k_sys/ata.h"
 
@@ -79,45 +82,92 @@ static fernos_error_t init_kernel_heap(void) {
     return FOS_SUCCESS;
 }
 
+static void now(fernos_datetime_t *dt) {
+    *dt = (fernos_datetime_t) { 0 };
+}
+
 kernel_state_t *kernel = NULL;
 
-static fernos_error_t init_kernel_state(void) {
-    kernel = new_da_kernel_state();
-    if (!kernel) {
-        return FOS_NO_MEM;
+static void init_kernel_state(void) {
+    fernos_error_t err;
+
+    block_device_t *bd = new_da_cached_block_device(
+        get_ata_block_device(),
+        512, 0, true
+    );
+
+    if (!bd) {
+        setup_fatal("Failed to created block device");
     }
+
+    file_sys_t *fs;
+    err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
+    if (err != FOS_SUCCESS) {
+        err = init_fat32(bd, 0, bd_num_sectors(bd), 8);
+        if (err != FOS_SUCCESS) {
+            setup_fatal("Failed to init FAT32");
+        }
+
+        // NOTE: This is a temporary fix and VERY VERY dangerous. 
+        // It basically resets the entire disk if it fails to parse it the first time.
+        err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
+        if (err != FOS_SUCCESS) {
+            setup_fatal("Failed to create FAT32 FS");
+        }
+    }
+
+    kernel = new_da_kernel_state(fs);
+    if (!kernel) {
+        setup_fatal("Failed to allocate kernel state");
+    }
+
+    // Let's register the root key into the kenrel state.
+    fs_node_key_t root_key;
+    err = fs_new_key(fs, NULL, "/", &root_key);
+    if (err != FOS_SUCCESS) {
+        setup_fatal("Failed to get root dir key");
+    }
+
+    fs_node_key_t kernel_root_key;
+    err = ks_fs_register_nk(kernel, root_key, &kernel_root_key);
+    if (err != FOS_SUCCESS) {
+        setup_fatal("Failed to register root key!");
+    }
+
+    fs_delete_key(kernel->fs, root_key);
+
+    // Let's setup our first user process.
 
     proc_id_t pid = idtb_pop_id(kernel->proc_table);
     if (pid == idtb_null_id(kernel->proc_table)) {
-        return FOS_NO_MEM;
+        setup_fatal("Failed to pop root pid");
     }
 
-    uint32_t user_pd = pop_initial_user_info();
+    phys_addr_t user_pd = pop_initial_user_info();
     if (user_pd == NULL_PHYS_ADDR) {
-        return FOS_UNKNWON_ERROR;
+        setup_fatal("Failed to get user PD");
     }
 
-    process_t *proc = new_da_process(pid, user_pd, NULL);
+    process_t *proc = new_da_process(pid, user_pd, NULL, kernel_root_key);
     if (!proc) {
-        return FOS_NO_MEM;
+        setup_fatal("Failed to allocate first process");
     }
 
     kernel->root_proc = proc;
     idtb_set(kernel->proc_table, pid, proc);
 
+    // The first thread spawned will not get a void * arg, nor will it return one.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
     thread_t *thr = proc_new_thread(kernel->root_proc, 
             (thread_entry_t)user_main, NULL);
     if (!thr) {
-        return FOS_UNKNWON_ERROR;
+        setup_fatal("Failed to allocate first thread");
     }
+#pragma GCC diagnostic pop
 
     // Finally, schedule our first thread!
     ks_schedule_thread(kernel, thr);
-
-    // Now we are actually getting somewhere, we should be able to add the sleep queue now!
-
-    return FOS_SUCCESS;
-
 }
 
 void start_kernel(void) {
@@ -137,7 +187,7 @@ void start_kernel(void) {
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
 
-    try_setup_step(init_kernel_state(), "Failed to setup kernel state");
+    init_kernel_state();
 
     // Now put in the real actions.
     set_gpf_action(fos_gpf_action);

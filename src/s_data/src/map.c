@@ -9,7 +9,7 @@ void init_map(map_t *mp, const map_impl_t *impl, size_t ks, size_t vs) {
 }
 
 static void delete_chained_hash_map(map_t *mp);
-static void *chm_get(map_t *mp, const void *key);
+static fernos_error_t chm_get_kvp(map_t *mp, const void *key, const void **key_out, void **val_out);
 static fernos_error_t chm_put(map_t *mp, const void *key, const void *value);
 static bool chm_remove(map_t *mp, const void *key);
 static size_t chm_len(map_t *mp);
@@ -20,7 +20,7 @@ static fernos_error_t chm_next_iter(map_t *mp, const void **key, void **value);
 const map_impl_t CHM_IMPL = {
     .delete_map = delete_chained_hash_map,
 
-    .mp_get = chm_get,
+    .mp_get_kvp = chm_get_kvp,
     .mp_put = chm_put,
     .mp_remove = chm_remove,
     .mp_len = chm_len,
@@ -168,18 +168,24 @@ static chm_node_header_t *chm_get_node(chained_hash_map_t *chm, const void *key)
     return NULL;
 }
 
-static void *chm_get(map_t *mp, const void *key) {
+static fernos_error_t chm_get_kvp(map_t *mp, const void *key, const void **key_out, void **val_out) {
     chained_hash_map_t *chm = (chained_hash_map_t *)mp;
 
     chm_node_header_t *node = chm_get_node(chm, key);
 
     if (!node) {
-        return NULL;
+        return FOS_EMPTY;
     }
 
-    const void *key_ptr = node + 1;
+    if (key_out) {
+        *key_out = (const void *)(node + 1);
+    }
 
-    return (uint8_t *)key_ptr + chm->super.key_size;
+    if (val_out) {
+        *val_out = (void *)((uint8_t *)(node + 1) + chm->super.key_size);
+    }
+
+    return FOS_SUCCESS;
 }
 
 static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {

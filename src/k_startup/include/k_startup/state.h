@@ -7,6 +7,30 @@
 #include "s_mem/allocator.h"
 #include "k_startup/fwd_defs.h"
 #include "s_bridge/ctx.h"
+#include "s_data/map.h"
+
+#include "s_block_device/file_sys.h"
+
+/*
+ * Some helper macros for returning from these calls in both the kernel space and the user thread.
+ */
+
+#define DUAL_RET(thr, u_err, k_err) \
+    do { \
+        (thr)->ctx.eax = u_err; \
+        return (k_err); \
+    } while (0)
+
+#define DUAL_RET_COND(cond, thr, u_err, k_err) \
+    if (cond) { \
+        DUAL_RET(thr, u_err, k_err); \
+    }
+
+#define DUAL_RET_FOS_ERR(err, thr) \
+    if (err != FOS_SUCCESS) { \
+        (thr)->ctx.eax = (err);  \
+        return FOS_SUCCESS; \
+    }
 
 /*
  * Design NOTES:
@@ -26,13 +50,32 @@
  * Kernel State -- Can Modify -- > Processes -- Can Modify -- > Threads
  *
  * NOT THE OTHER DIRECTION!
+ *
+ * Addition (9/1/2025) NOTE that many of these functions are designed specifically to correspond
+ * to system calls. Others may simply be helpers which are used within the system call 
+ * implementations. When a system call style function (One that acts on the current thread) returns
+ * anything other than FOS_SUCCESS (in kernel space), the kernel shuts down.
+ * The helper functions need a way of differentiating between an error which can be returned
+ * to the calling userspace thread, and an error which should shut down the system.
+ * When a helper function encounters some unexpected fatal state, it should return 
+ * FOS_ABORT_SYSTEM. Then users of the function know when an error is allowed, and when an error
+ * is fatal. (See the node key functions in state_fs.c)
  */
+
+/**
+ * Kernels state endpoints which directly correspond to a syscall will have this
+ * prefix here in the header files.
+ *
+ * It doesn't do anything. It just let's you know that said call will assume there is 
+ * a current thread, and that thread is the caller.
+ */
+#define KS_SYSCALL
 
 struct _kernel_state_t {
     /**
      * Allocator to be used by the kernel!
      */
-    allocator_t *al;
+    allocator_t * const al;
 
     /**
      * The currently executing thread.
@@ -40,15 +83,13 @@ struct _kernel_state_t {
      * NOTE: The schedule forms a cyclic doubly linked list.
      *
      * During a context switch curr_thread is set to curr_thread->next.
-     *
-     * TODO: What should happen when there is no current thread??
      */
     thread_t *curr_thread;
 
     /**
      * Every process will have a globally unique ID!
      */
-    id_table_t *proc_table;
+    id_table_t * const proc_table;
 
     /**
      * When the root proecess exits, the whole kernel should exit!
@@ -64,18 +105,32 @@ struct _kernel_state_t {
     /**
      * Threads that call the sleep system call will be placed in this queue.
      */
-    timed_wait_queue_t *sleep_q;
+    timed_wait_queue_t * const sleep_q;
+
+    /*
+     * File System Stuff!!
+     */
+
+    file_sys_t * const fs;
+
+    /**
+     * This is a map of fs_node_key_t -> kernel_fs_node_state_t *
+     *
+     * EVERY fs_node_key in use by the kernel will have an entry in this map.
+     * (This includes directory node keys which are not directly accessibly by the user)
+     */
+    map_t * const nk_map;
 };
 
 /**
- * Create a kernel state with basically no details.
+ * Create a kernel state!
  *
  * Returns NULL on error.
  */
-kernel_state_t *new_kernel_state(allocator_t *al);
+kernel_state_t *new_kernel_state(allocator_t *al, file_sys_t *fs);
 
-static inline kernel_state_t *new_da_kernel_state(void) {
-    return new_kernel_state(get_default_allocator());
+static inline kernel_state_t *new_da_kernel_state(file_sys_t *fs) {
+    return new_kernel_state(get_default_allocator(), fs);
 }
 
 /**
@@ -131,7 +186,7 @@ fernos_error_t ks_tick(kernel_state_t *ks);
  *
  * All calls should return FOS_SUCCESS here in the kernel unless something is very very wrong.
  * Errors for bad arguments and lack of resources should be forwarded to the user via the
- * current threads %eac register.
+ * current threads %eax register.
  */
 
 /**
@@ -151,7 +206,7 @@ fernos_error_t ks_tick(kernel_state_t *ks);
  *
  * NOTE: u_cpid is optional and a userspace pointer.
  */
-fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid);
+KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid);
 
 /** 
  * Exit the current process. (Becoming a zombie process)
@@ -167,7 +222,7 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid);
  *
  * This function is automatically called when returning from a proceess's main thread.
  */
-fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status);
+KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status);
 
 /**
  * Reap a zombie child process! 
@@ -188,7 +243,7 @@ fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status);
  *
  * On error, FOS_MAX_PROCS is written to *u_rcpid, and PROC_ES_UNSET is written to *u_rces.
  */
-fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, 
+KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, 
         proc_exit_status_t *u_rces);
 
 /** 
@@ -207,7 +262,7 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcp
  *
  * (NOTE: that if the signal bit is already set, this call is essentially a nop)
  */
-fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid);
+KS_SYSCALL fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid);
 
 /** 
  * Set the current process's signal allow vector. Returns old signal vector value in the 
@@ -215,7 +270,7 @@ fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid);
  *
  * NOTE: If there are pending signals which the new vector does not allow, the process will exit!
  */
-fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv);
+KS_SYSCALL fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv);
 
 /**
  * Sleeps the cureent thread until any of the signals described in sv are receieved.
@@ -228,7 +283,7 @@ fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv);
  * A user error is returned if sv is 0. 
  * On user error, 32 is written to *u_sid.
  */
-fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid);
+KS_SYSCALL fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid);
 
 /**
  * Take the current thread, deschedule it, and add it it to the sleep wait queue.
@@ -238,7 +293,7 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
  * User error if there are insufficient resources. In this case the thread will 
  * remain scheduled.
  */
-fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks);
+KS_SYSCALL fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks);
 
 /**
  * Spawn new thread in the current process using entry and arg.
@@ -251,7 +306,7 @@ fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks);
  *
  * User error if entry is NULL, or if there are insufficient resources to spawn thre thread.
  */
-fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 
+KS_SYSCALL fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 
         thread_entry_t entry, void *arg);
 
 /**
@@ -268,7 +323,7 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
  *
  * Kernel error if there is no current thread, or if something goes wrong with the exit.
  */
-fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val);
+KS_SYSCALL fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val);
 
 /**
  * Have the current thread join on a given join vector.
@@ -288,7 +343,7 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val);
  * This is kinda hacky, but just remember, the userspace verion of this call essentially blocks.
  * This call here though in kernel space doesn't!
  */
-fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
+KS_SYSCALL fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
         thread_join_ret_t *u_join_ret);
 
 /**
@@ -298,7 +353,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
  *
  * Remember, u_futex is a pointer into userspace!
  */
-fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex);
+KS_SYSCALL fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex);
 
 /**
  * Deregister a futex of the current process.
@@ -310,7 +365,7 @@ fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex);
  *
  * Returns an error if there is some issue with the deregister.
  */
-fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex);
+KS_SYSCALL fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex);
 
 /**
  * Confirm the given value of the futex = exp_val. If not, returns user success immediately.
@@ -322,11 +377,11 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex);
  *
  * Returns user error if arguements are invalid.
  */
-fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val);
+KS_SYSCALL fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val);
 
 /**
  * Wake up one or all threads waiting on a futex.
  *
  * Returns user error if arguements are invalid.
  */
-fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all);
+KS_SYSCALL fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all);

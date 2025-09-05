@@ -6,52 +6,44 @@
 #include "k_startup/thread.h"
 #include "k_startup/process.h"
 #include "k_startup/page.h"
+#include "k_startup/state_fs.h"
 
 #include "k_bios_term/term.h"
+#include "s_util/str.h"
 
-/*
- * Some helper macros for returning from these calls in both the kernel space and the user thread.
- */
-
-#define DUAL_RET(thr, u_err, k_err) \
-    do { \
-        (thr)->ctx.eax = u_err; \
-        return (k_err); \
-    } while (0)
-
-#define DUAL_RET_COND(cond, thr, u_err, k_err) \
-    if (cond) { \
-        DUAL_RET(thr, u_err, k_err); \
-    }
-
-#define DUAL_RET_FOS_ERR(err, thr) \
-    if (err != FOS_SUCCESS) { \
-        (thr)->ctx.eax = (err);  \
-        return FOS_SUCCESS; \
-    }
 
 /**
  * Creates a new kernel state with basically no fleshed out details.
  */
-kernel_state_t *new_kernel_state(allocator_t *al) {
-    kernel_state_t *ks = al_malloc(al, sizeof(kernel_state_t));
-    id_table_t *pt = new_id_table(al, FOS_MAX_PROCS);
-    timed_wait_queue_t *twq = new_timed_wait_queue(al);
-
-    if (!ks || !pt || !twq) {
-        al_free(al, ks);
-        delete_id_table(pt);
-        delete_wait_queue((wait_queue_t *)twq);
+kernel_state_t *new_kernel_state(allocator_t *al, file_sys_t *fs) {
+    if (!fs) {
         return NULL;
     }
 
-    ks->al = al;
+    kernel_state_t *ks = al_malloc(al, sizeof(kernel_state_t));
+    id_table_t *pt = new_id_table(al, FOS_MAX_PROCS);
+    timed_wait_queue_t *twq = new_timed_wait_queue(al);
+    map_t *nk_map = new_chained_hash_map(al, sizeof(fs_node_key_t), sizeof(kernel_fs_node_state_t *),
+            3, fs_get_key_equator(fs), fs_get_key_hasher(fs));
+
+    if (!ks || !pt || !twq || !nk_map) {
+        al_free(al, ks);
+        delete_id_table(pt);
+        delete_wait_queue((wait_queue_t *)twq);
+        delete_map(nk_map);
+        return NULL;
+    }
+
+    *(allocator_t **)&(ks->al) = al;
     ks->curr_thread = NULL;
-    ks->proc_table = pt;
+    *(id_table_t **)&(ks->proc_table) = pt;
     ks->root_proc = NULL;
 
     ks->curr_tick = 0;
-    ks->sleep_q = twq;
+    *(timed_wait_queue_t **)&(ks->sleep_q) = twq;
+
+    *(file_sys_t **)&(ks->fs) = fs;
+    *(map_t **)&(ks->nk_map) = nk_map;
 
     return ks;
 }
@@ -179,10 +171,52 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
 
 static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid);
 
+/**
+ * Given a newly forked process, increment the reference counts of all file node keys
+ * mentioned in this new child.
+ *
+ * Remember, since this process must've been created via a fork, we can assume our `nk_map`
+ * map already has entries for every node key present in `child`.
+ */
+static fernos_error_t ks_register_fork_nks(kernel_state_t *ks, process_t *child) {
+    idtb_reset_iterator(child->file_handle_table);
+    for (file_handle_t fh = idtb_get_iter(child->file_handle_table);
+            fh != idtb_null_id(child->file_handle_table); 
+            fh = idtb_next(child->file_handle_table)) {
+        file_handle_state_t *fh_state = idtb_get(child->file_handle_table, fh);
+        if (!fh_state) {
+            return FOS_ABORT_SYSTEM;
+        }
+
+        // Here we will not use the `register_nk` helper because we know each node key must
+        // already exist in the `nk_map`. If not something bad has happened.
+        // The helper would miss this case.
+
+        fs_node_key_t nk = fh_state->nk;
+        kernel_fs_node_state_t **node_state = mp_get(ks->nk_map, &nk);
+        if (!node_state || !(*node_state)) {
+            return FOS_ABORT_SYSTEM;
+        }
+        (*node_state)->references++;
+    }
+
+    // Now, don't forget the cwd either!
+
+    kernel_fs_node_state_t **cwd_node_state = mp_get(ks->nk_map, &(child->cwd));
+    if (!cwd_node_state || !(*cwd_node_state)) {
+        return FOS_ABORT_SYSTEM;
+    }
+    (*cwd_node_state)->references++;
+
+    return FOS_SUCCESS;
+}
+
 fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
+
+    fernos_error_t err;
 
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
@@ -234,6 +268,14 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     child->main_thread->ctx.eax = FOS_SUCCESS;
     ks_schedule_thread(ks, child->main_thread);
 
+    // Now increment the handle reference counts.
+    err = ks_register_fork_nks(ks, child);
+    if (err != FOS_SUCCESS) {
+        return err; // Pretty bad if this fails.
+    }
+
+    // Finally I think we are done!
+
     if (u_cpid) {
         proc_id_t temp_pid;
 
@@ -254,6 +296,8 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     fernos_error_t err;
 
     if (ks->root_proc == proc) {
+        fs_flush(ks->fs, NULL); // Flush full file system on kernel exit.
+                                         
         term_put_fmt_s("\n[System Exited with Status 0x%X]\n", status);
         lock_up();
     }
@@ -272,7 +316,8 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
         } else if (worker->state == THREAD_STATE_WAITING) {
             wq_remove((wait_queue_t *)(worker->wq), worker);
             worker->wq = NULL;
-            worker->u_wait_ctx = NULL;
+            // Clearing the wait context isn't really necessary, but whatever.
+            mem_set(worker->wait_ctx, 0, sizeof(worker->wait_ctx)); 
             worker->state = THREAD_STATE_DETATCHED;
         }
     }
@@ -413,6 +458,12 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     if (user_err == FOS_SUCCESS) {
         // REAP!
         
+        err = ks_fs_deregister_proc_nks(ks, rproc);
+        if (err != FOS_SUCCESS) {
+            return err; // Failing to cleanup the file handles is seen as a fatal error.
+        }
+
+        // Reaping should also clean up file handles within the process being reaped!
         rcpid = rproc->pid;
         rces = rproc->exit_status;
 
@@ -474,10 +525,11 @@ static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t 
         // Clear our bit real quick.
         proc->sig_vec &= ~(1 << sid);
 
-        sig_id_t *u_sid = woken_thread->u_wait_ctx;
+        // When waiting for a signal, just the first wait context field is used.
+        sig_id_t *u_sid = (sig_id_t *)(woken_thread->wait_ctx[0]);
 
         // Detach thread.
-        woken_thread->u_wait_ctx = NULL;
+        woken_thread->wait_ctx[0] = 0;
         woken_thread->wq = NULL;
         woken_thread->state = THREAD_STATE_DETATCHED;
 
@@ -613,7 +665,7 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
     ks_deschedule_thread(ks, thr);
     thr->wq = (wait_queue_t *)(proc->signal_queue);
     thr->state = THREAD_STATE_WAITING;
-    thr->u_wait_ctx = u_sid;
+    thr->wait_ctx[0] = (uint32_t)u_sid;
 
     return FOS_SUCCESS;
 }
@@ -639,7 +691,7 @@ fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     thr->wq = (wait_queue_t *)(ks->sleep_q);
     thr->state = THREAD_STATE_WAITING;
 
-    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+    return FOS_SUCCESS;
 }
 
 fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 
@@ -729,8 +781,8 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     // write return values, then schedule it!
 
     joining_thread->wq = NULL;
-    thread_join_ret_t *u_ret_ptr = (thread_join_ret_t *)(joining_thread->u_wait_ctx);
-    joining_thread->u_wait_ctx = NULL;
+    thread_join_ret_t *u_ret_ptr = (thread_join_ret_t *)(joining_thread->wait_ctx[0]);
+    joining_thread->wait_ctx[0] = 0;
     joining_thread->state = THREAD_STATE_DETATCHED;
 
     if (u_ret_ptr) {
@@ -809,7 +861,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
 
     ks_deschedule_thread(ks, thr);
     thr->wq = (wait_queue_t *)(proc->join_queue);
-    thr->u_wait_ctx = u_join_ret; // Save where we will eventually return to!
+    thr->wait_ctx[0] = (uint32_t)u_join_ret; // Save where we will eventually return to!
     thr->state = THREAD_STATE_WAITING;
 
     return FOS_SUCCESS;
@@ -904,7 +956,7 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     ks_deschedule_thread(ks, thr);
 
     thr->wq = (wait_queue_t *)wq;
-    thr->u_wait_ctx = NULL; // No context info needed for waiting on a futex.
+    // No context info needed for waiting on a futex.
     thr->state = THREAD_STATE_WAITING;
 
     return FOS_SUCCESS;

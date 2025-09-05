@@ -14,6 +14,7 @@
 #include "k_startup/kernel.h"
 #include <stdint.h>
 #include "k_startup/state.h"
+#include "k_startup/state_fs.h"
 #include "k_sys/debug.h"
 #include "s_data/wait_queue.h"
 #include "k_startup/thread.h"
@@ -88,6 +89,10 @@ void fos_gpf_action(user_ctx_t *ctx) {
 }
 
 void fos_pf_action(user_ctx_t *ctx) {
+    // NOTE: I believe right now if you blow the kernel stack, the system just straight up
+    // crashes. So don't do that. Maybe in the future I could set up some cool double fault 
+    // handler with some special stack.
+
     if (ctx->cr3 == get_kernel_pd()) {
         out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
                 "Kernel Locking up in PF Action");
@@ -181,6 +186,54 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     case SCID_FUTEX_WAKE:
         err = ks_wake_futex(kernel, (futex_t *)arg0, (bool)arg1);
+        break;
+
+	case SCID_FS_SET_WD:
+        err = ks_fs_set_wd(kernel, (const char *)arg0, (size_t)arg1);
+        break;
+        
+	case SCID_FS_TOUCH:
+        err = ks_fs_touch(kernel, (const char *)arg0, (size_t)arg1);
+        break;
+        
+	case SCID_FS_MKDIR:
+        err = ks_fs_mkdir(kernel, (const char *)arg0, (size_t)arg1);
+        break;
+
+	case SCID_FS_REMOVE:
+        err = ks_fs_remove(kernel, (const char *)arg0, (size_t)arg1);
+        break;
+
+	case SCID_FS_GET_INFO:
+        err = ks_fs_get_info(kernel, (const char *)arg0, (size_t)arg1, (fs_node_info_t *)arg2);
+        break;
+
+	case SCID_FS_GET_CHILD_NAME:
+        err = ks_fs_get_child_name(kernel, (const char *)arg0, (size_t)arg1, (size_t)arg2, (char *)arg3);
+        break;
+
+	case SCID_FS_OPEN:
+        err = ks_fs_open(kernel, (const char *)arg0, (size_t)arg1, (file_handle_t *)arg2);
+        break;
+
+	case SCID_FS_CLOSE:
+        err = ks_fs_close(kernel, (file_handle_t)arg0);
+        break;
+
+	case SCID_FS_SEEK:
+        err = ks_fs_seek(kernel, (file_handle_t)arg0, (size_t)arg1);
+        break;
+
+	case SCID_FS_WRITE:
+        err = ks_fs_write(kernel, (file_handle_t)arg0, (const void *)arg1, (size_t)arg2, (size_t *)arg3);
+        break;
+
+	case SCID_FS_READ:
+        err = ks_fs_read(kernel, (file_handle_t)arg0, (void *)arg1, (size_t)arg2, (size_t *)arg3);
+        break;
+
+	case SCID_FS_FLUSH:
+        err = ks_fs_flush(kernel, (file_handle_t)arg0);
         break;
 
     case SCID_TERM_PUT_S:

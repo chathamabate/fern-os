@@ -45,7 +45,7 @@ static bool test_new_and_delete(void) {
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     delete_process(proc);
@@ -57,7 +57,7 @@ static bool test_new_thread(void) {
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     thread_t *thr0 = proc_new_thread(proc, fake_entry, NULL);
@@ -79,7 +79,7 @@ static bool test_many_threads(void) {
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     for (size_t i = 0; i < FOS_MAX_THREADS_PER_PROC; i++) {
@@ -120,10 +120,12 @@ static bool test_many_threads(void) {
 }
 
 static bool test_fork_process(void) {
+    fernos_error_t err;
+
     phys_addr_t pd = new_page_directory();
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     thread_t *main_thread = proc_new_thread(proc, fake_entry, NULL);
@@ -131,6 +133,15 @@ static bool test_fork_process(void) {
 
     thread_t *secondary_thread = proc_new_thread(proc, fake_entry, NULL);
     TEST_TRUE(secondary_thread != NULL);
+
+    file_handle_t fh[2];
+    err = proc_register_file_handle(proc, (fs_node_key_t)1, &(fh[0]));
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = proc_register_file_handle(proc, (fs_node_key_t)2, &(fh[1]));
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    proc_deregister_file_handle(proc, fh[0]);
 
     process_t *child_proc = new_process_fork(proc, secondary_thread, 1);
     TEST_TRUE(child_proc != NULL);
@@ -143,6 +154,18 @@ static bool test_fork_process(void) {
     TEST_TRUE(NULL != idtb_get(child_proc->thread_table, secondary_thread->tid));
 
     TEST_EQUAL_HEX(secondary_thread->tid, child_proc->main_thread->tid);
+
+    // Confirm file handles are correct.
+
+    file_handle_state_t *fh_state;
+
+    fh_state = idtb_get(proc->file_handle_table, fh[0]);
+    TEST_TRUE(fh_state == NULL);
+
+    fh_state = idtb_get(proc->file_handle_table, fh[1]);
+    TEST_TRUE(fh_state != NULL);
+
+    TEST_TRUE(fh_state->nk == (fs_node_key_t)2);
 
     delete_process(child_proc);
     delete_process(proc);
@@ -166,7 +189,7 @@ static bool test_simple_futex(void) {
     futex_t *u_futex0 = (futex_t *)M_4K;
     futex_t *u_futex1 = (futex_t *)M_4K - 1;
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     err = proc_register_futex(proc, u_futex0);
@@ -204,7 +227,7 @@ static bool test_complex_process(void) {
     futex_t *u_futex0 = (futex_t *)M_4K;
     futex_t *u_futex1 = (futex_t *)M_4K + 1;
 
-    process_t *proc = new_da_process(0, pd, NULL);
+    process_t *proc = new_da_process(0, pd, NULL, (fs_node_key_t)1);
     TEST_TRUE(proc != NULL);
 
     thread_t *threads[10];
@@ -234,8 +257,16 @@ static bool test_complex_process(void) {
 
         thr->state = THREAD_STATE_WAITING;
         thr->wq = (wait_queue_t *)wq;
-        thr->u_wait_ctx = NULL;
     }
+
+    // Now add some file handles.
+
+    file_handle_t fh;
+    err = proc_register_file_handle(proc, (fs_node_key_t)1, &fh);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    err = proc_register_file_handle(proc, (fs_node_key_t)2, &fh);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     delete_process(proc);
     TEST_SUCCEED();

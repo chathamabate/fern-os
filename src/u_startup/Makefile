@@ -4,13 +4,13 @@
 MOD_NAME 	?= u_startup
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= main.c syscall.c
+_SRCS 		?= main.c syscall.c syscall_fs.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= main.s syscall.s
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= syscall.c
+_TEST_SRCS 	?= syscall.c syscall_fs.c
 
 -include ../mod_stub.mk
 

@@ -73,6 +73,19 @@ bool is_valid_path(const char *path);
 size_t next_filename(const char *path, char *dest);
 
 /**
+ * Given a VALID path separate it's basename and directory components. 
+ *
+ * This returns FOS_BAD_ARGS if `path` does not end with a significant filename.
+ * (By "significant" I mean a filename other than "." or "..")
+ *
+ * This will also fail if the given path ends with a "/".
+ *
+ * `dir` should be a buffer with size at least FS_MAX_PATH_LEN + 1
+ * `basename` should be a buffer with size at least FS_MAX_FILENAME_LEN + 1
+ */
+fernos_error_t separate_path(const char *path, char *dir, char *basename);
+
+/**
  * A Node key is an immutable piece of data which can be used to efficiently reference a 
  * file or directory.
  * 
@@ -132,6 +145,7 @@ struct _file_sys_impl_t {
 
     void (*delete_file_sys)(file_sys_t *fs);
     fernos_error_t (*fs_new_key)(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key);
+    fs_node_key_t (*fs_new_key_copy)(file_sys_t *fs, fs_node_key_t key);
     void (*fs_delete_key)(file_sys_t *fs, fs_node_key_t key);
     equator_ft (*fs_get_key_equator)(file_sys_t *fs);
     hasher_ft (*fs_get_key_hasher)(file_sys_t *fs);
@@ -189,6 +203,21 @@ static inline fernos_error_t fs_new_key(file_sys_t *fs, fs_node_key_t cwd,
 }
 
 /**
+ * What this actually does is kinda up to the implementor.
+ *
+ * The intention is that a node key is a pointer to some dynamic object, and by calling this
+ * function some new dynamic object is created and its pointer is returned.
+ *
+ * HOWEVER, it may also be suitable for this to just to return the very key given. Maybe
+ * in the case where keys are immutable and indesctructable? Or maybe internally reference counted?
+ *
+ * If something goes wrong, this should return NULL.
+ */
+static inline fs_node_key_t fs_new_key_copy(file_sys_t *fs, fs_node_key_t key) {
+    return fs->impl->fs_new_key_copy(fs, key);
+}
+
+/**
  * Delete a key which was allocated using the `fs_new_key` function.
  *
  * This should always succeed!
@@ -223,7 +252,7 @@ static inline fernos_error_t fs_get_node_info(file_sys_t *fs, fs_node_key_t key,
 /**
  * Create a new file within a directory.
  *
- * Returns FOS_BAD_ARGS if `name` is not a valid filename.
+ * Returns FOS_BAD_ARGS if `name` is not a valid filename OR if `name` = "." or ".."
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
  * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
  * Returns FOS_NO_SPACE if there isn't enough space to create the file.
@@ -237,9 +266,20 @@ static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir,
 }
 
 /**
+ * This is a wrapper around `fs_touch`.
+ *
+ * basename(path) will attempted to be created in dir(path).
+ * FOS_BAD_ARGS is returned if there is an error separating the basename and directory components
+ * of `path`.
+ *
+ * dir(path) will be passed into `fs_new_key` to create a temporary key for calling `fs_touch`.
+ */
+fernos_error_t fs_touch_path(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key);
+
+/**
  * Create a subdiretory.
  *
- * Returns FOS_BAD_ARGS if `name` is not a valid filename.
+ * Returns FOS_BAD_ARGS if `name` is not a valid filename OR if `name` = "." or ".."
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
  * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
  * Returns FOS_NO_SPACE if there isn't enough space to create the directory.
@@ -255,6 +295,17 @@ static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir,
 }
 
 /**
+ * This is a wrapper around `fs_mkdir`.
+ *
+ * basename(path) will attempted to be created as a subdirectory dir(path).
+ * FOS_BAD_ARGS is returned if there is an error separating the basename and directory components
+ * of `path`.
+ *
+ * dir(path) will be passed into `fs_new_key` to create a temporary key for calling `fs_mkdir`.
+ */
+fernos_error_t fs_mkdir_path(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key);
+
+/**
  * Remove a file or subdirectory.
  *
  * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
@@ -267,6 +318,17 @@ static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir,
 static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, const char *name) {
     return fs->impl->fs_remove(fs, parent_dir, name);
 }
+
+/**
+ * This is a wrapper around `fs_remove`.
+ *
+ * This attempts to remove basename(path) from dir(path).
+ * FOS_BAD_ARGS is returned if there is an error separating the basename and directory components
+ * of `path`.
+ *
+ * dir(path) will be passed into `fs_new_key` to create a temporary key for calling `fs_remove`.
+ */
+fernos_error_t fs_remove_path(file_sys_t *fs, fs_node_key_t cwd, const char *path);
 
 /**
  * Retrieve the names of a child nodes within a directory.

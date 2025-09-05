@@ -5,6 +5,7 @@
 #include "k_sys/page.h"
 #include "s_mem/allocator.h"
 #include "s_util/constraints.h"
+#include "s_util/str.h"
 
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
@@ -20,7 +21,11 @@ static uint32_t fm_key_hash(const void *k) {
     return (((uint32_t)futex + 1373) * 7) + 2;
 }
 
-process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent) {
+process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd) {
+    if (!cwd) {
+        return NULL;
+    }
+
     process_t *proc = al_malloc(al, sizeof(process_t));
     list_t *children = new_linked_list(al, sizeof(process_t *));
     list_t *zchildren = new_linked_list(al, sizeof(process_t *));
@@ -29,9 +34,10 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     vector_wait_queue_t *signal_queue = new_vector_wait_queue(al);
     map_t *futexes = new_chained_hash_map(al, sizeof(futex_t *), sizeof(basic_wait_queue_t *), 
             3, fm_key_eq, fm_key_hash);
+    id_table_t *file_handle_table = new_id_table(al, FOS_MAX_FILE_HANDLES_PER_PROC);
 
     if (!proc || !children || !zchildren || !thread_table || !join_queue || 
-            !signal_queue || !futexes) {
+            !signal_queue || !futexes || !file_handle_table) {
         al_free(al, proc);
         delete_list(children);
         delete_list(zchildren);
@@ -39,6 +45,7 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
         delete_wait_queue((wait_queue_t *)signal_queue);
         delete_wait_queue((wait_queue_t *)join_queue);
         delete_map(futexes);
+        delete_id_table(file_handle_table);
 
         return NULL;
     }
@@ -63,6 +70,9 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     proc->signal_queue = signal_queue;
 
     proc->futexes = futexes;
+
+    proc->cwd = cwd;
+    proc->file_handle_table = file_handle_table;
 
     return proc;
 }
@@ -95,11 +105,13 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
         }
     }
 
-    process_t *child = new_process(proc->al, cpid, new_pd, proc);
+    process_t *child = new_process(proc->al, cpid, new_pd, proc, proc->cwd);
+
     if (!child) {
         delete_page_directory(new_pd);
         return NULL;
     }
+
 
     // From this point on, `child` owns `new_pd`.
     // Deleting `child` will delete `new_pd`.
@@ -118,6 +130,32 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
 
     idtb_set(child->thread_table, child_main_thr->tid, child_main_thr);
     child->main_thread = child_main_thr;
+
+    // Finally, let's copy over newly allocated file handle states!
+    // Kinda like with threads, each file state copied will need the same file handle
+    // in the forked process!
+
+    for (file_handle_t fh = 0; fh < FOS_MAX_FILE_HANDLES_PER_PROC; fh++) {
+        file_handle_state_t *fh_state = idtb_get(proc->file_handle_table, fh);
+        if (fh_state) {
+            err = idtb_request_id(child->file_handle_table, fh);
+            file_handle_state_t *fh_state_copy = NULL;
+
+            if (err == FOS_SUCCESS) {
+                fh_state_copy = al_malloc(proc->al, sizeof(file_handle_state_t));
+                if (fh_state_copy) {
+                    mem_cpy(fh_state_copy, fh_state, sizeof(file_handle_state_t));
+
+                    idtb_set(child->file_handle_table, fh, fh_state_copy);
+                }
+            }
+
+            if (err != FOS_SUCCESS || !fh_state_copy) {
+                delete_process(child);
+                return NULL;
+            }
+        }
+    }
 
     return child;
 }
@@ -156,6 +194,18 @@ void delete_process(process_t *proc) {
 
     // Now delete the map as a whole.
     delete_map(proc->futexes);
+
+    // Now delete all file handle states.
+
+    const file_handle_t NULL_FH = idtb_null_id(proc->file_handle_table);
+    idtb_reset_iterator(proc->file_handle_table);
+    for (file_handle_t fh = idtb_get_iter(proc->file_handle_table); fh != NULL_FH;
+            fh = idtb_next(proc->file_handle_table)) {
+        file_handle_state_t *fh_state = idtb_get(proc->file_handle_table, fh);
+        al_free(proc->al, fh_state);
+    }
+
+    delete_id_table(proc->file_handle_table);
 
     // Finally free entire process structure!
     al_free(proc->al, proc);
@@ -308,4 +358,39 @@ void proc_deregister_futex(process_t *proc, futex_t *u_futex) {
     mp_remove(proc->futexes, &u_futex);
 
     delete_wait_queue((wait_queue_t *)*bwq);
+}
+
+fernos_error_t proc_register_file_handle(process_t *proc, fs_node_key_t nk, file_handle_t *fh) {
+    if (!fh || !nk) {
+        return FOS_BAD_ARGS;
+    }
+
+    file_handle_state_t *new_state = al_malloc(proc->al, sizeof(file_handle_state_t));
+    if (!new_state) {
+        return FOS_NO_MEM;
+    }
+
+    *(fs_node_key_t *)&(new_state->nk) = nk;
+    new_state->pos = 0;
+
+    const file_handle_t NULL_FH = idtb_null_id(proc->file_handle_table);
+    file_handle_t new_fh = idtb_pop_id(proc->file_handle_table);
+    if (new_fh == NULL_FH) {
+        al_free(proc->al, new_state);
+        return FOS_EMPTY;
+    }
+
+    idtb_set(proc->file_handle_table, new_fh, new_state);
+
+    *fh = new_fh;
+
+    return FOS_SUCCESS;
+}
+
+void proc_deregister_file_handle(process_t *proc, file_handle_t fh) {
+    file_handle_state_t *fh_state = idtb_get(proc->file_handle_table, fh);
+    if (fh_state) {
+        al_free(proc->al, fh_state);
+        idtb_push_id(proc->file_handle_table, fh);
+    }
 }
