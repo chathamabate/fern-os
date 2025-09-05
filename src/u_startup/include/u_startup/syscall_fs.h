@@ -19,20 +19,24 @@
  *
  * Paths which are relative are interpreted as relative to the current working directory.
  *
+ * returns FOS_INVALID_INDEX if the given path does not exist.
  * returns FOS_STATE_MISMATCH if path doesn't point to a directory.
  */
 fernos_error_t sc_fs_set_wd(const char *path);
 
 /**
  * Create a new file.
+ *
+ * returns FOS_INVALID_INDEX if the directory component of the path does not exist.
+ * returns FOS_IN_USE if the given path already exists.
  */
 fernos_error_t sc_fs_touch(const char *path);
 
 /**
  * Create a new directory.
  *
- * This only creates the final component of the path. If there are directories within the path
- * which don't exist yet, this will fail.
+ * returns FOS_INVALID_INDEX if the directory component of the path does not exist.
+ * returns FOS_IN_USE if the given path already exists.
  */
 fernos_error_t sc_fs_mkdir(const char *path);
 
@@ -42,6 +46,7 @@ fernos_error_t sc_fs_mkdir(const char *path);
  * If this node trying to be deleted is currently refercence by any process, FOS_IN_USE
  * is returned.
  *
+ * returns FOS_INVALID_INDEX if the given path does not exist.
  * FOS_IN_USE is also returned when trying to delete a non-empty directory.
  */
 fernos_error_t sc_fs_remove(const char *path);
@@ -49,6 +54,7 @@ fernos_error_t sc_fs_remove(const char *path);
 /**
  * Attempt to get information about a file or directory.
  *
+ * returns FOS_INVALID_INDEX if the given path does not exist.
  * On success, the information is written to `*info`.
  */
 fernos_error_t sc_fs_get_info(const char *path, fs_node_info_t *info);
@@ -60,6 +66,8 @@ fernos_error_t sc_fs_get_info(const char *path, fs_node_info_t *info);
  *
  * If `index` overshoots the end of the directory, FOS_INVALID_INDEX is returned in the calling thread.
  *
+ * returns FOS_INVALID_INDEX if the given path does not exist.
+ * returns FOS_STATE_MISMATCH if given path leads to a file.
  * On success, FOS_SUCCESS is returned in the calling thread, and the child's name is written
  * to `*child_name` in userspace.
  */
@@ -72,6 +80,8 @@ fernos_error_t sc_fs_get_child_name(const char *path,
  * When a file is opened, it's corresponding handle will start at position 0. (i.e. the 
  * beginning of the file)
  *
+ * returns FOS_INVALID_INDEX if the given path does not exist.
+ * returns FOS_STATE_MISMATCH if the given path is a directory.
  * FOS_EMPTY is returned when we are out of space in the file handle table for this
  * process!
  */
@@ -147,5 +157,7 @@ fernos_error_t sc_fs_read_full(file_handle_t fh, void *dst, size_t len);
  *
  * If `fh == FOS_MAX_FILE_HANDLES_PER_PROC`, this will flush the entire kernel file
  * system. (Again, what "flushing" actually means depends on what file system is being used)
+ *
+ * returns FOS_INVALID_INDEX if `fh` cannot be found AND it isn't equal to FOS_MAX_FILE_HANDLES_PER_PROC.
  */
 fernos_error_t sc_fs_flush(file_handle_t fh);

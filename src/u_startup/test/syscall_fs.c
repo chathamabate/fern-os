@@ -483,6 +483,7 @@ static bool test_many_handles(void) {
 
 static bool test_dir_functions(void) {
     // Test functions like mkdir, set_wd, and get child name.
+    // Pretty simple test tbh.
 
     fernos_error_t err;
 
@@ -523,6 +524,92 @@ static bool test_dir_functions(void) {
     TEST_SUCCEED();
 }
 
+static bool test_bad_fs_calls(void) {
+    fernos_error_t err;
+
+    err = sc_fs_touch("a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    // Can't set working directory to a file.
+    err = sc_fs_set_wd("a.txt");
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    // Can't set working directory to a directory which doesn't exist.
+    err = sc_fs_set_wd("./fake_dir");
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    // Trying to create a file which doesn't exist.
+    err = sc_fs_touch("a.txt");
+    TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+    // This path doesn't exist.
+    err = sc_fs_touch("b/a.txt");
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    // Same outcomes expected for mkdir.
+    err = sc_fs_mkdir("a.txt");
+    TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+    err = sc_fs_mkdir("b/a.txt");
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    // Can't delete a non-empty directory.
+    err = sc_fs_remove(TEMP_TEST_DIR_PATH);
+    TEST_EQUAL_HEX(FOS_IN_USE, err);
+
+    // Can't delete a file which doesn't exist.
+    err = sc_fs_remove("c.txt");
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    // OK Now for get info/get childname
+    fs_node_info_t info;
+
+    err = sc_fs_get_info("b.txt", &info);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    char child_name[FS_MAX_FILENAME_LEN + 1];
+    err = sc_fs_get_child_name("b", 0, child_name);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = sc_fs_get_child_name("a.txt", 0, child_name);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    // Open and close.
+
+    file_handle_t fh;
+
+    err = sc_fs_open("b", &fh);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = sc_fs_open(".", &fh);
+    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+
+    // Some random invalid file handle shouldn't cause issues.
+    sc_fs_close((file_handle_t)238438);
+
+    // Seek/read/write
+    
+    err = sc_fs_seek((file_handle_t)123, 3);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    size_t txed;
+    uint32_t dummy;
+
+    err = sc_fs_write((file_handle_t)3432, &dummy, sizeof(dummy), &txed);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = sc_fs_read((file_handle_t)3432, &dummy, sizeof(dummy), &txed);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = sc_fs_flush((file_handle_t)3432);
+    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+
+    err = sc_fs_remove("a.txt");
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_fs(void) {
     BEGIN_SUITE("FS Syscalls");
     RUN_TEST(test_simple_rw);
@@ -532,5 +619,6 @@ bool test_syscall_fs(void) {
     RUN_TEST(test_early_close);
     RUN_TEST(test_many_handles);
     RUN_TEST(test_dir_functions);
+    RUN_TEST(test_bad_fs_calls);
     return END_SUITE();
 }
