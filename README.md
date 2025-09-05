@@ -1,6 +1,6 @@
 # FernOS
 
-My own 32-bit x86 operating system!
+A hobby 32-bit x86 operating system.
 
 ### Building and Running
 
@@ -10,9 +10,9 @@ To run code, edit `src/u_startup/main.c`. This file contains the main function o
 user process.
 
 To create more processes and perform other system operations, 
-see `src/u_startup/include/u_startup/syscall.h`.
+see `src/u_startup/include/u_startup/syscall.h` and `src/u_startup/include/u_startup/syscall_fs.h`.
 
-__NOTE:__ In its current condition, FernOS has no disk driver. The build process uses `qemu`'s
+__NOTE:__ In its current condition, FernOS does not boot from a disk image. The build process uses `qemu`'s
 `-kernel` flag to boot directly from an ELF file.
 
 ```bash

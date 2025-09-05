@@ -11,9 +11,6 @@
 #include "s_util/str.h"
 #include "s_util/constraints.h"
 
-// DELETE ME!
-#include "k_bios_term/term.h"
-
 fernos_error_t ks_fs_register_nk(kernel_state_t *ks, fs_node_key_t nk, fs_node_key_t *kernel_nk) {
     fernos_error_t err;
 
