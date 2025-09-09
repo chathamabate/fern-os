@@ -7,6 +7,7 @@
 #include "k_startup/process.h"
 #include "k_startup/page.h"
 #include "k_startup/state_fs.h"
+#include "k_startup/plugin.h"
 
 #include "k_bios_term/term.h"
 #include "s_util/str.h"
@@ -40,6 +41,20 @@ kernel_state_t *new_kernel_state(allocator_t *al) {
     }
 
     return ks;
+}
+
+fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *plg) {
+    if (plg_id >= FOS_MAX_PLUGINS) {
+        return FOS_INVALID_INDEX;
+    }
+
+    if (ks->plugins[plg_id]) {
+        return FOS_IN_USE;
+    }
+
+    ks->plugins[plg_id] = plg;
+
+    return FOS_SUCCESS;
 }
 
 void ks_save_ctx(kernel_state_t *ks, user_ctx_t *ctx) {
@@ -157,6 +172,14 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
         ks->curr_thread = ks->curr_thread->next_thread;
     }
 
+    // trigger plugin on tick handlers every 16th tick.
+    if (((uintptr_t)(ks->curr_thread) & 0xF) == 0) {
+        err = plgs_tick(ks->plugins, FOS_MAX_PLUGINS);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+
     return FOS_SUCCESS;
 }
 
@@ -220,6 +243,12 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     child->main_thread->ctx.eax = FOS_SUCCESS;
     ks_schedule_thread(ks, child->main_thread);
 
+    // Call the on fork handlers!
+    fernos_error_t err = plgs_on_fork_proc(ks->plugins, FOS_MAX_PLUGINS, cpid);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
     // Finally I think we are done!
 
     if (u_cpid) {
@@ -242,6 +271,11 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     fernos_error_t err;
 
     if (ks->root_proc == proc) {
+        // Delete/Cleanup all plugins!
+        for (size_t i = 0; i < FOS_MAX_PLUGINS; i++) {
+            delete_plugin(ks->plugins[i]);
+        }
+
         term_put_fmt_s("\n[System Exited with Status 0x%X]\n", status);
         lock_up();
     }
@@ -402,6 +436,11 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     if (user_err == FOS_SUCCESS) {
         // REAP!
         
+        err = plgs_on_reap_proc(ks->plugins, FOS_MAX_PLUGINS, rcpid);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
         // Reaping should also clean up file handles within the process being reaped!
         rcpid = rproc->pid;
         rces = rproc->exit_status;

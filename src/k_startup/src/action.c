@@ -20,6 +20,7 @@
 #include "k_startup/thread.h"
 #include "k_startup/gdt.h"
 #include "k_sys/intr.h"
+#include "k_startup/plugin.h"
 #include "s_util/constraints.h"
 
 
@@ -203,8 +204,41 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         break;
 
     default:
-        kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
-        err = FOS_SUCCESS;
+        if (scid_is_vanilla(id)) {
+            // If we make here, we just have a totally unknown system call!
+            kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
+            err = FOS_SUCCESS;
+            break;
+        }
+
+        // Here we have a plugin system call.
+
+        plugin_id_t plg_id;
+        plugin_cmd_id_t cmd_id;
+
+        plugin_scid_extract(id, &plg_id, &cmd_id);
+
+        // Bad plugin ID was given!
+        if (plg_id >= FOS_MAX_PLUGINS || !(kernel->plugins[plg_id])) {
+            kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
+            err = FOS_SUCCESS;
+
+            break;
+        }
+
+        // We assume that in the success case, the plugin will set the current thread's return
+        // value!
+        err = plg_cmd(kernel->plugins[plg_id], cmd_id, arg0, arg1, arg2, arg3);
+
+        // Plugin failed, but system can go on!
+        if (err != FOS_ABORT_SYSTEM && err != FOS_SUCCESS) {
+            delete_plugin(kernel->plugins[plg_id]);
+            kernel->plugins[plg_id] = NULL;
+
+            kernel->curr_thread->ctx.eax = err;
+            err = FOS_SUCCESS;
+        }
+
         break;
     }
 

@@ -132,6 +132,16 @@ static inline kernel_state_t *new_da_kernel_state(void) {
 }
 
 /**
+ * Place the given plugin pointer in the plugins table at slot `plg_id`.
+ *
+ * FOS_IN_USE is returned if the given slot is occupied.
+ * FOS_INVALID_INDEX is returned if `plg_id` overshoots the end of the table.
+ *
+ * otherwise FOS_SUCCESS is returned.
+ */
+fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *plg);
+
+/**
  * This function saves the given context into the current thread.
  *
  * Does nothing if there is no current thread.

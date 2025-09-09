@@ -111,6 +111,8 @@
  * EDITABLE
  *
  * The maximum number of plugins holdable by the kernel.
+ * 
+ * Must be <= 256.
  */
 #define FOS_MAX_PLUGINS (16U)
 

@@ -116,6 +116,8 @@ typedef uint32_t proc_exit_status_t;
 
 /*
  * Syscall IDs.
+ *
+ * FOR VANILLA SYSTEM CALLS, the MSb must always be 0!!!
  */
 
 /* Process Syscalls */
@@ -145,14 +147,36 @@ typedef uint32_t proc_exit_status_t;
 
 /*
  * Plugin Stuff
+ *
+ * NOTE: Plugin system calls are formatted slightly differently than vanilla system calls.
+ *
+ * [0:15]  plugin_cmd_id
+ * [16:23] plugin_id
+ * [24:31] 0x80
  */
 
 /**
  * The globally unique ID of a plugin.
  */
-typedef uint32_t plugin_id_t;
+typedef uint8_t plugin_id_t;
 
 /**
  * The Plugin unique ID of a command.
  */
-typedef uint32_t plugin_cmd_id_t;
+typedef uint16_t plugin_cmd_id_t;
+
+static inline uint32_t plugin_scid(plugin_id_t plg_id, plugin_cmd_id_t cmd_id) {
+    return (0x1UL << 31) | ((uint32_t)plg_id << 16) | cmd_id;
+}
+
+static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, plugin_cmd_id_t *cmd_id) {
+    *plg_id = (uint8_t)(plg_scid >> 16) & 0xFF;
+    *cmd_id = (uint16_t)plg_scid;
+}
+
+static inline bool scid_is_not_vanilla(uint32_t scid) {
+    return scid & (1UL << 31);
+}
+static inline bool scid_is_vanilla(uint32_t scid) {
+    return !(scid & (1UL << 31));
+}

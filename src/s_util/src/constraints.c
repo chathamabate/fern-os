@@ -62,6 +62,10 @@ fernos_error_t validate_constraints(void) {
         return FOS_INVALID_RANGE;
     }
 
+    if (FOS_MAX_PLUGINS > 256) {
+        return FOS_INVALID_RANGE;
+    }
+
     // If we make it here, the OS should be safe to boot!
 
     return FOS_SUCCESS;
