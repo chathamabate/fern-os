@@ -9,6 +9,7 @@
 
 #include "s_block_device/file_sys.h"
 
+#ifdef NOT_DEFINED 
 /*
  * All of these calls correspond 1:1 to the functions in `k_startup/state_fs.h`.
  * For more information on what these functions do, see the Docstrings there.
@@ -162,3 +163,5 @@ fernos_error_t sc_fs_read_full(file_handle_t fh, void *dst, size_t len);
  * returns FOS_INVALID_INDEX if `fh` cannot be found AND it isn't equal to FOS_MAX_FILE_HANDLES_PER_PROC.
  */
 fernos_error_t sc_fs_flush(file_handle_t fh);
+
+#endif

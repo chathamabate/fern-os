@@ -118,23 +118,6 @@ struct _process_t {
      * This is a map from userspace addresses (futex_t *)'s -> basic_wait_queue's
      */
     map_t *futexes;
-
-    /**
-     * The current working directory of this process.
-     *
-     * Just like the node keys found in `file_handle_table` below, this key should be managed by
-     * the kernel state, NOT HERE. (This just means, we can shallow copy around this value
-     * all we want, it is the kernel state's reponsibility to keep track)
-     *
-     * This should NEVER be NULL.
-     */
-    fs_node_key_t cwd;
-
-    /**
-     * Each entry in this table holds a pointer to a file_handle_state_t * which is 
-     * dynamically allocated by this process's allocator.
-     */
-    id_table_t *file_handle_table;
 };
 
 struct _file_handle_state_t {
@@ -165,10 +148,10 @@ struct _file_handle_state_t {
  *
  * If any allocation fails, NULL is returned.
  */
-process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd);
+process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent);
 
-static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd) {
-    return new_process(get_default_allocator(), pid, pd, parent, cwd);
+static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent) {
+    return new_process(get_default_allocator(), pid, pd, parent);
 }
 
 /**
@@ -258,18 +241,3 @@ basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex);
  * Make sure all waiting threads are dealt with before calling this function.
  */
 void proc_deregister_futex(process_t *proc, futex_t *u_futex);
-
-/**
- * Create a new file handle entry with the given node key.
- *
- * On success, the created file handle is written to `*fh`.
- */
-fernos_error_t proc_register_file_handle(process_t *proc, fs_node_key_t nk, file_handle_t *fh);
-
-/**
- * Clean up the resources of a file handle.
- */
-void proc_deregister_file_handle(process_t *proc, file_handle_t fh);
-
-
-

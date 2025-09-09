@@ -188,54 +188,6 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_wake_futex(kernel, (futex_t *)arg0, (bool)arg1);
         break;
 
-	case SCID_FS_SET_WD:
-        err = ks_fs_set_wd(kernel, (const char *)arg0, (size_t)arg1);
-        break;
-        
-	case SCID_FS_TOUCH:
-        err = ks_fs_touch(kernel, (const char *)arg0, (size_t)arg1);
-        break;
-        
-	case SCID_FS_MKDIR:
-        err = ks_fs_mkdir(kernel, (const char *)arg0, (size_t)arg1);
-        break;
-
-	case SCID_FS_REMOVE:
-        err = ks_fs_remove(kernel, (const char *)arg0, (size_t)arg1);
-        break;
-
-	case SCID_FS_GET_INFO:
-        err = ks_fs_get_info(kernel, (const char *)arg0, (size_t)arg1, (fs_node_info_t *)arg2);
-        break;
-
-	case SCID_FS_GET_CHILD_NAME:
-        err = ks_fs_get_child_name(kernel, (const char *)arg0, (size_t)arg1, (size_t)arg2, (char *)arg3);
-        break;
-
-	case SCID_FS_OPEN:
-        err = ks_fs_open(kernel, (const char *)arg0, (size_t)arg1, (file_handle_t *)arg2);
-        break;
-
-	case SCID_FS_CLOSE:
-        err = ks_fs_close(kernel, (file_handle_t)arg0);
-        break;
-
-	case SCID_FS_SEEK:
-        err = ks_fs_seek(kernel, (file_handle_t)arg0, (size_t)arg1);
-        break;
-
-	case SCID_FS_WRITE:
-        err = ks_fs_write(kernel, (file_handle_t)arg0, (const void *)arg1, (size_t)arg2, (size_t *)arg3);
-        break;
-
-	case SCID_FS_READ:
-        err = ks_fs_read(kernel, (file_handle_t)arg0, (void *)arg1, (size_t)arg2, (size_t *)arg3);
-        break;
-
-	case SCID_FS_FLUSH:
-        err = ks_fs_flush(kernel, (file_handle_t)arg0);
-        break;
-
     case SCID_TERM_PUT_S:
         if (!arg0) {
             kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;

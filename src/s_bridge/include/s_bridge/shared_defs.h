@@ -102,13 +102,6 @@ typedef struct _thread_join_ret_t {
 typedef int32_t futex_t;
 
 /**
- * In kernel space we'll use the fs_node_key_t type often. 
- *
- * However, the user will only ever be given file_handle_t values.
- */
-typedef id_t file_handle_t;
-
-/**
  * Exit statuses of a process.
  */
 typedef uint32_t proc_exit_status_t;
@@ -146,20 +139,6 @@ typedef uint32_t proc_exit_status_t;
 #define SCID_FUTEX_DEREGISTER (0x201U)
 #define SCID_FUTEX_WAIT       (0x202U)
 #define SCID_FUTEX_WAKE       (0x203U)
-
-/* FS Syscalls */
-#define SCID_FS_SET_WD          (0x300U)
-#define SCID_FS_TOUCH           (0x301U)
-#define SCID_FS_MKDIR           (0x302U)
-#define SCID_FS_REMOVE          (0x303U)
-#define SCID_FS_GET_INFO        (0x304U)
-#define SCID_FS_GET_CHILD_NAME  (0x305U)
-#define SCID_FS_OPEN            (0x306U)
-#define SCID_FS_CLOSE           (0x307U)
-#define SCID_FS_SEEK            (0x308U)
-#define SCID_FS_WRITE           (0x309U)
-#define SCID_FS_READ            (0x30AU)
-#define SCID_FS_FLUSH           (0x30BU)
 
 /* Term Puts syscalls */
 #define SCID_TERM_PUT_S (0x400U)

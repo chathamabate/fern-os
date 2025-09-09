@@ -77,6 +77,9 @@
 typedef struct _thread_t thread_t;
 typedef struct _process_t process_t;
 typedef struct _kernel_state_t kernel_state_t;
+
+typedef struct _plugin_t plugin_t;
+
 typedef struct _kernel_fs_node_state_t kernel_fs_node_state_t;
 
 

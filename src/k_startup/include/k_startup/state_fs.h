@@ -5,6 +5,7 @@
 #include "k_startup/state.h"
 #include "s_data/wait_queue.h"
 
+#ifdef NOT_DEFINED
 /*
  * Kernel State mechanisms the relate to the file system.
  *
@@ -227,3 +228,4 @@ KS_SYSCALL fernos_error_t ks_fs_read(kernel_state_t *ks, file_handle_t fh, void 
  * system. (Again, what "flushing" actually means depends on what file system is being used)
  */
 KS_SYSCALL fernos_error_t ks_fs_flush(kernel_state_t *ks, file_handle_t fh);
+#endif

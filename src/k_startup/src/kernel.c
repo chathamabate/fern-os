@@ -116,26 +116,10 @@ static void init_kernel_state(void) {
         }
     }
 
-    kernel = new_da_kernel_state(fs);
+    kernel = new_da_kernel_state();
     if (!kernel) {
         setup_fatal("Failed to allocate kernel state");
     }
-
-    // Let's register the root key into the kenrel state.
-    fs_node_key_t root_key;
-    err = fs_new_key(fs, NULL, "/", &root_key);
-    if (err != FOS_SUCCESS) {
-        setup_fatal("Failed to get root dir key");
-    }
-
-    fs_node_key_t kernel_root_key;
-    err = ks_fs_register_nk(kernel, root_key, &kernel_root_key);
-    if (err != FOS_SUCCESS) {
-        setup_fatal("Failed to register root key!");
-    }
-
-    fs_delete_key(kernel->fs, root_key);
-
     // Let's setup our first user process.
 
     proc_id_t pid = idtb_pop_id(kernel->proc_table);
@@ -148,7 +132,7 @@ static void init_kernel_state(void) {
         setup_fatal("Failed to get user PD");
     }
 
-    process_t *proc = new_da_process(pid, user_pd, NULL, kernel_root_key);
+    process_t *proc = new_da_process(pid, user_pd, NULL);
     if (!proc) {
         setup_fatal("Failed to allocate first process");
     }

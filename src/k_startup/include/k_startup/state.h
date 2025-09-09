@@ -106,20 +106,6 @@ struct _kernel_state_t {
      * Threads that call the sleep system call will be placed in this queue.
      */
     timed_wait_queue_t * const sleep_q;
-
-    /*
-     * File System Stuff!!
-     */
-
-    file_sys_t * const fs;
-
-    /**
-     * This is a map of fs_node_key_t -> kernel_fs_node_state_t *
-     *
-     * EVERY fs_node_key in use by the kernel will have an entry in this map.
-     * (This includes directory node keys which are not directly accessibly by the user)
-     */
-    map_t * const nk_map;
 };
 
 /**
@@ -127,10 +113,10 @@ struct _kernel_state_t {
  *
  * Returns NULL on error.
  */
-kernel_state_t *new_kernel_state(allocator_t *al, file_sys_t *fs);
+kernel_state_t *new_kernel_state(allocator_t *al);
 
-static inline kernel_state_t *new_da_kernel_state(file_sys_t *fs) {
-    return new_kernel_state(get_default_allocator(), fs);
+static inline kernel_state_t *new_da_kernel_state(void) {
+    return new_kernel_state(get_default_allocator());
 }
 
 /**
