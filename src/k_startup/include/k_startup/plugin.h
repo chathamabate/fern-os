@@ -17,7 +17,7 @@
 
 typedef struct _plugin_impl_t {
     // REQUIRED
-    fernos_error_t (*delete_plugin)(plugin_t *plg);
+    void (*delete_plugin)(plugin_t *plg);
 
     /*
      * Below calls are ALL OPTIONAL!
@@ -48,15 +48,11 @@ static inline void init_base_plugin(plugin_t *plg, const plugin_impl_t *impl, ke
  * Cleanup this plugin's resources.
  *
  * When the system exits, this will be called on all plugins within the kernel.
- *
- * If a plugin is deleted early, the error code is interpreted. Anything other than FOS_SUCCESS
- * locks up the system.
  */
-static inline fernos_error_t delete_plugin(plugin_t *plg) {
+static inline void delete_plugin(plugin_t *plg) {
     if (plg) {
-        return plg->impl->delete_plugin(plg);
+        plg->impl->delete_plugin(plg);
     }
-    return FOS_SUCCESS;
 }
 
 /**
@@ -81,6 +77,14 @@ static inline fernos_error_t plg_tick(plugin_t *plg) {
     }
     return FOS_SUCCESS;
 }
+
+/**
+ * Execute `plg_tick` on an array of plugins. 
+ *
+ * Returns FOS_ABORT_SYSTEM if any plugins return FOS_ABORT_SYSTEM during their tick handler.
+ * Otherwise, returns FOS_SUCCESS.
+ */
+fernos_error_t plgs_tick(plugin_t **plgs, size_t plgs_len);
 
 /**
  * The kernel state's current thread requested a custom command be executed by this plugin!
@@ -108,6 +112,14 @@ fernos_error_t plg_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
 }
 
 /**
+ * Execute `plg_on_fork` on an array of plugins. 
+ *
+ * Returns FOS_ABORT_SYSTEM if any plugins return FOS_ABORT_SYSTEM during their on fork handler.
+ * Otherwise, returns FOS_SUCCESS.
+ */
+fernos_error_t plgs_on_fork_proc(plugin_t **plgs, size_t plgs_len, proc_id_t cpid);
+
+/**
  * When a process is reaped by the kernel state current thread, this will be called
  * BEFORE any core process resources are cleaned up.
  *
@@ -122,4 +134,12 @@ fernos_error_t plg_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
     }
     return FOS_SUCCESS;
 }
+
+/**
+ * Execute `plg_on_reap` on an array of plugins. 
+ *
+ * Returns FOS_ABORT_SYSTEM if any plugins return FOS_ABORT_SYSTEM during their on reap handler.
+ * Otherwise, returns FOS_SUCCESS.
+ */
+fernos_error_t plgs_on_reap_proc(plugin_t **plgs, size_t plgs_len, proc_id_t rpid);
 
