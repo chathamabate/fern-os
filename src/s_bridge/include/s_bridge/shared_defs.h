@@ -142,3 +142,17 @@ typedef uint32_t proc_exit_status_t;
 
 /* Term Puts syscalls */
 #define SCID_TERM_PUT_S (0x400U)
+
+/*
+ * Plugin Stuff
+ */
+
+/**
+ * The globally unique ID of a plugin.
+ */
+typedef uint32_t plugin_id_t;
+
+/**
+ * The Plugin unique ID of a command.
+ */
+typedef uint32_t plugin_cmd_id_t;

@@ -110,9 +110,9 @@
 /**
  * EDITABLE
  *
- * This is the number of entries in a process's file handle ID table.
+ * The maximum number of plugins holdable by the kernel.
  */
-#define FOS_MAX_FILE_HANDLES_PER_PROC (32U)
+#define FOS_MAX_PLUGINS (16U)
 
 /**
  * Confirm values listed above make sense.

@@ -35,6 +35,10 @@ kernel_state_t *new_kernel_state(allocator_t *al) {
     ks->curr_tick = 0;
     *(timed_wait_queue_t **)&(ks->sleep_q) = twq;
 
+    for (size_t i = 0; i < FOS_MAX_PLUGINS; i++) {
+        ks->plugins[i] = NULL; // No plugins yet!
+    }
+
     return ks;
 }
 

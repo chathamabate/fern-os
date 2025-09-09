@@ -3,6 +3,7 @@
 
 #include "s_util/err.h"
 #include "k_startup/state.h"
+#include "s_bridge/shared_defs.h"
 
 /*
  *  A plugin will be a way of extending the kernel without needing to manually
@@ -23,7 +24,7 @@ typedef struct _plugin_impl_t {
      */
 
     fernos_error_t (*plg_tick)(plugin_t *plg);
-    fernos_error_t (*plg_cmd)(plugin_t *plg, uint32_t cmd_id, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+    fernos_error_t (*plg_cmd)(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg1, uint32_t arg2, uint32_t arg3);
     fernos_error_t (*plg_on_fork_proc)(plugin_t *plg, proc_id_t cpid);
     fernos_error_t (*plg_on_reap_proc)(plugin_t *plg, proc_id_t rpid);
 } plugin_impl_t;
@@ -86,7 +87,7 @@ static inline fernos_error_t plg_tick(plugin_t *plg) {
  *
  * `cmd_id` will likely by `arg0` from the syscall handler. Hence why the other args start at "1".
  */
-fernos_error_t plg_cmd(plugin_t *plg, uint32_t cmd_id, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     if (plg->impl->plg_cmd) {
         return plg->impl->plg_cmd(plg, cmd_id, arg1, arg2, arg3);
     }

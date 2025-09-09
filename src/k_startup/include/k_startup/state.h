@@ -6,6 +6,7 @@
 #include "k_sys/page.h"
 #include "s_mem/allocator.h"
 #include "k_startup/fwd_defs.h"
+#include "s_util/constraints.h"
 #include "s_bridge/ctx.h"
 #include "s_data/map.h"
 
@@ -59,7 +60,7 @@
  * to the calling userspace thread, and an error which should shut down the system.
  * When a helper function encounters some unexpected fatal state, it should return 
  * FOS_ABORT_SYSTEM. Then users of the function know when an error is allowed, and when an error
- * is fatal. (See the node key functions in state_fs.c)
+ * is fatal.
  */
 
 /**
@@ -106,6 +107,17 @@ struct _kernel_state_t {
      * Threads that call the sleep system call will be placed in this queue.
      */
     timed_wait_queue_t * const sleep_q;
+
+    /**
+     * For now, plugins are meant to be registered before kicking of the user processes.
+     *
+     * The number cell occupied by the plugin pointer will be the ID used from userspace to
+     * invoke the plugins custom commands.
+     *
+     * Unused cells will have value NULL. When a plugin errors out and must be deleted, it's cell
+     * is also set to NULL after cleanup.
+     */
+    plugin_t *plugins[FOS_MAX_PLUGINS];
 };
 
 /**

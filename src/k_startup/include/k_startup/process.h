@@ -120,27 +120,6 @@ struct _process_t {
     map_t *futexes;
 };
 
-struct _file_handle_state_t {
-    /**
-     * The node key used by this handle.
-     *
-     * NOTE VERY IMPORTANT!! This node key is NOT owned by this structure.
-     * On deletion, node keys are not deleted! We'd expect the kernel to keep track of all
-     * allocated node keys some where else. (This works because all node keys are really just 
-     * pointers)
-     */
-    const fs_node_key_t nk;
-
-    /**
-     * The position in the file to read/write to next.
-     *
-     * NOTE: The user will only be able to write/read from bytes [0, SIZE_MAX - 1].
-     * When pos = SIZE_MAX, this signifies the file is at it's maximum size and cannot
-     * be written to or read from any more without calling seek.
-     */
-    size_t pos;
-};
-
 /**
  * This allocates a process with basically no information.
  *
