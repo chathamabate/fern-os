@@ -180,3 +180,26 @@ static inline bool scid_is_not_vanilla(uint32_t scid) {
 static inline bool scid_is_vanilla(uint32_t scid) {
     return !(scid & (1UL << 31));
 }
+
+/*
+ * File System Plugin.
+ */
+
+#define PLG_FILE_SYS_ID (0U)
+
+// File System Plugin Commands
+
+#define PLG_FILE_SYS_CID_SET_WD         (0U)
+#define PLG_FILE_SYS_CID_TOUCH          (1U)
+#define PLG_FILE_SYS_CID_MKDIR          (2U)
+#define PLG_FILE_SYS_CID_REMOVE         (3U)
+#define PLG_FILE_SYS_CID_GET_INFO       (4U)
+#define PLG_FILE_SYS_CID_GET_CHILD_NAME (5U)
+#define PLG_FILE_SYS_CID_OPEN           (6U)
+#define PLG_FILE_SYS_CID_CLOSE          (7U)
+#define PLG_FILE_SYS_CID_SEEK           (8U)
+#define PLG_FILE_SYS_CID_WRITE          (9U)
+#define PLG_FILE_SYS_CID_READ           (10U)
+#define PLG_FILE_SYS_CID_FLUSH          (11U)
+
+
