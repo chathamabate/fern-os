@@ -273,6 +273,7 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     if (ks->root_proc == proc) {
         // Delete/Cleanup all plugins!
         for (size_t i = 0; i < FOS_MAX_PLUGINS; i++) {
+            // Don't worry about errors for now.
             delete_plugin(ks->plugins[i]);
         }
 

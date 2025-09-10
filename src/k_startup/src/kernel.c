@@ -39,7 +39,8 @@
 #include "s_block_device/file_sys.h"
 #include "s_block_device/test/file_sys_helpers.h"
 #include "s_block_device/test/fat32_file_sys.h"
-#include "k_startup/state_fs.h"
+#include "k_startup/plugin.h"
+#include "k_startup/plugin_fs.h"
 
 #include "k_sys/ata.h"
 
@@ -89,33 +90,6 @@ static void now(fernos_datetime_t *dt) {
 kernel_state_t *kernel = NULL;
 
 static void init_kernel_state(void) {
-    fernos_error_t err;
-
-    block_device_t *bd = new_da_cached_block_device(
-        get_ata_block_device(),
-        512, 0, true
-    );
-
-    if (!bd) {
-        setup_fatal("Failed to created block device");
-    }
-
-    file_sys_t *fs;
-    err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
-    if (err != FOS_SUCCESS) {
-        err = init_fat32(bd, 0, bd_num_sectors(bd), 8);
-        if (err != FOS_SUCCESS) {
-            setup_fatal("Failed to init FAT32");
-        }
-
-        // NOTE: This is a temporary fix and VERY VERY dangerous. 
-        // It basically resets the entire disk if it fails to parse it the first time.
-        err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
-        if (err != FOS_SUCCESS) {
-            setup_fatal("Failed to create FAT32 FS");
-        }
-    }
-
     kernel = new_da_kernel_state();
     if (!kernel) {
         setup_fatal("Failed to allocate kernel state");
@@ -154,6 +128,42 @@ static void init_kernel_state(void) {
     ks_schedule_thread(kernel, thr);
 }
 
+static void init_kernel_plugins(void) {
+    fernos_error_t err;
+
+    block_device_t *bd = new_da_cached_block_device(
+        get_ata_block_device(),
+        512, 0, true
+    );
+
+    if (!bd) {
+        setup_fatal("Failed to created block device");
+    }
+
+    file_sys_t *fs;
+    err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
+    if (err != FOS_SUCCESS) {
+        err = init_fat32(bd, 0, bd_num_sectors(bd), 8);
+        if (err != FOS_SUCCESS) {
+            setup_fatal("Failed to init FAT32");
+        }
+
+        // NOTE: This is a temporary fix and VERY VERY dangerous. 
+        // It basically resets the entire disk if it fails to parse it the first time.
+        err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
+        if (err != FOS_SUCCESS) {
+            setup_fatal("Failed to create FAT32 FS");
+        }
+    }
+
+    plugin_t *plg_fs = new_plugin_fs(kernel, fs);
+    if (!plg_fs) {
+        setup_fatal("Failed to create File System plugin");
+    }
+
+    try_setup_step(ks_set_plugin(kernel, PLG_FILE_SYS_ID, (plugin_t *)plg_fs), "Failed to set FS Plugin in the kernel");
+}
+
 void start_kernel(void) {
     init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 
@@ -172,6 +182,7 @@ void start_kernel(void) {
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
 
     init_kernel_state();
+    init_kernel_plugins();
 
     // Now put in the real actions.
     set_gpf_action(fos_gpf_action);

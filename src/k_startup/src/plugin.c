@@ -14,8 +14,12 @@ fernos_error_t plgs_tick(plugin_t **plgs, size_t plgs_len) {
             }
 
             if (err != FOS_SUCCESS) {
-                delete_plugin(plg);        
+                fernos_error_t del_err = delete_plugin(plg);        
                 plgs[i] = NULL;
+
+                if (del_err != FOS_SUCCESS) {
+                    return FOS_ABORT_SYSTEM;
+                }
             }
         }
     }
@@ -36,8 +40,12 @@ fernos_error_t plgs_on_fork_proc(plugin_t **plgs, size_t plgs_len, proc_id_t cpi
             }
 
             if (err != FOS_SUCCESS) {
-                delete_plugin(plg);        
+                fernos_error_t del_err = delete_plugin(plg);        
                 plgs[i] = NULL;
+
+                if (del_err != FOS_SUCCESS) {
+                    return FOS_ABORT_SYSTEM;
+                }
             }
         }
     }
@@ -58,8 +66,12 @@ fernos_error_t plgs_on_reap_proc(plugin_t **plgs, size_t plgs_len, proc_id_t rpi
             }
 
             if (err != FOS_SUCCESS) {
-                delete_plugin(plg);        
+                fernos_error_t del_err = delete_plugin(plg);        
                 plgs[i] = NULL;
+
+                if (del_err != FOS_SUCCESS) {
+                    return FOS_ABORT_SYSTEM;
+                }
             }
         }
     }

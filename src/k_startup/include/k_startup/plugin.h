@@ -17,7 +17,7 @@
 
 typedef struct _plugin_impl_t {
     // REQUIRED
-    void (*delete_plugin)(plugin_t *plg);
+    fernos_error_t (*delete_plugin)(plugin_t *plg);
 
     /*
      * Below calls are ALL OPTIONAL!
@@ -47,12 +47,16 @@ static inline void init_base_plugin(plugin_t *plg, const plugin_impl_t *impl, ke
 /**
  * Cleanup this plugin's resources.
  *
+ * If a plugin must be deleted while the system is running, this is called. If this returns
+ * anything other than success, the system is aborted!
+ *
  * When the system exits, this will be called on all plugins within the kernel.
  */
-static inline void delete_plugin(plugin_t *plg) {
+static inline fernos_error_t delete_plugin(plugin_t *plg) {
     if (plg) {
-        plg->impl->delete_plugin(plg);
+        return plg->impl->delete_plugin(plg);
     }
+    return FOS_SUCCESS;
 }
 
 /**
@@ -94,7 +98,7 @@ fernos_error_t plgs_tick(plugin_t **plgs, size_t plgs_len);
  *
  * `cmd_id` will likely by `arg0` from the syscall handler. Hence why the other args start at "1".
  */
-fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+static inline fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     if (plg->impl->plg_cmd) {
         return plg->impl->plg_cmd(plg, cmd_id, arg0, arg1, arg2, arg3);
     }
@@ -107,7 +111,7 @@ fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uin
  *
  * `cpid` is the process ID of the child process which was created.
  */
-fernos_error_t plg_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
+static inline fernos_error_t plg_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
     if (plg->impl->plg_on_fork_proc) {
         return plg->impl->plg_on_fork_proc(plg, cpid);
     }
@@ -134,7 +138,7 @@ fernos_error_t plgs_on_fork_proc(plugin_t **plgs, size_t plgs_len, proc_id_t cpi
  *
  * `rpid` is the process ID of the process to be reaped.
  */
-fernos_error_t plg_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
+static inline fernos_error_t plg_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
     if (plg->impl->plg_on_reap_proc) {
         return plg->impl->plg_on_reap_proc(plg, rpid);
     }

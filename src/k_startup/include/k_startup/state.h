@@ -156,6 +156,8 @@ void ks_save_ctx(kernel_state_t *ks, user_ctx_t *ctx);
  *
  * Undefined behavoir will occur if the same thread appears twice
  * in the schedule! So make sure this never happens!
+ *
+ * NOTE: this only modifies the current thread field iff there is no current thread!
  */
 void ks_schedule_thread(kernel_state_t *ks, thread_t *thr);
 

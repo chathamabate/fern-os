@@ -72,7 +72,7 @@ typedef struct _plugin_fs_t {
      *
      * If there is no process with proc_id `pid`, then handle_tables[pid] will be NULL.
      */
-    id_table_t *handle_tables[FOS_MAX_PROCS];
+    plugin_fs_proc_state_t *handle_tables[FOS_MAX_PROCS];
 } plugin_fs_t;
 
 /**
