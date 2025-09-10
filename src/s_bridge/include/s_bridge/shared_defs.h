@@ -202,4 +202,10 @@ static inline bool scid_is_vanilla(uint32_t scid) {
 #define PLG_FILE_SYS_CID_READ           (10U)
 #define PLG_FILE_SYS_CID_FLUSH          (11U)
 
+typedef id_t plugin_fs_handle_t;
 
+/**
+ * The maximum number of file handles allowed to be open at once by
+ * a single process.
+ */
+#define PLG_FS_MAX_HANDLES_PER_PROC (32U)
