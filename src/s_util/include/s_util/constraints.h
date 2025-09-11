@@ -110,6 +110,14 @@
 /**
  * EDITABLE
  *
+ * Maximum number of handles which can be open by one process at once.
+ * MUST be <= 256.
+ */
+#define FOS_MAX_HANDLES_PER_PROC (32U)
+
+/**
+ * EDITABLE
+ *
  * The maximum number of plugins holdable by the kernel.
  * 
  * Must be <= 256.

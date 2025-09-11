@@ -116,9 +116,27 @@ typedef uint32_t proc_exit_status_t;
 
 /*
  * Syscall IDs.
- *
- * FOR VANILLA SYSTEM CALLS, the MSb must always be 0!!!
  */
+
+typedef uint32_t syscall_id_t;
+
+/**
+ * The final two bits of a syscall are the "attrs".
+ * If "attrs" = 0b00, Vanilla Syscall
+ * If "attrs" = 0b01, Handle Syscall
+ * If "attrs" = 0b10, Plugin Syscall 
+ */
+#define SYSCALL_ATTRS_MASK (3UL << 30) 
+
+/*
+ * Vanilla Syscalls
+ */
+
+#define VANILLA_CMD_PREFIX (0x0UL)
+
+static inline bool scid_is_vanilla(syscall_id_t scid) {
+    return (scid & SYSCALL_ATTRS_MASK) == VANILLA_CMD_PREFIX;
+}
 
 /* Process Syscalls */
 #define SCID_PROC_FORK (0x80U)
@@ -146,9 +164,43 @@ typedef uint32_t proc_exit_status_t;
 #define SCID_TERM_PUT_S (0x400U)
 
 /*
- * Plugin Stuff
+ * Handle Syscalls
+ */
+
+/*
+ * The handle system call id will take the following form:
  *
- * NOTE: Plugin system calls are formatted slightly differently than vanilla system calls.
+ * [0:15]  handle_cmd_id
+ * [16:23] handle
+ * [24:31] 0x40
+ */
+
+
+typedef uint8_t handle_t;
+typedef uint16_t handle_cmd_id_t;
+
+#define HANDLE_CMD_PREFIX (1UL << 30)
+
+static inline bool scid_is_handle_cmd(syscall_id_t scid) {
+    return (scid & SYSCALL_ATTRS_MASK) == HANDLE_CMD_PREFIX;
+}
+
+#define HCID_HANDLE_WRITE (0x0U)
+#define HCID_HANDLE_READ  (0x1U)
+
+// All other handle commands are custom/implementation specific!
+
+static inline uint32_t handle_cmd_scid(handle_t h, handle_cmd_id_t cmd) {
+    return HANDLE_CMD_PREFIX | ((uint32_t)h << 16) | cmd;
+}
+
+static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cmd_id_t *hcid) {
+    *h = (handle_t)(scid >> 16);
+    *hcid = (handle_cmd_id_t)scid;
+}
+
+/*
+ * Plugin Command syntax
  *
  * [0:15]  plugin_cmd_id
  * [16:23] plugin_id
@@ -165,8 +217,19 @@ typedef uint8_t plugin_id_t;
  */
 typedef uint16_t plugin_cmd_id_t;
 
-static inline uint32_t plugin_scid(plugin_id_t plg_id, plugin_cmd_id_t cmd_id) {
-    return (0x1UL << 31) | ((uint32_t)plg_id << 16) | cmd_id;
+#define PLUGIN_CMD_PREFIX (2UL << 30)
+
+static inline bool scid_is_plugin_cmd(syscall_id_t scid) {
+    return (scid & SYSCALL_ATTRS_MASK) == PLUGIN_CMD_PREFIX;
+}
+
+/*
+ * NOTE: Unlike Handles, Plugins have NO default command IDs, plugins have no special builtin
+ * endpoints.
+ */
+
+static inline uint32_t plugin_cmd_scid(plugin_id_t plg_id, plugin_cmd_id_t cmd_id) {
+    return PLUGIN_CMD_PREFIX | ((uint32_t)plg_id << 16) | cmd_id;
 }
 
 static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, plugin_cmd_id_t *cmd_id) {
@@ -174,12 +237,9 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
     *cmd_id = (uint16_t)plg_scid;
 }
 
-static inline bool scid_is_not_vanilla(uint32_t scid) {
-    return scid & (1UL << 31);
-}
-static inline bool scid_is_vanilla(uint32_t scid) {
-    return !(scid & (1UL << 31));
-}
+
+
+// TODO: Likely delete everything below!!!!
 
 /*
  * File System Plugin.
