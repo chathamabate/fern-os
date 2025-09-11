@@ -89,3 +89,23 @@ void sc_term_put_fmt_s(const char *fmt, ...) {
 
     sc_term_put_s(buf);
 }
+
+fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    return (fernos_error_t)trigger_syscall(handle_cmd_scid(h, cmd_id), arg0, arg1, arg2, arg3);
+}
+
+fernos_error_t sc_close(handle_t h) {
+    return sc_handle_cmd(h, HCID_CLOSE, 0, 0, 0, 0);
+}
+
+fernos_error_t sc_write(handle_t h, const void *src, size_t len, size_t *written) {
+    return sc_handle_cmd(h, HCID_WRITE, (uint32_t)src, len, (uint32_t)written, 0);
+}
+
+fernos_error_t sc_read(handle_t h, void *dest, size_t len, size_t *readden) {
+    return sc_handle_cmd(h, HCID_READ, (uint32_t)dest, len, (uint32_t)readden, 0);
+}
+
+fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    return (fernos_error_t)trigger_syscall(plugin_cmd_scid(plg_id, cmd_id), arg0, arg1, arg2, arg3);
+}

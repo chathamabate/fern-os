@@ -176,7 +176,14 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
  */
 
 
-typedef uint8_t handle_t;
+/**
+ * NOTE: a handle will only ever require 8 bits, but because handles will be placed
+ * in ID Tables, the "NULL" handle will be 256 (which does not fit in 8 bits)
+ *
+ * So, the handle type will actually be 32 bits to make iteration/operations 
+ * less error prone.
+ */
+typedef id_t handle_t;
 typedef uint16_t handle_cmd_id_t;
 
 #define HANDLE_CMD_PREFIX (1UL << 30)
@@ -192,11 +199,11 @@ static inline bool scid_is_handle_cmd(syscall_id_t scid) {
 // All other handle commands are custom/implementation specific!
 
 static inline uint32_t handle_cmd_scid(handle_t h, handle_cmd_id_t cmd) {
-    return HANDLE_CMD_PREFIX | ((uint32_t)h << 16) | cmd;
+    return HANDLE_CMD_PREFIX | ((h & 0xFF) << 16) | cmd;
 }
 
 static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cmd_id_t *hcid) {
-    *h = (handle_t)(scid >> 16);
+    *h = (scid >> 16) & 0xFF;
     *hcid = (handle_cmd_id_t)scid;
 }
 
@@ -210,8 +217,10 @@ static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cm
 
 /**
  * The globally unique ID of a plugin.
+ *
+ * This is 32 bits for the same reason `handle_t` is 32 bits.
  */
-typedef uint8_t plugin_id_t;
+typedef uint32_t plugin_id_t;
 
 /**
  * The Plugin unique ID of a command.
@@ -230,11 +239,11 @@ static inline bool scid_is_plugin_cmd(syscall_id_t scid) {
  */
 
 static inline uint32_t plugin_cmd_scid(plugin_id_t plg_id, plugin_cmd_id_t cmd_id) {
-    return PLUGIN_CMD_PREFIX | ((uint32_t)plg_id << 16) | cmd_id;
+    return PLUGIN_CMD_PREFIX | ((plg_id & 0xFF) << 16) | cmd_id;
 }
 
 static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, plugin_cmd_id_t *cmd_id) {
-    *plg_id = (uint8_t)(plg_scid >> 16) & 0xFF;
+    *plg_id = (plg_scid >> 16) & 0xFF;
     *cmd_id = (uint16_t)plg_scid;
 }
 

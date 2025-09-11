@@ -114,6 +114,7 @@ static inline fernos_error_t hs_close(handle_state_t *hs) {
 
     idtb_push_id(hs->proc->handle_table, h);
 
+    hs->ks->curr_thread->ctx.eax = FOS_SUCCESS;
     return FOS_SUCCESS;
 }
 
@@ -170,3 +171,11 @@ static inline fernos_error_t hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uin
  * After this call, `handle_table` will hold no handles.
  */
 void clear_handle_table(id_table_t *handle_table);
+
+/**
+ * Attempt to copy over handles from a parent process to a newly forked child.
+ *
+ * On error, all handles which were created will be deleted before returning.
+ * (Except when FOS_ABORT_SYSTEM is returned)
+ */
+fernos_error_t copy_handle_table(process_t *parent, process_t *child);

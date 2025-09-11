@@ -225,3 +225,18 @@ fernos_error_t sc_futex_wake(futex_t *futex, bool all);
 void sc_term_put_s(const char *s);
 void sc_term_put_fmt_s(const char *fmt, ...);
 
+/*
+ * Now for handle and plugin system calls!
+ *
+ * Remember, the behavior of these calls depends on what type of handle is opened and
+ * what type of plugin is being referenced!
+ */
+
+fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+fernos_error_t sc_close(handle_t h);
+fernos_error_t sc_write(handle_t h, const void *src, size_t len, size_t *written);
+fernos_error_t sc_read(handle_t h, void *dest, size_t len, size_t *readden);
+
+fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+
+

@@ -203,7 +203,7 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
 
     proc_id_t cpid = NULL_PID;
     process_t *child = NULL;
-    fernos_error_t push_err = FOS_UNKNWON_ERROR;
+    fernos_error_t err = FOS_UNKNWON_ERROR;
 
     // Request child process ID.
     cpid = idtb_pop_id(ks->proc_table);
@@ -213,16 +213,23 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
         child = new_process_fork(proc, thr, cpid);
     }
 
-    // TODO Handle copying needs to be done!
+    // Attempt to copy handles from parent to child.
+    if (child) {
+        err = copy_handle_table(proc, child);
+        if (err == FOS_ABORT_SYSTEM) {
+            return FOS_ABORT_SYSTEM;
+        }
+    }
 
     // Push child on to children list.
-    if (child) {
-        push_err = l_push_back(proc->children, &child);
+    if (err == FOS_SUCCESS) {
+        err = l_push_back(proc->children, &child);
     }
 
     // Now check for errors.
-    if (cpid == NULL_PID || !child || push_err != FOS_SUCCESS) {
+    if (cpid == NULL_PID || !child || err != FOS_SUCCESS) {
         idtb_push_id(ks->proc_table, cpid);
+        clear_handle_table(child->handle_table);
         delete_process(child);
 
         if (u_cpid) {
@@ -247,7 +254,7 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     ks_schedule_thread(ks, child->main_thread);
 
     // Call the on fork handlers!
-    fernos_error_t err = plgs_on_fork_proc(ks->plugins, FOS_MAX_PLUGINS, cpid);
+    err = plgs_on_fork_proc(ks->plugins, FOS_MAX_PLUGINS, cpid);
     if (err != FOS_SUCCESS) {
         return err;
     }
@@ -440,14 +447,14 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     if (user_err == FOS_SUCCESS) {
         // REAP!
         
-        // First off, let's delete all handles!
-        clear_handle_table(rproc->handle_table);
-
-        // Next call the on reap handler!
+        // First off, call the on reap handler!
         err = plgs_on_reap_proc(ks->plugins, FOS_MAX_PLUGINS, rcpid);
         if (err != FOS_SUCCESS) {
             return err;
         }
+
+        // then, delete all handles!
+        clear_handle_table(rproc->handle_table);
 
         // Reaping should also clean up file handles within the process being reaped!
         rcpid = rproc->pid;

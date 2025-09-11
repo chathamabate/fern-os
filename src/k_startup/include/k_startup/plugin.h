@@ -96,7 +96,8 @@ fernos_error_t plgs_tick(plugin_t **plgs, size_t plgs_len);
 /**
  * The kernel state's current thread requested a custom command be executed by this plugin!
  *
- * `cmd_id` will likely by `arg0` from the syscall handler. Hence why the other args start at "1".
+ * Remember, unlike handle commands these can return an error which tells the kernel to 
+ * delete the plugin and move on. FOS_ABORT_SYSTEM though will always lock up the system!
  */
 static inline fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     if (plg->impl->plg_cmd) {
@@ -131,7 +132,7 @@ fernos_error_t plgs_on_fork_proc(plugin_t **plgs, size_t plgs_len, proc_id_t cpi
 
 /**
  * When a process is reaped by the kernel state current thread, this will be called
- * BEFORE any core process resources are cleaned up.
+ * BEFORE any core process resources are cleaned up. (This includes handles)
  *
  * NOTE: as it is gauranteed a process exits before it can be reaped, all of `rpid`'s threads 
  * will be detatched on entry to this handler.

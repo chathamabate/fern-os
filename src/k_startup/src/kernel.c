@@ -156,12 +156,13 @@ static void init_kernel_plugins(void) {
         }
     }
 
+    /*
     plugin_t *plg_fs = new_plugin_fs(kernel, fs);
     if (!plg_fs) {
         setup_fatal("Failed to create File System plugin");
     }
-
     try_setup_step(ks_set_plugin(kernel, PLG_FILE_SYS_ID, (plugin_t *)plg_fs), "Failed to set FS Plugin in the kernel");
+    */
 }
 
 void start_kernel(void) {

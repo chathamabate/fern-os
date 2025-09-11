@@ -22,6 +22,8 @@
 #include "k_sys/intr.h"
 #include "k_startup/plugin.h"
 #include "s_util/constraints.h"
+#include "k_startup/handle.h"
+#include "k_startup/plugin.h"
 
 
 /**
@@ -204,38 +206,58 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         break;
 
     default:
-        if (scid_is_vanilla(id)) {
-            // If we make here, we just have a totally unknown system call!
+        // Using a more nested structure here...
+        if (scid_is_handle_cmd(id)) {
+            handle_t h;
+            handle_cmd_id_t h_cmd;
+
+            handle_scid_extract(id, &h, &h_cmd);
+
+            id_table_t *handle_table = kernel->curr_thread->proc->handle_table;
+            handle_state_t *hs = idtb_get(handle_table, h);
+
+            if (!hs) {
+                kernel->curr_thread->ctx.eax = FOS_INVALID_INDEX;
+                err = FOS_SUCCESS;
+            } else { // handle found!
+                switch(h_cmd) {
+                case HCID_CLOSE:
+                    err = hs_close(hs);
+                    break;
+
+                case HCID_WRITE:
+                    err = hs_write(hs, (const void *)arg0, (size_t)arg1, (size_t *)arg2);
+                    break;
+
+                case HCID_READ:
+                    err = hs_read(hs, (void *)arg0, (size_t)arg1, (size_t *)arg2);
+                    break;
+
+                default: // Otherwise, default to custom command!
+                    err = hs_cmd(hs, h_cmd, arg0, arg1, arg2, arg3);
+                    break;
+                }
+            }
+        } else if (scid_is_plugin_cmd(id)) {
+            plugin_id_t plg_id;
+            plugin_cmd_id_t plg_cmd_id;
+
+            plugin_scid_extract(id, &plg_id, &plg_cmd_id);
+
+            plugin_t *plg = kernel->plugins[plg_id];
+
+            if (!plg) {
+                kernel->curr_thread->ctx.eax = FOS_INVALID_INDEX;
+                err = FOS_SUCCESS;
+            } else {
+                err = plg_cmd(plg, plg_cmd_id, arg0, arg1, arg2, arg3);
+                if (err != FOS_SUCCESS && err != FOS_ABORT_SYSTEM) {
+                    kernel->plugins[plg_id] = NULL;
+                    err = delete_plugin(plg);
+                }
+            }
+        } else {
             kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
-            err = FOS_SUCCESS;
-            break;
-        }
-
-        // Here we have a plugin system call.
-
-        plugin_id_t plg_id;
-        plugin_cmd_id_t cmd_id;
-
-        plugin_scid_extract(id, &plg_id, &cmd_id);
-
-        // Bad plugin ID was given!
-        if (plg_id >= FOS_MAX_PLUGINS || !(kernel->plugins[plg_id])) {
-            kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
-            err = FOS_SUCCESS;
-
-            break;
-        }
-
-        // We assume that in the success case, the plugin will set the current thread's return
-        // value!
-        err = plg_cmd(kernel->plugins[plg_id], cmd_id, arg0, arg1, arg2, arg3);
-
-        // Plugin failed, but system can go on!
-        if (err != FOS_ABORT_SYSTEM && err != FOS_SUCCESS) {
-            delete_plugin(kernel->plugins[plg_id]);
-            kernel->plugins[plg_id] = NULL;
-
-            kernel->curr_thread->ctx.eax = err;
             err = FOS_SUCCESS;
         }
 
