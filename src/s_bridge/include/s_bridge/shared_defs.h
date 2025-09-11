@@ -185,8 +185,9 @@ static inline bool scid_is_handle_cmd(syscall_id_t scid) {
     return (scid & SYSCALL_ATTRS_MASK) == HANDLE_CMD_PREFIX;
 }
 
-#define HCID_HANDLE_WRITE (0x0U)
-#define HCID_HANDLE_READ  (0x1U)
+#define HCID_CLOSE (0x0U)
+#define HCID_WRITE (0x1U)
+#define HCID_READ  (0x2U)
 
 // All other handle commands are custom/implementation specific!
 

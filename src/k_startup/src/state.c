@@ -6,6 +6,7 @@
 #include "k_startup/thread.h"
 #include "k_startup/process.h"
 #include "k_startup/page.h"
+#include "k_startup/handle.h"
 #include "k_startup/state_fs.h"
 #include "k_startup/plugin.h"
 
@@ -211,6 +212,8 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     if (cpid != NULL_PID) {
         child = new_process_fork(proc, thr, cpid);
     }
+
+    // TODO Handle copying needs to be done!
 
     // Push child on to children list.
     if (child) {
@@ -437,6 +440,10 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     if (user_err == FOS_SUCCESS) {
         // REAP!
         
+        // First off, let's delete all handles!
+        clear_handle_table(rproc->handle_table);
+
+        // Next call the on reap handler!
         err = plgs_on_reap_proc(ks->plugins, FOS_MAX_PLUGINS, rcpid);
         if (err != FOS_SUCCESS) {
             return err;

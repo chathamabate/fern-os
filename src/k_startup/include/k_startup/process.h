@@ -118,6 +118,14 @@ struct _process_t {
      * This is a map from userspace addresses (futex_t *)'s -> basic_wait_queue's
      */
     map_t *futexes;
+
+    /**
+     * This ID table will always have a maximum capcity <= 256. This way ID's can always fit
+     * in 8 bits. (i.e. the size of a handle_t)
+     *
+     * This maps handle_t's -> handle_state_t *'s.
+     */
+    id_table_t *handle_table;
 };
 
 /**
@@ -145,8 +153,9 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  * NOTE: futexes and join queue are NOT copied! And The given process `proc` is not edited in
  * ANY WAY! It is your responsibility to register this new process as a child in the old.
  *
- * NOTE: All file handles ARE copied. HOWEVER remember that more work will likely need to be
- * done by the kernel to handle these new file handle copies.
+ * VERY IMPORTANT: Handle states in the Handle table ARE NOT COPIED! This is because copying a
+ * handle state can result in a catastrophic error. So, it's the kernel's responsibility to copy over
+ * handles one layer up.
  *
  * Returns NULL if there are insufficient resources or if the arguments are bad.
  *
@@ -160,6 +169,9 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid);
  * This frees all memory used by proc! (Including the full page directory)
  *
  * This does NOT remove threads from wait queues or schedules!!!!!!!
+ *
+ * VERY IMPORTANT: UNLIKE with `new_process_fork` this DOES NOT delete handle states.
+ * This must be dealt with one layer above this one!
  *
  * Before you delete a process, ALWAYS detach all threads!
  * This call DOES NOT check if threads are detatched or not before deleting.

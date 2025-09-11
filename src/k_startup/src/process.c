@@ -30,9 +30,10 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     vector_wait_queue_t *signal_queue = new_vector_wait_queue(al);
     map_t *futexes = new_chained_hash_map(al, sizeof(futex_t *), sizeof(basic_wait_queue_t *), 
             3, fm_key_eq, fm_key_hash);
+    id_table_t *handle_table = new_id_table(al, FOS_MAX_HANDLES_PER_PROC);
 
     if (!proc || !children || !zchildren || !thread_table || !join_queue || 
-            !signal_queue || !futexes) {
+            !signal_queue || !futexes || !handle_table) {
         al_free(al, proc);
         delete_list(children);
         delete_list(zchildren);
@@ -40,6 +41,7 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
         delete_wait_queue((wait_queue_t *)signal_queue);
         delete_wait_queue((wait_queue_t *)join_queue);
         delete_map(futexes);
+        delete_id_table(handle_table);
 
         return NULL;
     }
@@ -64,6 +66,7 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     proc->signal_queue = signal_queue;
 
     proc->futexes = futexes;
+    proc->handle_table = handle_table;
 
     return proc;
 }

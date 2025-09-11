@@ -3,6 +3,7 @@
 
 #include "s_util/err.h"
 #include "k_startup/fwd_defs.h"
+#include "k_startup/process.h"
 #include "k_startup/state.h"
 #include "k_startup/thread.h"
 
@@ -23,7 +24,7 @@ typedef struct _handle_state_impl_t {
     // OPTIONAL!
     fernos_error_t (*hs_write)(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
     fernos_error_t (*hs_read)(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden);
-    fernos_error_t (*hs_cmd)(handle_state_t *hs, handle_cmd_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+    fernos_error_t (*hs_cmd)(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 } handle_state_impl_t;
 
 struct _handle_state_t {
@@ -63,6 +64,9 @@ static inline void init_base_handle(handle_state_t *hs, const handle_state_impl_
  * after this function is called.
  *
  * Just create a new valid handle state and write it to `*out`.
+ *
+ * If this call returns FOS_ABORT_SYSTEM, the system will lock up.
+ * If this call return some other non-success error code, the fork will fail.
  */
 static inline fernos_error_t copy_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
     return hs->impl->copy_handle_state(hs, proc, out);
@@ -70,6 +74,10 @@ static inline fernos_error_t copy_handle_state(handle_state_t *hs, process_t *pr
 
 /**
  * Delete this handle state!
+ *
+ * NOTE: In the case of a process being reaped, this is called BEFORE all other process resources
+ * are deleted. i.e. the `proc` field in `hs` will still be valid when this call executes.
+ * (This will be called before the plugin on reap handlers)
  *
  * This can do other things, like flush buffers as needed.
  * Like with copy, this should NEVER modify the parent process's handle table, that will be
@@ -95,6 +103,19 @@ static inline void delete_handle_state(handle_state_t *hs) {
  * If any of these return an error here in kernel space, the system shoud lock up!
  * Normal errors are expected to be returned to userspace.
  */
+
+/**
+ * This will map to the close handle system call. It simply calls the destructor and returns
+ * the given handle ID to the handle table.
+ */
+static inline fernos_error_t hs_close(handle_state_t *hs) {
+    handle_t h = hs->handle;
+    delete_handle_state(hs);
+
+    idtb_push_id(hs->proc->handle_table, h);
+
+    return FOS_SUCCESS;
+}
 
 /**
  * Write data to the handle.
@@ -131,11 +152,21 @@ static inline fernos_error_t hs_read(handle_state_t *hs, void *u_dst, size_t len
 /**
  * Perform a custom command on the handle.
  */
-static inline fernos_error_t hs_cmd(handle_state_t *hs, handle_cmd_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+static inline fernos_error_t hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     if (hs->impl->hs_cmd) {
         return hs->impl->hs_cmd(hs, cmd, arg0, arg1, arg2, arg3);
     }
     DUAL_RET(hs->ks->curr_thread, FOS_NOT_IMPLEMENTED, FOS_SUCCESS);
 }
 
+/*
+ * Some helpers.
+ */
 
+/**
+ * This is a helper function which calls `delete` on every handle within a handle table,
+ * AND returns all handle id's to the table.
+ *
+ * After this call, `handle_table` will hold no handles.
+ */
+void clear_handle_table(id_table_t *handle_table);
