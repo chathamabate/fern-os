@@ -99,6 +99,58 @@ static fernos_error_t delete_plugin_fs(plugin_t *plg) {
     return FOS_ABORT_SYSTEM; 
 }
 
+static fernos_error_t plg_fs_register_nk(plugin_fs_t *plg_fs, fs_node_key_t nk, fs_node_key_t *kernel_nk) {
+    fernos_error_t err;
+
+    if (!nk) {
+        return FOS_BAD_ARGS;
+    }
+
+    const fs_node_key_t *k_nk_p;
+    plugin_fs_nk_map_entry_t **nk_entry_p;
+
+    // First see if the given node key already exists in the node key map.
+    err = mp_get_kvp(plg_fs->nk_map, &nk, (const void **)&k_nk_p, (void **)&nk_entry_p);
+    if (err == FOS_SUCCESS) {
+        fs_node_key_t k_nk = *k_nk_p; 
+        plugin_fs_nk_map_entry_t *nk_entry = *nk_entry_p;
+        if (!k_nk || !nk_entry) {
+            return FOS_STATE_MISMATCH;
+        }
+
+        nk_entry->references++;
+
+        if (kernel_nk) {
+            *kernel_nk = k_nk;
+        }
+
+        return FOS_SUCCESS;
+    }
+
+    // Otherwise, we must create an entry in the map for a copy of nk.
+
+    fs_node_key_t nk_copy = fs_new_key_copy(plg_fs->fs, nk);
+    plugin_fs_nk_map_entry_t *entry = al_malloc(plg_fs->super.ks->al, sizeof(plugin_fs_nk_map_entry_t));
+    basic_wait_queue_t *bwq = new_basic_wait_queue(plg_fs->super.ks->al);
+
+    if (nk_copy && entry && bwq) {
+        entry->references = 1;
+        entry->bwq = bwq;
+        err = mp_put(plg_fs->nk_map, &nk_copy, &entry);
+    }
+
+    if (!nk_copy || !entry || !bwq || err != FOS_SUCCESS) {
+        mp_remove(plg_fs->nk_map, &nk_copy);
+        delete_wait_queue((wait_queue_t *)bwq);
+        al_free(plg_fs->super.ks->al, entry);
+        fs_delete_key(plg_fs->fs, nk_copy);
+
+        return FOS_UNKNWON_ERROR;
+    }
+
+    return FOS_SUCCESS;
+}
+
 static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk) {
     fernos_error_t err;
 
@@ -188,8 +240,13 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
         return FOS_STATE_MISMATCH; // should never happen.
     }
 
+    fs_node_key_t nk;
+    fs_node_info_t info;
+
     switch (cmd) {
-    case PLG_FS_PCID_SET_WD:
+    case PLG_FS_PCID_SET_WD: {
+
+     }
 
     case PLG_FS_PCID_TOUCH:
         err = fs_touch_path(plg_fs->fs, cwd, path, NULL);
