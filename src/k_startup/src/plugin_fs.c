@@ -6,13 +6,14 @@
 #include "k_bios_term/term.h"
 
 static fernos_error_t delete_plugin_fs(plugin_t *plg);
+static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 static fernos_error_t plg_fs_on_fork_proc(plugin_t *plg, proc_id_t cpid);
 static fernos_error_t plg_fs_on_reap_proc(plugin_t *plg, proc_id_t rpid);
 
 static const plugin_impl_t PLUGIN_FS_IMPL = {
     .delete_plugin = delete_plugin_fs,
 
-    .plg_cmd = NULL,
+    .plg_cmd = plg_fs_cmd,
     .plg_tick = NULL,
     .plg_on_fork_proc = plg_fs_on_fork_proc,
     .plg_on_reap_proc = plg_fs_on_reap_proc
@@ -27,38 +28,53 @@ plugin_t *new_plugin_fs(kernel_state_t *ks, file_sys_t *fs) {
     map_t *nk_map = new_chained_hash_map(ks->al, sizeof(fs_node_key_t), 
             sizeof(plugin_fs_nk_map_entry_t *), 3, 
             fs_get_key_equator(fs), fs_get_key_hasher(fs));
+    
+    fs_node_key_t root_nk;
+    fernos_error_t new_key_err = fs_new_key(fs, NULL, "/", &root_nk);
 
+    plugin_fs_nk_map_entry_t *nk_entry = al_malloc(ks->al, sizeof(plugin_fs_nk_map_entry_t));
+    basic_wait_queue_t *bwq = new_basic_wait_queue(ks->al);
 
-    // Create an empty handle for every process in the process table.
-    bool table_allocs_failed = false;
-    if (plg_fs) {
-        for (proc_id_t i = 0; i < FOS_MAX_PROCS; i++) {
-            if (!table_allocs_failed && idtb_get(ks->proc_table, i)) {
-                id_table_t *handle_table = new_id_table(ks->al, PLG_FS_MAX_HANDLES_PER_PROC);
-                if (!handle_table) {
-                    table_allocs_failed = true;
-                }
-                plg_fs->handle_tables[i] = handle_table;
-            } else {
-                plg_fs->handle_tables[i] = NULL; 
-            }
-        }
+    fernos_error_t put_err = FOS_UNKNWON_ERROR;
+    if (nk_map && new_key_err == FOS_SUCCESS) {
+        put_err = mp_put(nk_map, (void *)&root_nk, (const void *)&nk_entry);
     }
 
-    if (!plg_fs || !nk_map || table_allocs_failed) {
-        if (plg_fs) {
-            for (proc_id_t i = 0; i < FOS_MAX_PROCS; i++) {
-                delete_id_table(plg_fs->handle_tables[i]);
-            }
-        }
-
+    if (!plg_fs || !nk_map || new_key_err != FOS_SUCCESS || !nk_entry || !bwq || put_err != FOS_SUCCESS) {
+        delete_wait_queue((wait_queue_t *)bwq);
+        al_free(ks->al, nk_entry);
+        fs_delete_key(fs, root_nk);
         delete_map(nk_map);
         al_free(ks->al, plg_fs);
 
         return NULL;
     }
 
-    // SUCCESS! Write all fields!
+    // Ok should be smooth sailing from here.
+
+    size_t root_nk_references = 0;
+    for (size_t i = 0; i < FOS_MAX_PROCS; i++) {
+        if (idtb_get(ks->proc_table, i)) {
+            root_nk_references++;
+            plg_fs->cwds[i] = root_nk;
+        } else {
+            plg_fs->cwds[i] = NULL;
+        }
+    }
+
+    if (root_nk_references > 0) {
+        nk_entry->bwq = bwq;
+        nk_entry->references = root_nk_references;
+    } else {
+        // This is the case where there were no processes at all. (Which should never happen)
+        // We'll still succeed though.
+
+        mp_remove(nk_map, &root_nk);
+
+        delete_wait_queue((wait_queue_t *)bwq);
+        al_free(ks->al, nk_entry);
+        fs_delete_key(fs, root_nk);
+    }
 
     init_base_plugin((plugin_t *)plg_fs, &PLUGIN_FS_IMPL, ks);
     *(file_sys_t **)&(plg_fs->fs) = fs;
@@ -68,82 +84,17 @@ plugin_t *new_plugin_fs(kernel_state_t *ks, file_sys_t *fs) {
 }
 
 static fernos_error_t delete_plugin_fs(plugin_t *plg) {
-    fernos_error_t err;
-
     plugin_fs_t *plg_fs = (plugin_fs_t *)plg;
 
-    // This needs to wake up all threads which are waiting!
-    // Ok, how do I iterate over a map again?
-    
-    mp_reset_iter(plg_fs->nk_map);
+    // It's kinda difficult to clean up this plugin as it will have open handles
+    // littered throughout userspace.
+    //
+    // So this destructory doesn't really delete anything, it just flushes the file system
+    // and tells the OS to shutdown.
 
-    const fs_node_key_t *nk_p;
-    plugin_fs_nk_map_entry_t **nk_entry_p;
+    fs_flush(plg_fs->fs, NULL);
 
-    for (err = mp_get_iter(plg_fs->nk_map, (const void **)&nk_p, (void **)&nk_entry_p);
-        err == FOS_SUCCESS; err = mp_next_iter(plg_fs->nk_map, (const void **)&nk_p, (void **)&nk_entry_p)) {
-
-        fs_node_key_t nk = *nk_p;
-        plugin_fs_nk_map_entry_t *nk_entry = *nk_entry_p;
-         
-        // Ok, schedule all threads which are woken up. On error, whatever.
-        fernos_error_t tmp_err = bwq_notify_all(nk_entry->bwq);
-        if (tmp_err != FOS_SUCCESS) {
-            return tmp_err;
-        }
-
-        thread_t *woken_thread;
-        while ((tmp_err = bwq_pop(nk_entry->bwq, (void **)&woken_thread)) == FOS_SUCCESS) {
-            woken_thread->state = THREAD_STATE_DETATCHED; 
-            mem_set(&(woken_thread->wait_ctx), 0, sizeof(woken_thread->wait_ctx));
-            woken_thread->ctx.eax = FOS_STATE_MISMATCH; 
-
-            ks_schedule_thread(plg_fs->super.ks, woken_thread);
-        }
-
-        if (tmp_err != FOS_EMPTY) {
-            return tmp_err;
-        }
-
-        // Finally delete the wait queue, nk_entry, and nk.
-        delete_wait_queue((wait_queue_t *)(nk_entry->bwq));
-        al_free(plg_fs->super.ks->al, nk_entry);
-        fs_delete_key(plg_fs->fs, nk);
-    }
-
-    // Now we can delete the nk map entirely!
-    
-    delete_map(plg_fs->nk_map);
-    
-    // Now just delete all handle tables!
-    
-    for (proc_id_t i = 0; i < FOS_MAX_PROCS; i++) {
-        id_table_t *handle_table = plg_fs->handle_tables[i];
-        if (handle_table) {
-            idtb_reset_iterator(handle_table);
-            const plugin_fs_handle_t NULL_HANDLE = idtb_null_id(handle_table);
-
-            for (plugin_fs_handle_t j = idtb_get_iter(handle_table); j != NULL_HANDLE; 
-                    j = idtb_next(handle_table)) {
-                plugin_fs_handle_state_t *handle_state = idtb_get(handle_table, j);
-                al_free(plg_fs->super.ks->al, handle_state);
-            }
-
-            delete_id_table(handle_table);
-        }
-    }
-
-    err = fs_flush(plg_fs->fs, NULL);
-    if (err != FOS_SUCCESS) {
-        return err;
-    }
-
-    delete_file_sys(plg_fs->fs);
-
-    // Finally, we can delete the whole plugin obj!
-    al_free(plg_fs->super.ks->al, plg_fs);
-
-    return FOS_SUCCESS;
+    return FOS_ABORT_SYSTEM; 
 }
 
 static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk) {
@@ -195,8 +146,36 @@ static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk
     return FOS_SUCCESS;
 }
 
+static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    // Remeber, this is called by a thread.
+    DUAL_RET(plg->ks->curr_thread, FOS_SUCCESS, FOS_SUCCESS);
+}
+
 static fernos_error_t plg_fs_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
-    // Slowly getting there ugh!
+    plugin_fs_t *plg_fs = (plugin_fs_t *)plg;
+
+    process_t *child = idtb_get(plg_fs->super.ks->proc_table, cpid);
+    if (!child) {
+        return FOS_STATE_MISMATCH; // Something is very wrong if this is the case.
+    }
+
+    process_t *parent = child->parent;
+    fs_node_key_t parent_cwd = plg_fs->cwds[parent->pid];
+    if (!parent_cwd) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    // Copy over parent CWD
+    plg_fs->cwds[child->pid] = parent_cwd;
+
+    plugin_fs_nk_map_entry_t *nk_entry = mp_get(plg_fs->nk_map, &parent_cwd);
+    if (!nk_entry) {
+        return FOS_STATE_MISMATCH;
+    }
+    nk_entry->references++;
+
+    // The copy function inside each handle should handle increasing the reference count for
+    // each copied handle. We only need to deal with copying over the cwd here.
 
     return FOS_SUCCESS;    
 }
@@ -204,24 +183,15 @@ static fernos_error_t plg_fs_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
 static fernos_error_t plg_fs_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
     plugin_fs_t *plg_fs = (plugin_fs_t *)plg;
 
-    id_table_t *handle_table = plg_fs->handle_tables[rpid];
-    if (!handle_table) {
+    fs_node_key_t cwd = plg_fs->cwds[rpid];
+    if (!cwd) {
         return FOS_STATE_MISMATCH;
     }
 
-    const plugin_fs_handle_t NULL_HANDLE = idtb_null_id(handle_table);
-
-    // Delete all handle states from the handle table!
-
-    idtb_reset_iterator(handle_table);
-    for (plugin_fs_handle_t fh = idtb_get_iter(handle_table); fh != NULL_HANDLE; 
-            fh = idtb_next(handle_table)) {
-        plugin_fs_handle_state_t *fh_state = idtb_get(handle_table, fh);
-        plg_fs_deregister_nk(plg_fs, fh_state->nk);
-        al_free(plg_fs->super.ks->al, fh_state);
+    fernos_error_t err = plg_fs_deregister_nk(plg_fs, cwd);
+    if (err != FOS_SUCCESS) {
+        return err;
     }
-
-    // Finally delete the handle table itself!
 
     return FOS_SUCCESS;
 }

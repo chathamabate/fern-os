@@ -170,7 +170,7 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid);
  *
  * This does NOT remove threads from wait queues or schedules!!!!!!!
  *
- * VERY IMPORTANT: UNLIKE with `new_process_fork` this DOES NOT delete handle states.
+ * VERY IMPORTANT: This DOES NOT delete handle states.
  * This must be dealt with one layer above this one!
  *
  * Before you delete a process, ALWAYS detach all threads!

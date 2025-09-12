@@ -163,6 +163,8 @@ void delete_process(process_t *proc) {
     // Now delete the map as a whole.
     delete_map(proc->futexes);
 
+    delete_id_table(proc->handle_table);
+
     // Finally free entire process structure!
     al_free(proc->al, proc);
 }
