@@ -103,7 +103,8 @@ static fernos_error_t plg_fs_register_nk(plugin_fs_t *plg_fs, fs_node_key_t nk, 
     fernos_error_t err;
 
     if (!nk) {
-        return FOS_BAD_ARGS;
+        return FOS_ABORT_SYSTEM; // If we use this incorrectly within the kernel, we wrote something
+                                 // very wrong.
     }
 
     const fs_node_key_t *k_nk_p;
@@ -115,7 +116,7 @@ static fernos_error_t plg_fs_register_nk(plugin_fs_t *plg_fs, fs_node_key_t nk, 
         fs_node_key_t k_nk = *k_nk_p; 
         plugin_fs_nk_map_entry_t *nk_entry = *nk_entry_p;
         if (!k_nk || !nk_entry) {
-            return FOS_STATE_MISMATCH;
+            return FOS_ABORT_SYSTEM;
         }
 
         nk_entry->references++;
@@ -155,7 +156,7 @@ static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk
     fernos_error_t err;
 
     if (!nk) {
-        return FOS_BAD_ARGS;
+        return FOS_ABORT_SYSTEM;
     }
 
     const fs_node_key_t *kernel_nk_p;
@@ -163,19 +164,19 @@ static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk
 
     err = mp_get_kvp(plg_fs->nk_map, &nk, (const void **)&kernel_nk_p, (void **)&nk_entry_p);
     if (err != FOS_SUCCESS) {
-        return FOS_STATE_MISMATCH;
+        return FOS_ABORT_SYSTEM;
     }
 
     fs_node_key_t kernel_nk = *kernel_nk_p; 
     plugin_fs_nk_map_entry_t *nk_entry = *nk_entry_p;
     if (!kernel_nk || !nk_entry) {
-        return FOS_STATE_MISMATCH;
+        return FOS_ABORT_SYSTEM;
     }
 
     if (--(nk_entry->references) == 0) {
         err = bwq_notify_all(nk_entry->bwq);
         if (err != FOS_SUCCESS) {
-            return err;
+            return FOS_ABORT_SYSTEM;
         }
 
         thread_t *woken_thread;
@@ -188,7 +189,7 @@ static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk
         }
 
         if (err != FOS_EMPTY) {
-            return err;
+            return FOS_ABORT_SYSTEM;
         }
 
         delete_wait_queue((wait_queue_t *)nk_entry->bwq);
@@ -204,7 +205,10 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
     fernos_error_t err;
 
     plugin_fs_t *plg_fs = (plugin_fs_t *)plg;
+
     thread_t *thr = plg->ks->curr_thread;
+    process_t *proc = thr->proc;
+    proc_id_t pid = proc->pid;
 
     // Is this command even valid though?
     if (cmd >= PLG_FILE_SYS_NUM_CMDS) {
@@ -215,63 +219,222 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
     // So, we'll just deal with it first than move on.
     if (cmd == PLG_FS_PCID_FLUSH) {
         err = fs_flush(plg_fs->fs, NULL);
-        if (err == FOS_ABORT_SYSTEM) {
-            return FOS_ABORT_SYSTEM;
-        }
-
         DUAL_RET(thr, err, FOS_SUCCESS);
     }
 
+    const char *u_path = (const char *)arg0;
     size_t path_len = arg1;
 
-    if (path_len > FS_MAX_PATH_LEN) {
+    if (!u_path || path_len > FS_MAX_PATH_LEN || path_len == 0) {
         DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
     }
 
     char path[FS_MAX_PATH_LEN + 1];
-    err = mem_cpy_from_user(path, thr->proc->pd, (const void *)arg0, arg1, NULL);
+    err = mem_cpy_from_user(path, thr->proc->pd, u_path, path_len, NULL);
     if (err != FOS_SUCCESS) {
         DUAL_RET(thr, err, FOS_SUCCESS); // some sort of copy error?
     }
     path[path_len] = '\0';
 
-    fs_node_key_t cwd = plg_fs->cwds[thr->proc->pid];
+    fs_node_key_t cwd = plg_fs->cwds[pid];
     if (!cwd) {
         return FOS_STATE_MISMATCH; // should never happen.
     }
 
-    fs_node_key_t nk;
-    fs_node_info_t info;
+    // Just gonna do this all in place cause why not.
 
     switch (cmd) {
+
+    /*
+     * Set new working directory.
+     *
+     * returns FOS_INVALID_INDEX if the given path does not exist.
+     * returns FOS_STATE_MISMATCH if path doesn't point to a directory.
+     */
     case PLG_FS_PCID_SET_WD: {
+        fs_node_key_t nk;
+        err =  fs_new_key(plg_fs->fs, cwd, path, &nk);
+        DUAL_RET_FOS_ERR(err, thr);
 
-     }
+        fs_node_info_t info;
+        err = fs_get_node_info(plg_fs->fs, nk, &info);
+        if (err != FOS_SUCCESS || !(info.is_dir)) {
+            fs_delete_key(plg_fs->fs, nk);
+            err = info.is_dir ? FOS_STATE_MISMATCH : err;
+            DUAL_RET(thr, err, FOS_SUCCESS);
+        }
 
-    case PLG_FS_PCID_TOUCH:
-        err = fs_touch_path(plg_fs->fs, cwd, path, NULL);
-        break;
-
-    case PLG_FS_PCID_MKDIR:
-        err = fs_mkdir_path(plg_fs->fs, cwd, path, NULL);
-        break;
-
-    case PLG_FS_PCID_REMOVE:
-        err = fs_remove_path(plg_fs->fs, cwd, path);
-        break;
-
-    case PLG_FS_PCID_GET_INFO: {
+        // For now, if there is any error, dergistering/registering, we'll just abort.
         
+        // Deregister old CWD
+        err = plg_fs_deregister_nk(plg_fs, plg_fs->cwds[pid]);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        plg_fs->cwds[pid] = NULL;
+
+        fs_node_key_t kernel_nk;
+        err = plg_fs_register_nk(plg_fs, nk, &kernel_nk);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
+        fs_delete_key(plg_fs->fs, nk);
+        plg_fs->cwds[pid] = kernel_nk;
+
+        DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
     }
 
-    case PLG_FS_PCID_GET_CHILD_NAME:
-    case PLG_FS_PCID_OPEN:
-
-    default: // This will never run.
-        err = FOS_STATE_MISMATCH;
-        break;
+    /*
+     * Create a new file.
+     *
+     * returns FOS_INVALID_INDEX if the directory component of the path does not exist.
+     * returns FOS_IN_USE if the given path already exists.
+     */
+    case PLG_FS_PCID_TOUCH: {
+        err = fs_touch_path(plg_fs->fs, cwd, path, NULL);
+        DUAL_RET(thr, err, FOS_SUCCESS);
     }
-    DUAL_RET(plg->ks->curr_thread, FOS_SUCCESS, FOS_SUCCESS);
+
+    /*
+     * Create a new directory.
+     *
+     * returns FOS_INVALID_INDEX if the directory component of the path does not exist.
+     * returns FOS_IN_USE if the given path already exists.
+     */
+    case PLG_FS_PCID_MKDIR: {
+        err = fs_mkdir_path(plg_fs->fs, cwd, path, NULL);
+        DUAL_RET(thr, err, FOS_SUCCESS);
+    }
+
+    /*
+     * Remove a file or directory.
+     *
+     * If this node trying to be deleted is currently refercence by any process, FOS_IN_USE
+     * is returned.
+     *
+     * returns FOS_INVALID_INDEX if the given path does not exist.
+     * FOS_IN_USE is also returned when trying to delete a non-empty directory.
+     */
+    case PLG_FS_PCID_REMOVE: {
+        fs_node_key_t nk;
+
+        err =  fs_new_key(plg_fs->fs, cwd, path, &nk);
+        DUAL_RET_FOS_ERR(err, thr);
+
+        if (mp_get(plg_fs->nk_map, &nk)) {
+            // This key is referenced by another process!
+            fs_delete_key(plg_fs->fs, nk);
+            DUAL_RET(thr, FOS_IN_USE, FOS_SUCCESS);
+        }
+
+        fs_node_info_t info;
+        err = fs_get_node_info(plg_fs->fs, nk, &info);
+
+        // We should be able to delete the node key here regardless.
+        fs_delete_key(plg_fs->fs, nk);
+
+        if (err != FOS_SUCCESS) {
+            DUAL_RET(thr, err, FOS_SUCCESS);
+        }
+
+        if (info.is_dir && info.len > 0) {
+            // Non empty directory!
+            DUAL_RET(thr, FOS_IN_USE, FOS_SUCCESS);
+        }
+
+        // We made it here, the file being reference is not referenced by any processes!
+        // And, if it is a directory, it is empty!
+
+        err = fs_remove_path(plg_fs->fs, cwd, path);
+        DUAL_RET(thr, err, FOS_SUCCESS);
+    }
+
+    /*
+     * Attempt to get information about a file or directory.
+     *
+     * returns FOS_INVALID_INDEX if the given path does not exist.
+     * On success, the information is written to `*info`.
+     */
+    case PLG_FS_PCID_GET_INFO: {
+        fs_node_info_t *u_info = (fs_node_info_t *)arg2; 
+        if (!u_info) {
+            DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+        }
+
+        fs_node_key_t nk;
+
+        err =  fs_new_key(plg_fs->fs, cwd, path, &nk);
+        DUAL_RET_FOS_ERR(err, thr);
+
+        fs_node_info_t info;
+        err = fs_get_node_info(plg_fs->fs, nk, &info);
+        if (err == FOS_SUCCESS) {
+            err = mem_cpy_to_user(proc->pd, u_info, &info, sizeof(fs_node_info_t), NULL);
+        }
+
+        fs_delete_key(plg_fs->fs, nk);
+        DUAL_RET(thr, err, FOS_SUCCESS);
+    }
+
+    /*
+     * Get the name of a node within a directory at a given index.
+     *
+     * `child_name` should be a buffer in with size at least `FS_MAX_FILENAME_LEN + 1`.
+     *
+     * returns FOS_INVALID_INDEX if the given path does not exist.
+     * returns FOS_STATE_MISMATCH if given path leads to a file.
+     * On success, FOS_SUCCESS is returned in the calling thread, and the child's name is written
+     * to `*child_name` in userspace.
+     *
+     * If `index` overshoots the end of the directory, FOS_SUCCESS is still returned, but
+     * `\0` is written to `child_name`.
+     */
+    case PLG_FS_PCID_GET_CHILD_NAME: {
+        size_t index = arg2;
+        char *u_child_name = (char *)arg3;
+
+        if (!u_child_name) {
+            DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+        }
+
+        char child_names[1][FS_MAX_FILENAME_LEN + 1];
+
+        fs_node_key_t nk;
+
+        err =  fs_new_key(plg_fs->fs, cwd, path, &nk);
+        DUAL_RET_FOS_ERR(err, thr);
+
+        err = fs_get_child_names(plg_fs->fs, nk, index, 1, child_names);
+        fs_delete_key(plg_fs->fs, nk);
+
+        DUAL_RET_FOS_ERR(err, thr);
+
+        err = mem_cpy_to_user(proc->pd, u_child_name, child_names[0], str_len(child_names[0]) + 1, NULL);
+
+        DUAL_RET(thr, err, FOS_SUCCESS);
+    }
+
+    /*
+     * Open an existing file.
+     * 
+     * When a file is opened, it's corresponding handle will start at position 0. (i.e. the 
+     * beginning of the file)
+     *
+     * returns FOS_INVALID_INDEX if the given path does not exist.
+     * returns FOS_STATE_MISMATCH if the given path is a directory.
+     * FOS_EMPTY is returned when we are out of space in the file handle table for this
+     * process!
+     */
+    case PLG_FS_PCID_OPEN: {
+        return FOS_NOT_IMPLEMENTED;
+    }
+
+    default: { // This will never run.
+        return FOS_STATE_MISMATCH;
+    }
+    }
 }
 
 static fernos_error_t plg_fs_on_fork_proc(plugin_t *plg, proc_id_t cpid) {

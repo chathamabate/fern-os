@@ -28,10 +28,11 @@
     }
 
 #define DUAL_RET_FOS_ERR(err, thr) \
-    if (err != FOS_SUCCESS) { \
+    if ((err) != FOS_SUCCESS) { \
         (thr)->ctx.eax = (err);  \
         return FOS_SUCCESS; \
     }
+
 
 /*
  * Design NOTES:
