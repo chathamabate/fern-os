@@ -9,12 +9,6 @@
 
 #include "s_block_device/file_sys.h"
 
-#ifdef NOT_DEFINED 
-/*
- * All of these calls correspond 1:1 to the functions in `k_startup/state_fs.h`.
- * For more information on what these functions do, see the Docstrings there.
- */
-
 /**
  * Set the current process's working directory.
  *
@@ -77,6 +71,11 @@ fernos_error_t sc_fs_get_child_name(const char *path,
         size_t index, char *child_name);
 
 /**
+ * Flush the entire file system.
+ */
+fernos_error_t sc_fs_flush_all(void);
+
+/**
  * Open an existing file.
  * 
  * When a file is opened, it's corresponding handle will start at position 0. (i.e. the 
@@ -87,8 +86,9 @@ fernos_error_t sc_fs_get_child_name(const char *path,
  * FOS_EMPTY is returned when we are out of space in the file handle table for this
  * process!
  */
-fernos_error_t sc_fs_open(const char *path, file_handle_t *fh);
+fernos_error_t sc_fs_open(const char *path, handle_t *h);
 
+#ifdef NOT_DEF
 /**
  * Return a file handle to the operating system. After this call, the file handle stored in `fh`
  * is no longer usable.
@@ -163,5 +163,4 @@ fernos_error_t sc_fs_read_full(file_handle_t fh, void *dst, size_t len);
  * returns FOS_INVALID_INDEX if `fh` cannot be found AND it isn't equal to FOS_MAX_FILE_HANDLES_PER_PROC.
  */
 fernos_error_t sc_fs_flush(file_handle_t fh);
-
 #endif

@@ -255,27 +255,27 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  * File System Plugin.
  */
 
-#define PLG_FILE_SYS_ID (0U)
+#define PLG_FILE_SYS_ID (1U)
 
-// File System Plugin Commands
-
-#define PLG_FILE_SYS_CID_SET_WD         (0U)
-#define PLG_FILE_SYS_CID_TOUCH          (1U)
-#define PLG_FILE_SYS_CID_MKDIR          (2U)
-#define PLG_FILE_SYS_CID_REMOVE         (3U)
-#define PLG_FILE_SYS_CID_GET_INFO       (4U)
-#define PLG_FILE_SYS_CID_GET_CHILD_NAME (5U)
-#define PLG_FILE_SYS_CID_OPEN           (6U)
-#define PLG_FILE_SYS_CID_CLOSE          (7U)
-#define PLG_FILE_SYS_CID_SEEK           (8U)
-#define PLG_FILE_SYS_CID_WRITE          (9U)
-#define PLG_FILE_SYS_CID_READ           (10U)
-#define PLG_FILE_SYS_CID_FLUSH          (11U)
-
-typedef id_t plugin_fs_handle_t;
-
-/**
- * The maximum number of file handles allowed to be open at once by
- * a single process.
+/*
+ * File system plugin commands.
  */
-#define PLG_FS_MAX_HANDLES_PER_PROC (32U)
+
+#define PLG_FS_PCID_SET_WD         (0U)
+#define PLG_FS_PCID_TOUCH          (1U)
+#define PLG_FS_PCID_MKDIR          (2U)
+#define PLG_FS_PCID_REMOVE         (3U)
+#define PLG_FS_PCID_GET_INFO       (4U)
+#define PLG_FS_PCID_GET_CHILD_NAME (5U)
+#define PLG_FS_PCID_FLUSH          (6U)
+#define PLG_FS_PCID_OPEN           (7U)
+
+#define PLG_FILE_SYS_NUM_CMDS      (PLG_FS_PCID_OPEN + 1)
+
+/*
+ * File system plugin handle commands
+ */
+
+#define PLG_FS_HCID_SEEK           (0U)
+#define PLG_FS_HCID_FLUSH          (1U)
+

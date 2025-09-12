@@ -4,6 +4,8 @@
 #include "s_bridge/shared_defs.h"
 #include "k_startup/thread.h"
 #include "k_bios_term/term.h"
+#include "k_startup/page.h"
+#include "k_startup/page_helpers.h"
 
 static fernos_error_t delete_plugin_fs(plugin_t *plg);
 static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
@@ -147,7 +149,71 @@ static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk
 }
 
 static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
-    // Remeber, this is called by a thread.
+    fernos_error_t err;
+
+    plugin_fs_t *plg_fs = (plugin_fs_t *)plg;
+    thread_t *thr = plg->ks->curr_thread;
+
+    // Is this command even valid though?
+    if (cmd >= PLG_FILE_SYS_NUM_CMDS) {
+        DUAL_RET(thr, FOS_INVALID_INDEX, FOS_SUCCESS);
+    }
+
+    // Flush all is kinda special because it does not take a string as the first argument.
+    // So, we'll just deal with it first than move on.
+    if (cmd == PLG_FS_PCID_FLUSH) {
+        err = fs_flush(plg_fs->fs, NULL);
+        if (err == FOS_ABORT_SYSTEM) {
+            return FOS_ABORT_SYSTEM;
+        }
+
+        DUAL_RET(thr, err, FOS_SUCCESS);
+    }
+
+    size_t path_len = arg1;
+
+    if (path_len > FS_MAX_PATH_LEN) {
+        DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+    }
+
+    char path[FS_MAX_PATH_LEN + 1];
+    err = mem_cpy_from_user(path, thr->proc->pd, (const void *)arg0, arg1, NULL);
+    if (err != FOS_SUCCESS) {
+        DUAL_RET(thr, err, FOS_SUCCESS); // some sort of copy error?
+    }
+    path[path_len] = '\0';
+
+    fs_node_key_t cwd = plg_fs->cwds[thr->proc->pid];
+    if (!cwd) {
+        return FOS_STATE_MISMATCH; // should never happen.
+    }
+
+    switch (cmd) {
+    case PLG_FS_PCID_SET_WD:
+
+    case PLG_FS_PCID_TOUCH:
+        err = fs_touch_path(plg_fs->fs, cwd, path, NULL);
+        break;
+
+    case PLG_FS_PCID_MKDIR:
+        err = fs_mkdir_path(plg_fs->fs, cwd, path, NULL);
+        break;
+
+    case PLG_FS_PCID_REMOVE:
+        err = fs_remove_path(plg_fs->fs, cwd, path);
+        break;
+
+    case PLG_FS_PCID_GET_INFO: {
+        
+    }
+
+    case PLG_FS_PCID_GET_CHILD_NAME:
+    case PLG_FS_PCID_OPEN:
+
+    default: // This will never run.
+        err = FOS_STATE_MISMATCH;
+        break;
+    }
     DUAL_RET(plg->ks->curr_thread, FOS_SUCCESS, FOS_SUCCESS);
 }
 
