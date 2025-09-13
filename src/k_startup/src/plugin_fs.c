@@ -609,14 +609,120 @@ static fernos_error_t delete_fs_handle_state(handle_state_t *hs) {
     return FOS_SUCCESS;
 }
 
+/**
+ * Write the contents of `src` to the referenced file.
+ *
+ * If `len` overshoots the end of the file, the file will be expanded as necessary.
+ * If the given file handle's position is already SIZE_MAX, FOS_NO_SPACE will be returned
+ * in the calling thread.
+ *
+ * The total number of bytes written is written to `*written`.
+ * FOS_SUCCESS does NOT mean all bytes were written!!! (This will likely write in chunks to 
+ * prevent being in the kernel for too long)
+ */
 static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
     plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
     return FOS_NOT_IMPLEMENTED;
 }
 
+/**
+ * Blocking read.
+ *
+ * Read from a file into userspace buffer `dst`.
+ *
+ * If the position of `fh` = len(file), this function blocks the current thread until more data 
+ * is added to the file. If any data at all can be read, it is immediately written to `dst`
+ * and FOS_SUCCESS is returned.
+ *
+ * If the position of `fh` = SIZE_MAX, FOS_SUCCESS is return and 0 is written to `*readden`.
+ *
+ * Just like with `sc_fs_write`, FOS_SUCCESS does NOT mean `len` bytes were read. 
+ * On Success, always check what is written to `readden` to confirm the actual number of 
+ * read bytes.
+ */
 static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden) {
+    fernos_error_t err;
+
     plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
-    return FOS_NOT_IMPLEMENTED;
+    plugin_fs_t *plg_fs = fs_hs->plg_fs;
+
+    thread_t *thr = hs->ks->curr_thread;
+
+    if (!u_dst || !u_readden) {
+        DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+    }
+
+    fs_node_info_t info;
+    err = fs_get_node_info(plg_fs->fs, fs_hs->nk, &info);
+    DUAL_RET_FOS_ERR(err, thr);
+
+    // A file handle should never point to a directory!
+    if (info.is_dir) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    if (fs_hs->pos > info.len) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    if (fs_hs->pos == SIZE_MAX) {
+        const size_t zero = 0;
+        err = mem_cpy_to_user(thr->proc->pd, u_readden, &zero, sizeof(size_t), NULL);
+        DUAL_RET(thr, err, FOS_SUCCESS);
+    }
+
+    if (fs_hs->pos == info.len) { // Blocking read case!
+        plugin_fs_nk_map_entry_t **nk_entry_p = mp_get(plg_fs->nk_map, &(fs_hs->nk));
+        if (!nk_entry_p || !*nk_entry_p) {
+            return FOS_STATE_MISMATCH;
+        }
+
+        basic_wait_queue_t *bwq = (*nk_entry_p)->bwq;
+
+        err = bwq_enqueue(bwq, thr);
+        DUAL_RET_FOS_ERR(err, thr);
+
+        ks_deschedule_thread(hs->ks, thr);
+
+        thr->wq = (wait_queue_t *)bwq;
+        thr->wait_ctx[0] = (uint32_t)fs_hs;
+        thr->wait_ctx[1] = (uint32_t)u_dst;
+        thr->wait_ctx[2] = len;
+        thr->wait_ctx[3] = (uint32_t)u_readden;
+        thr->state = THREAD_STATE_WAITING;
+
+        return FOS_SUCCESS;
+    }
+
+    // pos < len. Non-blocking read case.
+
+    const size_t bytes_left = info.len - fs_hs->pos;
+    size_t bytes_to_read = len;
+
+    if (bytes_to_read > bytes_left) {
+        bytes_to_read = bytes_left;
+    }
+
+    if (bytes_to_read > KS_FS_TX_MAX_LEN) {
+        bytes_to_read = KS_FS_TX_MAX_LEN;
+    }
+
+    uint8_t rx_buf[KS_FS_TX_MAX_LEN];
+
+    err = fs_read(plg_fs->fs, fs_hs->nk, fs_hs->pos, bytes_to_read, rx_buf);
+    DUAL_RET_FOS_ERR(err, thr);
+
+    err = mem_cpy_to_user(hs->proc->pd, u_dst, rx_buf, bytes_to_read, NULL);
+    DUAL_RET_FOS_ERR(err, thr);
+
+    err = mem_cpy_to_user(hs->proc->pd, u_readden, &bytes_to_read, sizeof(size_t), NULL);
+    DUAL_RET_FOS_ERR(err, thr);
+    
+    // SUCCESS!
+
+    fs_hs->pos += bytes_to_read;
+
+    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
 }
 
 static fernos_error_t fs_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {

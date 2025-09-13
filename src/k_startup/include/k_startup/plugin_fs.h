@@ -7,6 +7,8 @@
 #include "s_block_device/file_sys.h"
 #include "s_data/map.h"
 
+#define KS_FS_TX_MAX_LEN (2048U)
+
 typedef struct _plugin_fs_t plugin_fs_t;
 typedef struct _plugin_fs_handle_state_t plugin_fs_handle_state_t;
 typedef struct _plugin_fs_nk_map_entry_t plugin_fs_nk_map_entry_t;
