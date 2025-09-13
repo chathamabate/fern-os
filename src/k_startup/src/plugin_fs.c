@@ -3,8 +3,6 @@
 #include "k_startup/plugin_fs.h"
 #include "s_bridge/shared_defs.h"
 #include "k_startup/thread.h"
-// DELETE ME
-#include "k_bios_term/term.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
 

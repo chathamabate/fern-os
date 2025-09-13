@@ -14,7 +14,6 @@
 #include "k_startup/kernel.h"
 #include <stdint.h>
 #include "k_startup/state.h"
-#include "k_startup/state_fs.h"
 #include "k_sys/debug.h"
 #include "s_data/wait_queue.h"
 #include "k_startup/thread.h"

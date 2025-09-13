@@ -7,7 +7,6 @@
 #include "k_startup/process.h"
 #include "k_startup/page.h"
 #include "k_startup/handle.h"
-#include "k_startup/state_fs.h"
 #include "k_startup/plugin.h"
 
 #include "k_bios_term/term.h"
