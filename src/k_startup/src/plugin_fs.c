@@ -226,7 +226,7 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
 
     // Is this command even valid though?
     if (cmd >= PLG_FILE_SYS_NUM_CMDS) {
-        DUAL_RET(thr, FOS_INVALID_INDEX, FOS_SUCCESS);
+        DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
     }
 
     // Flush all is kinda special because it does not take a string as the first argument.
@@ -851,8 +851,57 @@ static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, si
 }
 
 static fernos_error_t fs_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    fernos_error_t err;
+
+    (void)arg1;
+    (void)arg2;
+    (void)arg3;
+
     plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
-    return FOS_NOT_IMPLEMENTED;
+    plugin_fs_t *plg_fs = fs_hs->plg_fs;
+
+    thread_t *thr = hs->ks->curr_thread;
+
+    switch (cmd) {
+
+    /*
+     * Move a handle's position.
+     *
+     * If `pos` > len(file), then the `fh`'s position will be set to len(file).
+     *
+     * Using SIZE_MAX as the position will thus always bring the handle position to the end of the
+     * file. (Remember, we will enforce the max file size of SIZE_MAX, and thus a maximum addressable
+     * byte of SIZE_MAX - 1)
+     */
+    case PLG_FS_HCID_SEEK: {
+        size_t new_pos = (size_t)arg0;
+
+        fs_node_info_t info;
+        err = fs_get_node_info(plg_fs->fs, fs_hs->nk, &info);
+        DUAL_RET_FOS_ERR(err, thr);
+
+        if (info.is_dir) {
+            return FOS_STATE_MISMATCH; // Sanity check.
+        }
+
+        if (new_pos > info.len) {
+            new_pos = info.len;
+        }
+
+        fs_hs->pos = new_pos;
+        DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+    }
+
+    case PLG_FS_HCID_FLUSH: {
+        err = fs_flush(plg_fs->fs, fs_hs->nk);
+        DUAL_RET(thr, err, FOS_SUCCESS);
+    }
+
+    default: {
+        DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+    }
+
+    }
 }
 
 
