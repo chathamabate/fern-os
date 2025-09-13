@@ -529,11 +529,11 @@ static fernos_error_t plg_fs_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
     // Copy over parent CWD
     plg_fs->cwds[child->pid] = parent_cwd;
 
-    plugin_fs_nk_map_entry_t *nk_entry = mp_get(plg_fs->nk_map, &parent_cwd);
-    if (!nk_entry) {
+    plugin_fs_nk_map_entry_t **nk_entry = mp_get(plg_fs->nk_map, &parent_cwd);
+    if (!nk_entry || !*nk_entry) {
         return FOS_STATE_MISMATCH;
     }
-    nk_entry->references++;
+    (*nk_entry)->references++;
 
     // The copy function inside each handle should handle increasing the reference count for
     // each copied handle. We only need to deal with copying over the cwd here.
@@ -557,9 +557,71 @@ static fernos_error_t plg_fs_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
     return FOS_SUCCESS;
 }
 
-static fernos_error_t copy_fs_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
-static fernos_error_t delete_fs_handle_state(handle_state_t *hs);
-static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
-static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden);
-static fernos_error_t fs_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+static fernos_error_t copy_fs_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
+    plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
+    plugin_fs_t *plg_fs = fs_hs->plg_fs;
+
+    // Ok, let's make our new handle.
+
+    plugin_fs_handle_state_t *fs_hs_copy = al_malloc(hs->ks->al, sizeof(plugin_fs_handle_state_t));
+    if (!fs_hs_copy) {
+        return FOS_NO_MEM;
+    }
+
+    // Because we are copying a handle state, we expect its node key to already be in
+    // the map, we don't need to call register, we can just incrememnt the count.
+
+    plugin_fs_nk_map_entry_t **nk_entry = mp_get(plg_fs->nk_map, &(fs_hs->nk));
+    if (!nk_entry || !*nk_entry) {
+        return FOS_ABORT_SYSTEM; // Catastrophic error.
+    }
+    (*nk_entry)->references++;
+
+    init_base_handle((handle_state_t *)fs_hs_copy, hs->impl, hs->ks, proc, hs->handle);
+    *(plugin_fs_t **)&(fs_hs_copy->plg_fs) = plg_fs;
+    fs_hs_copy->pos = fs_hs->pos;
+    *(fs_node_key_t *)&(fs_hs_copy->nk) = fs_hs->nk;
+
+    // Remember, we don't need to modify the table here! That's done outside this function for us!
+
+    *out = (handle_state_t *)fs_hs_copy;
+    return FOS_SUCCESS;
+}
+
+static fernos_error_t delete_fs_handle_state(handle_state_t *hs) {
+    fernos_error_t err;
+
+    plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
+    plugin_fs_t *plg_fs = fs_hs->plg_fs;
+
+    // We'll flush on close and not really worry about errors.
+    fs_flush(plg_fs->fs, fs_hs->nk);
+
+    err = plg_fs_deregister_nk(plg_fs, fs_hs->nk);
+    if (err != FOS_SUCCESS) {
+        return err;
+    }
+
+    // We're in the clear!
+
+    al_free(fs_hs->super.ks->al, fs_hs);
+
+    return FOS_SUCCESS;
+}
+
+static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
+    plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden) {
+    plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
+    return FOS_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t fs_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
+    return FOS_NOT_IMPLEMENTED;
+}
+
 

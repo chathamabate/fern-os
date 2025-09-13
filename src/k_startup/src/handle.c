@@ -47,7 +47,12 @@ fernos_error_t copy_handle_table(process_t *parent, process_t *child) {
     // successfully copied.
     if (err != FOS_SUCCESS) { 
         for (id_t i = 0; i < FOS_MAX_HANDLES_PER_PROC; i++) {
-            delete_handle_state(idtb_get(child->handle_table, i));
+            err = delete_handle_state(idtb_get(child->handle_table, i));
+            if (err != FOS_SUCCESS) {
+                return FOS_ABORT_SYSTEM; // Failing to delete a handle state is always
+                                         // catastrophic.
+            }
+
             idtb_push_id(child->handle_table, i);
         }
 
