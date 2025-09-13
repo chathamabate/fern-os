@@ -6,12 +6,39 @@
 #define LOGF_METHOD(...) sc_term_put_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
 
+static bool pretest(void);
+static bool posttest(void);
+
+#define PRETEST() pretest()
+#define POSTTEST() posttest()
+
 #include "s_util/test.h"
+
+sig_vector_t old_sv;
+
+static bool pretest(void) {
+    // Since we will be working with child processes, we will allow the 
+    // child signal in root.
+    old_sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    TEST_SUCCEED();
+}
+
+static bool posttest(void) {
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
 
 static fernos_error_t reap_single(proc_id_t *rcpid, proc_exit_status_t *rces) {
     fernos_error_t err;
     while (1) {
         err = sc_proc_reap(FOS_MAX_PROCS, rcpid, rces);
+        if (err == FOS_SUCCESS) {
+            // We clear just in case we were able to reap without waiting on the signal!
+            sc_signal_clear(1 << FSIG_CHLD);
+        }
+
         if (err != FOS_EMPTY) {
             return err;
         }
@@ -27,8 +54,6 @@ static bool test_simple_fork(void) {
     fernos_error_t err;
 
     proc_id_t cpid;
-
-    sc_signal_allow((1 << FSIG_CHLD));
 
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);

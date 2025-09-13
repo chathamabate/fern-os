@@ -667,6 +667,16 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
     return FOS_SUCCESS;
 }
 
+fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv) {
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    ks->curr_thread->proc->sig_vec &= ~sv;
+
+    return FOS_SUCCESS;
+}
+
 fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     fernos_error_t err;
 

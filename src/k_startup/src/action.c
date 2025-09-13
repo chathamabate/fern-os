@@ -157,6 +157,10 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_wait_signal(kernel, (sig_vector_t)arg0, (sig_id_t *)arg1);
         break;
 
+    case SCID_SIGNAL_CLEAR:
+        err = ks_signal_clear(kernel, (sig_vector_t)arg0);
+        break;
+
     case SCID_THREAD_EXIT:
         err = ks_exit_thread(kernel, (void *)arg0);
         break;

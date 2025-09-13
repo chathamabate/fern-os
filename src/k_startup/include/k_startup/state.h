@@ -296,6 +296,18 @@ KS_SYSCALL fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv);
  */
 KS_SYSCALL fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid);
 
+
+/**
+ * Clears all bits which are set in the given signal vector `sv`.
+ *
+ * This is useful when you can confirm some operation is complete and that no further signals
+ * will be received, BUT you may not know the state of the signal vector.
+ *
+ * For example, when reaping child processes. All processes may be reapped, but there still
+ * may be a lingering FSIG_CHLD bit set in the signal vector.
+ */
+KS_SYSCALL fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv);
+
 /**
  * Take the current thread, deschedule it, and add it it to the sleep wait queue.
  *

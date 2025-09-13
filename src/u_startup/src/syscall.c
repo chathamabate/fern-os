@@ -29,6 +29,10 @@ fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid) {
     return (fernos_error_t)trigger_syscall(SCID_SIGNAL_WAIT, (uint32_t)sv, (uint32_t)sid, 0, 0);
 }
 
+void sc_signal_clear(sig_vector_t sv) {
+    trigger_syscall(SCID_SIGNAL_CLEAR, (uint32_t)sv, 0, 0, 0);
+}
+
 void sc_thread_exit(void *retval) {
     (void)trigger_syscall(SCID_THREAD_EXIT, (uint32_t)retval, 0, 0, 0);
 

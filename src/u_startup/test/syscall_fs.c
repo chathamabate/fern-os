@@ -395,6 +395,94 @@ static bool test_early_close(void) {
     TEST_SUCCEED();
 }
 
+static bool test_many_procs(void) {
+    const char *pipe_names[] = {
+        "a", "b", "c", "d"
+    };
+    const size_t num_pipes = sizeof(pipe_names) / sizeof(pipe_names[0]);
+
+    fernos_error_t err;
+    for (size_t i = 0; i < num_pipes; i++) {
+        err = sc_fs_touch(pipe_names[i]);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Ok, we are going to have one child process for every pipe.
+    // Root - pipe[0] -> proc1 - pipe[1] -> proc2 ... - pipe[num_pipes - 1] -> proc num_pipes 
+    
+    size_t proc_number;
+    proc_id_t cpid;
+
+    handle_t h;
+
+    char tx_buf[100];
+
+    const char *msg = "HELLO";
+    str_cpy(tx_buf, msg);
+    const size_t tx_amt = str_len(msg) + 1;
+
+    for (proc_number = 0; proc_number < num_pipes; proc_number++) {
+        err = sc_fs_open(pipe_names[proc_number], &h);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        err = sc_proc_fork(&cpid);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+        if (cpid != FOS_MAX_PROCS) { // Parent process.
+            // Write in full.
+            err = sc_write_full(h, tx_buf, tx_amt);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            // Don't need this guy anymore.
+            sc_close(h);
+
+            if (proc_number == 0) {
+                break;
+            } else {
+                sc_proc_exit(PROC_ES_SUCCESS);
+            }
+        } else { // Child process.
+            err = sc_read_full(h, tx_buf, tx_amt);
+            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+            sc_close(h);
+            
+            TEST_TRUE(str_eq(msg, tx_buf));
+        }
+    }
+
+    if (proc_number == num_pipes) {
+        // Exit the final child process out here.
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // Wait for all children to exit.
+    size_t reaped = 0;
+    while (true) {
+        while ((err = sc_proc_reap(FOS_MAX_PROCS, NULL, NULL)) == FOS_SUCCESS) {
+            reaped++;
+        }
+        TEST_EQUAL_HEX(FOS_EMPTY, err);
+
+        if (reaped == num_pipes) {
+            // We've reaped all children, so we know no more FSIG_CHLD's will be received!
+            sc_signal_clear(1 << FSIG_CHLD);
+            break;
+        }
+
+        err = sc_signal_wait(1 << FSIG_CHLD, NULL);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    // Finally, delete all pipes.
+    for (size_t i = 0; i < num_pipes; i++) {
+        err = sc_fs_remove(pipe_names[i]);
+        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    }
+
+    TEST_SUCCEED();
+}
+
 static bool test_many_handles(void) {
     // Test pushing the handle limit.
 
@@ -665,6 +753,7 @@ bool test_syscall_fs(void) {
     RUN_TEST(test_multiprocess_rw);
     RUN_TEST(test_multithread_and_process_rw);
     RUN_TEST(test_early_close);
+    RUN_TEST(test_many_procs);
     RUN_TEST(test_many_handles);
     RUN_TEST(test_dir_functions);
     RUN_TEST(test_big_file);

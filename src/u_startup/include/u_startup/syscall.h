@@ -123,6 +123,17 @@ sig_vector_t sc_signal_allow(sig_vector_t sv);
 fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid);
 
 /**
+ * Clears all bits which are set in the given signal vector `sv`.
+ *
+ * This is useful when you can confirm some operation is complete and that no further signals
+ * will be received, BUT you may not know the state of the signal vector.
+ *
+ * For example, when reaping child processes. All processes may be reapped, but there still
+ * may be a lingering FSIG_CHLD bit set in the signal vector.
+ */
+void sc_signal_clear(sig_vector_t sv);
+
+/**
  * Exit the current thread.
  *
  * If this thread is the "main thread", the full process will exit.

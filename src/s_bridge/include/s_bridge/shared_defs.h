@@ -147,6 +147,7 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 #define SCID_SIGNAL       (0x90U)
 #define SCID_SIGNAL_ALLOW (0x91U)
 #define SCID_SIGNAL_WAIT  (0x92U)
+#define SCID_SIGNAL_CLEAR (0x93U)
 
 /* Thread Syscalls */
 #define SCID_THREAD_EXIT  (0x100U)
