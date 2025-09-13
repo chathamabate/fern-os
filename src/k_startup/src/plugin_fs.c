@@ -621,8 +621,133 @@ static fernos_error_t delete_fs_handle_state(handle_state_t *hs) {
  * prevent being in the kernel for too long)
  */
 static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
+    fernos_error_t err;
+
     plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
-    return FOS_NOT_IMPLEMENTED;
+    plugin_fs_t *plg_fs = fs_hs->plg_fs;
+
+    thread_t *thr = hs->ks->curr_thread;
+
+    if (!u_src || !u_written) {
+        DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+    }
+
+    if (fs_hs->pos == SIZE_MAX)  {
+        DUAL_RET(thr, FOS_NO_SPACE, FOS_SUCCESS);
+    }
+
+    fs_node_info_t info;
+    err = fs_get_node_info(plg_fs->fs, fs_hs->nk, &info);
+    DUAL_RET_FOS_ERR(err, thr);
+
+    if (info.is_dir) {
+        return FOS_STATE_MISMATCH; // Sanity check.
+    }
+
+    const size_t old_len = info.len;
+
+    if (fs_hs->pos > old_len) {
+        // Another quick sanity check. (This should never happen!)
+        return FOS_STATE_MISMATCH;
+    }
+
+    // Ok, expansion may be necessary!
+
+    size_t bytes_to_write = len;
+    if (fs_hs->pos + bytes_to_write < fs_hs->pos) { // check wrap.
+        bytes_to_write = SIZE_MAX - fs_hs->pos;
+    }
+
+    if (bytes_to_write > KS_FS_TX_MAX_LEN) {
+        bytes_to_write = KS_FS_TX_MAX_LEN;
+    }
+
+    uint8_t tx_buf[KS_FS_TX_MAX_LEN];
+    err = mem_cpy_from_user(tx_buf, thr->proc->pd, u_src, bytes_to_write, NULL);
+    DUAL_RET_FOS_ERR(err, thr);
+
+    const size_t bytes_left = old_len - fs_hs->pos;
+
+    // First off, do we need to expand our file?
+    if (bytes_left < bytes_to_write) { // expansion is needed.
+        err = fs_resize(plg_fs->fs, fs_hs->nk, fs_hs->pos + bytes_to_write);
+        DUAL_RET_FOS_ERR(err, thr);
+    }
+
+    // Save this error for later.
+    err = fs_write(plg_fs->fs, fs_hs->nk, fs_hs->pos, bytes_to_write, tx_buf);
+
+    if (err == FOS_SUCCESS) {
+        fs_hs->pos += bytes_to_write;
+        err = mem_cpy_to_user(thr->proc->pd, u_written, &bytes_to_write, sizeof(size_t), NULL);
+    }
+
+    thr->ctx.eax = err;
+
+    // Ok, so, if we had to expand our file, that means we must wake up all our blocked reading threads!
+    // We do this regardless of whether or not the above write succeeded or not.
+    // This could potentially result in faulty data read in the case where the write fails.
+    // But whatever.
+    if (bytes_left < bytes_to_write) {
+        const size_t bytes_appended = bytes_to_write - bytes_left;
+
+        plugin_fs_nk_map_entry_t **nk_entry_p = mp_get(plg_fs->nk_map, &(fs_hs->nk));
+        if (!nk_entry_p || !(*nk_entry_p)) {
+            return FOS_STATE_MISMATCH;
+        }
+
+        basic_wait_queue_t *bwq = (*nk_entry_p)->bwq;
+        err = bwq_notify_all(bwq);
+        if (err != FOS_SUCCESS) {
+            return FOS_UNKNWON_ERROR; // We'll say this is a fatal error for now.
+        }
+
+        thread_t *woken_thr;
+        while ((err = bwq_pop(bwq, (void **)&woken_thr)) == FOS_SUCCESS) {
+            woken_thr->wq = NULL;
+            woken_thr->state = THREAD_STATE_DETATCHED;
+
+            // Ok, read out the wait context please.
+
+            plugin_fs_handle_state_t * const woken_handle_state = (plugin_fs_handle_state_t *)(woken_thr->wait_ctx[0]);
+            void * const u_dst = (void *)(woken_thr->wait_ctx[1]);
+            size_t bytes_to_read = (size_t)(woken_thr->wait_ctx[2]);
+            size_t * const u_readden =  (size_t *)(woken_thr->wait_ctx[3]);
+
+            mem_set(woken_thr->wait_ctx, 0, sizeof(woken_thr->wait_ctx));
+
+            if (woken_handle_state->pos != old_len) {
+                return FOS_STATE_MISMATCH; // Sanity check.
+            }
+
+            // We know for a fact that `bytes_appended < KS_FS_MAX_TX_LEN`
+            // We also know that the position of all waiting handles = the old length of the file!
+            if (bytes_to_read > bytes_appended) {
+                bytes_to_read = bytes_appended;
+            }
+
+            err = fs_read(plg_fs->fs, woken_handle_state->nk, old_len, bytes_to_read, tx_buf);
+
+            if (err == FOS_SUCCESS) {
+                err = mem_cpy_to_user(woken_thr->proc->pd, u_dst, tx_buf, bytes_to_read, NULL);
+            }
+
+            if (err == FOS_SUCCESS) {
+                err = mem_cpy_to_user(woken_thr->proc->pd, u_readden, &bytes_to_read, sizeof(size_t), NULL);
+            }
+
+            if (err == FOS_SUCCESS) {
+                // += here could be kinda dangerous if the user uses file handles incorrectly.
+                woken_handle_state->pos = old_len + bytes_to_read;
+            }
+
+            woken_thr->ctx.eax = err;
+
+            ks_schedule_thread(plg_fs->super.ks, woken_thr);
+        }
+    }
+
+    return FOS_SUCCESS;
 }
 
 /**
