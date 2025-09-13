@@ -229,7 +229,10 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     // Now check for errors.
     if (cpid == NULL_PID || !child || err != FOS_SUCCESS) {
         idtb_push_id(ks->proc_table, cpid);
-        clear_handle_table(child->handle_table);
+        err = clear_handle_table(child->handle_table);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
         delete_process(child);
 
         if (u_cpid) {
@@ -453,10 +456,12 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
             return err;
         }
 
-        // then, delete all handles!
-        clear_handle_table(rproc->handle_table);
+        // then, try to delete all handles!
+        err = clear_handle_table(rproc->handle_table);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
 
-        // Reaping should also clean up file handles within the process being reaped!
         rcpid = rproc->pid;
         rces = rproc->exit_status;
 

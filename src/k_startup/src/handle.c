@@ -1,11 +1,16 @@
 
 #include "k_startup/handle.h"
 
-void clear_handle_table(id_table_t *handle_table) {
+fernos_error_t clear_handle_table(id_table_t *handle_table) {
+    fernos_error_t err;
     for (size_t h = 0; h < FOS_MAX_HANDLES_PER_PROC; h++) {
-        delete_handle_state(idtb_get(handle_table, h));
+        err = delete_handle_state(idtb_get(handle_table, h));
+        if (err != FOS_SUCCESS) {
+            return FOS_ABORT_SYSTEM;
+        }
         idtb_push_id(handle_table, h);
     }
+    return FOS_SUCCESS;
 }
 
 fernos_error_t copy_handle_table(process_t *parent, process_t *child) {

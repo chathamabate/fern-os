@@ -21,6 +21,20 @@ static const plugin_impl_t PLUGIN_FS_IMPL = {
     .plg_on_reap_proc = plg_fs_on_reap_proc
 };
 
+static fernos_error_t copy_fs_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
+static fernos_error_t delete_fs_handle_state(handle_state_t *hs);
+static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
+static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden);
+static fernos_error_t fs_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+
+const handle_state_impl_t FS_HS_IMPL = {
+    .copy_handle_state = copy_fs_handle_state,
+    .delete_handle_state = delete_fs_handle_state,
+    .hs_write = fs_hs_write,
+    .hs_read = fs_hs_read,
+    .hs_cmd = fs_hs_cmd
+};
+
 plugin_t *new_plugin_fs(kernel_state_t *ks, file_sys_t *fs) {
     if (!ks || !fs) {
         return NULL;
@@ -428,7 +442,68 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
      * process!
      */
     case PLG_FS_PCID_OPEN: {
-        return FOS_NOT_IMPLEMENTED;
+        handle_t *u_h = (handle_t *)arg2;
+        if (!u_h) {
+            DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+        }
+
+        fs_node_key_t nk;
+
+        err = fs_new_key(plg_fs->fs, cwd, path, &nk);
+        DUAL_RET_FOS_ERR(err, thr);
+
+        fs_node_info_t info;
+        err = fs_get_node_info(plg_fs->fs, nk, &info);
+        if (err != FOS_SUCCESS || info.is_dir) {
+            fs_delete_key(plg_fs->fs, nk);
+            err = info.is_dir ? FOS_STATE_MISMATCH : err;
+            DUAL_RET(thr, err, FOS_SUCCESS);
+        }
+
+        // Ok, our node key exists and points to a file (not a directory)
+        // We should be able to succeed from here given there's no unexpected error.
+
+        fs_node_key_t kernel_nk = NULL;
+        err = plg_fs_register_nk(plg_fs, nk, &kernel_nk);
+        fs_delete_key(plg_fs->fs, nk); // Do this regardless.
+        
+        if (err != FOS_SUCCESS) {
+            return err; // Treat a register failure as catastrophic.
+        }
+
+        const handle_t NULL_HANDLE = idtb_null_id(proc->handle_table);
+        handle_t h = idtb_pop_id(proc->handle_table);
+        if (h == NULL_HANDLE) {
+            err = FOS_EMPTY;
+        }
+
+        plugin_fs_handle_state_t *hs = NULL;
+        if (err == FOS_SUCCESS) {
+            hs = al_malloc(plg_fs->super.ks->al, sizeof(plugin_fs_handle_state_t));
+        }
+
+        if (hs) {
+            init_base_handle((handle_state_t *)hs, &FS_HS_IMPL, plg_fs->super.ks, proc, h);
+            *(plugin_fs_t **)&(hs->plg_fs) = plg_fs;
+            hs->pos = 0;
+            *(fs_node_key_t *)&(hs->nk) = kernel_nk;
+        } else {
+            err = FOS_NO_MEM;
+        }
+
+        if (err != FOS_SUCCESS) {
+            al_free(plg_fs->super.ks->al, hs);
+            idtb_push_id(proc->handle_table, h);
+            if (kernel_nk && plg_fs_deregister_nk(plg_fs, kernel_nk) != FOS_SUCCESS) {
+                return FOS_ABORT_SYSTEM;
+            }
+
+            DUAL_RET(thr, err, FOS_SUCCESS);
+        }
+
+        idtb_set(proc->handle_table, h, hs);
+
+        DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
     }
 
     default: { // This will never run.
@@ -481,3 +556,10 @@ static fernos_error_t plg_fs_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
 
     return FOS_SUCCESS;
 }
+
+static fernos_error_t copy_fs_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
+static fernos_error_t delete_fs_handle_state(handle_state_t *hs);
+static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
+static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden);
+static fernos_error_t fs_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+

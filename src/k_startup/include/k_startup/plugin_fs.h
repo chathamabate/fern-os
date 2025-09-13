@@ -35,7 +35,7 @@ struct _plugin_fs_handle_state_t {
      * (Remember, not owned here!, the actual is in the `nk_map`, 
      * this is just a shallow copy)
      */
-    fs_node_key_t nk;
+    const fs_node_key_t nk;
 };
 
 struct _plugin_fs_nk_map_entry_t {

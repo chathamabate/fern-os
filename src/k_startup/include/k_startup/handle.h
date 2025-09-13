@@ -19,7 +19,7 @@
 typedef struct _handle_state_impl_t {
     // REQUIRED!
     fernos_error_t (*copy_handle_state)(handle_state_t *hs, process_t *proc, handle_state_t **out);
-    void (*delete_handle_state)(handle_state_t *hs);
+    fernos_error_t (*delete_handle_state)(handle_state_t *hs);
 
     // OPTIONAL!
     fernos_error_t (*hs_write)(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
@@ -85,11 +85,14 @@ static inline fernos_error_t copy_handle_state(handle_state_t *hs, process_t *pr
  *
  * If this handle belongs to some plugin, how it interacts with said plugin on deletion is
  * up to you! (i.e. just be careful)
+ *
+ * If a destructor ever returns any error at all, The system will lock up.
  */
-static inline void delete_handle_state(handle_state_t *hs) {
+static inline fernos_error_t delete_handle_state(handle_state_t *hs) {
     if (hs) {
-        hs->impl->delete_handle_state(hs); 
+        return hs->impl->delete_handle_state(hs); 
     }
+    return FOS_SUCCESS;
 }
 
 /*
@@ -109,8 +112,14 @@ static inline void delete_handle_state(handle_state_t *hs) {
  * the given handle ID to the handle table.
  */
 static inline fernos_error_t hs_close(handle_state_t *hs) {
+    fernos_error_t err;
     handle_t h = hs->handle;
-    delete_handle_state(hs);
+
+    // Failure to delete a handle is seen as a catastrophic error.
+    err = delete_handle_state(hs);
+    if (err != FOS_SUCCESS) {
+        return FOS_ABORT_SYSTEM;
+    }
 
     idtb_push_id(hs->proc->handle_table, h);
 
@@ -169,8 +178,10 @@ static inline fernos_error_t hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uin
  * AND returns all handle id's to the table.
  *
  * After this call, `handle_table` will hold no handles.
+ *
+ * Returns FOS_ABORT_SYSTEM if there is ever a problem deleting any of the handles.
  */
-void clear_handle_table(id_table_t *handle_table);
+fernos_error_t clear_handle_table(id_table_t *handle_table);
 
 /**
  * Attempt to copy over handles from a parent process to a newly forked child.
