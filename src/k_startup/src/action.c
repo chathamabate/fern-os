@@ -220,7 +220,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
                 kernel->curr_thread->ctx.eax = FOS_INVALID_INDEX;
                 err = FOS_SUCCESS;
             } else { // handle found!
-                switch(h_cmd) {
+                switch (h_cmd) {
                 case HCID_CLOSE:
                     err = hs_close(hs);
                     break;
@@ -252,6 +252,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
             } else {
                 err = plg_cmd(plg, plg_cmd_id, arg0, arg1, arg2, arg3);
                 if (err != FOS_SUCCESS && err != FOS_ABORT_SYSTEM) {
+                    term_put_fmt_s("DELETING DUE TO 0x%X\n", err);
                     kernel->plugins[plg_id] = NULL;
                     err = delete_plugin(plg);
                 }

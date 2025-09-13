@@ -58,7 +58,7 @@ static inline void init_base_handle(handle_state_t *hs, const handle_state_impl_
  * Create a copy of this handle state however you see fit.
  * This will likely only be done when a process forks.
  *
- * `proc` is the parent process of the copied handle state.
+ * `proc` is the process of the copied handle state will belong to.
  * The created handle state should have the EXACT same handle as `hs`. 
  * NOTE: This call SHOULD NOT modify `proc`'s handle table, that will be done automatically
  * after this function is called.
@@ -123,7 +123,6 @@ static inline fernos_error_t hs_close(handle_state_t *hs) {
 
     idtb_push_id(hs->proc->handle_table, h);
 
-    hs->ks->curr_thread->ctx.eax = FOS_SUCCESS;
     return FOS_SUCCESS;
 }
 

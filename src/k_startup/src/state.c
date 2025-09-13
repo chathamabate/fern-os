@@ -451,7 +451,7 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
         // REAP!
         
         // First off, call the on reap handler!
-        err = plgs_on_reap_proc(ks->plugins, FOS_MAX_PLUGINS, rcpid);
+        err = plgs_on_reap_proc(ks->plugins, FOS_MAX_PLUGINS, rproc->pid);
         if (err != FOS_SUCCESS) {
             return err;
         }

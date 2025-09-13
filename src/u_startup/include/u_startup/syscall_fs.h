@@ -88,17 +88,6 @@ fernos_error_t sc_fs_flush_all(void);
  */
 fernos_error_t sc_fs_open(const char *path, handle_t *h);
 
-#ifdef NOT_DEF
-/**
- * Return a file handle to the operating system. After this call, the file handle stored in `fh`
- * is no longer usable.
- *
- * NOTE: If the file referenced by this handle is no longer referenced by any handles after this
- * call, all threads waiting to read from said file will be woken up. This is a somewhat
- * niche case. To avoid, never close your handles until after your done reading!
- */
-void sc_fs_close(file_handle_t fh);
-
 /**
  * Move a handle's position.
  *
@@ -107,60 +96,12 @@ void sc_fs_close(file_handle_t fh);
  * Using SIZE_MAX as the position will thus always bring the handle position to the end of the
  * file. (Remember, we will enforce the max file size of SIZE_MAX, and thus a maximum addressable
  * byte of SIZE_MAX - 1)
- *
- * Returns FOS_INVALID_INDEX if `fh` cannot be found.
  */
-fernos_error_t sc_fs_seek(file_handle_t fh, size_t pos);
+fernos_error_t sc_fs_seek(handle_t h, size_t pos);
 
 /**
- * Write the contents of `src` to the referenced file.
- *
- * If `len` overshoots the end of the file, the file will be expanded as necessary.
- * If the given file handle's position is already SIZE_MAX, FOS_NO_SPACE will be returned
- * in the calling thread.
- *
- * The total number of bytes written is written to `*written`.
- * FOS_SUCCESS does NOT mean all bytes were written!!! (This will likely write in chunks to 
- * prevent being in the kernel for too long)
+ * Call the flush command on a given handle.
  */
-fernos_error_t sc_fs_write(file_handle_t fh, const void *src, size_t len, size_t *written);
+fernos_error_t sc_fs_flush(handle_t h);
 
-/**
- * Wrapper around `sc_fs_write`. It will write in a loop until all bytes from 
- * `src` are written, or an error is thrown.
- */
-fernos_error_t sc_fs_write_full(file_handle_t fh, const void *src, size_t len);
 
-/**
- * Blocking read.
- *
- * Read from a file into userspace buffer `dst`.
- *
- * If the position of `fh` = len(file), this function blocks the current thread until more data 
- * is added to the file. If any data at all can be read, it is immediately written to `dst`
- * and FOS_SUCCESS is returned.
- *
- * If the position of `fh` = SIZE_MAX, FOS_SUCCESS is return and 0 is written to `*readden`.
- *
- * Just like with `sc_fs_write`, FOS_SUCCESS does NOT mean `len` bytes were read. 
- * On Success, always check what is written to `readden` to confirm the actual number of 
- * read bytes.
- */
-fernos_error_t sc_fs_read(file_handle_t fh, void *dst, size_t len, size_t *readden);
-
-/**
- * Wrapper around `sc_fs_read`. It reads in a loop until `len` bytes are read into `dst`.
- * (Or an error is returned)
- */
-fernos_error_t sc_fs_read_full(file_handle_t fh, void *dst, size_t len);
-
-/**
- * Flush!
- *
- * If `fh == FOS_MAX_FILE_HANDLES_PER_PROC`, this will flush the entire kernel file
- * system. (Again, what "flushing" actually means depends on what file system is being used)
- *
- * returns FOS_INVALID_INDEX if `fh` cannot be found AND it isn't equal to FOS_MAX_FILE_HANDLES_PER_PROC.
- */
-fernos_error_t sc_fs_flush(file_handle_t fh);
-#endif

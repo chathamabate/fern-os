@@ -3,6 +3,7 @@
 #include "k_startup/plugin_fs.h"
 #include "s_bridge/shared_defs.h"
 #include "k_startup/thread.h"
+// DELETE ME
 #include "k_bios_term/term.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
@@ -163,6 +164,8 @@ static fernos_error_t plg_fs_register_nk(plugin_fs_t *plg_fs, fs_node_key_t nk, 
         return FOS_UNKNWON_ERROR;
     }
 
+    *kernel_nk = nk_copy;
+
     return FOS_SUCCESS;
 }
 
@@ -274,7 +277,7 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
         err = fs_get_node_info(plg_fs->fs, nk, &info);
         if (err != FOS_SUCCESS || !(info.is_dir)) {
             fs_delete_key(plg_fs->fs, nk);
-            err = info.is_dir ? FOS_STATE_MISMATCH : err;
+            err = !(info.is_dir) ? FOS_STATE_MISMATCH : err;
             DUAL_RET(thr, err, FOS_SUCCESS);
         }
 
@@ -480,15 +483,20 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
         plugin_fs_handle_state_t *hs = NULL;
         if (err == FOS_SUCCESS) {
             hs = al_malloc(plg_fs->super.ks->al, sizeof(plugin_fs_handle_state_t));
+            if (!hs) {
+                err = FOS_NO_MEM;
+            }
         }
 
-        if (hs) {
+        if (err == FOS_SUCCESS) {
             init_base_handle((handle_state_t *)hs, &FS_HS_IMPL, plg_fs->super.ks, proc, h);
             *(plugin_fs_t **)&(hs->plg_fs) = plg_fs;
             hs->pos = 0;
             *(fs_node_key_t *)&(hs->nk) = kernel_nk;
-        } else {
-            err = FOS_NO_MEM;
+        } 
+
+        if (err == FOS_SUCCESS) {
+            err = mem_cpy_to_user(proc->pd, u_h, &h, sizeof(handle_t), NULL);
         }
 
         if (err != FOS_SUCCESS) {

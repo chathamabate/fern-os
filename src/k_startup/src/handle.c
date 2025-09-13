@@ -28,7 +28,7 @@ fernos_error_t copy_handle_table(process_t *parent, process_t *child) {
         }
 
         handle_state_t *hs_copy;
-        err = copy_handle_state(hs, parent, &hs_copy);
+        err = copy_handle_state(hs, child, &hs_copy);
         if (err == FOS_ABORT_SYSTEM) {
             return FOS_ABORT_SYSTEM;
         }

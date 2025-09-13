@@ -196,6 +196,8 @@ static inline bool scid_is_handle_cmd(syscall_id_t scid) {
 #define HCID_WRITE (0x1U)
 #define HCID_READ  (0x2U)
 
+#define NUM_DEFAULT_HCIDS (HCID_READ + 1)
+
 // All other handle commands are custom/implementation specific!
 
 static inline uint32_t handle_cmd_scid(handle_t h, handle_cmd_id_t cmd) {
@@ -248,9 +250,6 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 }
 
 
-
-// TODO: Likely delete everything below!!!!
-
 /*
  * File System Plugin.
  */
@@ -276,6 +275,6 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  * File system plugin handle commands
  */
 
-#define PLG_FS_HCID_SEEK           (0U)
-#define PLG_FS_HCID_FLUSH          (1U)
+#define PLG_FS_HCID_SEEK           (NUM_DEFAULT_HCIDS + 0U)
+#define PLG_FS_HCID_FLUSH          (NUM_DEFAULT_HCIDS + 1U)
 

@@ -233,10 +233,28 @@ void sc_term_put_fmt_s(const char *fmt, ...);
  */
 
 fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
-fernos_error_t sc_close(handle_t h);
+void sc_close(handle_t h);
 fernos_error_t sc_write(handle_t h, const void *src, size_t len, size_t *written);
 fernos_error_t sc_read(handle_t h, void *dest, size_t len, size_t *readden);
 
 fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+
+/*
+ * Helpers
+ */
+
+/**
+ * When using a handle which may write a partial amount on success,
+ * this function will call `sc_write` in a loop until all bytes are written!
+ * (Or an error is encountered)
+ */
+fernos_error_t sc_write_full(handle_t h, const void *src, size_t len);
+
+/**
+ * When using a handle which may read a partial amount on success,
+ * this function will call `sc_read` in a loop until all bytes are written!
+ * (Or an error is encountered)
+ */
+fernos_error_t sc_read_full(handle_t h, void *dest, size_t len);
 
 
