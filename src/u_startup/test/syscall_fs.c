@@ -425,7 +425,6 @@ static bool test_many_procs(void) {
         err = sc_fs_open(pipe_names[proc_number], &h);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-        LOGF_PREFIXED("FORKING\n");
         err = sc_proc_fork(&cpid);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
@@ -443,7 +442,6 @@ static bool test_many_procs(void) {
                 sc_proc_exit(PROC_ES_SUCCESS);
             }
         } else { // Child process.
-            sc_term_put_fmt_s("Attempting to get: %u\n", h);
             err = sc_read_full(h, tx_buf, tx_amt);
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
 

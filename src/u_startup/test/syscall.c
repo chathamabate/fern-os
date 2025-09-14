@@ -14,7 +14,7 @@ static bool posttest(void);
 
 #include "s_util/test.h"
 
-sig_vector_t old_sv;
+static sig_vector_t old_sv;
 
 static bool pretest(void) {
     // Since we will be working with child processes, we will allow the 

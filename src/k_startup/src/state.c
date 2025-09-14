@@ -289,8 +289,6 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
             delete_plugin(ks->plugins[i]);
         }
 
-        term_put_fmt_s("ALB: %u\n", al_num_user_blocks(get_default_allocator()));
-
         term_put_fmt_s("\n[System Exited with Status 0x%X]\n", status);
         lock_up();
     }
