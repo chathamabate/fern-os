@@ -13,6 +13,9 @@ fernos_error_t clear_handle_table(id_table_t *handle_table) {
     return FOS_SUCCESS;
 }
 
+// DELETE ME
+#include "k_bios_term/term.h"
+
 fernos_error_t copy_handle_table(process_t *parent, process_t *child) {
     fernos_error_t err = FOS_SUCCESS;
 
@@ -46,6 +49,8 @@ fernos_error_t copy_handle_table(process_t *parent, process_t *child) {
     // let's just go through the child's handle table and delete all handles which were 
     // successfully copied.
     if (err != FOS_SUCCESS) { 
+        term_put_fmt_s("FORK ERROR: 0x%X\n", err);
+
         for (id_t i = 0; i < FOS_MAX_HANDLES_PER_PROC; i++) {
             err = delete_handle_state(idtb_get(child->handle_table, i));
             if (err != FOS_SUCCESS) {
@@ -56,7 +61,7 @@ fernos_error_t copy_handle_table(process_t *parent, process_t *child) {
             idtb_push_id(child->handle_table, i);
         }
 
-        return err;
+        return FOS_UNKNWON_ERROR;
     }
 
     return FOS_SUCCESS;

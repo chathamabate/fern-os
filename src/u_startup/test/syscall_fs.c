@@ -397,7 +397,7 @@ static bool test_early_close(void) {
 
 static bool test_many_procs(void) {
     const char *pipe_names[] = {
-        "a", "b", "c", "d"
+        "a", "b", "c", "d", "e", "f", "g"
     };
     const size_t num_pipes = sizeof(pipe_names) / sizeof(pipe_names[0]);
 
@@ -425,6 +425,7 @@ static bool test_many_procs(void) {
         err = sc_fs_open(pipe_names[proc_number], &h);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
+        LOGF_PREFIXED("FORKING\n");
         err = sc_proc_fork(&cpid);
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
@@ -442,6 +443,7 @@ static bool test_many_procs(void) {
                 sc_proc_exit(PROC_ES_SUCCESS);
             }
         } else { // Child process.
+            sc_term_put_fmt_s("Attempting to get: %u\n", h);
             err = sc_read_full(h, tx_buf, tx_amt);
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
 

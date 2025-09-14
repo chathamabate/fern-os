@@ -21,6 +21,7 @@
 #include "k_startup/test/ata_block_device.h"
 #include "k_startup/ata_block_device.h"
 #include "s_util/str.h"
+#include "s_data/id_table.h"
 
 #include "s_block_device/cached_block_device.h"
 #include "s_data/test/list.h"
@@ -189,6 +190,11 @@ void start_kernel(void) {
 
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
+
+    term_put_fmt_s("ALB: %u\n", al_num_user_blocks(get_default_allocator()));
+
+    test_id_table(); 
+    lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }
