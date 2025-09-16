@@ -181,6 +181,8 @@ void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr);
  */
 fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base);
 
+void ks_shutdown(kernel_state_t *ks);
+
 /**
  * This function advances the kernel's tick counter.
  *

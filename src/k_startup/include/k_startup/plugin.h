@@ -4,6 +4,7 @@
 #include "s_util/err.h"
 #include "k_startup/state.h"
 #include "s_bridge/shared_defs.h"
+#include "k_startup/thread.h"
 
 /*
  *  A plugin will be a way of extending the kernel without needing to manually
@@ -12,17 +13,19 @@
  *  As of today (9/8/2025), a plugin's interface will be somewhat simple. Essentially a plugin is
  *  just a listener for certain system events. Right now, only a few events are listened for,
  *  later if I feel the need, I will expand this interface. 
+ *
+ *  VERY IMPORTANT: As of now, plugins are not meant to be removeable/loadable at runtime.
+ *  They are meant to be set in the kernel at system startup. A plugin will be active for
+ *  the entire life time of the operating system. 
  */
 
 
 typedef struct _plugin_impl_t {
-    // REQUIRED
-    fernos_error_t (*delete_plugin)(plugin_t *plg);
-
     /*
      * Below calls are ALL OPTIONAL!
      */
 
+    void (*plg_on_shutdown)(plugin_t *plg);
     fernos_error_t (*plg_tick)(plugin_t *plg);
     fernos_error_t (*plg_cmd)(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
     fernos_error_t (*plg_on_fork_proc)(plugin_t *plg, proc_id_t cpid);
@@ -45,26 +48,26 @@ static inline void init_base_plugin(plugin_t *plg, const plugin_impl_t *impl, ke
 }
 
 /**
- * Cleanup this plugin's resources.
+ * A plugin is never deleted. It lives until the system shuts down.
  *
- * If a plugin must be deleted while the system is running, this is called. If this returns
- * anything other than success, the system is aborted!
+ * This handler is called when shutdown occurs. NOTE: FernOS may shutdown in case of a system 
+ * error. In this situation, the state of the kernel may not be 100% known. 
  *
- * When the system exits, this will be called on all plugins within the kernel.
+ * The implementation of this function should only perform extremely safe and essential clean
+ * up calls. For example, maybe flushing the file system to disk. This call is NOT meant to
+ * free allocated resources of this plugin. Avoid anything that is not absolutely critical!
  */
-static inline fernos_error_t delete_plugin(plugin_t *plg) {
-    if (plg) {
-        return plg->impl->delete_plugin(plg);
+static inline void plg_on_shutdown(plugin_t *plg) {
+    if (plg->impl->plg_on_shutdown) {
+        plg->impl->plg_on_shutdown(plg);
     }
-    return FOS_SUCCESS;
 }
 
 /**
  * NOTE: The below calls all return fernos errors.
  *
  * When FOS_SUCCESS is returned, life is good! continue execution as normal.
- * When FOS_ABORT_SYSTEM is returned, ths OS locks up.
- * When any other error is returned, the plugin is deleted and removed from the system.
+ * In the case of ANY OTHER error, the system will shutdown!
  */
 
 /**
@@ -85,25 +88,26 @@ static inline fernos_error_t plg_tick(plugin_t *plg) {
 /**
  * Execute `plg_tick` on an array of plugins. 
  *
- * If a plugin returns an error code other than FOS_ABORT_SYSTEM or FOS_SUCCESS, the plugin will
- * be deleted and overwritten with NULL in `plgs`.
- *
- * Returns FOS_ABORT_SYSTEM if any plugins return FOS_ABORT_SYSTEM during their tick handler.
- * Otherwise, returns FOS_SUCCESS.
+ * Returns FOS_SUCCESS if and only if every tick call succeeds. 
+ * Returns early if an error is encountered.
  */
 fernos_error_t plgs_tick(plugin_t **plgs, size_t plgs_len);
 
 /**
  * The kernel state's current thread requested a custom command be executed by this plugin!
  *
- * Remember, unlike handle commands these can return an error which tells the kernel to 
- * delete the plugin and move on. FOS_ABORT_SYSTEM though will always lock up the system!
+ * Any non-success error code returned here in kernel-space shuts down the system.
  */
 static inline fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     if (plg->impl->plg_cmd) {
         return plg->impl->plg_cmd(plg, cmd_id, arg0, arg1, arg2, arg3);
     }
-    return FOS_SUCCESS;
+
+    if (plg->ks->curr_thread) {
+        DUAL_RET(plg->ks->curr_thread, FOS_NOT_IMPLEMENTED, FOS_SUCCESS);
+    } else {
+        return FOS_STATE_MISMATCH;
+    }
 }
 
 /**
@@ -121,12 +125,6 @@ static inline fernos_error_t plg_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
 
 /**
  * Execute `plg_on_fork` on an array of plugins. 
- *
- * If a plugin returns an error code other than FOS_ABORT_SYSTEM or FOS_SUCCESS, the plugin will
- * be deleted and overwritten with NULL in `plgs`.
- *
- * Returns FOS_ABORT_SYSTEM if any plugins return FOS_ABORT_SYSTEM during their on fork handler.
- * Otherwise, returns FOS_SUCCESS.
  */
 fernos_error_t plgs_on_fork_proc(plugin_t **plgs, size_t plgs_len, proc_id_t cpid);
 
@@ -148,12 +146,6 @@ static inline fernos_error_t plg_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
 
 /**
  * Execute `plg_on_reap` on an array of plugins. 
- *
- * If a plugin returns an error code other than FOS_ABORT_SYSTEM or FOS_SUCCESS, the plugin will
- * be deleted and overwritten with NULL in `plgs`.
- *
- * Returns FOS_ABORT_SYSTEM if any plugins return FOS_ABORT_SYSTEM during their on reap handler.
- * Otherwise, returns FOS_SUCCESS.
  */
 fernos_error_t plgs_on_reap_proc(plugin_t **plgs, size_t plgs_len, proc_id_t rpid);
 
