@@ -120,42 +120,12 @@ struct _process_t {
     map_t *futexes;
 
     /**
-     * The current working directory of this process.
+     * This ID table will always have a maximum capcity <= 256. This way ID's can always fit
+     * in 8 bits. (i.e. the size of a handle_t)
      *
-     * Just like the node keys found in `file_handle_table` below, this key should be managed by
-     * the kernel state, NOT HERE. (This just means, we can shallow copy around this value
-     * all we want, it is the kernel state's reponsibility to keep track)
-     *
-     * This should NEVER be NULL.
+     * This maps handle_t's -> handle_state_t *'s.
      */
-    fs_node_key_t cwd;
-
-    /**
-     * Each entry in this table holds a pointer to a file_handle_state_t * which is 
-     * dynamically allocated by this process's allocator.
-     */
-    id_table_t *file_handle_table;
-};
-
-struct _file_handle_state_t {
-    /**
-     * The node key used by this handle.
-     *
-     * NOTE VERY IMPORTANT!! This node key is NOT owned by this structure.
-     * On deletion, node keys are not deleted! We'd expect the kernel to keep track of all
-     * allocated node keys some where else. (This works because all node keys are really just 
-     * pointers)
-     */
-    const fs_node_key_t nk;
-
-    /**
-     * The position in the file to read/write to next.
-     *
-     * NOTE: The user will only be able to write/read from bytes [0, SIZE_MAX - 1].
-     * When pos = SIZE_MAX, this signifies the file is at it's maximum size and cannot
-     * be written to or read from any more without calling seek.
-     */
-    size_t pos;
+    id_table_t *handle_table;
 };
 
 /**
@@ -165,10 +135,10 @@ struct _file_handle_state_t {
  *
  * If any allocation fails, NULL is returned.
  */
-process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd);
+process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent);
 
-static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent, fs_node_key_t cwd) {
-    return new_process(get_default_allocator(), pid, pd, parent, cwd);
+static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t *parent) {
+    return new_process(get_default_allocator(), pid, pd, parent);
 }
 
 /**
@@ -183,8 +153,9 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  * NOTE: futexes and join queue are NOT copied! And The given process `proc` is not edited in
  * ANY WAY! It is your responsibility to register this new process as a child in the old.
  *
- * NOTE: All file handles ARE copied. HOWEVER remember that more work will likely need to be
- * done by the kernel to handle these new file handle copies.
+ * VERY IMPORTANT: Handle states in the Handle table ARE NOT COPIED! This is because copying a
+ * handle state can result in a catastrophic error. So, it's the kernel's responsibility to copy over
+ * handles one layer up.
  *
  * Returns NULL if there are insufficient resources or if the arguments are bad.
  *
@@ -198,6 +169,9 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid);
  * This frees all memory used by proc! (Including the full page directory)
  *
  * This does NOT remove threads from wait queues or schedules!!!!!!!
+ *
+ * VERY IMPORTANT: This DOES NOT delete handle states.
+ * This must be dealt with one layer above this one!
  *
  * Before you delete a process, ALWAYS detach all threads!
  * This call DOES NOT check if threads are detatched or not before deleting.
@@ -258,18 +232,3 @@ basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex);
  * Make sure all waiting threads are dealt with before calling this function.
  */
 void proc_deregister_futex(process_t *proc, futex_t *u_futex);
-
-/**
- * Create a new file handle entry with the given node key.
- *
- * On success, the created file handle is written to `*fh`.
- */
-fernos_error_t proc_register_file_handle(process_t *proc, fs_node_key_t nk, file_handle_t *fh);
-
-/**
- * Clean up the resources of a file handle.
- */
-void proc_deregister_file_handle(process_t *proc, file_handle_t fh);
-
-
-

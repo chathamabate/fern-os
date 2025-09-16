@@ -102,13 +102,6 @@ typedef struct _thread_join_ret_t {
 typedef int32_t futex_t;
 
 /**
- * In kernel space we'll use the fs_node_key_t type often. 
- *
- * However, the user will only ever be given file_handle_t values.
- */
-typedef id_t file_handle_t;
-
-/**
  * Exit statuses of a process.
  */
 typedef uint32_t proc_exit_status_t;
@@ -125,6 +118,26 @@ typedef uint32_t proc_exit_status_t;
  * Syscall IDs.
  */
 
+typedef uint32_t syscall_id_t;
+
+/**
+ * The final two bits of a syscall are the "attrs".
+ * If "attrs" = 0b00, Vanilla Syscall
+ * If "attrs" = 0b01, Handle Syscall
+ * If "attrs" = 0b10, Plugin Syscall 
+ */
+#define SYSCALL_ATTRS_MASK (3UL << 30) 
+
+/*
+ * Vanilla Syscalls
+ */
+
+#define VANILLA_CMD_PREFIX (0x0UL)
+
+static inline bool scid_is_vanilla(syscall_id_t scid) {
+    return (scid & SYSCALL_ATTRS_MASK) == VANILLA_CMD_PREFIX;
+}
+
 /* Process Syscalls */
 #define SCID_PROC_FORK (0x80U)
 #define SCID_PROC_EXIT (0x81U)
@@ -134,6 +147,7 @@ typedef uint32_t proc_exit_status_t;
 #define SCID_SIGNAL       (0x90U)
 #define SCID_SIGNAL_ALLOW (0x91U)
 #define SCID_SIGNAL_WAIT  (0x92U)
+#define SCID_SIGNAL_CLEAR (0x93U)
 
 /* Thread Syscalls */
 #define SCID_THREAD_EXIT  (0x100U)
@@ -147,19 +161,122 @@ typedef uint32_t proc_exit_status_t;
 #define SCID_FUTEX_WAIT       (0x202U)
 #define SCID_FUTEX_WAKE       (0x203U)
 
-/* FS Syscalls */
-#define SCID_FS_SET_WD          (0x300U)
-#define SCID_FS_TOUCH           (0x301U)
-#define SCID_FS_MKDIR           (0x302U)
-#define SCID_FS_REMOVE          (0x303U)
-#define SCID_FS_GET_INFO        (0x304U)
-#define SCID_FS_GET_CHILD_NAME  (0x305U)
-#define SCID_FS_OPEN            (0x306U)
-#define SCID_FS_CLOSE           (0x307U)
-#define SCID_FS_SEEK            (0x308U)
-#define SCID_FS_WRITE           (0x309U)
-#define SCID_FS_READ            (0x30AU)
-#define SCID_FS_FLUSH           (0x30BU)
-
 /* Term Puts syscalls */
 #define SCID_TERM_PUT_S (0x400U)
+
+/*
+ * Handle Syscalls
+ */
+
+/*
+ * The handle system call id will take the following form:
+ *
+ * [0:15]  handle_cmd_id
+ * [16:23] handle
+ * [24:31] 0x40
+ */
+
+
+/**
+ * NOTE: a handle will only ever require 8 bits, but because handles will be placed
+ * in ID Tables, the "NULL" handle will be 256 (which does not fit in 8 bits)
+ *
+ * So, the handle type will actually be 32 bits to make iteration/operations 
+ * less error prone.
+ */
+typedef id_t handle_t;
+typedef uint16_t handle_cmd_id_t;
+
+#define HANDLE_CMD_PREFIX (1UL << 30)
+
+static inline bool scid_is_handle_cmd(syscall_id_t scid) {
+    return (scid & SYSCALL_ATTRS_MASK) == HANDLE_CMD_PREFIX;
+}
+
+#define HCID_CLOSE (0x0U)
+#define HCID_WRITE (0x1U)
+#define HCID_READ  (0x2U)
+#define HCID_WAIT  (0x3U)
+
+#define NUM_DEFAULT_HCIDS (HCID_WAIT + 1)
+
+// All other handle commands are custom/implementation specific!
+
+static inline uint32_t handle_cmd_scid(handle_t h, handle_cmd_id_t cmd) {
+    return HANDLE_CMD_PREFIX | ((h & 0xFF) << 16) | cmd;
+}
+
+static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cmd_id_t *hcid) {
+    *h = (scid >> 16) & 0xFF;
+    *hcid = (handle_cmd_id_t)scid;
+}
+
+/*
+ * Plugin Command syntax
+ *
+ * [0:15]  plugin_cmd_id
+ * [16:23] plugin_id
+ * [24:31] 0x80
+ */
+
+/**
+ * The globally unique ID of a plugin.
+ *
+ * This is 32 bits for the same reason `handle_t` is 32 bits.
+ */
+typedef uint32_t plugin_id_t;
+
+/**
+ * The Plugin unique ID of a command.
+ */
+typedef uint16_t plugin_cmd_id_t;
+
+#define PLUGIN_CMD_PREFIX (2UL << 30)
+
+static inline bool scid_is_plugin_cmd(syscall_id_t scid) {
+    return (scid & SYSCALL_ATTRS_MASK) == PLUGIN_CMD_PREFIX;
+}
+
+/*
+ * NOTE: Unlike Handles, Plugins have NO default command IDs, plugins have no special builtin
+ * endpoints.
+ */
+
+static inline uint32_t plugin_cmd_scid(plugin_id_t plg_id, plugin_cmd_id_t cmd_id) {
+    return PLUGIN_CMD_PREFIX | ((plg_id & 0xFF) << 16) | cmd_id;
+}
+
+static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, plugin_cmd_id_t *cmd_id) {
+    *plg_id = (plg_scid >> 16) & 0xFF;
+    *cmd_id = (uint16_t)plg_scid;
+}
+
+
+/*
+ * File System Plugin.
+ */
+
+#define PLG_FILE_SYS_ID (1U)
+
+/*
+ * File system plugin commands.
+ */
+
+#define PLG_FS_PCID_SET_WD         (0U)
+#define PLG_FS_PCID_TOUCH          (1U)
+#define PLG_FS_PCID_MKDIR          (2U)
+#define PLG_FS_PCID_REMOVE         (3U)
+#define PLG_FS_PCID_GET_INFO       (4U)
+#define PLG_FS_PCID_GET_CHILD_NAME (5U)
+#define PLG_FS_PCID_FLUSH          (6U)
+#define PLG_FS_PCID_OPEN           (7U)
+
+#define PLG_FILE_SYS_NUM_CMDS      (PLG_FS_PCID_OPEN + 1)
+
+/*
+ * File system plugin handle commands
+ */
+
+#define PLG_FS_HCID_SEEK           (NUM_DEFAULT_HCIDS + 0U)
+#define PLG_FS_HCID_FLUSH          (NUM_DEFAULT_HCIDS + 1U)
+

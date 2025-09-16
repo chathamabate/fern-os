@@ -21,6 +21,7 @@
 #include "k_startup/test/ata_block_device.h"
 #include "k_startup/ata_block_device.h"
 #include "s_util/str.h"
+#include "s_data/id_table.h"
 
 #include "s_block_device/cached_block_device.h"
 #include "s_data/test/list.h"
@@ -39,7 +40,8 @@
 #include "s_block_device/file_sys.h"
 #include "s_block_device/test/file_sys_helpers.h"
 #include "s_block_device/test/fat32_file_sys.h"
-#include "k_startup/state_fs.h"
+#include "k_startup/plugin.h"
+#include "k_startup/plugin_fs.h"
 
 #include "k_sys/ata.h"
 
@@ -89,6 +91,45 @@ static void now(fernos_datetime_t *dt) {
 kernel_state_t *kernel = NULL;
 
 static void init_kernel_state(void) {
+    kernel = new_da_kernel_state();
+    if (!kernel) {
+        setup_fatal("Failed to allocate kernel state");
+    }
+    // Let's setup our first user process.
+
+    proc_id_t pid = idtb_pop_id(kernel->proc_table);
+    if (pid == idtb_null_id(kernel->proc_table)) {
+        setup_fatal("Failed to pop root pid");
+    }
+
+    phys_addr_t user_pd = pop_initial_user_info();
+    if (user_pd == NULL_PHYS_ADDR) {
+        setup_fatal("Failed to get user PD");
+    }
+
+    process_t *proc = new_da_process(pid, user_pd, NULL);
+    if (!proc) {
+        setup_fatal("Failed to allocate first process");
+    }
+
+    kernel->root_proc = proc;
+    idtb_set(kernel->proc_table, pid, proc);
+
+    // The first thread spawned will not get a void * arg, nor will it return one.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+    thread_t *thr = proc_new_thread(kernel->root_proc, 
+            (thread_entry_t)user_main, NULL);
+    if (!thr) {
+        setup_fatal("Failed to allocate first thread");
+    }
+#pragma GCC diagnostic pop
+
+    // Finally, schedule our first thread!
+    ks_schedule_thread(kernel, thr);
+}
+
+static void init_kernel_plugins(void) {
     fernos_error_t err;
 
     block_device_t *bd = new_da_cached_block_device(
@@ -116,58 +157,11 @@ static void init_kernel_state(void) {
         }
     }
 
-    kernel = new_da_kernel_state(fs);
-    if (!kernel) {
-        setup_fatal("Failed to allocate kernel state");
+    plugin_t *plg_fs = new_plugin_fs(kernel, fs);
+    if (!plg_fs) {
+        setup_fatal("Failed to create File System plugin");
     }
-
-    // Let's register the root key into the kenrel state.
-    fs_node_key_t root_key;
-    err = fs_new_key(fs, NULL, "/", &root_key);
-    if (err != FOS_SUCCESS) {
-        setup_fatal("Failed to get root dir key");
-    }
-
-    fs_node_key_t kernel_root_key;
-    err = ks_fs_register_nk(kernel, root_key, &kernel_root_key);
-    if (err != FOS_SUCCESS) {
-        setup_fatal("Failed to register root key!");
-    }
-
-    fs_delete_key(kernel->fs, root_key);
-
-    // Let's setup our first user process.
-
-    proc_id_t pid = idtb_pop_id(kernel->proc_table);
-    if (pid == idtb_null_id(kernel->proc_table)) {
-        setup_fatal("Failed to pop root pid");
-    }
-
-    phys_addr_t user_pd = pop_initial_user_info();
-    if (user_pd == NULL_PHYS_ADDR) {
-        setup_fatal("Failed to get user PD");
-    }
-
-    process_t *proc = new_da_process(pid, user_pd, NULL, kernel_root_key);
-    if (!proc) {
-        setup_fatal("Failed to allocate first process");
-    }
-
-    kernel->root_proc = proc;
-    idtb_set(kernel->proc_table, pid, proc);
-
-    // The first thread spawned will not get a void * arg, nor will it return one.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-    thread_t *thr = proc_new_thread(kernel->root_proc, 
-            (thread_entry_t)user_main, NULL);
-    if (!thr) {
-        setup_fatal("Failed to allocate first thread");
-    }
-#pragma GCC diagnostic pop
-
-    // Finally, schedule our first thread!
-    ks_schedule_thread(kernel, thr);
+    try_setup_step(ks_set_plugin(kernel, PLG_FILE_SYS_ID, (plugin_t *)plg_fs), "Failed to set FS Plugin in the kernel");
 }
 
 void start_kernel(void) {
@@ -188,6 +182,7 @@ void start_kernel(void) {
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
 
     init_kernel_state();
+    init_kernel_plugins();
 
     // Now put in the real actions.
     set_gpf_action(fos_gpf_action);

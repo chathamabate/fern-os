@@ -14,13 +14,15 @@
 #include "k_startup/kernel.h"
 #include <stdint.h>
 #include "k_startup/state.h"
-#include "k_startup/state_fs.h"
 #include "k_sys/debug.h"
 #include "s_data/wait_queue.h"
 #include "k_startup/thread.h"
 #include "k_startup/gdt.h"
 #include "k_sys/intr.h"
+#include "k_startup/plugin.h"
 #include "s_util/constraints.h"
+#include "k_startup/handle.h"
+#include "k_startup/plugin.h"
 
 
 /**
@@ -117,9 +119,8 @@ void fos_timer_action(user_ctx_t *ctx) {
     
     fernos_error_t err = ks_tick(kernel);
     if (err != FOS_SUCCESS) {
-        out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
-                "Fatal timer error");
-        lock_up();
+        term_put_fmt_s("[Timer Error 0x%X]", err);
+        ks_shutdown(kernel);
     }
 
     return_to_curr_thread();
@@ -155,6 +156,10 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_wait_signal(kernel, (sig_vector_t)arg0, (sig_id_t *)arg1);
         break;
 
+    case SCID_SIGNAL_CLEAR:
+        err = ks_signal_clear(kernel, (sig_vector_t)arg0);
+        break;
+
     case SCID_THREAD_EXIT:
         err = ks_exit_thread(kernel, (void *)arg0);
         break;
@@ -188,54 +193,6 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_wake_futex(kernel, (futex_t *)arg0, (bool)arg1);
         break;
 
-	case SCID_FS_SET_WD:
-        err = ks_fs_set_wd(kernel, (const char *)arg0, (size_t)arg1);
-        break;
-        
-	case SCID_FS_TOUCH:
-        err = ks_fs_touch(kernel, (const char *)arg0, (size_t)arg1);
-        break;
-        
-	case SCID_FS_MKDIR:
-        err = ks_fs_mkdir(kernel, (const char *)arg0, (size_t)arg1);
-        break;
-
-	case SCID_FS_REMOVE:
-        err = ks_fs_remove(kernel, (const char *)arg0, (size_t)arg1);
-        break;
-
-	case SCID_FS_GET_INFO:
-        err = ks_fs_get_info(kernel, (const char *)arg0, (size_t)arg1, (fs_node_info_t *)arg2);
-        break;
-
-	case SCID_FS_GET_CHILD_NAME:
-        err = ks_fs_get_child_name(kernel, (const char *)arg0, (size_t)arg1, (size_t)arg2, (char *)arg3);
-        break;
-
-	case SCID_FS_OPEN:
-        err = ks_fs_open(kernel, (const char *)arg0, (size_t)arg1, (file_handle_t *)arg2);
-        break;
-
-	case SCID_FS_CLOSE:
-        err = ks_fs_close(kernel, (file_handle_t)arg0);
-        break;
-
-	case SCID_FS_SEEK:
-        err = ks_fs_seek(kernel, (file_handle_t)arg0, (size_t)arg1);
-        break;
-
-	case SCID_FS_WRITE:
-        err = ks_fs_write(kernel, (file_handle_t)arg0, (const void *)arg1, (size_t)arg2, (size_t *)arg3);
-        break;
-
-	case SCID_FS_READ:
-        err = ks_fs_read(kernel, (file_handle_t)arg0, (void *)arg1, (size_t)arg2, (size_t *)arg3);
-        break;
-
-	case SCID_FS_FLUSH:
-        err = ks_fs_flush(kernel, (file_handle_t)arg0);
-        break;
-
     case SCID_TERM_PUT_S:
         if (!arg0) {
             kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
@@ -251,14 +208,67 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         break;
 
     default:
-        kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
-        err = FOS_SUCCESS;
+        // Using a more nested structure here...
+        if (scid_is_handle_cmd(id)) {
+            handle_t h;
+            handle_cmd_id_t h_cmd;
+
+            handle_scid_extract(id, &h, &h_cmd);
+
+            id_table_t *handle_table = kernel->curr_thread->proc->handle_table;
+            handle_state_t *hs = idtb_get(handle_table, h);
+
+            if (!hs) {
+                kernel->curr_thread->ctx.eax = FOS_INVALID_INDEX;
+                err = FOS_SUCCESS;
+            } else { // handle found!
+                switch (h_cmd) {
+                case HCID_CLOSE:
+                    err = hs_close(hs);
+                    break;
+
+                case HCID_WRITE:
+                    err = hs_write(hs, (const void *)arg0, (size_t)arg1, (size_t *)arg2);
+                    break;
+
+                case HCID_READ:
+                    err = hs_read(hs, (void *)arg0, (size_t)arg1, (size_t *)arg2);
+                    break;
+
+                case HCID_WAIT:
+                    err = hs_wait(hs);
+                    break;
+
+                default: // Otherwise, default to custom command!
+                    err = hs_cmd(hs, h_cmd, arg0, arg1, arg2, arg3);
+                    break;
+                }
+            }
+        } else if (scid_is_plugin_cmd(id)) {
+            plugin_id_t plg_id;
+            plugin_cmd_id_t plg_cmd_id;
+
+            plugin_scid_extract(id, &plg_id, &plg_cmd_id);
+
+            plugin_t *plg = kernel->plugins[plg_id];
+
+            if (!plg) {
+                kernel->curr_thread->ctx.eax = FOS_INVALID_INDEX;
+                err = FOS_SUCCESS;
+            } else {
+                err = plg_cmd(plg, plg_cmd_id, arg0, arg1, arg2, arg3);
+            }
+        } else {
+            kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
+            err = FOS_SUCCESS;
+        }
+
         break;
     }
 
     if (err != FOS_SUCCESS) {
         term_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
-        lock_up();
+        ks_shutdown(kernel);
     }
 
     return_to_curr_thread();

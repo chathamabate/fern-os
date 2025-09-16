@@ -172,6 +172,7 @@ fernos_error_t idtb_request_id(id_table_t *idtb, id_t id) {
         idtb->tbl[al_head].prev = id;
     }
 
+    idtb->tbl[id].prev = NULL_ID;
     idtb->tbl[id].next = al_head;
     idtb->al_head = id;
 

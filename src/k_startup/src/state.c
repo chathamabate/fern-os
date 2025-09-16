@@ -6,31 +6,26 @@
 #include "k_startup/thread.h"
 #include "k_startup/process.h"
 #include "k_startup/page.h"
-#include "k_startup/state_fs.h"
+#include "k_startup/handle.h"
+#include "k_startup/plugin.h"
 
 #include "k_bios_term/term.h"
 #include "s_util/str.h"
+#include "s_util/ansii.h"
 
 
 /**
  * Creates a new kernel state with basically no fleshed out details.
  */
-kernel_state_t *new_kernel_state(allocator_t *al, file_sys_t *fs) {
-    if (!fs) {
-        return NULL;
-    }
-
+kernel_state_t *new_kernel_state(allocator_t *al) {
     kernel_state_t *ks = al_malloc(al, sizeof(kernel_state_t));
     id_table_t *pt = new_id_table(al, FOS_MAX_PROCS);
     timed_wait_queue_t *twq = new_timed_wait_queue(al);
-    map_t *nk_map = new_chained_hash_map(al, sizeof(fs_node_key_t), sizeof(kernel_fs_node_state_t *),
-            3, fs_get_key_equator(fs), fs_get_key_hasher(fs));
 
-    if (!ks || !pt || !twq || !nk_map) {
+    if (!ks || !pt || !twq) {
         al_free(al, ks);
         delete_id_table(pt);
         delete_wait_queue((wait_queue_t *)twq);
-        delete_map(nk_map);
         return NULL;
     }
 
@@ -42,10 +37,25 @@ kernel_state_t *new_kernel_state(allocator_t *al, file_sys_t *fs) {
     ks->curr_tick = 0;
     *(timed_wait_queue_t **)&(ks->sleep_q) = twq;
 
-    *(file_sys_t **)&(ks->fs) = fs;
-    *(map_t **)&(ks->nk_map) = nk_map;
+    for (size_t i = 0; i < FOS_MAX_PLUGINS; i++) {
+        ks->plugins[i] = NULL; // No plugins yet!
+    }
 
     return ks;
+}
+
+fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *plg) {
+    if (plg_id >= FOS_MAX_PLUGINS) {
+        return FOS_INVALID_INDEX;
+    }
+
+    if (ks->plugins[plg_id]) {
+        return FOS_IN_USE;
+    }
+
+    ks->plugins[plg_id] = plg;
+
+    return FOS_SUCCESS;
 }
 
 void ks_save_ctx(kernel_state_t *ks, user_ctx_t *ctx) {
@@ -130,6 +140,16 @@ fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base) {
     return FOS_SUCCESS;
 }
 
+void ks_shutdown(kernel_state_t *ks) {
+    for (size_t i = 0; i < FOS_MAX_PLUGINS; i++) {
+        if (ks->plugins[i]) {
+            plg_on_shutdown(ks->plugins[i]);
+        }
+    }
+
+    lock_up();
+}
+
 fernos_error_t ks_tick(kernel_state_t *ks) {
     fernos_error_t err;
 
@@ -163,6 +183,14 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
         ks->curr_thread = ks->curr_thread->next_thread;
     }
 
+    // trigger plugin on tick handlers every 16th tick.
+    if (((uintptr_t)(ks->curr_thread) & 0xF) == 0) {
+        err = plgs_tick(ks->plugins, FOS_MAX_PLUGINS);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+    }
+
     return FOS_SUCCESS;
 }
 
@@ -171,52 +199,10 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
 
 static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid);
 
-/**
- * Given a newly forked process, increment the reference counts of all file node keys
- * mentioned in this new child.
- *
- * Remember, since this process must've been created via a fork, we can assume our `nk_map`
- * map already has entries for every node key present in `child`.
- */
-static fernos_error_t ks_register_fork_nks(kernel_state_t *ks, process_t *child) {
-    idtb_reset_iterator(child->file_handle_table);
-    for (file_handle_t fh = idtb_get_iter(child->file_handle_table);
-            fh != idtb_null_id(child->file_handle_table); 
-            fh = idtb_next(child->file_handle_table)) {
-        file_handle_state_t *fh_state = idtb_get(child->file_handle_table, fh);
-        if (!fh_state) {
-            return FOS_ABORT_SYSTEM;
-        }
-
-        // Here we will not use the `register_nk` helper because we know each node key must
-        // already exist in the `nk_map`. If not something bad has happened.
-        // The helper would miss this case.
-
-        fs_node_key_t nk = fh_state->nk;
-        kernel_fs_node_state_t **node_state = mp_get(ks->nk_map, &nk);
-        if (!node_state || !(*node_state)) {
-            return FOS_ABORT_SYSTEM;
-        }
-        (*node_state)->references++;
-    }
-
-    // Now, don't forget the cwd either!
-
-    kernel_fs_node_state_t **cwd_node_state = mp_get(ks->nk_map, &(child->cwd));
-    if (!cwd_node_state || !(*cwd_node_state)) {
-        return FOS_ABORT_SYSTEM;
-    }
-    (*cwd_node_state)->references++;
-
-    return FOS_SUCCESS;
-}
-
 fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     if (!(ks->curr_thread)) {
         return FOS_STATE_MISMATCH;
     }
-
-    fernos_error_t err;
 
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
@@ -227,7 +213,7 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
 
     proc_id_t cpid = NULL_PID;
     process_t *child = NULL;
-    fernos_error_t push_err = FOS_UNKNWON_ERROR;
+    fernos_error_t err = FOS_UNKNWON_ERROR;
 
     // Request child process ID.
     cpid = idtb_pop_id(ks->proc_table);
@@ -237,14 +223,26 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
         child = new_process_fork(proc, thr, cpid);
     }
 
-    // Push child on to children list.
+    // Attempt to copy handles from parent to child.
     if (child) {
-        push_err = l_push_back(proc->children, &child);
+        err = copy_handle_table(proc, child);
+        if (err == FOS_ABORT_SYSTEM) {
+            return FOS_ABORT_SYSTEM;
+        }
+    }
+
+    // Push child on to children list.
+    if (err == FOS_SUCCESS) {
+        err = l_push_back(proc->children, &child);
     }
 
     // Now check for errors.
-    if (cpid == NULL_PID || !child || push_err != FOS_SUCCESS) {
+    if (cpid == NULL_PID || !child || err != FOS_SUCCESS) {
         idtb_push_id(ks->proc_table, cpid);
+        err = clear_handle_table(child->handle_table);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
         delete_process(child);
 
         if (u_cpid) {
@@ -268,10 +266,10 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     child->main_thread->ctx.eax = FOS_SUCCESS;
     ks_schedule_thread(ks, child->main_thread);
 
-    // Now increment the handle reference counts.
-    err = ks_register_fork_nks(ks, child);
+    // Call the on fork handlers!
+    err = plgs_on_fork_proc(ks->plugins, FOS_MAX_PLUGINS, cpid);
     if (err != FOS_SUCCESS) {
-        return err; // Pretty bad if this fails.
+        return err;
     }
 
     // Finally I think we are done!
@@ -296,10 +294,8 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     fernos_error_t err;
 
     if (ks->root_proc == proc) {
-        fs_flush(ks->fs, NULL); // Flush full file system on kernel exit.
-                                         
-        term_put_fmt_s("\n[System Exited with Status 0x%X]\n", status);
-        lock_up();
+        term_put_fmt_s("[System Exit with Status 0x%X]", status);
+        ks_shutdown(ks);
     }
 
     // First what do we do? Detatch all threads plz!
@@ -458,12 +454,18 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     if (user_err == FOS_SUCCESS) {
         // REAP!
         
-        err = ks_fs_deregister_proc_nks(ks, rproc);
+        // First off, call the on reap handler!
+        err = plgs_on_reap_proc(ks->plugins, FOS_MAX_PLUGINS, rproc->pid);
         if (err != FOS_SUCCESS) {
-            return err; // Failing to cleanup the file handles is seen as a fatal error.
+            return err;
         }
 
-        // Reaping should also clean up file handles within the process being reaped!
+        // then, try to delete all handles!
+        err = clear_handle_table(rproc->handle_table);
+        if (err != FOS_SUCCESS) {
+            return err;
+        }
+
         rcpid = rproc->pid;
         rces = rproc->exit_status;
 
@@ -666,6 +668,16 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
     thr->wq = (wait_queue_t *)(proc->signal_queue);
     thr->state = THREAD_STATE_WAITING;
     thr->wait_ctx[0] = (uint32_t)u_sid;
+
+    return FOS_SUCCESS;
+}
+
+fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv) {
+    if (!(ks->curr_thread)) {
+        return FOS_STATE_MISMATCH;
+    }
+
+    ks->curr_thread->proc->sig_vec &= ~sv;
 
     return FOS_SUCCESS;
 }

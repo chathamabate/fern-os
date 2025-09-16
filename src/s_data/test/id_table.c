@@ -171,8 +171,7 @@ static bool test_id_table1(void) {
 }
 
 #define TEST_ID_TABLE_REQ_MC 0x10U
-static bool test_id_table_request(void) {
-    // Here we assume that the heap doesn have 2Gs of space.
+static bool test_id_table_request0(void) {
     id_table_t *idtb = new_da_id_table(TEST_ID_TABLE_REQ_MC);
     TEST_TRUE(idtb != NULL);
 
@@ -209,6 +208,35 @@ static bool test_id_table_request(void) {
         void *data = idtb_get(idtb, id);
         TEST_EQUAL_HEX(data, (void *)id);
     }
+
+    // Now let's put them all back for a second.
+    for (id_t id = 0; id < TEST_ID_TABLE_REQ_MC; id++) {
+        idtb_push_id(idtb, id);
+    }
+
+    delete_id_table(idtb);
+
+    TEST_SUCCEED();
+}
+
+static bool test_id_table_request1(void) {
+    id_table_t *idtb = new_da_id_table(TEST_ID_TABLE_REQ_MC);
+    TEST_TRUE(idtb != NULL);
+
+    const id_t NULL_ID = idtb_null_id(idtb);
+
+    fernos_error_t err;
+    err = idtb_request_id(idtb, TEST_ID_TABLE_REQ_MC - 1);
+    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+
+    idtb_reset_iterator(idtb);
+    size_t iters = 0;
+    for (id_t id = idtb_get_iter(idtb); id != NULL_ID; id = idtb_next(idtb)) {
+        TEST_EQUAL_UINT(TEST_ID_TABLE_REQ_MC - 1, id);
+        iters++;
+    }
+
+    TEST_EQUAL_UINT(1, iters);
 
     delete_id_table(idtb);
 
@@ -297,7 +325,8 @@ bool test_id_table(void) {
     RUN_TEST(test_id_table_simple);
     RUN_TEST(test_id_table0);
     RUN_TEST(test_id_table1);
-    RUN_TEST(test_id_table_request);
+    RUN_TEST(test_id_table_request0);
+    RUN_TEST(test_id_table_request1);
     RUN_TEST(test_id_table_exhaustion);
     RUN_TEST(test_id_table_iter);
     return END_SUITE();

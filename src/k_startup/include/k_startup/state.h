@@ -6,6 +6,7 @@
 #include "k_sys/page.h"
 #include "s_mem/allocator.h"
 #include "k_startup/fwd_defs.h"
+#include "s_util/constraints.h"
 #include "s_bridge/ctx.h"
 #include "s_data/map.h"
 
@@ -27,10 +28,11 @@
     }
 
 #define DUAL_RET_FOS_ERR(err, thr) \
-    if (err != FOS_SUCCESS) { \
+    if ((err) != FOS_SUCCESS) { \
         (thr)->ctx.eax = (err);  \
         return FOS_SUCCESS; \
     }
+
 
 /*
  * Design NOTES:
@@ -59,7 +61,7 @@
  * to the calling userspace thread, and an error which should shut down the system.
  * When a helper function encounters some unexpected fatal state, it should return 
  * FOS_ABORT_SYSTEM. Then users of the function know when an error is allowed, and when an error
- * is fatal. (See the node key functions in state_fs.c)
+ * is fatal.
  */
 
 /**
@@ -107,19 +109,16 @@ struct _kernel_state_t {
      */
     timed_wait_queue_t * const sleep_q;
 
-    /*
-     * File System Stuff!!
-     */
-
-    file_sys_t * const fs;
-
     /**
-     * This is a map of fs_node_key_t -> kernel_fs_node_state_t *
+     * For now, plugins are meant to be registered before kicking of the user processes.
      *
-     * EVERY fs_node_key in use by the kernel will have an entry in this map.
-     * (This includes directory node keys which are not directly accessibly by the user)
+     * The number cell occupied by the plugin pointer will be the ID used from userspace to
+     * invoke the plugins custom commands.
+     *
+     * Unused cells will have value NULL. When a plugin errors out and must be deleted, it's cell
+     * is also set to NULL after cleanup.
      */
-    map_t * const nk_map;
+    plugin_t *plugins[FOS_MAX_PLUGINS];
 };
 
 /**
@@ -127,11 +126,21 @@ struct _kernel_state_t {
  *
  * Returns NULL on error.
  */
-kernel_state_t *new_kernel_state(allocator_t *al, file_sys_t *fs);
+kernel_state_t *new_kernel_state(allocator_t *al);
 
-static inline kernel_state_t *new_da_kernel_state(file_sys_t *fs) {
-    return new_kernel_state(get_default_allocator(), fs);
+static inline kernel_state_t *new_da_kernel_state(void) {
+    return new_kernel_state(get_default_allocator());
 }
+
+/**
+ * Place the given plugin pointer in the plugins table at slot `plg_id`.
+ *
+ * FOS_IN_USE is returned if the given slot is occupied.
+ * FOS_INVALID_INDEX is returned if `plg_id` overshoots the end of the table.
+ *
+ * otherwise FOS_SUCCESS is returned.
+ */
+fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *plg);
 
 /**
  * This function saves the given context into the current thread.
@@ -148,6 +157,8 @@ void ks_save_ctx(kernel_state_t *ks, user_ctx_t *ctx);
  *
  * Undefined behavoir will occur if the same thread appears twice
  * in the schedule! So make sure this never happens!
+ *
+ * NOTE: this only modifies the current thread field iff there is no current thread!
  */
 void ks_schedule_thread(kernel_state_t *ks, thread_t *thr);
 
@@ -169,6 +180,19 @@ void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr);
  * If this area is already allocated on the thread stack, this call still succeeds.
  */
 fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base);
+
+/**
+ * This "Shuts down" the system.
+ *
+ * i.e. it calls the on shutdown handler of every plugin, then locks up the machine.
+ *
+ * NOTE: This will likely be called during certain kernel errors. (Or if the root process exits)
+ * If there is some ultra fatal system error, this may not even be called, and the system
+ * may immediately lock up.
+ *
+ * IT DOES NOT RETURN!
+ */
+void ks_shutdown(kernel_state_t *ks);
 
 /**
  * This function advances the kernel's tick counter.
@@ -284,6 +308,18 @@ KS_SYSCALL fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv);
  * On user error, 32 is written to *u_sid.
  */
 KS_SYSCALL fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid);
+
+
+/**
+ * Clears all bits which are set in the given signal vector `sv`.
+ *
+ * This is useful when you can confirm some operation is complete and that no further signals
+ * will be received, BUT you may not know the state of the signal vector.
+ *
+ * For example, when reaping child processes. All processes may be reapped, but there still
+ * may be a lingering FSIG_CHLD bit set in the signal vector.
+ */
+KS_SYSCALL fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv);
 
 /**
  * Take the current thread, deschedule it, and add it it to the sleep wait queue.
