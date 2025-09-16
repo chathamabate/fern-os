@@ -81,7 +81,7 @@ static bool test_simple_rw(void) {
     const char *msg = "Hello FS";
     const size_t msg_size = str_len(msg) + 1;
 
-    err = sc_write_full(fh, msg, msg_size);
+    err = sc_handle_write_full(fh, msg, msg_size);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     fs_node_info_t info;
@@ -93,7 +93,7 @@ static bool test_simple_rw(void) {
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     char rx_buf[50];
-    err = sc_read_full(fh, rx_buf, msg_size);
+    err = sc_handle_read_full(fh, rx_buf, msg_size);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
     
     TEST_TRUE(str_eq(msg, rx_buf));
@@ -101,7 +101,7 @@ static bool test_simple_rw(void) {
     err = sc_fs_remove("./a.txt");
     TEST_EQUAL_HEX(FOS_IN_USE, err);
 
-    sc_close(fh);
+    sc_handle_close(fh);
 
     err = sc_fs_remove("./a.txt");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -122,7 +122,7 @@ static void *test_multithread_rw_worker(void *arg) {
     uint8_t rx_buf[10];
 
     for (size_t i = 0; i < 10; i++) {
-        err = sc_read_full(fh, rx_buf, sizeof(rx_buf));
+        err = sc_handle_read_full(fh, rx_buf, sizeof(rx_buf));
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         for (size_t j = 0; j < sizeof(rx_buf); j++) {
@@ -130,7 +130,7 @@ static void *test_multithread_rw_worker(void *arg) {
         }
     }
 
-    sc_close(fh);
+    sc_handle_close(fh);
 
     return NULL;
 }
@@ -154,13 +154,13 @@ static bool test_multithread_rw(void) {
     for (size_t i = 0; i < 10; i++) {
         mem_set(tx_buf, (uint8_t)i, sizeof(tx_buf));
 
-        err = sc_write_full(fh, tx_buf, sizeof(tx_buf));
+        err = sc_handle_write_full(fh, tx_buf, sizeof(tx_buf));
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         sc_thread_sleep(1);
     }
 
-    sc_close(fh);
+    sc_handle_close(fh);
 
     err = sc_thread_join(full_join_vector(), NULL, NULL);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -192,7 +192,7 @@ static bool test_multiprocess_rw(void) {
     // Let's start by advancing the position of the file handle to confirm
     // the file handle copy works as expected!
 
-    err = sc_write_full(fh, buf, sizeof(buf));
+    err = sc_handle_write_full(fh, buf, sizeof(buf));
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     proc_id_t cpid;
@@ -201,7 +201,7 @@ static bool test_multiprocess_rw(void) {
 
     if (cpid == FOS_MAX_PROCS) { // Child process!
         for (size_t i = 0; i < 10; i++) {
-            err = sc_read_full(fh, buf, sizeof(buf));
+            err = sc_handle_read_full(fh, buf, sizeof(buf));
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
             for (size_t j = 0; j < sizeof(buf); j++) {
@@ -218,7 +218,7 @@ static bool test_multiprocess_rw(void) {
     for (size_t i = 0; i < 10; i++) {
         mem_set(buf, i, sizeof(buf));
 
-        err = sc_write_full(fh, buf, sizeof(buf));
+        err = sc_handle_write_full(fh, buf, sizeof(buf));
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         sc_thread_sleep(1);
@@ -230,7 +230,7 @@ static bool test_multiprocess_rw(void) {
     err = sc_proc_reap(cpid, NULL, NULL);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    sc_close(fh);
+    sc_handle_close(fh);
 
     err = sc_fs_remove("./a.txt");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -249,7 +249,7 @@ static void *test_multithread_and_process_rw_worker(void *arg) {
     uint8_t buf[100];
 
     for (size_t i = 0; i < 10; i++) {
-        err = sc_read_full(b_fh, buf, sizeof(buf));
+        err = sc_handle_read_full(b_fh, buf, sizeof(buf));
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         for (size_t j = 0; j < sizeof(buf); j++) {
@@ -257,7 +257,7 @@ static void *test_multithread_and_process_rw_worker(void *arg) {
         }
     }
 
-    sc_close(b_fh);
+    sc_handle_close(b_fh);
 
     return NULL;
 }
@@ -294,19 +294,19 @@ static bool test_multithread_and_process_rw(void) {
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         for (size_t i = 0; i < 10; i++) {
-            err = sc_read_full(a_fh, buf, sizeof(buf));
+            err = sc_handle_read_full(a_fh, buf, sizeof(buf));
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
             for (size_t j = 0; j < sizeof(buf); j++) {
                 buf[j]++;
             }
 
-            err = sc_write_full(b_fh, buf, sizeof(buf));
+            err = sc_handle_write_full(b_fh, buf, sizeof(buf));
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
         }
 
-        sc_close(a_fh);
-        sc_close(b_fh);
+        sc_handle_close(a_fh);
+        sc_handle_close(b_fh);
 
         sc_proc_exit(PROC_ES_SUCCESS);
     }
@@ -319,7 +319,7 @@ static bool test_multithread_and_process_rw(void) {
     for (size_t i = 0; i < 10; i++) {
         mem_set(buf, i, sizeof(buf));
 
-        err = sc_write_full(a_fh, buf, sizeof(buf));
+        err = sc_handle_write_full(a_fh, buf, sizeof(buf));
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
     }
 
@@ -334,7 +334,7 @@ static bool test_multithread_and_process_rw(void) {
     err = sc_thread_join(full_join_vector(), NULL, NULL);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    sc_close(a_fh);
+    sc_handle_close(a_fh);
 
     err = sc_fs_remove("./a.txt");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -352,11 +352,11 @@ static void *test_early_close_worker(void *arg) {
 
     fernos_error_t err;
 
-    err = sc_read_full(fh, &i, sizeof(i));
+    err = sc_handle_read_full(fh, &i, sizeof(i));
     TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
 
     // Trying to read from a handle which doesn't exist!
-    err = sc_read_full(fh, &i, sizeof(i));
+    err = sc_handle_read_full(fh, &i, sizeof(i));
     TEST_TRUE(err != FOS_SUCCESS);
 
     return NULL;
@@ -384,7 +384,7 @@ static bool test_early_close(void) {
     sc_thread_sleep(5);
 
     // Close the very handle the worker is reading from :(
-    sc_close(fh);
+    sc_handle_close(fh);
 
     err = sc_thread_join(full_join_vector(), NULL, NULL);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -430,11 +430,11 @@ static bool test_many_procs(void) {
 
         if (cpid != FOS_MAX_PROCS) { // Parent process.
             // Write in full.
-            err = sc_write_full(h, tx_buf, tx_amt);
+            err = sc_handle_write_full(h, tx_buf, tx_amt);
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
             // Don't need this guy anymore.
-            sc_close(h);
+            sc_handle_close(h);
 
             if (proc_number == 0) {
                 break;
@@ -442,10 +442,10 @@ static bool test_many_procs(void) {
                 sc_proc_exit(PROC_ES_SUCCESS);
             }
         } else { // Child process.
-            err = sc_read_full(h, tx_buf, tx_amt);
+            err = sc_handle_read_full(h, tx_buf, tx_amt);
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-            sc_close(h);
+            sc_handle_close(h);
             
             TEST_TRUE(str_eq(msg, tx_buf));
         }
@@ -516,10 +516,10 @@ static bool test_many_handles(void) {
         for (size_t i = 0; i < FOS_MAX_HANDLES_PER_PROC; i++) {
             mem_set(buf, i, i + 1);
 
-            err = sc_write_full(handles[i], buf, i + 1);
+            err = sc_handle_write_full(handles[i], buf, i + 1);
             TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-            sc_close(handles[i]);
+            sc_handle_close(handles[i]);
         }
         
         // This confirms that all of our handles started at position 0.
@@ -533,13 +533,13 @@ static bool test_many_handles(void) {
         sc_proc_exit(PROC_ES_SUCCESS);
     }
 
-    err = sc_read_full(handles[0], buf, FOS_MAX_HANDLES_PER_PROC);
+    err = sc_handle_read_full(handles[0], buf, FOS_MAX_HANDLES_PER_PROC);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     // Since we read the full buffer each time, after the second read, we can gaurantee
     // we are reading the entire file in its final state.
     
-    err = sc_read_full(handles[1], buf, FOS_MAX_HANDLES_PER_PROC);
+    err = sc_handle_read_full(handles[1], buf, FOS_MAX_HANDLES_PER_PROC);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     for (size_t i = 0 ; i < sizeof(buf); i++) {
@@ -547,14 +547,14 @@ static bool test_many_handles(void) {
     }
 
     for (size_t i = 0; i < FOS_MAX_HANDLES_PER_PROC; i++) {
-        sc_close(handles[i]);
+        sc_handle_close(handles[i]);
     }
 
     // There should be space at the very end!
     err = sc_fs_open("./a.txt", handles + 0);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
-    sc_close(handles[0]);
+    sc_handle_close(handles[0]);
 
     err = sc_signal_wait(1 << FSIG_CHLD, NULL);
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -633,7 +633,7 @@ static bool test_big_file(void) {
     for (size_t i = 0; i < 100; i++) {
         mem_set(big_buf, (uint8_t)i, sizeof(big_buf));
 
-        err = sc_write_full(fh, big_buf, sizeof(big_buf));
+        err = sc_handle_write_full(fh, big_buf, sizeof(big_buf));
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
     }
 
@@ -641,7 +641,7 @@ static bool test_big_file(void) {
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
     for (size_t i = 0; i < 100; i++) {
-        err = sc_read_full(fh, big_buf, sizeof(big_buf));
+        err = sc_handle_read_full(fh, big_buf, sizeof(big_buf));
         TEST_EQUAL_HEX(FOS_SUCCESS, err);
 
         for (size_t j = 0; j < sizeof(big_buf); j++) {
@@ -649,7 +649,7 @@ static bool test_big_file(void) {
         }
     }
 
-    sc_close(fh);
+    sc_handle_close(fh);
 
     err = sc_fs_remove("b/a.txt");
     TEST_EQUAL_HEX(FOS_SUCCESS, err);
@@ -721,7 +721,7 @@ static bool test_bad_fs_calls(void) {
     TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
 
     // Some random invalid file handle shouldn't cause issues.
-    sc_close((handle_t)238438);
+    sc_handle_close((handle_t)238438);
 
     // Seek/read/write
     
@@ -731,10 +731,10 @@ static bool test_bad_fs_calls(void) {
     size_t txed;
     uint32_t dummy;
 
-    err = sc_write((handle_t)3432, &dummy, sizeof(dummy), &txed);
+    err = sc_handle_write((handle_t)3432, &dummy, sizeof(dummy), &txed);
     TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
 
-    err = sc_read((handle_t)3432, &dummy, sizeof(dummy), &txed);
+    err = sc_handle_read((handle_t)3432, &dummy, sizeof(dummy), &txed);
     TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
 
     err = sc_fs_flush((handle_t)3432);

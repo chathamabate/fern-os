@@ -235,6 +235,10 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
                     err = hs_read(hs, (void *)arg0, (size_t)arg1, (size_t *)arg2);
                     break;
 
+                case HCID_WAIT:
+                    err = hs_wait(hs);
+                    break;
+
                 default: // Otherwise, default to custom command!
                     err = hs_cmd(hs, h_cmd, arg0, arg1, arg2, arg3);
                     break;

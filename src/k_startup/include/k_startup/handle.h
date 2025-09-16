@@ -24,6 +24,7 @@ typedef struct _handle_state_impl_t {
     // OPTIONAL!
     fernos_error_t (*hs_write)(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
     fernos_error_t (*hs_read)(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden);
+    fernos_error_t (*hs_wait)(handle_state_t *hs);
     fernos_error_t (*hs_cmd)(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 } handle_state_impl_t;
 
@@ -150,10 +151,28 @@ static inline fernos_error_t hs_write(handle_state_t *hs, const void *u_src, siz
  * `len` is the amount of data to attempt to read to `u_dst`.
  * `u_readden` is optional. On success, if `u_readden` is provided, the number of bytes successfully
  * read should be stored in `*u_readden`.
+ *
+ * If ANY DATA at all is read, FOS_SUCCESS is returned.
+ * If there is no data to read at this time, FOS_EMPTY is returned!
+ *
+ * This call should NEVER BLOCK. 
  */
 static inline fernos_error_t hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden) {
     if (hs->impl->hs_read) {
         return hs->impl->hs_read(hs, u_dst, len, u_readden);
+    }
+    DUAL_RET(hs->ks->curr_thread, FOS_NOT_IMPLEMENTED, FOS_SUCCESS);
+}
+
+/**
+ * Block until there is data to read from a given handle.
+ *
+ * FOS_SUCCESS means there is data to read!
+ * FOS_EMPTY means there will NEVER be anymore data to read from this handle!
+ */
+static inline fernos_error_t hs_wait(handle_state_t *hs) {
+    if (hs->impl->hs_wait) {
+        return hs->impl->hs_wait(hs);
     }
     DUAL_RET(hs->ks->curr_thread, FOS_NOT_IMPLEMENTED, FOS_SUCCESS);
 }

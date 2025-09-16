@@ -98,29 +98,33 @@ fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, 
     return (fernos_error_t)trigger_syscall(handle_cmd_scid(h, cmd_id), arg0, arg1, arg2, arg3);
 }
 
-void sc_close(handle_t h) {
+void sc_handle_close(handle_t h) {
     sc_handle_cmd(h, HCID_CLOSE, 0, 0, 0, 0);
 }
 
-fernos_error_t sc_write(handle_t h, const void *src, size_t len, size_t *written) {
+fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *written) {
     return sc_handle_cmd(h, HCID_WRITE, (uint32_t)src, len, (uint32_t)written, 0);
 }
 
-fernos_error_t sc_read(handle_t h, void *dest, size_t len, size_t *readden) {
+fernos_error_t sc_handle_read(handle_t h, void *dest, size_t len, size_t *readden) {
     return sc_handle_cmd(h, HCID_READ, (uint32_t)dest, len, (uint32_t)readden, 0);
+}
+
+fernos_error_t sc_handle_wait(handle_t h) {
+    return sc_handle_cmd(h, HCID_WAIT, 0, 0, 0, 0);
 }
 
 fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     return (fernos_error_t)trigger_syscall(plugin_cmd_scid(plg_id, cmd_id), arg0, arg1, arg2, arg3);
 }
 
-fernos_error_t sc_write_full(handle_t h, const void *src, size_t len) {
+fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len) {
     fernos_error_t err;
 
     size_t written = 0;
     while (written < len) {
         size_t tmp_written;
-        err = sc_write(h, (const uint8_t *)src + written, len - written, &tmp_written);
+        err = sc_handle_write(h, (const uint8_t *)src + written, len - written, &tmp_written);
         if (err != FOS_SUCCESS) {
             return err;
         }
@@ -131,18 +135,24 @@ fernos_error_t sc_write_full(handle_t h, const void *src, size_t len) {
     return FOS_SUCCESS;
 }
 
-fernos_error_t sc_read_full(handle_t h, void *dest, size_t len) {
+fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
     fernos_error_t err;
 
     size_t readden = 0;
     while (readden < len) {
         size_t tmp_readden;
-        err = sc_read(h, (uint8_t *)dest + readden, len - readden, &tmp_readden);
-        if (err != FOS_SUCCESS) {
-            return err;
-        }
+        err = sc_handle_read(h, (uint8_t *)dest + readden, len - readden, &tmp_readden);
 
-        readden += tmp_readden;
+        if (err == FOS_EMPTY) { // block!
+            err = sc_handle_wait(h);
+            if (err != FOS_SUCCESS) {
+                return err;
+            }
+        } else if (err == FOS_SUCCESS) {
+            readden += tmp_readden; // Successful read.
+        } else {
+            return err; // Unexpected error.
+        }
     }
 
     return FOS_SUCCESS;

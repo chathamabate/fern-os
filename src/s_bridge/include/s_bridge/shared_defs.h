@@ -196,8 +196,9 @@ static inline bool scid_is_handle_cmd(syscall_id_t scid) {
 #define HCID_CLOSE (0x0U)
 #define HCID_WRITE (0x1U)
 #define HCID_READ  (0x2U)
+#define HCID_WAIT  (0x3U)
 
-#define NUM_DEFAULT_HCIDS (HCID_READ + 1)
+#define NUM_DEFAULT_HCIDS (HCID_WAIT + 1)
 
 // All other handle commands are custom/implementation specific!
 

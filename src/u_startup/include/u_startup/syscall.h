@@ -243,11 +243,48 @@ void sc_term_put_fmt_s(const char *fmt, ...);
  * what type of plugin is being referenced!
  */
 
+/**
+ * Execute a handle command.
+ */
 fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
-void sc_close(handle_t h);
-fernos_error_t sc_write(handle_t h, const void *src, size_t len, size_t *written);
-fernos_error_t sc_read(handle_t h, void *dest, size_t len, size_t *readden);
 
+/**
+ * Clean up the resources corresponding to a given handle.
+ */
+void sc_handle_close(handle_t h);
+
+/**
+ * Write data to a handle, `written` is optional.
+ *
+ * On success, FOS_SUCCESS is returned, meaning some or all of the given data was written.
+ * The exact amount written will be stored in `*written`.
+ */
+fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *written);
+
+/**
+ * Read data from a handle. `readden` is optional.
+ *
+ * Returns FOS_EMPTY if there is no data to read.
+ * Returns FOS_SUCCESS if some or all of the requested data is read. The exact amount is 
+ * written to `*readden`.
+ *
+ * (Other errors may be returned)
+ */
+fernos_error_t sc_handle_read(handle_t h, void *dest, size_t len, size_t *readden);
+
+/**
+ * Block until there is data to read from `h`.
+ *
+ * Returns FOS_SUCCESS when there is data to read!
+ * Returns FOS_EMPTY when there will never be any more data to read from `h`.
+ *
+ * (Other errors may be returned)
+ */
+fernos_error_t sc_handle_wait(handle_t h);
+
+/**
+ * Execute some plugin specific command.
+ */
 fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
 /*
@@ -259,13 +296,16 @@ fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t a
  * this function will call `sc_write` in a loop until all bytes are written!
  * (Or an error is encountered)
  */
-fernos_error_t sc_write_full(handle_t h, const void *src, size_t len);
+fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len);
 
 /**
  * When using a handle which may read a partial amount on success,
  * this function will call `sc_read` in a loop until all bytes are written!
  * (Or an error is encountered)
+ *
+ * NOTE: like `sc_handle_read`, this will return FOS_EMPTY if there is no more data to
+ * read.
  */
-fernos_error_t sc_read_full(handle_t h, void *dest, size_t len);
+fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len);
 
 
