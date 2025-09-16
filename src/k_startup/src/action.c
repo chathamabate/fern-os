@@ -119,9 +119,8 @@ void fos_timer_action(user_ctx_t *ctx) {
     
     fernos_error_t err = ks_tick(kernel);
     if (err != FOS_SUCCESS) {
-        out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
-                "Fatal timer error");
-        lock_up();
+        term_put_fmt_s("[Timer Error 0x%X]", err);
+        ks_shutdown(kernel);
     }
 
     return_to_curr_thread();
@@ -254,10 +253,6 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
                 err = FOS_SUCCESS;
             } else {
                 err = plg_cmd(plg, plg_cmd_id, arg0, arg1, arg2, arg3);
-                if (err != FOS_SUCCESS && err != FOS_ABORT_SYSTEM) {
-                    kernel->plugins[plg_id] = NULL;
-                    err = delete_plugin(plg);
-                }
             }
         } else {
             kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
@@ -269,7 +264,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     if (err != FOS_SUCCESS) {
         term_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
-        lock_up();
+        ks_shutdown(kernel);
     }
 
     return_to_curr_thread();

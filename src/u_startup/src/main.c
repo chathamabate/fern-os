@@ -13,5 +13,6 @@
 proc_exit_status_t user_main(void) {
     // Your code here!
 
+    test_syscall_fs();
     return PROC_ES_SUCCESS;
 }

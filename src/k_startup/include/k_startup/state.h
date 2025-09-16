@@ -181,6 +181,17 @@ void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr);
  */
 fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base);
 
+/**
+ * This "Shuts down" the system.
+ *
+ * i.e. it calls the on shutdown handler of every plugin, then locks up the machine.
+ *
+ * NOTE: This will likely be called during certain kernel errors. (Or if the root process exits)
+ * If there is some ultra fatal system error, this may not even be called, and the system
+ * may immediately lock up.
+ *
+ * IT DOES NOT RETURN!
+ */
 void ks_shutdown(kernel_state_t *ks);
 
 /**

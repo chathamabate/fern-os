@@ -11,6 +11,7 @@
 
 #include "k_bios_term/term.h"
 #include "s_util/str.h"
+#include "s_util/ansii.h"
 
 
 /**
@@ -137,6 +138,16 @@ fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base) {
     thr->stack_base = new_base;
 
     return FOS_SUCCESS;
+}
+
+void ks_shutdown(kernel_state_t *ks) {
+    for (size_t i = 0; i < FOS_MAX_PLUGINS; i++) {
+        if (ks->plugins[i]) {
+            plg_on_shutdown(ks->plugins[i]);
+        }
+    }
+
+    lock_up();
 }
 
 fernos_error_t ks_tick(kernel_state_t *ks) {
@@ -283,14 +294,8 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     fernos_error_t err;
 
     if (ks->root_proc == proc) {
-        // Delete/Cleanup all plugins!
-        for (size_t i = 0; i < FOS_MAX_PLUGINS; i++) {
-            // Don't worry about errors for now.
-            delete_plugin(ks->plugins[i]);
-        }
-
-        term_put_fmt_s("\n[System Exited with Status 0x%X]\n", status);
-        lock_up();
+        term_put_fmt_s("[System Exit with Status 0x%X]", status);
+        ks_shutdown(ks);
     }
 
     // First what do we do? Detatch all threads plz!

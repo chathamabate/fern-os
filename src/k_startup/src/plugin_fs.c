@@ -6,14 +6,13 @@
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
 
-static fernos_error_t delete_plugin_fs(plugin_t *plg);
+static void plg_fs_on_shutdown(plugin_t *plg);
 static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 static fernos_error_t plg_fs_on_fork_proc(plugin_t *plg, proc_id_t cpid);
 static fernos_error_t plg_fs_on_reap_proc(plugin_t *plg, proc_id_t rpid);
 
 static const plugin_impl_t PLUGIN_FS_IMPL = {
-    .delete_plugin = delete_plugin_fs,
-
+    .plg_on_shutdown = plg_fs_on_shutdown,
     .plg_cmd = plg_fs_cmd,
     .plg_tick = NULL,
     .plg_on_fork_proc = plg_fs_on_fork_proc,
@@ -98,18 +97,11 @@ plugin_t *new_plugin_fs(kernel_state_t *ks, file_sys_t *fs) {
     return (plugin_t *)plg_fs;
 }
 
-static fernos_error_t delete_plugin_fs(plugin_t *plg) {
+static void plg_fs_on_shutdown(plugin_t *plg) {
     plugin_fs_t *plg_fs = (plugin_fs_t *)plg;
 
-    // It's kinda difficult to clean up this plugin as it will have open handles
-    // littered throughout userspace.
-    //
-    // So this destructory doesn't really delete anything, it just flushes the file system
-    // and tells the OS to shutdown.
-
+    // Flush the full file system, do nothign else.
     fs_flush(plg_fs->fs, NULL);
-
-    return FOS_ABORT_SYSTEM; 
 }
 
 static fernos_error_t plg_fs_register_nk(plugin_fs_t *plg_fs, fs_node_key_t nk, fs_node_key_t *kernel_nk) {
