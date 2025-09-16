@@ -98,6 +98,11 @@ static bool test_simple_rw(void) {
     
     TEST_TRUE(str_eq(msg, rx_buf));
 
+    // When there isn't more to read, this should return FOS_EMPTY without blocking.
+    size_t readden;
+    err = sc_handle_read(fh, rx_buf, msg_size, &readden);
+    TEST_EQUAL_HEX(FOS_EMPTY, err);
+
     err = sc_fs_remove("./a.txt");
     TEST_EQUAL_HEX(FOS_IN_USE, err);
 
