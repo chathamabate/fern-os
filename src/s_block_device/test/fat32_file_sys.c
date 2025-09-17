@@ -24,11 +24,11 @@ static file_sys_t *gen_fat32_fs(void) {
 
         file_sys_t *fs;
 
-        if (err == FOS_SUCCESS) {
+        if (err == FOS_E_SUCCESS) {
             err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
         }
 
-        if (err == FOS_SUCCESS) {
+        if (err == FOS_E_SUCCESS) {
             return fs; // Success!
         }
     }
@@ -78,18 +78,18 @@ static bool test_bad_names(void) {
     TEST_TRUE(bd != NULL);
 
     err = init_fat32(bd, 0, bd_num_sectors(bd), 8);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fat32_device_t *dev;
 
     err = parse_new_da_fat32_device(bd, 0, 0, false, &dev);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     // First we will create a directory with an invalidly named file within.
 
     uint32_t dir_start;
     err = fat32_new_dir(dev, &dir_start);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     uint32_t dummy_offset;
     fat32_short_fn_dir_entry_t sfn_entry;
@@ -102,12 +102,12 @@ static bool test_bad_names(void) {
         .attrs = FT32F_ATTR_SUBDIR
     };
     err = fat32_new_seq_c8(dev, dev->root_dir_cluster, &sfn_entry, "a", &dummy_offset);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     // Now add the invalid file.
     uint32_t file_start;
     err = fat32_new_chain(dev, 1, &file_start);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     sfn_entry = (fat32_short_fn_dir_entry_t) {
         .short_fn = {'b', ' ', ' ', ' ', ' ' , ' ' , ' ', ' '},
@@ -116,10 +116,10 @@ static bool test_bad_names(void) {
         .first_cluster_high = (uint16_t)(file_start >> 16),
     };
     err = fat32_new_seq_c8(dev, dir_start, &sfn_entry, "*****", &dummy_offset);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fat32_flush(dev);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     delete_fat32_device(dev);
 
@@ -128,23 +128,23 @@ static bool test_bad_names(void) {
     file_sys_t *fs;
 
     err = parse_new_da_fat32_file_sys(bd, 0, 0, false, now, &fs);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_node_key_t key;
     err = fs_new_key(fs, NULL, "/a", &key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_node_info_t info;
 
     err = fs_get_node_info(fs, key, &info);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_TRUE(info.is_dir);
     TEST_EQUAL_UINT(0, info.len);
 
     char names_bufs[1][FS_MAX_FILENAME_LEN + 1];
     err = fs_get_child_names(fs, key, 0, 1, names_bufs);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_TRUE(names_bufs[0][0] == '\0');
 
@@ -152,15 +152,15 @@ static bool test_bad_names(void) {
 
     fs_node_key_t root_key;
     err = fs_new_key(fs, NULL, "/", &root_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_remove(fs, root_key, "a");
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_delete_key(fs, root_key);    
 
     err = fs_flush(fs, NULL);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     delete_file_sys(fs);
 

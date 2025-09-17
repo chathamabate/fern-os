@@ -75,10 +75,10 @@ typedef const fat32_fs_node_key_val_t *fat32_fs_node_key_t;
  * so will the given block device. Otherwise, the given block device will persist past the lifetime
  * of the file system object.
  *
- * On success, FOS_SUCCESS is returned, the created file system is written to `*fs_out`.
+ * On success, FOS_E_SUCCESS is returned, the created file system is written to `*fs_out`.
  * On failure, the given block device will NEVER be deleteed.
  *
- * Returns FOS_STATE_MISMATCH
+ * Returns FOS_E_STATE_MISMATCH
  */
 fernos_error_t parse_new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset,
         uint64_t seed, bool dubd, dt_producer_ft now, file_sys_t **fs_out);

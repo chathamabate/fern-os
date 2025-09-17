@@ -42,20 +42,20 @@ static const file_sys_impl_t FAT32_FS_IMPL = {
 fernos_error_t parse_new_fat32_file_sys(allocator_t *al, block_device_t *bd, uint32_t offset,
         uint64_t seed, bool dubd, dt_producer_ft now, file_sys_t **fs_out) {
     if (!al || !bd || !fs_out) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fernos_error_t err;
 
     fat32_file_sys_t *fat32_fs = al_malloc(al, sizeof(fat32_file_sys_t));
     if (!fat32_fs) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     fat32_device_t *dev;
 
     err = parse_new_fat32_device(al, bd, offset, seed, dubd, &dev);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         al_free(al, fat32_fs);
         return err;
     }
@@ -71,7 +71,7 @@ fernos_error_t parse_new_fat32_file_sys(allocator_t *al, block_device_t *bd, uin
     fat32_fs->r = rand(seed + 0xABCD0123EEEEFEFEULL);
     
     *fs_out = (file_sys_t *)fat32_fs;
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_flush(file_sys_t *fs, fs_node_key_t key) {
@@ -83,7 +83,7 @@ static fernos_error_t fat32_fs_flush(file_sys_t *fs, fs_node_key_t key) {
     if (key == NULL) {
         // If the a full flush was requested, we will also sync the fats!
         err = fat32_sync_fats(fat32_fs->dev);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
@@ -104,15 +104,15 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
     fat32_fs_node_key_t wd = (fat32_fs_node_key_t)cwd;
 
     if (!path || !key) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (!is_valid_path(path)) {
-        return FOS_BAD_ARGS; // given path must be valid.
+        return FOS_E_BAD_ARGS; // given path must be valid.
     }
 
     if (wd && !(wd->is_dir)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     fernos_error_t err;
@@ -126,7 +126,7 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
 
         if (!wd) {
             // A working directory is required!
-            return FOS_BAD_ARGS;
+            return FOS_E_BAD_ARGS;
         }
 
         dir_slot_ind = wd->starting_slot_ind;
@@ -154,7 +154,7 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
 
             fat32_fs_node_key_t nk = al_malloc(fat32_fs->al, sizeof(fat32_fs_node_key_val_t));
             if (!nk) {
-                return FOS_NO_MEM;
+                return FOS_E_NO_MEM;
             }
 
             // The reason why you cannot always just set the parent index is because of the special
@@ -171,7 +171,7 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
 
             *key = (fs_node_key_t)nk;
 
-            return FOS_SUCCESS;
+            return FOS_E_SUCCESS;
         }
 
         // Ok, otherwise there is more to traverse.
@@ -179,7 +179,7 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
         path_str_offset += path_processed;
 
         if (!is_dir) { // The current node MUST be a directory for us to continue.
-            return FOS_STATE_MISMATCH;
+            return FOS_E_STATE_MISMATCH;
         }
 
         prev_ind = curr_ind;
@@ -201,23 +201,23 @@ static fernos_error_t fat32_fs_new_key(file_sys_t *fs, fs_node_key_t cwd, const 
         }
 
         // Entry couldn't be found.
-        if (err == FOS_EMPTY) {
-            return FOS_INVALID_INDEX;
+        if (err == FOS_E_EMPTY) {
+            return FOS_E_INVALID_INDEX;
         }
 
-        if (err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
+        if (err != FOS_E_SUCCESS) {
+            return FOS_E_UNKNWON_ERROR;
         }
 
         err = fat32_get_dir_seq_sfn(dev, prev_ind, seq_start, &prev_sfn_offset);
-        if (err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
+        if (err != FOS_E_SUCCESS) {
+            return FOS_E_UNKNWON_ERROR;
         }
 
         fat32_dir_entry_t entry;
         err = fat32_read_dir_entry(dev, prev_ind, prev_sfn_offset, &entry);
-        if (err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
+        if (err != FOS_E_SUCCESS) {
+            return FOS_E_UNKNWON_ERROR;
         }
 
         is_dir = (FT32F_ATTR_SUBDIR & entry.short_fn.attrs) == FT32F_ATTR_SUBDIR;
@@ -278,7 +278,7 @@ static hasher_ft fat32_fs_get_key_hasher(file_sys_t *fs) {
 
 static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, fs_node_info_t *info) {
     if (!key || !info) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fernos_error_t err;
@@ -305,21 +305,21 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
         while (true) {
             uint32_t sfn_entry_offset;
             err = fat32_next_dir_seq_sfn(dev, nk->starting_slot_ind, entry_iter, &sfn_entry_offset);
-            if (err == FOS_EMPTY) {
+            if (err == FOS_E_EMPTY) {
                 break;
             }
 
-            if (err != FOS_SUCCESS) {
+            if (err != FOS_E_SUCCESS) {
                 return err;
             }
 
             // We only count entries which have a valid lfn.
             err = fat32_get_dir_seq_lfn_c8(dev, nk->starting_slot_ind, sfn_entry_offset, lfn_buf);
-            if (err != FOS_SUCCESS && err != FOS_EMPTY) {
+            if (err != FOS_E_SUCCESS && err != FOS_E_EMPTY) {
                 return err;
             }
 
-            if (err == FOS_SUCCESS && is_valid_filename(lfn_buf)) {
+            if (err == FOS_E_SUCCESS && is_valid_filename(lfn_buf)) {
                 dir_len++;
             }
 
@@ -332,7 +332,7 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
 
         err = fat32_read_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, 
                 (fat32_dir_entry_t *)&sfn_entry);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
@@ -344,7 +344,7 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
         info->len = sfn_entry.files_size;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -353,12 +353,12 @@ static fernos_error_t fat32_fs_get_node_info(file_sys_t *fs, fs_node_key_t key, 
  *
  * This function generates such an SFN and writes it into `sfn_entry`.
  *
- * On success, FOS_SUCCESS is returned.
+ * On success, FOS_E_SUCCESS is returned.
  */
 static fernos_error_t fat32_fs_gen_unique_sfn(fat32_file_sys_t *fat32_fs, uint32_t slot_ind, 
         fat32_short_fn_dir_entry_t *sfn_entry) {
     if (!sfn_entry) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fernos_error_t err;
@@ -386,11 +386,11 @@ static fernos_error_t fat32_fs_gen_unique_sfn(fat32_file_sys_t *fat32_fs, uint32
 
         err = fat32_find_sfn(fat32_fs->dev, slot_ind, sfn_entry->short_fn, sfn_entry->extenstion, &seq_start);
 
-        if (err == FOS_EMPTY) { // Our name is unique!
-            return FOS_SUCCESS;
+        if (err == FOS_E_EMPTY) { // Our name is unique!
+            return FOS_E_SUCCESS;
         }
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
@@ -407,7 +407,7 @@ static fernos_error_t fat32_fs_gen_unique_sfn(fat32_file_sys_t *fat32_fs, uint32
 static fernos_error_t fat32_fs_new_subdir_chain(fat32_file_sys_t *fat32_fs, uint32_t parent_slot_ind, 
         uint32_t *slot_ind) {
     if (!slot_ind) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fernos_error_t err;
@@ -415,7 +415,7 @@ static fernos_error_t fat32_fs_new_subdir_chain(fat32_file_sys_t *fat32_fs, uint
     uint32_t dir_slot_ind;
 
     err = fat32_new_dir(fat32_fs->dev, &dir_slot_ind);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -439,7 +439,7 @@ static fernos_error_t fat32_fs_new_subdir_chain(fat32_file_sys_t *fat32_fs, uint
     err = fat32_new_seq_c8(fat32_fs->dev, dir_slot_ind, &sfn_entry, 
             NULL, &entry_offset);
 
-    if (err == FOS_SUCCESS) {
+    if (err == FOS_E_SUCCESS) {
         // Create parent reference.
         sfn_entry.short_fn[1] = '.';
         sfn_entry.first_cluster_low = (uint16_t)parent_slot_ind;
@@ -449,7 +449,7 @@ static fernos_error_t fat32_fs_new_subdir_chain(fat32_file_sys_t *fat32_fs, uint
                 NULL, &entry_offset);
     }
 
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         // In case of error, free our chain in the fat.
         fat32_free_chain(fat32_fs->dev, dir_slot_ind);
 
@@ -459,7 +459,7 @@ static fernos_error_t fat32_fs_new_subdir_chain(fat32_file_sys_t *fat32_fs, uint
     // Otherwise, success!!!
     *slot_ind = dir_slot_ind;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -473,18 +473,18 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
     fat32_device_t *dev = fat32_fs->dev;
 
     if (!name || !parent_dir) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (!(parent_dir->is_dir)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     // Ok, now we need to check the filename given.
 
     // Is it valid? (and not . or ..)
     if (!is_valid_filename(name) || str_eq(name, ".") || str_eq(name, "..")) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fernos_error_t err;
@@ -492,12 +492,12 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
 
     // Is it unique?
     err = fat32_find_lfn_c8(dev, parent_dir->starting_slot_ind, name, &seq_start);
-    if (err == FOS_SUCCESS) {
-        return FOS_IN_USE;
+    if (err == FOS_E_SUCCESS) {
+        return FOS_E_IN_USE;
     }
 
-    if (err != FOS_EMPTY) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_EMPTY) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     // Now we have a valid filenmae which does not appear in the given directory.
@@ -536,8 +536,8 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
 
     // Now generate a unique and random SFN.
     err = fat32_fs_gen_unique_sfn(fat32_fs, parent_dir->starting_slot_ind, &sfn_entry);
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     // Let's allocate a cluster chain now.
@@ -552,12 +552,12 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
         err = fat32_new_chain(dev, 1, &slot_ind);
     }
 
-    if (err == FOS_NO_SPACE) {
-        return FOS_NO_SPACE;
+    if (err == FOS_E_NO_SPACE) {
+        return FOS_E_NO_SPACE;
     }
 
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     // We have a chain, we must write its sequence into the parent dir!
@@ -571,24 +571,24 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
 
     // I really dislike this cleanup after each step, but ultimately, it's not so bad.
 
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         fat32_free_chain(dev, slot_ind);
 
-        if (err == FOS_NO_SPACE) {
-            return FOS_NO_SPACE;
+        if (err == FOS_E_NO_SPACE) {
+            return FOS_E_NO_SPACE;
         }
         
-        return FOS_UNKNWON_ERROR;
+        return FOS_E_UNKNWON_ERROR;
     }
 
     uint32_t sfn_entry_offset;
     err = fat32_get_dir_seq_sfn(dev, parent_dir->starting_slot_ind, entry_offset, &sfn_entry_offset);
 
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         fat32_erase_seq(dev, parent_dir->starting_slot_ind, entry_offset);
         fat32_free_chain(dev, slot_ind);
 
-        return FOS_UNKNWON_ERROR;
+        return FOS_E_UNKNWON_ERROR;
     }
 
     if (key) {
@@ -597,7 +597,7 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
             fat32_erase_seq(dev, parent_dir->starting_slot_ind, entry_offset);
             fat32_free_chain(dev, slot_ind);
 
-            return FOS_NO_MEM;
+            return FOS_E_NO_MEM;
         }
 
         if (!subdir) {
@@ -611,7 +611,7 @@ static fernos_error_t fat32_fs_new_node(fat32_file_sys_t *fat32_fs, fat32_fs_nod
         *key = (fs_node_key_t)nk;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, const char *name, fs_node_key_t *key) {
@@ -629,29 +629,29 @@ static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, 
     fat32_device_t *dev = fat32_fs->dev;
 
     if (!parent_dir || !name) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (!is_valid_filename(name)) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fat32_fs_node_key_t pd = (fat32_fs_node_key_t)parent_dir;
 
     if (!(pd->is_dir)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     fernos_error_t err;
 
     uint32_t seq_start;
     err = fat32_find_lfn_c8(dev, pd->starting_slot_ind, name, &seq_start);
-    if (err == FOS_EMPTY) {
-        return FOS_INVALID_INDEX; // The file you are trying to remove doesn't exist.
+    if (err == FOS_E_EMPTY) {
+        return FOS_E_INVALID_INDEX; // The file you are trying to remove doesn't exist.
     }
 
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     fat32_short_fn_dir_entry_t sfn_entry;
@@ -659,13 +659,13 @@ static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, 
     uint32_t sfn_offset;
     err = fat32_get_dir_seq_sfn(dev, pd->starting_slot_ind, 
             seq_start, &sfn_offset);
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     err = fat32_read_dir_entry(dev, pd->starting_slot_ind, sfn_offset, (fat32_dir_entry_t *)&sfn_entry);
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     uint32_t child_slot_ind = (sfn_entry.first_cluster_high << 16UL) | sfn_entry.first_cluster_low;
@@ -681,22 +681,22 @@ static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, 
         while (true) {
             uint32_t sd_seq_sfn_offset;
             err = fat32_next_dir_seq_sfn(dev, child_slot_ind, sd_entry_iter, &sd_seq_sfn_offset);
-            if (err == FOS_EMPTY) {
+            if (err == FOS_E_EMPTY) {
                 break;
             }
 
-            if (err != FOS_SUCCESS) {
-                return FOS_UNKNWON_ERROR;
+            if (err != FOS_E_SUCCESS) {
+                return FOS_E_UNKNWON_ERROR;
             }
 
             err = fat32_get_dir_seq_lfn_c8(dev, child_slot_ind, sd_seq_sfn_offset, lfn_buf);
-            if (err != FOS_SUCCESS && err != FOS_EMPTY) {
-                return FOS_UNKNWON_ERROR;
+            if (err != FOS_E_SUCCESS && err != FOS_E_EMPTY) {
+                return FOS_E_UNKNWON_ERROR;
             }
             
             // We only recognize sequences with valid LFNs.
-            if (err == FOS_SUCCESS && is_valid_filename(lfn_buf)) {
-                return FOS_IN_USE;
+            if (err == FOS_E_SUCCESS && is_valid_filename(lfn_buf)) {
+                return FOS_E_IN_USE;
             }
 
             sd_entry_iter = sd_seq_sfn_offset + 1;
@@ -706,35 +706,35 @@ static fernos_error_t fat32_fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, 
     // We have made it here which means we should be able to delete our child node just fine.
 
     err = fat32_erase_seq(dev, pd->starting_slot_ind, seq_start);
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     err = fat32_free_chain(dev, child_slot_ind);
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, 
         size_t num, char names[][FS_MAX_FILENAME_LEN + 1]) {
     if (!parent_dir) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fat32_fs_node_key_t pd = (fat32_fs_node_key_t)parent_dir;
     if (!(pd->is_dir)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     if (num == 0) {
-        return FOS_SUCCESS; // Return success early if no work needs to be done.
+        return FOS_E_SUCCESS; // Return success early if no work needs to be done.
     }
 
     if (!names) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
@@ -751,7 +751,7 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
     while (true) {
         uint32_t sfn_offset;
         err = fat32_next_dir_seq_sfn(dev, pd->starting_slot_ind, entry_iter, &sfn_offset);
-        if (err == FOS_EMPTY) { 
+        if (err == FOS_E_EMPTY) { 
             // Ok, we reached the end BEFORE filling all the `names` buffers, nbd, just write out
             // some '\0's and call it a day.
             
@@ -759,19 +759,19 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
                 names[j][0] = '\0';
             }
 
-            return FOS_SUCCESS;
+            return FOS_E_SUCCESS;
         }
 
-        if (err != FOS_SUCCESS) {
-            return FOS_UNKNWON_ERROR;
+        if (err != FOS_E_SUCCESS) {
+            return FOS_E_UNKNWON_ERROR;
         }
 
         err = fat32_get_dir_seq_lfn_c8(dev, pd->starting_slot_ind, sfn_offset, lfn_buf);
-        if (err != FOS_SUCCESS && err != FOS_EMPTY) {
-            return FOS_UNKNWON_ERROR;
+        if (err != FOS_E_SUCCESS && err != FOS_E_EMPTY) {
+            return FOS_E_UNKNWON_ERROR;
         }
 
-        if (err == FOS_SUCCESS && is_valid_filename(lfn_buf)) {
+        if (err == FOS_E_SUCCESS && is_valid_filename(lfn_buf)) {
             // We got a hit! Can we exit now? or must we keep iterating?
             
             if (i >= index) {
@@ -779,7 +779,7 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
 
                 // We've filled the `names` buffers.
                 if (written == num) {
-                    return FOS_SUCCESS;
+                    return FOS_E_SUCCESS;
                 }
             }
 
@@ -796,7 +796,7 @@ static fernos_error_t fat32_fs_get_child_names(file_sys_t *fs, fs_node_key_t par
 static fernos_error_t fat32_fs_read_write(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, 
         void *buf, bool write) {
     if (!file_key) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
@@ -804,17 +804,17 @@ static fernos_error_t fat32_fs_read_write(file_sys_t *fs, fs_node_key_t file_key
 
     fat32_fs_node_key_t nk = (fat32_fs_node_key_t)file_key;
     if (nk->is_dir) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     // When reading/writing nothing, we'll just say fuck it and always give 0 a successful return.
     if (bytes == 0) {
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
     // Otherwise, we require a non-null buffer.
     if (!buf) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     // Now we gotta validate the range we are trying to r/w.
@@ -824,14 +824,14 @@ static fernos_error_t fat32_fs_read_write(file_sys_t *fs, fs_node_key_t file_key
 
     err = fat32_read_dir_entry(dev, nk->parent_slot_ind, 
             nk->sfn_entry_offset, (fat32_dir_entry_t *)&sfn_entry);
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     const uint32_t file_size = sfn_entry.files_size;
 
     if (offset >= file_size || offset + bytes > file_size || offset + bytes < offset) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     // How many bytes have been read/written so far.
@@ -848,7 +848,7 @@ static fernos_error_t fat32_fs_read_write(file_sys_t *fs, fs_node_key_t file_key
         err = fat32_read_write_piece(dev, nk->starting_slot_ind, offset / FAT32_REQ_SECTOR_SIZE,
                 initial_rem, initial_amt, buf, write);
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
@@ -862,7 +862,7 @@ static fernos_error_t fat32_fs_read_write(file_sys_t *fs, fs_node_key_t file_key
 
         err = fat32_read_write(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE, 
                 num_middle_sectors, ((uint8_t *)buf + processed), write);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
@@ -874,7 +874,7 @@ static fernos_error_t fat32_fs_read_write(file_sys_t *fs, fs_node_key_t file_key
         err = fat32_read_write_piece(dev, nk->starting_slot_ind, (offset + processed) / FAT32_REQ_SECTOR_SIZE,
                 0, bytes - processed, (uint8_t *)buf + processed, write);
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
@@ -893,12 +893,12 @@ static fernos_error_t fat32_fs_read_write(file_sys_t *fs, fs_node_key_t file_key
 
         err = fat32_write_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, 
                 (fat32_dir_entry_t *)&sfn_entry);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t fat32_fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, size_t bytes, void *dest) {
@@ -911,13 +911,13 @@ static fernos_error_t fat32_fs_write(file_sys_t *fs, fs_node_key_t file_key, siz
 
 static fernos_error_t fat32_fs_resize(file_sys_t *fs, fs_node_key_t file_key, size_t bytes) {
     if (!file_key) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     fat32_fs_node_key_t nk = (fat32_fs_node_key_t)file_key;
 
     if (nk->is_dir) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     fat32_file_sys_t *fat32_fs = (fat32_file_sys_t *)fs;
@@ -928,8 +928,8 @@ static fernos_error_t fat32_fs_resize(file_sys_t *fs, fs_node_key_t file_key, si
 
     err = fat32_read_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, 
             (fat32_dir_entry_t *)&sfn_entry);
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     const uint32_t bytes_per_cluster =  dev->sectors_per_cluster * FAT32_REQ_SECTOR_SIZE;
@@ -941,12 +941,12 @@ static fernos_error_t fat32_fs_resize(file_sys_t *fs, fs_node_key_t file_key, si
 
     err = fat32_resize_chain(dev, nk->starting_slot_ind,  requested_chain_len);
 
-    if (err == FOS_NO_SPACE) {
-        return FOS_NO_SPACE;
+    if (err == FOS_E_NO_SPACE) {
+        return FOS_E_NO_SPACE;
     }
 
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
     // Ok, now rewrite out the SFN entry with new size and updated last write time.
@@ -965,11 +965,11 @@ static fernos_error_t fat32_fs_resize(file_sys_t *fs, fs_node_key_t file_key, si
 
     err = fat32_write_dir_entry(dev, nk->parent_slot_ind, nk->sfn_entry_offset, 
             (fat32_dir_entry_t *)&sfn_entry);
-    if (err != FOS_SUCCESS) {
-        return FOS_UNKNWON_ERROR;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 

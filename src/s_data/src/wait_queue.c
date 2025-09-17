@@ -54,7 +54,7 @@ fernos_error_t bwq_enqueue(basic_wait_queue_t *bwq, void *item) {
 }
 
 fernos_error_t bwq_notify(basic_wait_queue_t *bwq, bwq_notify_mode_t mode) {
-    fernos_error_t res = FOS_SUCCESS;
+    fernos_error_t res = FOS_E_SUCCESS;
 
     switch (mode) {
 
@@ -65,7 +65,7 @@ fernos_error_t bwq_notify(basic_wait_queue_t *bwq, bwq_notify_mode_t mode) {
 
             // This call may fail due to memory problems.
             res = l_push_back(bwq->ready_q, &item);
-            if (res == FOS_SUCCESS) {
+            if (res == FOS_E_SUCCESS) {
                 l_pop_front(bwq->wait_q, NULL);
             }
         }
@@ -76,20 +76,20 @@ fernos_error_t bwq_notify(basic_wait_queue_t *bwq, bwq_notify_mode_t mode) {
             void *item = *(void **)l_get_ptr(bwq->wait_q, l_get_len(bwq->wait_q) - 1);
 
             res = l_push_back(bwq->ready_q, &item);
-            if (res == FOS_SUCCESS) {
+            if (res == FOS_E_SUCCESS) {
                 l_pop_back(bwq->wait_q, NULL);
             }
         }
         break;
 
     case BWQ_NOTIFY_ALL:
-        while (res == FOS_SUCCESS && l_get_len(bwq->wait_q) > 0) {
+        while (res == FOS_E_SUCCESS && l_get_len(bwq->wait_q) > 0) {
             // We exit this loop once all items have been transfered to the ready queue.
             // OR once a single transfer from the wait q to the ready q fails.
 
             void *item = *(void **)l_get_ptr(bwq->wait_q, 0);
             res = l_push_back(bwq->ready_q, &item);
-            if (res == FOS_SUCCESS) {
+            if (res == FOS_E_SUCCESS) {
                 l_pop_front(bwq->wait_q, NULL);
             }         
         }
@@ -108,7 +108,7 @@ fernos_error_t bwq_pop(basic_wait_queue_t *bwq, void **item) {
         if (item) {
             *item = NULL;
         }
-        return FOS_EMPTY;
+        return FOS_E_EMPTY;
     }
 
     return l_pop_front(bwq->ready_q, item);
@@ -182,7 +182,7 @@ static void delete_vector_wait_queue(wait_queue_t *wq) {
 
 fernos_error_t vwq_enqueue(vector_wait_queue_t *vwq, void *item, uint32_t ready_mask) {
     if (ready_mask == 0) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     vwq_wait_pair_t wp = {
@@ -195,10 +195,10 @@ fernos_error_t vwq_enqueue(vector_wait_queue_t *vwq, void *item, uint32_t ready_
 
 fernos_error_t vwq_notify(vector_wait_queue_t *vwq, uint8_t ready_id, vwq_notify_mode_t mode) {
     if (ready_id >= 32) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
-    fernos_error_t err = FOS_SUCCESS;
+    fernos_error_t err = FOS_E_SUCCESS;
     
     vwq_wait_pair_t *iter;
     vwq_ready_pair_t rp;
@@ -215,7 +215,7 @@ fernos_error_t vwq_notify(vector_wait_queue_t *vwq, uint8_t ready_id, vwq_notify
                 };
 
                 err = l_push_back(vwq->ready_q, &rp); 
-                if (err == FOS_SUCCESS) {
+                if (err == FOS_E_SUCCESS) {
                     l_pop_iter(vwq->wait_q, NULL);
                 }
 
@@ -227,7 +227,7 @@ fernos_error_t vwq_notify(vector_wait_queue_t *vwq, uint8_t ready_id, vwq_notify
 
     case VWQ_NOTIFY_ALL:
         l_reset_iter(vwq->wait_q);
-        for (iter = l_get_iter(vwq->wait_q); err == FOS_SUCCESS && iter != NULL; ) {
+        for (iter = l_get_iter(vwq->wait_q); err == FOS_E_SUCCESS && iter != NULL; ) {
 
             if (iter->ready_mask & mask) {
                 rp = (vwq_ready_pair_t) {
@@ -236,7 +236,7 @@ fernos_error_t vwq_notify(vector_wait_queue_t *vwq, uint8_t ready_id, vwq_notify
                 };
 
                 err = l_push_back(vwq->ready_q, &rp); 
-                if (err == FOS_SUCCESS) {
+                if (err == FOS_E_SUCCESS) {
                     l_pop_iter(vwq->wait_q, NULL);
                     iter = l_get_iter(vwq->wait_q);
                 }
@@ -265,9 +265,9 @@ fernos_error_t vwq_pop(vector_wait_queue_t *vwq, void **item, uint8_t *ready_id)
 
     if (l_get_len(vwq->ready_q) > 0) {
         l_pop_front(vwq->ready_q, &rp);
-        err = FOS_SUCCESS;
+        err = FOS_E_SUCCESS;
     } else {
-        err = FOS_EMPTY;
+        err = FOS_E_EMPTY;
     }
 
     if (item) {
@@ -403,7 +403,7 @@ fernos_error_t twq_enqueue(timed_wait_queue_t *twq, void *item, uint32_t wt) {
 }
 
 fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t curr_time) {
-    fernos_error_t err = FOS_SUCCESS;
+    fernos_error_t err = FOS_E_SUCCESS;
 
     uint32_t ticks_passed = abs_wait_time(twq->time, curr_time);
 
@@ -417,7 +417,7 @@ fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t curr_time) {
             err = l_push_back(twq->ready_q, &(head->item));
 
             // If the push fails, just error out where we are.
-            if (err != FOS_SUCCESS) {
+            if (err != FOS_E_SUCCESS) {
                 break;
             }
 
@@ -440,11 +440,11 @@ fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t curr_time) {
 
 fernos_error_t twq_pop(timed_wait_queue_t *twq, void **item) {
     if (l_get_len(twq->ready_q) == 0) {
-        return FOS_EMPTY;
+        return FOS_E_EMPTY;
     }
 
     l_pop_front(twq->ready_q, item);                
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static void twq_remove(wait_queue_t *wq, void *item) {

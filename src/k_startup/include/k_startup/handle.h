@@ -66,7 +66,7 @@ static inline void init_base_handle(handle_state_t *hs, const handle_state_impl_
  *
  * Just create a new valid handle state and write it to `*out`.
  *
- * If this call returns FOS_ABORT_SYSTEM, the system will lock up.
+ * If this call returns FOS_E_ABORT_SYSTEM, the system will lock up.
  * If this call return some other non-success error code, the fork will fail.
  */
 static inline fernos_error_t copy_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
@@ -93,7 +93,7 @@ static inline fernos_error_t delete_handle_state(handle_state_t *hs) {
     if (hs) {
         return hs->impl->delete_handle_state(hs); 
     }
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /*
@@ -118,13 +118,13 @@ static inline fernos_error_t hs_close(handle_state_t *hs) {
 
     // Failure to delete a handle is seen as a catastrophic error.
     err = delete_handle_state(hs);
-    if (err != FOS_SUCCESS) {
-        return FOS_ABORT_SYSTEM;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_ABORT_SYSTEM;
     }
 
     idtb_push_id(hs->proc->handle_table, h);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -140,7 +140,7 @@ static inline fernos_error_t hs_write(handle_state_t *hs, const void *u_src, siz
     if (hs->impl->hs_write) {
         return hs->impl->hs_write(hs, u_src, len, u_written);
     }
-    DUAL_RET(hs->ks->curr_thread, FOS_NOT_IMPLEMENTED, FOS_SUCCESS);
+    DUAL_RET(hs->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }
 
 /**
@@ -152,8 +152,8 @@ static inline fernos_error_t hs_write(handle_state_t *hs, const void *u_src, siz
  * `u_readden` is optional. On success, if `u_readden` is provided, the number of bytes successfully
  * read should be stored in `*u_readden`.
  *
- * If ANY DATA at all is read, FOS_SUCCESS is returned.
- * If there is no data to read at this time, FOS_EMPTY is returned!
+ * If ANY DATA at all is read, FOS_E_SUCCESS is returned.
+ * If there is no data to read at this time, FOS_E_EMPTY is returned!
  *
  * This call should NEVER BLOCK. 
  */
@@ -161,20 +161,20 @@ static inline fernos_error_t hs_read(handle_state_t *hs, void *u_dst, size_t len
     if (hs->impl->hs_read) {
         return hs->impl->hs_read(hs, u_dst, len, u_readden);
     }
-    DUAL_RET(hs->ks->curr_thread, FOS_NOT_IMPLEMENTED, FOS_SUCCESS);
+    DUAL_RET(hs->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }
 
 /**
  * Block until there is data to read from a given handle.
  *
- * FOS_SUCCESS means there is data to read!
- * FOS_EMPTY means there will NEVER be anymore data to read from this handle!
+ * FOS_E_SUCCESS means there is data to read!
+ * FOS_E_EMPTY means there will NEVER be anymore data to read from this handle!
  */
 static inline fernos_error_t hs_wait(handle_state_t *hs) {
     if (hs->impl->hs_wait) {
         return hs->impl->hs_wait(hs);
     }
-    DUAL_RET(hs->ks->curr_thread, FOS_NOT_IMPLEMENTED, FOS_SUCCESS);
+    DUAL_RET(hs->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }
 
 /**
@@ -184,7 +184,7 @@ static inline fernos_error_t hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uin
     if (hs->impl->hs_cmd) {
         return hs->impl->hs_cmd(hs, cmd, arg0, arg1, arg2, arg3);
     }
-    DUAL_RET(hs->ks->curr_thread, FOS_NOT_IMPLEMENTED, FOS_SUCCESS);
+    DUAL_RET(hs->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }
 
 /*
@@ -197,7 +197,7 @@ static inline fernos_error_t hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uin
  *
  * After this call, `handle_table` will hold no handles.
  *
- * Returns FOS_ABORT_SYSTEM if there is ever a problem deleting any of the handles.
+ * Returns FOS_E_ABORT_SYSTEM if there is ever a problem deleting any of the handles.
  */
 fernos_error_t clear_handle_table(id_table_t *handle_table);
 
@@ -205,6 +205,6 @@ fernos_error_t clear_handle_table(id_table_t *handle_table);
  * Attempt to copy over handles from a parent process to a newly forked child.
  *
  * On error, all handles which were created will be deleted before returning.
- * (Except when FOS_ABORT_SYSTEM is returned)
+ * (Except when FOS_E_ABORT_SYSTEM is returned)
  */
 fernos_error_t copy_handle_table(process_t *parent, process_t *child);

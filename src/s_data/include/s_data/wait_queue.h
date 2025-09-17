@@ -150,10 +150,10 @@ static inline fernos_error_t bwq_notify_all(basic_wait_queue_t *bwq) {
  *
  * Should return items in the order they were made ready!
  * 
- * Should return FOS_EMPTY if there are no ready items. (NOTE: There still may be waiting items)
+ * Should return FOS_E_EMPTY if there are no ready items. (NOTE: There still may be waiting items)
  * In this case, NULL should be written to item (if item is given)
  *
- * Returns FOS_SUCCESS if a ready item was successfully popped. If item is given, the popped item
+ * Returns FOS_E_SUCCESS if a ready item was successfully popped. If item is given, the popped item
  * will be stored at *item.
  */
 fernos_error_t bwq_pop(basic_wait_queue_t *bwq, void **item);
@@ -270,10 +270,10 @@ static inline fernos_error_t vwq_notify_all(vector_wait_queue_t *vwq, uint8_t re
 /**
  * Pop an item off the ready queue.
  *
- * Returns FOS_EMPTY if there are no ready items. In this case, NULL should be written to item 
+ * Returns FOS_E_EMPTY if there are no ready items. In this case, NULL should be written to item 
  * (if given), and VWQ_NULL_READY_ID should be written to ready_id (if given).
  *
- * Returns FOS_SUCCESS if there is at least one item in the ready queue. In this case, the
+ * Returns FOS_E_SUCCESS if there is at least one item in the ready queue. In this case, the
  * item is popped from the ready queue. If item is given, the popped item is written at *item.
  * If ready_id is given, the ready_id which readied the popped item will be written at *ready_id.
  */
@@ -350,9 +350,9 @@ fernos_error_t twq_notify(timed_wait_queue_t *twq, uint32_t curr_time);
 /**
  * Pop an item of the ready queue.
  *
- * Returns FOS_EMPTY if there are no ready items. NULL will be written to item (if it's given)
+ * Returns FOS_E_EMPTY if there are no ready items. NULL will be written to item (if it's given)
  *
- * Returns FOS_SUCCESS if an item was successfully popped. If item is given, the popped item
+ * Returns FOS_E_SUCCESS if an item was successfully popped. If item is given, the popped item
  * will be written to *item.
  *
  * No other errors are returned from this function.

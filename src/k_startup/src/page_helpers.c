@@ -59,7 +59,7 @@ phys_addr_t copy_page_table(phys_addr_t pt) {
         return NULL_PHYS_ADDR;
     }
 
-    fernos_error_t status = FOS_SUCCESS;
+    fernos_error_t status = FOS_E_SUCCESS;
     
     phys_addr_t old0 = assign_free_page(0, pt);
     phys_addr_t old1 = assign_free_page(1, pt_copy);
@@ -67,7 +67,7 @@ phys_addr_t copy_page_table(phys_addr_t pt) {
     pt_entry_t *og_pt = (pt_entry_t *)(free_kernel_pages[0]);
     pt_entry_t *new_pt = (pt_entry_t *)(free_kernel_pages[1]);
 
-    for (uint32_t i = 0; status == FOS_SUCCESS && i < 1024; i++) {
+    for (uint32_t i = 0; status == FOS_E_SUCCESS && i < 1024; i++) {
         pt_entry_t pte = og_pt[i];
 
         // Skip all empty entries.
@@ -83,7 +83,7 @@ phys_addr_t copy_page_table(phys_addr_t pt) {
             phys_addr_t new_base =  pop_free_page();
 
             if (new_base == NULL_PHYS_ADDR) {
-                status = FOS_NO_MEM; // We failed :(
+                status = FOS_E_NO_MEM; // We failed :(
             } else {
                 page_copy(new_base, og_base); 
 
@@ -100,7 +100,7 @@ phys_addr_t copy_page_table(phys_addr_t pt) {
     assign_free_page(1, old1);
     assign_free_page(0, old0);
 
-    if (status != FOS_SUCCESS) {
+    if (status != FOS_E_SUCCESS) {
         delete_page_table(pt_copy);
         pt_copy = NULL_PHYS_ADDR;
     }
@@ -119,7 +119,7 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
         return NULL_PHYS_ADDR;
     }
 
-    fernos_error_t status = FOS_SUCCESS;
+    fernos_error_t status = FOS_E_SUCCESS;
 
     phys_addr_t old0 = assign_free_page(0, pd);
     phys_addr_t old1 = assign_free_page(1, pd_copy);
@@ -127,7 +127,7 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
     pt_entry_t *og_pd = (pt_entry_t *)(free_kernel_pages[0]);
     pt_entry_t *new_pd = (pt_entry_t *)(free_kernel_pages[1]);
 
-    for (uint32_t i = 0; status == FOS_SUCCESS && i < 1024; i++) {
+    for (uint32_t i = 0; status == FOS_E_SUCCESS && i < 1024; i++) {
         pt_entry_t pte = og_pd[i];
 
         // Skip empty entries.
@@ -139,7 +139,7 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
 
         phys_addr_t pt_copy = copy_page_table(og_pt);
         if (pt_copy == NULL_PHYS_ADDR) {
-            status = FOS_NO_MEM; // We failed :(
+            status = FOS_E_NO_MEM; // We failed :(
         } else {
             // Page tables are always unique and writeable. 
             new_pd[i] = fos_unique_pt_entry(pt_copy, true, true);
@@ -149,7 +149,7 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
     assign_free_page(1, old1);
     assign_free_page(0, old0);
 
-    if (status != FOS_SUCCESS) {
+    if (status != FOS_E_SUCCESS) {
         delete_page_directory(pd_copy);
         pd_copy = NULL_PHYS_ADDR;
     }
@@ -171,7 +171,7 @@ static fernos_error_t mem_cpy_user(void *kbuf, phys_addr_t user_pd, void *ubuf,
         if (copied) {
             *copied = 0;
         }
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     const uint8_t *limit = (uint8_t *)ubuf + bytes;
@@ -211,7 +211,7 @@ static fernos_error_t mem_cpy_user(void *kbuf, phys_addr_t user_pd, void *ubuf,
         *copied = bytes_copied;
     }
 
-    return bytes_copied == bytes ? FOS_SUCCESS : FOS_NO_MEM;
+    return bytes_copied == bytes ? FOS_E_SUCCESS : FOS_E_NO_MEM;
 
 }
 

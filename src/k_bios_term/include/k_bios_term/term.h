@@ -149,7 +149,7 @@ void term_put_c(char c);
  * Print a string onto the terminal.
  *
  * This supports control characters supported by putc.
- * This supports ANSII colors found in s_util/ansii.h
+ * This supports ANSI colors found in s_util/ansi.h
  */
 void term_put_s(const char *s);
 

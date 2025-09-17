@@ -125,14 +125,14 @@ fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len) {
     while (written < len) {
         size_t tmp_written;
         err = sc_handle_write(h, (const uint8_t *)src + written, len - written, &tmp_written);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
         written += tmp_written;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
@@ -143,17 +143,17 @@ fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
         size_t tmp_readden;
         err = sc_handle_read(h, (uint8_t *)dest + readden, len - readden, &tmp_readden);
 
-        if (err == FOS_EMPTY) { // block!
+        if (err == FOS_E_EMPTY) { // block!
             err = sc_handle_wait(h);
-            if (err != FOS_SUCCESS) {
+            if (err != FOS_E_SUCCESS) {
                 return err;
             }
-        } else if (err == FOS_SUCCESS) {
+        } else if (err == FOS_E_SUCCESS) {
             readden += tmp_readden; // Successful read.
         } else {
             return err; // Unexpected error.
         }
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }

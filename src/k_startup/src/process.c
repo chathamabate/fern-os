@@ -115,7 +115,7 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
     err = idtb_request_id(child->thread_table, thr->tid);
     thread_t *child_main_thr = new_thread_copy(thr, child);
 
-    if (err != FOS_SUCCESS || !child_main_thr) {
+    if (err != FOS_E_SUCCESS || !child_main_thr) {
         delete_process(child);
         delete_thread(child_main_thr);
 
@@ -156,7 +156,7 @@ void delete_process(process_t *proc) {
     basic_wait_queue_t **fwq; // Pretty confusing, but yes this should be a **.
     mp_reset_iter(proc->futexes);
     for (fernos_error_t err = mp_get_iter(proc->futexes, NULL, (void **)&fwq);
-                err == FOS_SUCCESS; err = mp_next_iter(proc->futexes, NULL, (void **)&fwq)) {
+                err == FOS_E_SUCCESS; err = mp_next_iter(proc->futexes, NULL, (void **)&fwq)) {
         delete_wait_queue((wait_queue_t *)*fwq); 
     }
 
@@ -188,7 +188,7 @@ static thread_t *proc_new_thread_with_stack(process_t *proc,
 
     fernos_error_t err = pd_alloc_pages(proc->pd, true, tstack_start, tstack_end, &true_e);
 
-    if (err != FOS_SUCCESS && err != FOS_ALREADY_ALLOCATED) {
+    if (err != FOS_E_SUCCESS && err != FOS_E_ALREADY_ALLOCATED) {
         delete_thread(new_thr);
         return NULL;
     }
@@ -255,20 +255,20 @@ fernos_error_t proc_register_futex(process_t *proc, futex_t *u_futex) {
     fernos_error_t err;
 
     if (!proc || !u_futex) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     // Is it already mapped?
 
     if (mp_get(proc->futexes, &u_futex)) {
-        return FOS_ALREADY_ALLOCATED;
+        return FOS_E_ALREADY_ALLOCATED;
     }
 
     // Test out that we have access to the futex.
 
     futex_t test;
     err = mem_cpy_from_user(&test, proc->pd, u_futex, sizeof(futex_t), NULL);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -276,16 +276,16 @@ fernos_error_t proc_register_futex(process_t *proc, futex_t *u_futex) {
 
     basic_wait_queue_t *bwq = new_basic_wait_queue(proc->al);
     if (!bwq) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     err = mp_put(proc->futexes, &u_futex, &bwq);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         delete_wait_queue((wait_queue_t *)bwq);
         return err;
     }
     
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex) {

@@ -6,7 +6,7 @@
 #include "s_util/err.h"
 #include "s_util/misc.h"
 #include "s_util/str.h"
-#include "s_util/ansii.h"
+#include "s_util/ansi.h"
 #include <stdarg.h>
 
 static void *shal_malloc(allocator_t *al, size_t bytes);
@@ -96,7 +96,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
     const void *true_e;
     err = attrs.mmp.request_mem(attrs.start, ((const uint8_t *)(attrs.start)) + M_4K, &true_e);
 
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return NULL;
     }
 
@@ -307,7 +307,7 @@ static mem_block_t *shal_request_mem(simple_heap_allocator_t *shal, const void *
         new_fb = shal_coalesce(shal, new_b);
     }
 
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         shal->exhausted = true;
     }
 
@@ -632,13 +632,13 @@ static void shal_dump(allocator_t *al, void (*pf)(const char *fmt, ...)) {
         bool mb_alloc = mb_get_allocated(mb);
         uint32_t mb_size = mb_get_size(mb);
 
-        pf("[" ANSII_CYAN_FG "0x%X" ANSII_RESET "] ", mb);
+        pf("[" ANSI_CYAN_FG "0x%X" ANSI_RESET "] ", mb);
         dump_hex_pairs(pf, "Size", mb_size);
 
         if (mb_alloc) {
-            pf(" %s\n", ANSII_RED_FG "ALLOCATED" ANSII_RESET);
+            pf(" %s\n", ANSI_RED_FG "ALLOCATED" ANSI_RESET);
         } else {
-            pf(" %s ", ANSII_GREEN_FG "FREE" ANSII_RESET);
+            pf(" %s ", ANSI_GREEN_FG "FREE" ANSI_RESET);
 
             free_block_t *fb = (free_block_t *)mb;
             dump_hex_pairs(pf, "Prv", fb->prev, "Nxt", fb->next); 

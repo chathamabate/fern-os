@@ -46,11 +46,11 @@ fernos_error_t fat32_write_dir_entry(fat32_device_t *dev, uint32_t slot_ind,
 /**
  * Find a sequence of free entires within a directory which has a length of at least `seq_len`.
  *
- * On Success, FOS_SUCCESS is returned, and the starting offset of the sequence is written to
+ * On Success, FOS_E_SUCCESS is returned, and the starting offset of the sequence is written to
  * `*entry_offset`.
  *
  * NOTE: if an initial search fails to find an adequate sequnce, the directory will be expanded.
- * If the expansion fails FOS_NO_SPACE will be returned.
+ * If the expansion fails FOS_E_NO_SPACE will be returned.
  */
 fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t seq_len,
         uint32_t *entry_offset);
@@ -58,7 +58,7 @@ fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32
 /**
  * This call alloactes a new directory sequence containing the given lfn and sfn.
  *
- * If the allocation fails, FOS_NO_SPACE is returned.
+ * If the allocation fails, FOS_E_NO_SPACE is returned.
  * NOTE: This call DOES NOT check for name uniqueness. You should do that yourself before calling
  * this function.
  *
@@ -66,7 +66,7 @@ fernos_error_t fat32_get_free_seq(fat32_device_t *dev, uint32_t slot_ind, uint32
  * (or provide a 0 length lfn)
  * If the given long file name is too long, an error will be returned.
  *
- * Returns FOS_SUCCESS if there is no error writing to the directory.
+ * Returns FOS_E_SUCCESS if there is no error writing to the directory.
  */
 fernos_error_t fat32_new_seq(fat32_device_t *dev, uint32_t slot_ind,
         const fat32_short_fn_dir_entry_t *sfn_entry, const uint16_t *lfn, uint32_t *entry_offset);
@@ -82,9 +82,9 @@ fernos_error_t fat32_new_seq_c8(fat32_device_t *dev, uint32_t slot_ind,
  *
  * This will return an error if the given sequence is malformed in any way.
  * It will also return an error if entry offset points to an LFN entry which doesn't have
- * the starting prefix. (FOS_STATE_MISMATCH is returned in both of these cases)
+ * the starting prefix. (FOS_E_STATE_MISMATCH is returned in both of these cases)
  *
- * Also returns FOS_STATE_MISMATCH if the entry given points ot an unused entry or
+ * Also returns FOS_E_STATE_MISMATCH if the entry given points ot an unused entry or
  * the directory terminator!
  */
 fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t entry_offset);
@@ -93,15 +93,15 @@ fernos_error_t fat32_erase_seq(fat32_device_t *dev, uint32_t slot_ind, uint32_t 
  * Given the offset of an entry within a directory, get the offset of the start of 
  * the next directory sequence.
  *
- * If `entry_offset` points to the directory terminator, FOS_EMPTY is returned.
- * If `entry_offset` overshoots the directory sectors, FOS_EMPTY is returned.
+ * If `entry_offset` points to the directory terminator, FOS_E_EMPTY is returned.
+ * If `entry_offset` overshoots the directory sectors, FOS_E_EMPTY is returned.
  * If `entry_offset` points to an existing slot which comes AFTER the directory terminator,
  * undefined behavior.
  * If `entry_offset` already points to an LFN or SFN entry, `entry_offset` is written to 
  * `*seq_start`. FOS_SUCCES is returned.
  * Otherwise, the directory is traversed until an LFN/SFN entry is found. This offset is then
- * written to `*seq_start`. FOS_SUCCESS is returned.
- * If no SFN/LFN entry is found before hitting the terminator, FOS_EMPTY is returned.
+ * written to `*seq_start`. FOS_E_SUCCESS is returned.
+ * If no SFN/LFN entry is found before hitting the terminator, FOS_E_EMPTY is returned.
  *
  * Other errors may be returned.
  */
@@ -115,7 +115,7 @@ fernos_error_t fat32_next_dir_seq(fat32_device_t *dev, uint32_t slot_ind,
  * If entry offset points to an SFN entry, `entry_offset` is written.
  *
  * If an unused entry is encountered or the end of the directory is reached before finding
- * the SFN, return FOS_STATE_MISMATCH.
+ * the SFN, return FOS_E_STATE_MISMATCH.
  *
  * Other errors may be returned.
  */
@@ -126,10 +126,10 @@ fernos_error_t fat32_get_dir_seq_sfn(fat32_device_t *dev, uint32_t slot_ind,
  * Herlper function for advancing to the next SFN entry.
  * If `entry_offset` already points to an SFN entry, this is what will be written to `*sfn_entry_offset`.
  *
- * Returns FOS_EMPTY if `entry_offset` points to the directory terminator, overshoots directory
+ * Returns FOS_E_EMPTY if `entry_offset` points to the directory terminator, overshoots directory
  * sectors, or the end of the directory is reached before hitting an SFN.
  *
- * FOS_STATE_MISMATCH is returned if a malformed sequence is found.
+ * FOS_E_STATE_MISMATCH is returned if a malformed sequence is found.
  *
  * (Really just the same rules as the above two functions combined)
  */
@@ -139,11 +139,11 @@ static inline fernos_error_t fat32_next_dir_seq_sfn(fat32_device_t *dev, uint32_
 
     uint32_t seq_start;
     err = fat32_next_dir_seq(dev, slot_ind, entry_offset, &seq_start);
-    if (err == FOS_EMPTY) {
-        return FOS_EMPTY;
+    if (err == FOS_E_EMPTY) {
+        return FOS_E_EMPTY;
     }
 
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -158,9 +158,9 @@ static inline fernos_error_t fat32_next_dir_seq_sfn(fat32_device_t *dev, uint32_
  *
  * `lfn` must have size at least FAT32_MAX_LFN_LEN + 1.
  *
- * If the given file has no LFN entries, FOS_EMPTY is returned.
+ * If the given file has no LFN entries, FOS_E_EMPTY is returned.
  *
- * The contents written to `lfn` are only gauranteed to be valid when FOS_SUCCESS is returned.
+ * The contents written to `lfn` are only gauranteed to be valid when FOS_E_SUCCESS is returned.
  *
  * This will return an error if your sequence has too many LFN entries.
  */
@@ -181,7 +181,7 @@ fernos_error_t fat32_get_dir_seq_lfn_c8(fat32_device_t *dev, uint32_t slot_ind,
  *
  * FOS_SUCESS is returned if such a sequence/entry is found. In this case, if `seq_start` is given,
  * the offset of the beginning of the sequence is written to `*seq_start`.
- * FOS_EMPTY is returned if there doesn't exist an entry with the given name extension
+ * FOS_E_EMPTY is returned if there doesn't exist an entry with the given name extension
  * combo.
  */
 fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char *name,
@@ -192,9 +192,9 @@ fernos_error_t fat32_find_sfn(fat32_device_t *dev, uint32_t slot_ind, const char
  *
  * `lfn` is a NULL terminated string. Shouldn't have length no longer than FAT32_MAK_LFN_LEN.
  *
- * FOS_SUCCESS is returned if a sequence with the given LFN is found. In this case, if `seq_start` is given,
+ * FOS_E_SUCCESS is returned if a sequence with the given LFN is found. In this case, if `seq_start` is given,
  * the offset of the beginning of the sequence is written to `*seq_start`.
- * FOS_EMPTY is returned if no sequence with the given LFN can be found.
+ * FOS_E_EMPTY is returned if no sequence with the given LFN can be found.
  */
 fernos_error_t fat32_find_lfn(fat32_device_t *dev, uint32_t slot_ind, const uint16_t *lfn,
         uint32_t *seq_start);

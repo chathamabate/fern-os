@@ -32,10 +32,10 @@ static bool pretest(void) {
 
     fernos_error_t err;
     err = init_fat32(bd, 0, 1024, 8);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = parse_new_da_fat32_device(bd, 0, 0, true, &dev);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_SUCCEED();
 }
@@ -57,13 +57,13 @@ static bool test_get_set_fat_slots(void) {
         uint32_t screwed_up_ind = i | ((i % 16) << 28);
         uint32_t screwed_up_val = i | (((i % 16) + 2) << 28);
         err = fat32_set_fat_slot(dev, screwed_up_ind, screwed_up_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     for (uint32_t i = 0; i < dev->num_fat_slots; i += 3) {
         uint32_t screwed_up_ind = i | (((i+3) % 16) << 28);
         err = fat32_get_fat_slot(dev, screwed_up_ind, &slot_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         TEST_EQUAL_UINT(i, slot_val);
     }
@@ -71,15 +71,15 @@ static bool test_get_set_fat_slots(void) {
     // It's kinda hard to find a test to fit this into. Just gonna put this here and make sure it
     // succeeds.
     err = fat32_sync_fats(dev);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    TEST_FALSE(fat32_set_fat_slot(dev, dev->num_fat_slots, 0) == FOS_SUCCESS);
-    TEST_FALSE(fat32_set_fat_slot(dev, FAT32_BAD_CLUSTER, 0) == FOS_SUCCESS);
-    TEST_FALSE(fat32_set_fat_slot(dev,0xFFFFFFFF, 0) == FOS_SUCCESS);
+    TEST_FALSE(fat32_set_fat_slot(dev, dev->num_fat_slots, 0) == FOS_E_SUCCESS);
+    TEST_FALSE(fat32_set_fat_slot(dev, FAT32_BAD_CLUSTER, 0) == FOS_E_SUCCESS);
+    TEST_FALSE(fat32_set_fat_slot(dev,0xFFFFFFFF, 0) == FOS_E_SUCCESS);
 
-    TEST_FALSE(fat32_get_fat_slot(dev, dev->num_fat_slots, &slot_val) == FOS_SUCCESS);
-    TEST_FALSE(fat32_get_fat_slot(dev, FAT32_BAD_CLUSTER, &slot_val) == FOS_SUCCESS);
-    TEST_FALSE(fat32_get_fat_slot(dev,0xFFFFFFFF, &slot_val) == FOS_SUCCESS);
+    TEST_FALSE(fat32_get_fat_slot(dev, dev->num_fat_slots, &slot_val) == FOS_E_SUCCESS);
+    TEST_FALSE(fat32_get_fat_slot(dev, FAT32_BAD_CLUSTER, &slot_val) == FOS_E_SUCCESS);
+    TEST_FALSE(fat32_get_fat_slot(dev,0xFFFFFFFF, &slot_val) == FOS_E_SUCCESS);
 
     TEST_SUCCEED();
 }
@@ -96,10 +96,10 @@ static bool fat32_store_chain(fat32_device_t *dev, const uint32_t *chain, uint32
 
     for (uint32_t i = 0; i < chain_len - 1; i++) {
         err =  fat32_set_fat_slot(dev, chain[i], chain[i + 1]);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
     err = fat32_set_fat_slot(dev, chain[chain_len - 1], FAT32_EOC);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     
     TEST_SUCCEED();
 }
@@ -116,7 +116,7 @@ static bool fat32_expect_len(fat32_device_t *dev, uint32_t slot_ind, uint32_t le
     while (true) {
         uint32_t next_iter;
         err = fat32_get_fat_slot(dev, iter, &next_iter);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         visited++;
 
@@ -141,23 +141,23 @@ static bool test_free_valid_chain(void) {
     TEST_TRUE(fat32_store_chain(dev, chain_indeces, chain_indeces_len));
 
     err = fat32_free_chain(dev, chain_indeces[0]); 
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     for (uint32_t i = 0; i < chain_indeces_len; i++) {
         err = fat32_get_fat_slot(dev, chain_indeces[i], &slot_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         TEST_EQUAL_UINT(0, slot_val);
     }
 
     // Lastly, let's just try a single element chain.
     err = fat32_set_fat_slot(dev, 10, FAT32_EOC);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fat32_free_chain(dev, 10); 
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fat32_get_fat_slot(dev, 10, &slot_val);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_UINT(0, slot_val);
 
     TEST_SUCCEED();
@@ -174,10 +174,10 @@ static bool test_free_bad_chain(void) {
     TEST_TRUE(fat32_store_chain(dev, chain_indeces, chain_indeces_len));
 
     err = fat32_set_fat_slot(dev, chain_indeces[chain_indeces_len - 1], FAT32_BAD_CLUSTER);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fat32_free_chain(dev, chain_indeces[0]); 
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     TEST_SUCCEED();
 }
@@ -190,17 +190,17 @@ static bool test_pop_free_fat_slot(void) {
 
         err = fat32_pop_free_fat_slot(dev, &slot_ind);
 
-        if (err == FOS_NO_SPACE) {
+        if (err == FOS_E_NO_SPACE) {
             TEST_SUCCEED();
         }
 
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         TEST_TRUE(slot_ind > 2 && slot_ind < dev->num_fat_slots);
 
         uint32_t slot_val;
 
         err = fat32_get_fat_slot(dev, slot_ind, &slot_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         TEST_EQUAL_HEX(FAT32_EOC, slot_val);
     }
 
@@ -215,12 +215,12 @@ static bool test_new_chain(void) {
     // Try a bunch of different lengths.
     for (uint32_t len = 1; len < 25; len += 3) {
         err = fat32_new_chain(dev, len, &slot_ind);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         TEST_TRUE(fat32_expect_len(dev, slot_ind, len));
 
         err = fat32_free_chain(dev, slot_ind);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     TEST_SUCCEED();
@@ -234,16 +234,16 @@ static bool test_new_chain_big(void) {
     uint32_t slot_ind;
 
     err = fat32_new_chain(dev, dev->num_fat_slots, &slot_ind);
-    TEST_EQUAL_HEX(FOS_NO_SPACE, err);
+    TEST_EQUAL_HEX(FOS_E_NO_SPACE, err);
     
     // Now try making a bunch of small chains until we run out of space.
     while (true) {
         err = fat32_new_chain(dev, 5, &slot_ind);
-        if (err == FOS_NO_SPACE) {
+        if (err == FOS_E_NO_SPACE) {
             TEST_SUCCEED();
         }
 
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     TEST_SUCCEED();
@@ -261,20 +261,20 @@ static bool test_extend_chain(void) {
 
     uint32_t new_len = init_chain_len + 5;
     err = fat32_resize_chain(dev, init_chain[0], new_len);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_TRUE(fat32_expect_len(dev, init_chain[0], new_len));
 
     new_len += 3;
     err = fat32_resize_chain(dev, init_chain[0], new_len);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_TRUE(fat32_expect_len(dev, init_chain[0], new_len));
 
     // This one should fail!
 
     err = fat32_resize_chain(dev, init_chain[0], new_len + dev->num_fat_slots);
-    TEST_EQUAL_HEX(FOS_NO_SPACE, err);
+    TEST_EQUAL_HEX(FOS_E_NO_SPACE, err);
 
     TEST_TRUE(fat32_expect_len(dev, init_chain[0], new_len));
 
@@ -295,19 +295,19 @@ static bool test_shrink_chain(void) {
     uint32_t new_len = init_chain_len - 3;
     
     err = fat32_resize_chain(dev, init_chain[0], new_len);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_TRUE(fat32_expect_len(dev, init_chain[0], new_len));
 
     // Now let's try freeing the chain.
     err = fat32_resize_chain(dev, init_chain[0], 0);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     for (uint32_t i = 0; i < init_chain_len; i++) {
         uint32_t slot_val;
 
         err = fat32_get_fat_slot(dev, init_chain[i], &slot_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         TEST_EQUAL_UINT(0, slot_val);
     }
@@ -326,14 +326,14 @@ static bool test_resize_malformed(void) {
     TEST_TRUE(fat32_store_chain(dev, init_chain, init_chain_len));
 
     err = fat32_set_fat_slot(dev, init_chain[init_chain_len - 1],  FAT32_BAD_CLUSTER);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fat32_resize_chain(dev, init_chain[0], init_chain_len + 5);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     // The behavior of shrinking a malformed chain not the well defined tbh.
     // err = fat32_resize_chain(dev, init_chain[0], init_chain_len - 1);
-    // TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    // TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
     
     TEST_SUCCEED();
 }
@@ -353,33 +353,33 @@ static bool test_traverse_chain(void) {
     for (uint32_t i = 0; i < init_chain_len; i++) {
 
         err = fat32_traverse_chain(dev, init_chain[0], i, &traversed_ind);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         TEST_EQUAL_UINT(init_chain[i], traversed_ind);
     }
 
     err = fat32_traverse_chain(dev, init_chain[0], init_chain_len, &traversed_ind);
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
 
     // Now malform the chain.
 
     err = fat32_set_fat_slot(dev, init_chain[2], FAT32_BAD_CLUSTER);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fat32_traverse_chain(dev, init_chain[0], 1, &traversed_ind);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_UINT(init_chain[1], traversed_ind);
 
     // This is kinda confusing, but we are allowed to traverse the chain even up to a malformed
     // cluster. An error is only returned if a bad cluster prevents us from being able to
     // reach our desired offset in the chain.
     err = fat32_traverse_chain(dev, init_chain[0], 2, &traversed_ind);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_UINT(init_chain[2], traversed_ind);
 
     // i.e. here.
     err = fat32_traverse_chain(dev, init_chain[0], 3, &traversed_ind);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     TEST_SUCCEED();
 }
@@ -391,7 +391,7 @@ static bool test_read_write(void) {
     uint32_t chain;
 
     err = fat32_new_chain(dev, chain_clusters, &chain);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     uint32_t chain_sectors = chain_clusters * dev->sectors_per_cluster;
 
@@ -403,12 +403,12 @@ static bool test_read_write(void) {
         mem_set(sector_buf[0], (uint8_t)i, FAT32_REQ_SECTOR_SIZE);
 
         err = fat32_write(dev, chain, i, 1, sector_buf[0]);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     for (uint32_t i = 0; i < chain_sectors; i++) {
         err = fat32_read(dev, chain, i, 1, sector_buf[0]);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         mem_set(sector_buf[1], (uint8_t)i, FAT32_REQ_SECTOR_SIZE);
         TEST_TRUE(mem_cmp(sector_buf[0], sector_buf[1], FAT32_REQ_SECTOR_SIZE));
@@ -422,14 +422,14 @@ static bool test_read_write(void) {
     for (uint32_t i = 0; i < chain_sectors; i++) {
         mem_set(full_buf, i, (chain_sectors - i) * FAT32_REQ_SECTOR_SIZE);
         err = fat32_write(dev, chain, i, chain_sectors - i, full_buf);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     // The resulting state of the chain should be the same as before after that above writes.
 
     for (uint32_t i = 0; i < chain_sectors; i++) {
         err = fat32_read(dev, chain, i, 1, sector_buf[0]);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         mem_set(sector_buf[1], (uint8_t)i, FAT32_REQ_SECTOR_SIZE);
         TEST_TRUE(mem_cmp(sector_buf[0], sector_buf[1], FAT32_REQ_SECTOR_SIZE));
@@ -466,12 +466,12 @@ static bool test_read_write_multi_chain(void) {
         mem_set(buf, i, sectors_per_chain * FAT32_REQ_SECTOR_SIZE);
 
         err = fat32_write(dev, chains[i][0], 0, sectors_per_chain, buf);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     for (uint32_t i = 0; i < num_chains; i++) {
         err = fat32_read(dev, chains[i][0], 0, sectors_per_chain, buf);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         for (uint32_t j = 0; j < sectors_per_chain * FAT32_REQ_SECTOR_SIZE; j++) {
             TEST_EQUAL_UINT(i, buf[j]);
@@ -498,35 +498,35 @@ static bool test_read_write_bad(void) {
     TEST_TRUE(buf != NULL);
 
     err = fat32_write(dev, chain[0], 0, chain_sectors + 1, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
 
     err = fat32_read(dev, chain[0], 0, chain_sectors + 1, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
 
     err = fat32_write(dev, chain[0], chain_sectors, 1, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
 
     err = fat32_read(dev, chain[0], chain_sectors, 1, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
 
     // Ok, now let's try to malform the chain.
 
     err = fat32_set_fat_slot(dev, chain[1], FAT32_BAD_CLUSTER);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     // A range which contains a bad sector.
     err = fat32_write(dev, chain[0], 0, chain_sectors, buf);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     err = fat32_read(dev, chain[0], 0, chain_sectors, buf);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     // Indexing after a bad cluster.
     err = fat32_write(dev, chain[0], chain_sectors - 1, 1, buf);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     err = fat32_read(dev, chain[0], chain_sectors - 1, 1, buf);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     da_free(buf);
 
@@ -557,7 +557,7 @@ static bool test_read_write_piece(void) {
             mem_set(buf, i + j, skip); 
             err = fat32_write_piece(dev, chain[0], i, j, 
                     write_amt, buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         }
     }
 
@@ -568,7 +568,7 @@ static bool test_read_write_piece(void) {
 
             err = fat32_read_piece(dev, chain[0], i, j, 
                     read_amt, buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             for (uint32_t k = 0; k < read_amt; k++) {
                 TEST_EQUAL_UINT((uint8_t)(i + j), buf[k]);
@@ -593,27 +593,27 @@ static bool test_read_write_piece_bad(void) {
     uint8_t buf[FAT32_REQ_SECTOR_SIZE];
 
     err = fat32_write_piece(dev, chain[0], num_sectors, 0, 10, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
 
     err = fat32_read_piece(dev, chain[0], num_sectors, 0, 10, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
 
     err = fat32_write_piece(dev, chain[0], num_sectors, FAT32_REQ_SECTOR_SIZE - 1, 10, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
 
     err = fat32_read_piece(dev, chain[0], num_sectors, FAT32_REQ_SECTOR_SIZE - 1, 10, buf);
-    TEST_EQUAL_HEX(FOS_INVALID_RANGE, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
 
     // Now maybe a malformed chain plz.
 
     err = fat32_set_fat_slot(dev, chain[2], FAT32_BAD_CLUSTER);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fat32_write_piece(dev, chain[0], num_sectors - 1, 0, 10, buf);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     err = fat32_read_piece(dev, chain[0], num_sectors - 1, 0, 10, buf);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     TEST_SUCCEED();
 }
@@ -646,11 +646,11 @@ static bool test_read_write_random(void) {
         mem_set(cntl_bufs[i], 0, num_chain_sectors * FAT32_REQ_SECTOR_SIZE);
 
         err = fat32_new_chain(dev, num_chain_clusters, chains + i);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         // Set the chain to 0 plz.
         err = fat32_write(dev, chains[i], 0, num_chain_sectors, cntl_bufs[i]);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     const uint32_t max_trial_sectors = 8;
@@ -688,10 +688,10 @@ static bool test_read_write_random(void) {
 
                 // Write to device.
                 err = fat32_write(dev, chain, sector_offset, trial_sectors, trial_buf);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             } else { // Read
                 err = fat32_read(dev, chain, sector_offset, trial_sectors, trial_buf);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                 TEST_TRUE(mem_cmp(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE), 
                             trial_buf, trial_sectors * FAT32_REQ_SECTOR_SIZE));
@@ -711,11 +711,11 @@ static bool test_read_write_random(void) {
 
                 err = fat32_write_piece(dev, chain, sector_offset, byte_offset, num_bytes, 
                         trial_buf);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             } else { // Read Piece
                 err = fat32_read_piece(dev, chain, sector_offset, byte_offset, num_bytes, 
                         trial_buf);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                 TEST_TRUE(mem_cmp(cntl_buf + (sector_offset * FAT32_REQ_SECTOR_SIZE) + byte_offset, 
                         trial_buf, num_bytes));

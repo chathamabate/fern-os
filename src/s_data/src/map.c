@@ -174,7 +174,7 @@ static fernos_error_t chm_get_kvp(map_t *mp, const void *key, const void **key_o
     chm_node_header_t *node = chm_get_node(chm, key);
 
     if (!node) {
-        return FOS_EMPTY;
+        return FOS_E_EMPTY;
     }
 
     if (key_out) {
@@ -185,7 +185,7 @@ static fernos_error_t chm_get_kvp(map_t *mp, const void *key, const void **key_o
         *val_out = (void *)((uint8_t *)(node + 1) + chm->super.key_size);
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {
@@ -201,7 +201,7 @@ static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {
         
         mem_cpy(val_ptr, value, chm->super.val_size);
 
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
     // We must add a new node to the map!
@@ -210,7 +210,7 @@ static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {
             sizeof(chm_node_header_t) + chm->super.key_size + chm->super.val_size);
 
     if (!new_node) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     // Redundant work here, but whatevs.
@@ -242,7 +242,7 @@ static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {
 
     chm_try_resize(chm);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static bool chm_remove(map_t *mp, const void *key) {
@@ -296,7 +296,7 @@ static void chm_reset_iter(map_t *mp) {
 static fernos_error_t chm_get_iter(map_t *mp, const void **key, void **value) {
     chained_hash_map_t *chm = (chained_hash_map_t *)mp;
 
-    fernos_error_t err = FOS_EMPTY;
+    fernos_error_t err = FOS_E_EMPTY;
 
     const void *key_ptr = NULL;
     void *val_ptr = NULL;
@@ -305,7 +305,7 @@ static fernos_error_t chm_get_iter(map_t *mp, const void **key, void **value) {
         key_ptr = chm->iter + 1;
         val_ptr = (uint8_t *)key_ptr + chm->super.key_size;
         
-        err = FOS_SUCCESS;
+        err = FOS_E_SUCCESS;
     }
 
     if (key) {

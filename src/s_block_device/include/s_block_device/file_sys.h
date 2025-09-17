@@ -75,7 +75,7 @@ size_t next_filename(const char *path, char *dest);
 /**
  * Given a VALID path separate it's basename and directory components. 
  *
- * This returns FOS_BAD_ARGS if `path` does not end with a significant filename.
+ * This returns FOS_E_BAD_ARGS if `path` does not end with a significant filename.
  * (By "significant" I mean a filename other than "." or "..")
  *
  * This will also fail if the given path ends with a "/".
@@ -170,7 +170,7 @@ static inline fernos_error_t fs_flush(file_sys_t *fs, fs_node_key_t key) {
         return fs->impl->fs_flush(fs, key);
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -191,11 +191,11 @@ static inline void delete_file_sys(file_sys_t *fs) {
  * start at this directory. 
  * If you know `path` is absolute, `cwd` can be NULL signifying no relative starting point.
  *
- * On success, FOS_SUCCESS is returned and the new key is written to `*key`.
- * If `path` does not point to an existing file, FOS_INVALID_INDEX s returned.
- * If `path` is relative and `cwd` is NULL, FOS_BAD_ARGS is returned.
- * If `cwd` is given, and doesn't point to a directory, FOS_STATE_MISMATCH is returned.
- * If the given `path` points to a file mid-path, FOS_STATE_MISMATCH is returned.
+ * On success, FOS_E_SUCCESS is returned and the new key is written to `*key`.
+ * If `path` does not point to an existing file, FOS_E_INVALID_INDEX s returned.
+ * If `path` is relative and `cwd` is NULL, FOS_E_BAD_ARGS is returned.
+ * If `cwd` is given, and doesn't point to a directory, FOS_E_STATE_MISMATCH is returned.
+ * If the given `path` points to a file mid-path, FOS_E_STATE_MISMATCH is returned.
  */
 static inline fernos_error_t fs_new_key(file_sys_t *fs, fs_node_key_t cwd, 
         const char *path, fs_node_key_t *key) {
@@ -252,12 +252,12 @@ static inline fernos_error_t fs_get_node_info(file_sys_t *fs, fs_node_key_t key,
 /**
  * Create a new file within a directory.
  *
- * Returns FOS_BAD_ARGS if `name` is not a valid filename OR if `name` = "." or ".."
- * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
- * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
- * Returns FOS_NO_SPACE if there isn't enough space to create the file.
+ * Returns FOS_E_BAD_ARGS if `name` is not a valid filename OR if `name` = "." or ".."
+ * Returns FOS_E_STATE_MISMATCH if `parent_dir` is not a key to a directory.
+ * Returns FOS_E_IN_USE if `name` already appears in `parent_dir`.
+ * Returns FOS_E_NO_SPACE if there isn't enough space to create the file.
  *
- * On success, FOS_SUCCESS is returned. If `key` is non-NULL, a key for the new file will be created
+ * On success, FOS_E_SUCCESS is returned. If `key` is non-NULL, a key for the new file will be created
  * and stored at `*key`.
  */
 static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir, 
@@ -269,7 +269,7 @@ static inline fernos_error_t fs_touch(file_sys_t *fs, fs_node_key_t parent_dir,
  * This is a wrapper around `fs_touch`.
  *
  * basename(path) will attempted to be created in dir(path).
- * FOS_BAD_ARGS is returned if there is an error separating the basename and directory components
+ * FOS_E_BAD_ARGS is returned if there is an error separating the basename and directory components
  * of `path`.
  *
  * dir(path) will be passed into `fs_new_key` to create a temporary key for calling `fs_touch`.
@@ -279,12 +279,12 @@ fernos_error_t fs_touch_path(file_sys_t *fs, fs_node_key_t cwd, const char *path
 /**
  * Create a subdiretory.
  *
- * Returns FOS_BAD_ARGS if `name` is not a valid filename OR if `name` = "." or ".."
- * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
- * Returns FOS_IN_USE if `name` already appears in `parent_dir`.
- * Returns FOS_NO_SPACE if there isn't enough space to create the directory.
+ * Returns FOS_E_BAD_ARGS if `name` is not a valid filename OR if `name` = "." or ".."
+ * Returns FOS_E_STATE_MISMATCH if `parent_dir` is not a key to a directory.
+ * Returns FOS_E_IN_USE if `name` already appears in `parent_dir`.
+ * Returns FOS_E_NO_SPACE if there isn't enough space to create the directory.
  *
- * On success, FOS_SUCCESS is returned. If `key` is non-NULL, a key for the new subdirecotry will 
+ * On success, FOS_E_SUCCESS is returned. If `key` is non-NULL, a key for the new subdirecotry will 
  * be created and stored at `*key`.
  *
  * NOTE: The created directory should have entries "." and "..".
@@ -298,7 +298,7 @@ static inline fernos_error_t fs_mkdir(file_sys_t *fs, fs_node_key_t parent_dir,
  * This is a wrapper around `fs_mkdir`.
  *
  * basename(path) will attempted to be created as a subdirectory dir(path).
- * FOS_BAD_ARGS is returned if there is an error separating the basename and directory components
+ * FOS_E_BAD_ARGS is returned if there is an error separating the basename and directory components
  * of `path`.
  *
  * dir(path) will be passed into `fs_new_key` to create a temporary key for calling `fs_mkdir`.
@@ -308,12 +308,12 @@ fernos_error_t fs_mkdir_path(file_sys_t *fs, fs_node_key_t cwd, const char *path
 /**
  * Remove a file or subdirectory.
  *
- * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
- * Returns FOS_INVALID_INDEX if `name` cannot be found within the given directory.
- * Returns FOS_IN_USE if the node being deleted is a subdirectory and has 
+ * Returns FOS_E_STATE_MISMATCH if `parent_dir` is not a key to a directory.
+ * Returns FOS_E_INVALID_INDEX if `name` cannot be found within the given directory.
+ * Returns FOS_E_IN_USE if the node being deleted is a subdirectory and has 
  * entries other than "." and "..".
  *
- * On success, FOS_SUCCESS is returned and the specified node is deleted from the file system.
+ * On success, FOS_E_SUCCESS is returned and the specified node is deleted from the file system.
  */
 static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir, const char *name) {
     return fs->impl->fs_remove(fs, parent_dir, name);
@@ -323,7 +323,7 @@ static inline fernos_error_t fs_remove(file_sys_t *fs, fs_node_key_t parent_dir,
  * This is a wrapper around `fs_remove`.
  *
  * This attempts to remove basename(path) from dir(path).
- * FOS_BAD_ARGS is returned if there is an error separating the basename and directory components
+ * FOS_E_BAD_ARGS is returned if there is an error separating the basename and directory components
  * of `path`.
  *
  * dir(path) will be passed into `fs_new_key` to create a temporary key for calling `fs_remove`.
@@ -335,16 +335,16 @@ fernos_error_t fs_remove_path(file_sys_t *fs, fs_node_key_t cwd, const char *pat
  *
  * `names` must have at least `num` rows. (i.e. a total size of `num` * (FS_MAX_FILENAME_LEN + 1))
  *
- * Returns FOS_STATE_MISMATCH if `parent_dir` is not a key to a directory.
+ * Returns FOS_E_STATE_MISMATCH if `parent_dir` is not a key to a directory.
  *
- * On sucess, FOS_SUCCESS is returned. In this case, `num` names starting from the child at index
+ * On sucess, FOS_E_SUCCESS is returned. In this case, `num` names starting from the child at index
  * `index` are written into the `names` buffers one at a time. If the number of nodes left
  * is less than `num`, '\0' is written into each unused buffer.
  *
  * NOTE: Special directory entries "." and ".." should NOT be returned by this function.
  *
  * NOTE: Even if the index is larger than the number of entries in the directory,
- * FOS_SUCCESS should still be returned. In this case, all `names` buffers will be given
+ * FOS_E_SUCCESS should still be returned. In this case, all `names` buffers will be given
  * empty string values '\0'.
  */
 static inline fernos_error_t fs_get_child_names(file_sys_t *fs, fs_node_key_t parent_dir, size_t index, 
@@ -358,9 +358,9 @@ static inline fernos_error_t fs_get_child_names(file_sys_t *fs, fs_node_key_t pa
  * `dest` must have size at least `bytes`.
  *
  * Returns FOS_STATE_MISTMATCH if `file_key` points to a directory.
- * Returns FOS_INVALID_RANGE if `offset` or `offset + bytes` overshoot the end of the file.
+ * Returns FOS_E_INVALID_RANGE if `offset` or `offset + bytes` overshoot the end of the file.
  *
- * On success, FOS_SUCCESS is returned, exactly `bytes` bytes will be written to dest.
+ * On success, FOS_E_SUCCESS is returned, exactly `bytes` bytes will be written to dest.
  */
 static inline fernos_error_t fs_read(file_sys_t *fs, fs_node_key_t file_key, size_t offset, 
         size_t bytes, void *dest) {
@@ -373,9 +373,9 @@ static inline fernos_error_t fs_read(file_sys_t *fs, fs_node_key_t file_key, siz
  * `src` must have size at least `bytes`.
  *
  * Returns FOS_STATE_MISTMATCH if `file_key` points to a directory.
- * Returns FOS_INVALID_RANGE if `offset` or `offset + bytes` overshoot the end of the file.
+ * Returns FOS_E_INVALID_RANGE if `offset` or `offset + bytes` overshoot the end of the file.
  *
- * On success, FOS_SUCCESS is returned, exactly `bytes` bytes will be written to the given file
+ * On success, FOS_E_SUCCESS is returned, exactly `bytes` bytes will be written to the given file
  * from `src` starting at offset `offset` within the file.
  */
 static inline fernos_error_t fs_write(file_sys_t *fs, fs_node_key_t file_key, size_t offset, 
@@ -390,10 +390,10 @@ static inline fernos_error_t fs_write(file_sys_t *fs, fs_node_key_t file_key, si
  * to encourage correct handling of node keys. That is, all node keys for a file should be deleted
  * before a file is deleted. 
  *
- * Returns FOS_STATE_MISMATCH if `file_key` points to a directory.
- * Returns FOS_NO_SPACE if there isn't enough space.
+ * Returns FOS_E_STATE_MISMATCH if `file_key` points to a directory.
+ * Returns FOS_E_NO_SPACE if there isn't enough space.
  *
- * On success, FOS_SUCCESS is returned, the given file will have exact size `bytes`.
+ * On success, FOS_E_SUCCESS is returned, the given file will have exact size `bytes`.
  */
 static inline fernos_error_t fs_resize(file_sys_t *fs, fs_node_key_t file_key, size_t bytes) {
     return fs->impl->fs_resize(fs, file_key, bytes);

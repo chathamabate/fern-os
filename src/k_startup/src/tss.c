@@ -17,5 +17,5 @@ fernos_error_t init_global_tss(void) {
 
     flush_tss(TSS_SELECTOR);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }

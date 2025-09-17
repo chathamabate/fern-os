@@ -36,13 +36,13 @@
 
 #define CHECK_ALIGN(val, align) \
     if (!IS_ALIGNED(val, align)) { \
-        return FOS_ALIGN_ERROR; \
+        return FOS_E_ALIGN_ERROR; \
     }
 
 #define PROP_ERR(expr) \
     do { \
         fernos_error_t __err = expr; \
-        if (__err != FOS_SUCCESS) { \
+        if (__err != FOS_E_SUCCESS) { \
             return __err; \
         } \
     } while (0);

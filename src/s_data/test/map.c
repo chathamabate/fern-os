@@ -42,7 +42,7 @@ static bool test_map_simple_put_and_get(void) {
 
     for (uint32_t i = 0; i < NUMS_TO_ADD; i++) {
         uint32_t val = i * 2;
-        TEST_EQUAL_HEX(FOS_SUCCESS, 
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, 
                 mp_put(mp, &i, &val));
 
         // Test that after every addition, previously added entries are still intact.
@@ -51,7 +51,7 @@ static bool test_map_simple_put_and_get(void) {
             uint32_t *val;
 
             err = mp_get_kvp(mp, &j, (const void **)&key, (void **)&val);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             TEST_EQUAL_UINT(j, *key);
             TEST_EQUAL_UINT(j * 2, *val);
@@ -72,13 +72,13 @@ static bool test_map_simple_overwrite(void) {
     const uint32_t NUMS_TO_ADD = 20;
 
     for (uint32_t i = 0; i < NUMS_TO_ADD; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, 
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, 
                 mp_put(mp, &i, &i));
     }
 
     for (uint32_t i = 0; i < NUMS_TO_ADD; i += 2) {
         uint32_t new_val = i * 2;
-        TEST_EQUAL_HEX(FOS_SUCCESS, 
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, 
                 mp_put(mp, &i, &new_val));
     }
 
@@ -113,7 +113,7 @@ static bool test_map_simple_remove(void) {
     for (uint32_t i = START_NUM; i < END_NUM; i++) {
         uint8_t val = (uint8_t)(i + 3);
 
-        TEST_EQUAL_HEX(FOS_SUCCESS, 
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, 
                 mp_put(mp, &i, &val));
     }
 
@@ -131,11 +131,11 @@ static bool test_map_simple_remove(void) {
         err = mp_get_kvp(mp, &i, (const void **)&key, (void **)&val);
 
         if (i & 1) {
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             TEST_EQUAL_UINT(i, *key);
             TEST_EQUAL_UINT((uint8_t)(i + 3), *val);
         } else {
-            TEST_EQUAL_HEX(FOS_EMPTY, err);
+            TEST_EQUAL_HEX(FOS_E_EMPTY, err);
         }
     }
 
@@ -152,7 +152,7 @@ static bool test_map_simple_iter(void) {
 
     for (uint16_t i = 0; i < 32; i++) {
         uint64_t val = i * i;
-        TEST_EQUAL_HEX(FOS_SUCCESS, 
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, 
                 mp_put(mp, &i, &val));
     }
 
@@ -166,7 +166,7 @@ static bool test_map_simple_iter(void) {
     fernos_error_t err;
 
     for (err = mp_get_iter(mp, (const void **)&key, (void **)&val);
-            err == FOS_SUCCESS; err = mp_next_iter(mp, (const void **)&key, (void **)&val)) {
+            err == FOS_E_SUCCESS; err = mp_next_iter(mp, (const void **)&key, (void **)&val)) {
         
         uint64_t exp_val = (uint64_t)*key * (uint64_t)*key;
         TEST_EQUAL_UINT(exp_val, *val);
@@ -174,7 +174,7 @@ static bool test_map_simple_iter(void) {
         found |= 1 << *key;
     }
 
-    TEST_EQUAL_HEX(FOS_EMPTY, err);
+    TEST_EQUAL_HEX(FOS_E_EMPTY, err);
     TEST_EQUAL_HEX(~(uint32_t)0, found);
 
     delete_map(mp);
@@ -195,7 +195,7 @@ static bool test_map_complex0(void) {
 
             uint64_t val = c0 + c1;
 
-            TEST_EQUAL_HEX(FOS_SUCCESS, 
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, 
                     mp_put(mp, id, &val));
         }
     }
@@ -230,7 +230,7 @@ static bool test_map_complex0(void) {
     mp_reset_iter(mp);
 
     for (err = mp_get_iter(mp, (const void **)&key, (void **)&val);
-            err == FOS_SUCCESS; err = mp_next_iter(mp, (const void **)&key, (void **)&val)) {
+            err == FOS_E_SUCCESS; err = mp_next_iter(mp, (const void **)&key, (void **)&val)) {
 
         TEST_TRUE(key[0] != 'c');
 
@@ -244,7 +244,7 @@ static bool test_map_complex0(void) {
         iters++;
     }
 
-    TEST_EQUAL_HEX(FOS_EMPTY, err);
+    TEST_EQUAL_HEX(FOS_E_EMPTY, err);
     TEST_EQUAL_UINT((26 * 26) - 26, iters);
 
     delete_map(mp);
@@ -265,7 +265,7 @@ static bool test_map_complex1(void) {
             uint64_t key = (10 * i) + j; 
             uint64_t val = key * 2;
 
-            TEST_EQUAL_HEX(FOS_SUCCESS, 
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, 
                     mp_put(mp, &key, &val));
         }
 
@@ -300,7 +300,7 @@ static bool test_map_complex1(void) {
     uint32_t iters = 0;
 
     for (err = mp_get_iter(mp, (const void **)&key_ptr, (void **)&val_ptr); 
-            err == FOS_SUCCESS; err = mp_next_iter(mp, (const void **)&key_ptr, (void **)&val_ptr)) {
+            err == FOS_E_SUCCESS; err = mp_next_iter(mp, (const void **)&key_ptr, (void **)&val_ptr)) {
         
         TEST_EQUAL_UINT(*key_ptr, *val_ptr);
         iters++;

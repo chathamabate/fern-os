@@ -28,9 +28,9 @@
     }
 
 #define DUAL_RET_FOS_ERR(err, thr) \
-    if ((err) != FOS_SUCCESS) { \
+    if ((err) != FOS_E_SUCCESS) { \
         (thr)->ctx.eax = (err);  \
-        return FOS_SUCCESS; \
+        return FOS_E_SUCCESS; \
     }
 
 
@@ -56,11 +56,11 @@
  * Addition (9/1/2025) NOTE that many of these functions are designed specifically to correspond
  * to system calls. Others may simply be helpers which are used within the system call 
  * implementations. When a system call style function (One that acts on the current thread) returns
- * anything other than FOS_SUCCESS (in kernel space), the kernel shuts down.
+ * anything other than FOS_E_SUCCESS (in kernel space), the kernel shuts down.
  * The helper functions need a way of differentiating between an error which can be returned
  * to the calling userspace thread, and an error which should shut down the system.
  * When a helper function encounters some unexpected fatal state, it should return 
- * FOS_ABORT_SYSTEM. Then users of the function know when an error is allowed, and when an error
+ * FOS_E_ABORT_SYSTEM. Then users of the function know when an error is allowed, and when an error
  * is fatal.
  */
 
@@ -135,10 +135,10 @@ static inline kernel_state_t *new_da_kernel_state(void) {
 /**
  * Place the given plugin pointer in the plugins table at slot `plg_id`.
  *
- * FOS_IN_USE is returned if the given slot is occupied.
- * FOS_INVALID_INDEX is returned if `plg_id` overshoots the end of the table.
+ * FOS_E_IN_USE is returned if the given slot is occupied.
+ * FOS_E_INVALID_INDEX is returned if `plg_id` overshoots the end of the table.
  *
- * otherwise FOS_SUCCESS is returned.
+ * otherwise FOS_E_SUCCESS is returned.
  */
 fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *plg);
 
@@ -208,7 +208,7 @@ fernos_error_t ks_tick(kernel_state_t *ks);
  * behavior. Thus erors will be returned here in kernel space, and also to the calling thread
  * via the %eax register.
  *
- * All calls should return FOS_SUCCESS here in the kernel unless something is very very wrong.
+ * All calls should return FOS_E_SUCCESS here in the kernel unless something is very very wrong.
  * Errors for bad arguments and lack of resources should be forwarded to the user via the
  * current threads %eax register.
  */
@@ -222,7 +222,7 @@ fernos_error_t ks_tick(kernel_state_t *ks);
  * The forked process will have its only thread scheduled, and will be set as a child
  * of the current process.
  *
- * On Success FOS_SUCCESS is returned in both processes, in the child process,
+ * On Success FOS_E_SUCCESS is returned in both processes, in the child process,
  * FOS_MAX_PROCS is written to *u_cpid, in the parent process the new child's pid is written to
  * *u_cpid.
  *
@@ -235,7 +235,7 @@ KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid);
 /** 
  * Exit the current process. (Becoming a zombie process)
  *
- * FSIG_CHLD is sent to the parent process. If this is the root process, FOS_ABORT_SYSTEM is 
+ * FSIG_CHLD is sent to the parent process. If this is the root process, FOS_E_ABORT_SYSTEM is 
  * returned.
  *
  * All living children of this process are now orphans, they are adopted by the root process.
@@ -255,10 +255,10 @@ KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t st
  * child process!
  * 
  * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
- * process, FOS_STATE_MISMATCH is returned to the user.
+ * process, FOS_E_STATE_MISMATCH is returned to the user.
  *
  * When attempting to reap any zombie process, if there are no zombie children to reap,
- * FOS_EMPTY is returned to the user.
+ * FOS_E_EMPTY is returned to the user.
  *
  * When a process is "reaped", its exit status is retrieved, and its resources are freed!
  *
@@ -300,7 +300,7 @@ KS_SYSCALL fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv);
  * Sleeps the cureent thread until any of the signals described in sv are receieved.
  * If an apt signal is pending, this call will not sleep the current thread.
  *
- * On success, FOS_SUCCESS is returned to the user. 
+ * On success, FOS_E_SUCCESS is returned to the user. 
  * If `u_sid` is given, the recieved signal is written to *u_sid`. 
  * The pending bit of the received signal is cleared.
  *
@@ -355,7 +355,7 @@ KS_SYSCALL fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t 
  * the join queue and scheduled!
  *
  * If the current thread is the "main thread" of a process, the entire process should exit.
- * If the current thread is the "main thread" of the root process, FOS_ABORT_SYSTEM is returned.
+ * If the current thread is the "main thread" of the root process, FOS_E_ABORT_SYSTEM is returned.
  *
  * Kernel error if there is no current thread, or if something goes wrong with the exit.
  */
@@ -397,7 +397,7 @@ KS_SYSCALL fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex
  * Doesn't return a user error.
  *
  * If threads are currently waiting on this futex, they are rescheduled with return value
- * FOS_STATE_MISMATCH.
+ * FOS_E_STATE_MISMATCH.
  *
  * Returns an error if there is some issue with the deregister.
  */
@@ -409,7 +409,7 @@ KS_SYSCALL fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_fut
  *
  * The descheduled thread will only be woken up with a call to wake, Or if the futex is destroyed.
  * If the futex is destroyed, all waiting threads are rescheduled with user return value of
- * FOS_STATE_MISMATCH.
+ * FOS_E_STATE_MISMATCH.
  *
  * Returns user error if arguements are invalid.
  */

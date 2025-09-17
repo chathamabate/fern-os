@@ -102,7 +102,7 @@ static void randomize_page(phys_addr_t p, uint32_t seed) {
  */
 static bool pt_randomize_alloc(phys_addr_t pt, bool user, uint32_t s, uint32_t e) {
     uint32_t true_e;
-    TEST_EQUAL_HEX(FOS_SUCCESS, pt_alloc_range(pt, user, s, e, &true_e));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, pt_alloc_range(pt, user, s, e, &true_e));
 
     phys_addr_t old0 = assign_free_page(0, pt);
     
@@ -334,7 +334,7 @@ static bool test_mem_cpy_user(void) {
     const void *true_e;
 
     phys_addr_t kpd = get_page_directory();
-    TEST_EQUAL_HEX(FOS_SUCCESS, 
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, 
             pd_alloc_pages(kpd, true, MEM_CPY_AREA_START, MEM_CPY_AREA_END, &true_e));
 
     phys_addr_t upd = copy_page_directory(kpd);
@@ -405,7 +405,7 @@ static bool test_mem_cpy_user(void) {
         
         uint32_t copied;
 
-        TEST_EQUAL_HEX(FOS_SUCCESS, mem_cpy_to_user(upd, MEM_CPY_AREA_START + c.ui, 
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, mem_cpy_to_user(upd, MEM_CPY_AREA_START + c.ui, 
                     MEM_CPY_AREA_START + c.ki, c.bytes, &copied));
         TEST_EQUAL_UINT(c.bytes, copied);
 
@@ -424,7 +424,7 @@ static bool test_mem_cpy_user(void) {
         // Now we copy in the from user direciton!
 
         set_page_directory(kpd);
-        TEST_EQUAL_HEX(FOS_SUCCESS, mem_cpy_from_user(MEM_CPY_AREA_START + c.ki, 
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, mem_cpy_from_user(MEM_CPY_AREA_START + c.ki, 
                     upd, MEM_CPY_AREA_START + c.ui, c.bytes, &copied));
         TEST_EQUAL_UINT(c.bytes, copied);
 
@@ -455,7 +455,7 @@ static bool test_bad_mem_cpy(void) {
     uint32_t copied;
 
     phys_addr_t kpd = get_page_directory();
-    TEST_EQUAL_HEX(FOS_SUCCESS, 
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, 
             pd_alloc_pages(kpd, true, MEM_CPY_AREA_START, MEM_CPY_AREA_END, &true_e));
 
     phys_addr_t upd = copy_page_directory(kpd);
@@ -474,7 +474,7 @@ static bool test_bad_mem_cpy(void) {
     err = mem_cpy_to_user(upd, MEM_CPY_AREA_END - M_4K, 
             MEM_CPY_AREA_START, 2 * M_4K, &copied);
 
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
     TEST_EQUAL_HEX(M_4K, copied);
 
     set_page_directory(upd);
@@ -488,7 +488,7 @@ static bool test_bad_mem_cpy(void) {
     // Now in the from direction.
     err = mem_cpy_from_user(MEM_CPY_AREA_START, upd, 
             MEM_CPY_AREA_END - M_4K, 2*M_4K, &copied);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
     TEST_EQUAL_HEX(M_4K, copied);
 
     for (uint32_t i = 0; i < M_4K; i++) {

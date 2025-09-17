@@ -1,7 +1,7 @@
 
 #include "s_util/misc.h"
 #include <stdarg.h>
-#include "s_util/ansii.h"
+#include "s_util/ansi.h"
 
 void _dump_hex_pairs(void (*pf)(const char *fmt, ...), ...) {
     va_list va;
@@ -13,7 +13,7 @@ void _dump_hex_pairs(void (*pf)(const char *fmt, ...), ...) {
     while (name) {
         val = va_arg(va, uint32_t);
 
-        pf(ANSII_LIGHT_GREY_FG "%s: "  ANSII_CYAN_FG "0x%X" ANSII_RESET, name, val);
+        pf(ANSI_LIGHT_GREY_FG "%s: "  ANSI_CYAN_FG "0x%X" ANSI_RESET, name, val);
 
         name = va_arg(va, const char *);
 

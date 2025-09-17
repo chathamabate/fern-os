@@ -73,10 +73,10 @@ static bool test_side_by_side(void) {
     mem_set(big_buf0, 0, sector_size * num_sectors);
 
     err = bd_write(mbd_cntl, 0, num_sectors, big_buf0);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = bd_write(cbd, 0, num_sectors, big_buf0);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     rand_t r = rand(0);
 
@@ -103,18 +103,18 @@ static bool test_side_by_side(void) {
                     mem_set(big_buf0, next_rand_u8(&r), sectors * sector_size);
 
                     err = bd_write(mbd_cntl, sector_ind, sectors, big_buf0);
-                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                     err = bd_write(cbd, sector_ind, sectors, big_buf0);
-                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
                 } else {
                     // bd_read
                     
                     err = bd_read(mbd_cntl, sector_ind, sectors, big_buf0);
-                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                     err = bd_read(cbd, sector_ind, sectors, big_buf1);
-                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                     TEST_TRUE(mem_cmp(big_buf0, big_buf1, sector_size * sectors));
                 }
@@ -134,18 +134,18 @@ static bool test_side_by_side(void) {
                     mem_set(big_buf0, next_rand_u8(&r), bytes);
 
                     err = bd_write_piece(mbd_cntl, sector_ind, offset, bytes, big_buf0);
-                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                     err = bd_write_piece(cbd, sector_ind, offset, bytes, big_buf0);
-                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
                 } else {
                     // bd_read_piece
                     
                     err = bd_read_piece(mbd_cntl, sector_ind, offset, bytes, big_buf0);
-                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                     err = bd_read_piece(cbd, sector_ind, offset, bytes, big_buf1);
-                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                     TEST_TRUE(mem_cmp(big_buf0, big_buf1, bytes));
                 }
@@ -155,13 +155,13 @@ static bool test_side_by_side(void) {
         // After all rounds, let's flush the cache.
 
         err = bd_flush(cbd);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         err = bd_read(mbd_cntl, 0, num_sectors, big_buf0);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         err = bd_read(mbd_under, 0, num_sectors, big_buf1);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         TEST_TRUE(mem_cmp(big_buf0, big_buf1, num_sectors * sector_size));
     }

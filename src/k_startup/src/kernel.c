@@ -55,7 +55,7 @@ static inline void setup_fatal(const char *msg) {
 }
 
 static inline void try_setup_step(fernos_error_t err, const char *msg) {
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         setup_fatal(msg);
     }
 }
@@ -76,12 +76,12 @@ static fernos_error_t init_kernel_heap(void) {
     allocator_t *k_al = new_simple_heap_allocator(shal_attrs);
 
     if (!k_al) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     set_default_allocator(k_al);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static void now(fernos_datetime_t *dt) {
@@ -143,16 +143,16 @@ static void init_kernel_plugins(void) {
 
     file_sys_t *fs;
     err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         err = init_fat32(bd, 0, bd_num_sectors(bd), 8);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             setup_fatal("Failed to init FAT32");
         }
 
         // NOTE: This is a temporary fix and VERY VERY dangerous. 
         // It basically resets the entire disk if it fails to parse it the first time.
         err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             setup_fatal("Failed to create FAT32 FS");
         }
     }

@@ -11,20 +11,20 @@ fernos_error_t l_push_back_all(list_t *l, list_t *s) {
     fernos_error_t err;
 
     if (!s) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     l_reset_iter(s);
     for (void *iter = l_get_iter(s); iter; iter = l_next_iter(s)) {
         err = l_push_back(l, iter);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
 
     l_clear(s);
     
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 bool l_pop_ele(list_t *l, const void *ele, bool (*cmp)(const void *, const void *), bool all) {
@@ -183,7 +183,7 @@ static linked_list_node_t *ll_get_node(linked_list_t *ll, size_t i) {
 static fernos_error_t ll_push_node_at(linked_list_t *ll, linked_list_node_t *pos, const void *src) {
     linked_list_node_t *new_node = al_malloc(ll->al, sizeof(linked_list_node_t) + ll->cs);
     if (!new_node) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     mem_cpy(new_node + 1, src, ll->cs);
@@ -212,7 +212,7 @@ static fernos_error_t ll_push_node_at(linked_list_t *ll, linked_list_node_t *pos
 
     ll->len++;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -253,11 +253,11 @@ static void *ll_get_ptr(list_t *l, size_t i) {
 static fernos_error_t ll_push(list_t *l, size_t i, const void *src) {
     linked_list_t *ll = (linked_list_t *)l;
     if (i > ll->len) {
-        return FOS_INVALID_INDEX;
+        return FOS_E_INVALID_INDEX;
     }
 
     if (!src) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     linked_list_node_t *pos = i < ll->len ? ll_get_node(ll, i) : NULL;
@@ -268,13 +268,13 @@ static fernos_error_t ll_push(list_t *l, size_t i, const void *src) {
 static fernos_error_t ll_pop(list_t *l, size_t i, void *dest) {
     linked_list_t *ll = (linked_list_t *)l;
     if (i >= ll->len) {
-        return FOS_INVALID_INDEX;
+        return FOS_E_INVALID_INDEX;
     }
 
     linked_list_node_t *node = ll_get_node(ll, i);
     ll_pop_node(ll, node, dest);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static void ll_reset_iter(list_t *l) {
@@ -302,11 +302,11 @@ static fernos_error_t ll_push_before_iter(list_t *l, const void *src) {
     linked_list_t *ll = (linked_list_t *)l;
 
     if (!src) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (!(ll->iter)) {
-        return FOS_INVALID_INDEX;
+        return FOS_E_INVALID_INDEX;
     }
 
     linked_list_node_t *pos = ll->iter;
@@ -318,11 +318,11 @@ static fernos_error_t ll_push_after_iter(list_t *l, const void *src) {
     linked_list_t *ll = (linked_list_t *)l;
 
     if (!src) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (!(ll->iter)) {
-        return FOS_INVALID_INDEX;
+        return FOS_E_INVALID_INDEX;
     }
 
     linked_list_node_t *pos = ll->iter->next;
@@ -335,7 +335,7 @@ static fernos_error_t ll_pop_iter(list_t *l, void *dest) {
     linked_list_t *ll = (linked_list_t *)l;
     // Unlike for push after
     if (!(ll->iter)) {
-        return FOS_INVALID_INDEX;
+        return FOS_E_INVALID_INDEX;
     }
 
     linked_list_node_t *node = ll->iter;
@@ -345,7 +345,7 @@ static fernos_error_t ll_pop_iter(list_t *l, void *dest) {
 
     ll_pop_node(ll, node, dest);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static void ll_dump(list_t *l, void (*pf)(const char *fmt, ...)) {

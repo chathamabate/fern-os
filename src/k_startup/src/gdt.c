@@ -78,5 +78,5 @@ fernos_error_t init_gdt(void) {
 
     load_gdtr(dtv);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }

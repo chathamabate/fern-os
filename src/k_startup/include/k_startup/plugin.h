@@ -66,7 +66,7 @@ static inline void plg_on_shutdown(plugin_t *plg) {
 /**
  * NOTE: The below calls all return fernos errors.
  *
- * When FOS_SUCCESS is returned, life is good! continue execution as normal.
+ * When FOS_E_SUCCESS is returned, life is good! continue execution as normal.
  * In the case of ANY OTHER error, the system will shutdown!
  */
 
@@ -82,13 +82,13 @@ static inline fernos_error_t plg_tick(plugin_t *plg) {
     if (plg->impl->plg_tick) {
         return plg->impl->plg_tick(plg);
     }
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
  * Execute `plg_tick` on an array of plugins. 
  *
- * Returns FOS_SUCCESS if and only if every tick call succeeds. 
+ * Returns FOS_E_SUCCESS if and only if every tick call succeeds. 
  * Returns early if an error is encountered.
  */
 fernos_error_t plgs_tick(plugin_t **plgs, size_t plgs_len);
@@ -104,9 +104,9 @@ static inline fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint
     }
 
     if (plg->ks->curr_thread) {
-        DUAL_RET(plg->ks->curr_thread, FOS_NOT_IMPLEMENTED, FOS_SUCCESS);
+        DUAL_RET(plg->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
     } else {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 }
 
@@ -120,7 +120,7 @@ static inline fernos_error_t plg_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
     if (plg->impl->plg_on_fork_proc) {
         return plg->impl->plg_on_fork_proc(plg, cpid);
     }
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -141,7 +141,7 @@ static inline fernos_error_t plg_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
     if (plg->impl->plg_on_reap_proc) {
         return plg->impl->plg_on_reap_proc(plg, rpid);
     }
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
