@@ -108,14 +108,14 @@ static fernos_error_t cbd_read(block_device_t *bd, size_t sector_ind, size_t num
     cached_block_device_t *cbd = (cached_block_device_t *)bd;
 
     if (!dest) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     const size_t ns = bd_num_sectors(cbd->wrapped_bd);
     const size_t ss = bd_sector_size(cbd->wrapped_bd);
 
     if (sector_ind >= ns || sector_ind + num_sectors > ns || sector_ind + num_sectors < sector_ind) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     fernos_error_t err;
@@ -137,7 +137,7 @@ static fernos_error_t cbd_read(block_device_t *bd, size_t sector_ind, size_t num
                 err = bd_read(cbd->wrapped_bd, section_start, i - section_start, 
                         (uint8_t *)dest + ((section_start - sector_ind) * ss));
 
-                if (err != FOS_SUCCESS) {
+                if (err != FOS_E_SUCCESS) {
                     return err;
                 }
             }
@@ -156,26 +156,26 @@ static fernos_error_t cbd_read(block_device_t *bd, size_t sector_ind, size_t num
                 sector_ind + num_sectors - section_start, 
                 (uint8_t *)dest + ((section_start - sector_ind) * ss));
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t cbd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src) {
     cached_block_device_t *cbd = (cached_block_device_t *)bd;
 
     if (!src) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     const size_t ns = bd_num_sectors(cbd->wrapped_bd);
     const size_t ss = bd_sector_size(cbd->wrapped_bd);
 
     if (sector_ind >= ns || sector_ind + num_sectors > ns || sector_ind + num_sectors < sector_ind) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     fernos_error_t err;
@@ -194,7 +194,7 @@ static fernos_error_t cbd_write(block_device_t *bd, size_t sector_ind, size_t nu
                 err = bd_write(cbd->wrapped_bd, section_start, i - section_start, 
                         (const uint8_t *)src + ((section_start - sector_ind) * ss)); 
 
-                if (err != FOS_SUCCESS)  {
+                if (err != FOS_E_SUCCESS)  {
                     return err;
                 }
             }
@@ -212,12 +212,12 @@ static fernos_error_t cbd_write(block_device_t *bd, size_t sector_ind, size_t nu
         err = bd_write(cbd->wrapped_bd, section_start, sector_ind + num_sectors - section_start, 
                 (const uint8_t *)src + ((section_start - sector_ind) * ss));
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         } 
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -247,7 +247,7 @@ static fernos_error_t cbd_get_cache_entry_ind(cached_block_device_t *cbd, size_t
             
             // Write out sector which is to be written over.
             err = bd_write(cbd->wrapped_bd, cbd->cache[ind].sector_ind, 1, cbd->cache[ind].sector);
-            if (err != FOS_SUCCESS) {
+            if (err != FOS_E_SUCCESS) {
                 return err;
             }
 
@@ -258,12 +258,12 @@ static fernos_error_t cbd_get_cache_entry_ind(cached_block_device_t *cbd, size_t
         cbd->cache[ind].sector_ind = sector_ind;
 
         err = mp_put(cbd->sector_map, &sector_ind, &ind);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err; 
         }
 
         err = bd_read(cbd->wrapped_bd, sector_ind, 1, cbd->cache[ind].sector); 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err; 
         }
     } else {
@@ -272,28 +272,28 @@ static fernos_error_t cbd_get_cache_entry_ind(cached_block_device_t *cbd, size_t
 
     *cache_entry_ind_p = ind;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t cbd_read_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, void *dest) {
     cached_block_device_t *cbd = (cached_block_device_t *)bd;
 
     if (!dest) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     const size_t ns = bd_num_sectors(cbd->wrapped_bd);
     const size_t ss = bd_sector_size(cbd->wrapped_bd);
 
     if (sector_ind >= ns || offset >= ss || offset + len > ss || offset + len < offset) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     fernos_error_t err;
 
     size_t cache_entry_ind;
     err = cbd_get_cache_entry_ind(cbd, sector_ind, &cache_entry_ind);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -302,28 +302,28 @@ static fernos_error_t cbd_read_piece(block_device_t *bd, size_t sector_ind, size
     uint8_t *cache_sector = cbd->cache[cache_entry_ind].sector;
     mem_cpy(dest, cache_sector + offset, len);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t cbd_write_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, const void *src) {
     cached_block_device_t *cbd = (cached_block_device_t *)bd;
 
     if (!src) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     const size_t ns = bd_num_sectors(cbd->wrapped_bd);
     const size_t ss = bd_sector_size(cbd->wrapped_bd);
 
     if (sector_ind >= ns || offset >= ss || offset + len > ss || offset + len < offset) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     fernos_error_t err;
 
     size_t cache_entry_ind;
     err = cbd_get_cache_entry_ind(cbd, sector_ind, &cache_entry_ind);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -332,7 +332,7 @@ static fernos_error_t cbd_write_piece(block_device_t *bd, size_t sector_ind, siz
     uint8_t *cache_sector = cbd->cache[cache_entry_ind].sector;
     mem_cpy(cache_sector + offset, src, len);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t cbd_flush(block_device_t *bd) {
@@ -347,16 +347,16 @@ static fernos_error_t cbd_flush(block_device_t *bd) {
 
     mp_reset_iter(cbd->sector_map);
     for (err = mp_get_iter(cbd->sector_map, (const void **)&sector_ind, (void **)&cache_entry_ind);
-            err == FOS_SUCCESS; err = mp_next_iter(cbd->sector_map, (const void **)&sector_ind, (void **)&cache_entry_ind)) {
+            err == FOS_E_SUCCESS; err = mp_next_iter(cbd->sector_map, (const void **)&sector_ind, (void **)&cache_entry_ind)) {
         err = bd_write(cbd->wrapped_bd, *sector_ind, 1, 
                 cbd->cache[*cache_entry_ind].sector);  
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
 
-    if (err != FOS_EMPTY) {
+    if (err != FOS_E_EMPTY) {
         return err;
     }
 
@@ -372,18 +372,18 @@ static fernos_error_t cbd_flush(block_device_t *bd) {
             size_t_eq_f, size_t_hash_f);
 
     if (!(cbd->sector_map)) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     cbd->cache_fill = 0;
 
     // Finally, flush the underlying block device.
     err = bd_flush(cbd->wrapped_bd);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static void delete_cached_block_device(block_device_t *bd) {

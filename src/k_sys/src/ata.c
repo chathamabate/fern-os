@@ -48,24 +48,24 @@ static fernos_error_t ata_wait_data_ready(void) {
     for (uint32_t i = 0; i < ATA_WAIT_DATA_READY_RETRIES; i++) {
         if (status & ATA_REG_STATUS_ERR_MASK) {
             // Error.
-            return FOS_UNKNWON_ERROR;            
+            return FOS_E_UNKNWON_ERROR;            
         }
 
         if (status & ATA_REG_STATUS_DF_MASK) {
             // Data Fault.
-            return FOS_UNKNWON_ERROR;            
+            return FOS_E_UNKNWON_ERROR;            
         }
 
         // If data is ready, we can exit!
         if (status & ATA_REG_STATUS_DRQ_MASK) {
-            return FOS_SUCCESS;
+            return FOS_E_SUCCESS;
         }
 
         status = inb(ATA_REG_ALT_STAT);
     }
 
     // DRQ was never set.
-    return FOS_UNKNWON_ERROR;
+    return FOS_E_UNKNWON_ERROR;
 }
 
 static void load_lba(uint32_t lba) {
@@ -96,7 +96,7 @@ fernos_error_t ata_identify(uint16_t *id_buf) {
     outb(ATA_REG_COMMAND, 0xEC); // Identify command.
 
     fernos_error_t err = ata_wait_data_ready();
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -104,14 +104,14 @@ fernos_error_t ata_identify(uint16_t *id_buf) {
         id_buf[w] = inw(ATA_REG_DATA);
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ata_num_sectors(uint32_t *ns) {
     uint16_t id_buf[256];
 
     fernos_error_t err = ata_identify(id_buf);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
     
@@ -121,7 +121,7 @@ fernos_error_t ata_num_sectors(uint32_t *ns) {
 
     *ns = num_sectors;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ata_rw_pio(bool read, uint32_t lba, uint8_t sc, void *buf) {
@@ -137,7 +137,7 @@ fernos_error_t ata_rw_pio(bool read, uint32_t lba, uint8_t sc, void *buf) {
 
     for (uint32_t s = 0; s < true_sc; s++) {
         fernos_error_t err = ata_wait_data_ready();
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
@@ -151,5 +151,5 @@ fernos_error_t ata_rw_pio(bool read, uint32_t lba, uint8_t sc, void *buf) {
         }
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }

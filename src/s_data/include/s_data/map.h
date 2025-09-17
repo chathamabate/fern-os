@@ -66,11 +66,11 @@ static inline void delete_map(map_t *mp) {
 /**
  * (A later addition to this interface)
  *
- * Given a key, if the key is mapped, FOS_SUCCESS is returned. If `key_out` is given a pointer
+ * Given a key, if the key is mapped, FOS_E_SUCCESS is returned. If `key_out` is given a pointer
  * to the key's cell in the map is written to `*key_out`. If `val_out` is given, a pointer to
  * the value's cell is written to `*val_out`.
  *
- * If the given key is not mapped. FOS_EMPTY is returned.
+ * If the given key is not mapped. FOS_E_EMPTY is returned.
  */
 static inline fernos_error_t mp_get_kvp(map_t *mp, const void *key, const void **key_out, void **val_out) {
     return mp->impl->mp_get_kvp(mp, key, key_out, val_out);
@@ -87,7 +87,7 @@ static inline fernos_error_t mp_get_kvp(map_t *mp, const void *key, const void *
 static inline void *mp_get(map_t *mp, const void *key) {
     void *val;
     fernos_error_t err = mp_get_kvp(mp, key, NULL, &val);
-    return err == FOS_SUCCESS ? val : NULL;
+    return err == FOS_E_SUCCESS ? val : NULL;
 }
 
 /**
@@ -143,7 +143,7 @@ static inline void mp_reset_iter(map_t *mp) {
  * The address of the value is written to *value.
  * (Either/both pointers are allowed to be NULL)
  *
- * Returns FOS_EMPTY if we've reached the end of iteration.
+ * Returns FOS_E_EMPTY if we've reached the end of iteration.
  */
 static inline fernos_error_t mp_get_iter(map_t *mp, const void **key, void **value) {
     return mp->impl->mp_get_iter(mp, key, value);

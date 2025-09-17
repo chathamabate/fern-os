@@ -32,7 +32,7 @@ static bool pretest(void) {
     TEST_TRUE(fs != NULL);
 
     err = fs_new_key(fs, NULL, "/", &root_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_SUCCEED();
 }
@@ -43,7 +43,7 @@ static bool posttest(void) {
     fs_delete_key(fs, root_key);
 
     err = fs_flush(fs, NULL);
-    TEST_EQUAL_UINT(FOS_SUCCESS, err);
+    TEST_EQUAL_UINT(FOS_E_SUCCESS, err);
 
     delete_file_sys(fs);
 
@@ -65,14 +65,14 @@ static bool test_fs_touch_and_mkdir(void) {
     // Know that "." and ".." ARE valid filenames technically,
     // however, you are not allowed to created files/subdirectories with their name!
     err = fs_touch(fs, root_key, ".", NULL);
-    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+    TEST_EQUAL_HEX(FOS_E_BAD_ARGS, err);
     err = fs_touch(fs, root_key, "..", NULL);
-    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+    TEST_EQUAL_HEX(FOS_E_BAD_ARGS, err);
 
     err = fs_mkdir(fs, root_key, ".", NULL);
-    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+    TEST_EQUAL_HEX(FOS_E_BAD_ARGS, err);
     err = fs_mkdir(fs, root_key, "..", NULL);
-    TEST_EQUAL_HEX(FOS_BAD_ARGS, err);
+    TEST_EQUAL_HEX(FOS_E_BAD_ARGS, err);
 
     // Maybe we could make a could of subdirectories on root?
     // Put files in those subdirectories???
@@ -85,7 +85,7 @@ static bool test_fs_touch_and_mkdir(void) {
 
         fs_node_key_t dir0_key;
         err = fs_mkdir(fs, root_key, name_buf, &dir0_key);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         for (char dir1_name = 'a'; dir1_name <= 'e'; dir1_name++) {
             name_buf[0] = dir1_name;
@@ -93,13 +93,13 @@ static bool test_fs_touch_and_mkdir(void) {
             fs_node_key_t dir1_key;
 
             err = fs_mkdir(fs, dir0_key, name_buf, &dir1_key);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             for (char file_name = 'A'; file_name <= 'E'; file_name++) {
                 name_buf[0] = file_name;
 
                 err = fs_touch(fs, dir1_key, name_buf, NULL);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             }
 
             fs_delete_key(fs, dir1_key);
@@ -124,7 +124,7 @@ static bool test_fs_touch_and_mkdir(void) {
 
     for (size_t i = 0; i < num_existing_paths; i++) {
         err = fs_new_key(fs, root_key, existing_paths[i], &key);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         fs_delete_key(fs, key);
     }
@@ -141,7 +141,7 @@ static bool test_fs_touch_and_mkdir(void) {
 
     for (size_t i = 0; i < num_non_existing_paths; i++) {
         err = fs_new_key(fs, root_key, non_existing_paths[i], &key);
-        TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+        TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
     }
 
     // Finally, let's try out some simple error cases.
@@ -149,26 +149,26 @@ static bool test_fs_touch_and_mkdir(void) {
     // 1) trying to create a file/directory into a non-sub directory should fail!
 
     err = fs_new_key(fs, NULL, "/a/b/C", &key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_touch(fs, key, "k", NULL);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     err = fs_mkdir(fs, key, "k", NULL);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     fs_delete_key(fs, key);
 
     // 2) We should not be able to make a file if one with the same name already exists.
 
     err = fs_new_key(fs, NULL, "/b/b", &key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_touch(fs, key, "A", NULL);
-    TEST_EQUAL_HEX(FOS_IN_USE, err);
+    TEST_EQUAL_HEX(FOS_E_IN_USE, err);
 
     err = fs_mkdir(fs, key, "A", NULL);
-    TEST_EQUAL_HEX(FOS_IN_USE, err);
+    TEST_EQUAL_HEX(FOS_E_IN_USE, err);
 
     // Maybe we can test exhausting all disk space in a later test.
 
@@ -184,49 +184,49 @@ static bool test_fs_remove(void) {
 
     fs_node_key_t subdir_key;
     err = fs_mkdir(fs, root_key, "sub", &subdir_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     char name_buf[2] = " ";
     for (char c = 'a'; c <= 'c'; c++) {
         name_buf[0] = c;
 
         err = fs_touch(fs, subdir_key, name_buf, NULL);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     // At this point, we should not be able to delete the subdir.
 
     err = fs_remove(fs, root_key, "sub");
-    TEST_EQUAL_HEX(FOS_IN_USE, err);
+    TEST_EQUAL_HEX(FOS_E_IN_USE, err);
 
     err = fs_remove(fs, subdir_key, "a");
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_node_key_t dummy_key;
     err = fs_new_key(fs, subdir_key, "a", &dummy_key);
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
 
     err = fs_remove(fs, subdir_key, "b");
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_remove(fs, subdir_key, "c");
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     // While "." and ".." likely exist and are valid in the given directory,
     // they should never be removeable!
     err = fs_remove(fs, subdir_key, ".");
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
 
     err = fs_remove(fs, subdir_key, "..");
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
 
     fs_delete_key(fs, subdir_key);
 
     err = fs_remove(fs, root_key, "sub");
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_remove(fs, root_key, "sub");
-    TEST_EQUAL_HEX(FOS_INVALID_INDEX, err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_INDEX, err);
 
     TEST_SUCCEED();
 }
@@ -244,12 +244,12 @@ static bool test_fs_get_child_names(void) {
         name_buf[0] = 'a' + i;
 
         err = fs_touch(fs, root_key, name_buf, NULL);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     for (size_t i = 0; i < num_files; i += num_names_bufs) {
         err = fs_get_child_names(fs, root_key, i, num_names_bufs, names_bufs);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         for (size_t j = 0; j < num_names_bufs; j++) {
             if (i + j < num_files) {
@@ -262,7 +262,7 @@ static bool test_fs_get_child_names(void) {
     }
 
     err = fs_get_child_names(fs, root_key, num_files, num_names_bufs, names_bufs);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     for (size_t i = 0; i < num_names_bufs; i++) {
         TEST_TRUE(str_eq("", names_bufs[i]));
@@ -273,10 +273,10 @@ static bool test_fs_get_child_names(void) {
     fs_node_key_t file_key;
 
     err = fs_new_key(fs, root_key, "a", &file_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_get_child_names(fs, file_key, 0, num_names_bufs, names_bufs);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     fs_delete_key(fs, file_key);
 
@@ -289,21 +289,21 @@ static bool test_fs_get_node_info(void) {
     fs_node_info_t info;
 
     err = fs_get_node_info(fs, root_key, &info);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_TRUE(info.is_dir);
     TEST_EQUAL_UINT(0, info.len);
 
     err = fs_touch(fs, root_key, "a", NULL);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_node_key_t child_key;
 
     err = fs_touch(fs, root_key, "b", &child_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_get_node_info(fs, child_key, &info);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_FALSE(info.is_dir);
     TEST_EQUAL_UINT(0, info.len); // Files should start with len 0.
@@ -311,10 +311,10 @@ static bool test_fs_get_node_info(void) {
     fs_delete_key(fs, child_key);
 
     err = fs_mkdir(fs, root_key, "c", &child_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_get_node_info(fs, child_key, &info);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_TRUE(info.is_dir);
     TEST_EQUAL_UINT(0, info.len); // Make sure "." and ".." are skipped.
@@ -324,7 +324,7 @@ static bool test_fs_get_node_info(void) {
     // Finally go back to root dir now that it has children.
 
     err = fs_get_node_info(fs, root_key, &info);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_TRUE(info.is_dir);
     TEST_EQUAL_UINT(3, info.len);
@@ -344,13 +344,13 @@ static bool test_fs_hash_equate_and_copy(void) {
     fs_node_key_t keys[4];
 
     err = fs_touch(fs, root_key, "a.txt", keys + 0);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_new_key(fs, root_key, "a.txt", keys + 1);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_touch(fs, root_key, "b.txt", keys + 2);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     keys[3] = fs_new_key_copy(fs, keys[2]);
     TEST_TRUE(keys[3] != NULL);
@@ -377,20 +377,20 @@ static bool test_fs_rw0(void) {
     fs_node_key_t key;
 
     err = fs_touch(fs, root_key, "a.txt", &key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     uint8_t buf[100];
 
     const size_t file_size = sizeof(buf);
     err = fs_resize(fs, key, file_size);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     for (size_t i = 0; i < file_size; i++) {
         buf[i] = (uint8_t)i;
     }
 
     err = fs_write(fs, key, 0, file_size, buf);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     mem_set(buf, 0, file_size);
 
@@ -407,7 +407,7 @@ static bool test_fs_rw0(void) {
 
     // Throwing this in real quick here.
     err = fs_write(fs, root_key, 0, 10, buf);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     TEST_SUCCEED();
 }
@@ -421,12 +421,12 @@ static bool test_fs_rw1(void) {
     fs_node_key_t key;
 
     err = fs_touch(fs, root_key, "a.txt", &key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     const size_t file_size = 4096;
 
     err = fs_resize(fs, key, file_size);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     uint8_t *big_buf = da_malloc(file_size);
     TEST_TRUE(big_buf != NULL);
@@ -434,11 +434,11 @@ static bool test_fs_rw1(void) {
     // 0 out the file.
     mem_set(big_buf, 0, file_size);
     err = fs_write(fs, key, 0, file_size, big_buf);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     mem_set(big_buf, 1, file_size);
     err = fs_write(fs, key, 1, file_size - 2, big_buf);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     mem_set(big_buf, 0, file_size);
     err = fs_read(fs, key, 1, file_size - 2, big_buf + 1);
@@ -453,13 +453,13 @@ static bool test_fs_rw1(void) {
     // IDK, I guess resize to smaller?
 
     err = fs_resize(fs, key, file_size / 2);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_write(fs, key, 0, (file_size / 2) + 1, big_buf);
-    TEST_EQUAL_HEX(FOS_INVALID_RANGE,  err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_RANGE,  err);
 
     err = fs_write(fs, key, 1, (file_size / 2), big_buf);
-    TEST_EQUAL_HEX(FOS_INVALID_RANGE,  err);
+    TEST_EQUAL_HEX(FOS_E_INVALID_RANGE,  err);
 
     da_free(big_buf);
 
@@ -477,7 +477,7 @@ static bool test_fs_rw2(void) {
     fs_node_key_t key;
 
     err = fs_touch(fs, root_key, "a.txt", &key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_node_key_t key_copy = fs_new_key_copy(fs, key);
     TEST_TRUE(key_copy != NULL);
@@ -485,7 +485,7 @@ static bool test_fs_rw2(void) {
     size_t file_size = 100;
 
     err = fs_resize(fs, key, file_size);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     uint8_t *buf = da_malloc(file_size);
     TEST_TRUE(buf != NULL);
@@ -499,7 +499,7 @@ static bool test_fs_rw2(void) {
 
     // Set the file as all 0's to start.
     err = fs_write(fs, key, 0, file_size, tx_buf);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     for (size_t iter = 0; iter < 1000; iter++) {
         if (next_rand_u1(&r)) { // r/w
@@ -513,14 +513,14 @@ static bool test_fs_rw2(void) {
                 // Transfer to the file.
                 mem_set(tx_buf + tx_offset, iter % 20, tx_amt); 
                 err = fs_write(fs, key, tx_offset, tx_amt, tx_buf + tx_offset);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             } else { // read
                 // Read from file to the tx buf.
 
                 // Reading from the key copy should not result in any issues.
                 // I just threw this in here to get more coverage on the copy key code.
                 err = fs_read(fs, key_copy, tx_offset, tx_amt, tx_buf + tx_offset);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                 // Compare with mirror buffer.
                 TEST_TRUE(mem_cmp(buf + tx_offset, tx_buf + tx_offset, tx_amt));
@@ -542,7 +542,7 @@ static bool test_fs_rw2(void) {
                 TEST_TRUE(buf != NULL);
 
                 err = fs_resize(fs, key, new_file_size);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                 // Make sure new section added is zero'd out.
                 if (new_file_size > file_size) {
@@ -550,7 +550,7 @@ static bool test_fs_rw2(void) {
                     mem_set(tx_buf + file_size, 0, new_file_size - file_size);
 
                     err = fs_write(fs, key, file_size, new_file_size - file_size, tx_buf + file_size);
-                    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
                 }
 
                 // lastly, just as a sanity check, let's confirm that resizing always updates
@@ -558,7 +558,7 @@ static bool test_fs_rw2(void) {
 
                 fs_node_info_t info;
                 err = fs_get_node_info(fs, key, &info);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                 TEST_EQUAL_UINT(new_file_size, info.len);
 
@@ -569,7 +569,7 @@ static bool test_fs_rw2(void) {
 
     // One final check of the full file contents.
     err = fs_read(fs, key, 0, file_size, tx_buf);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_TRUE(mem_cmp(buf, tx_buf, file_size));
 
@@ -577,7 +577,7 @@ static bool test_fs_rw2(void) {
     fs_node_info_t info;
 
     err = fs_get_node_info(fs, key, &info);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_UINT(file_size, info.len);
 
     da_free(tx_buf);
@@ -598,7 +598,7 @@ static bool test_fs_random_file_tree(void) {
     const size_t dir_keys_cap = sizeof(dir_keys) / sizeof(dir_keys[0]);
 
     err = fs_new_key(fs, NULL, "/", &(dir_keys[0]));
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     size_t dir_keys_len = 1;
 
@@ -612,9 +612,9 @@ static bool test_fs_random_file_tree(void) {
         };
 
         err = fs_mkdir(fs, dir_key, new_dir_name, &(dir_keys[dir_keys_len]));
-        TEST_TRUE(err == FOS_SUCCESS || err == FOS_IN_USE);
+        TEST_TRUE(err == FOS_E_SUCCESS || err == FOS_E_IN_USE);
 
-        if (err == FOS_SUCCESS) {
+        if (err == FOS_E_SUCCESS) {
             dir_keys_len++;
         }
     }
@@ -641,18 +641,18 @@ static bool test_fs_random_file_tree(void) {
         fs_node_key_t file_key;
 
         err = fs_touch(fs, dir_key, new_file_name, &file_key);
-        TEST_TRUE(err == FOS_SUCCESS || err == FOS_IN_USE);
+        TEST_TRUE(err == FOS_E_SUCCESS || err == FOS_E_IN_USE);
 
-        if (err == FOS_SUCCESS) {
+        if (err == FOS_E_SUCCESS) {
             const uint32_t hash = hash_func(&file_key);
             const size_t new_size = (hash % rw_buf_size);
 
             err = fs_resize(fs, file_key, new_size);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             mem_set(rw_buf, (uint8_t)hash, new_size);
             err = fs_write(fs, file_key, 0, new_size, rw_buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             fs_delete_key(fs, file_key);
             num_files++;
@@ -669,20 +669,20 @@ static bool test_fs_random_file_tree(void) {
         fs_node_key_t iter;
 
         err = fs_new_key(fs, NULL, "/", &iter);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         while (true) {
             fs_node_info_t info;
 
             err = fs_get_node_info(fs, iter, &info); 
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             if (!(info.is_dir)) { // Data file.
                 const uint32_t hash = hash_func(&iter); 
                 const uint32_t exp_size = hash % rw_buf_size;
 
                 err = fs_read(fs, iter, 0, exp_size, rw_buf);
-                TEST_EQUAL_HEX(FOS_SUCCESS, err);
+                TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
                 // Confirm contents.
                 for (size_t i = 0; i < exp_size; i++) {
@@ -704,11 +704,11 @@ static bool test_fs_random_file_tree(void) {
             char name_buf[1][FS_MAX_FILENAME_LEN + 1];
 
             err = fs_get_child_names(fs, iter, next_rand_u32(&r) % info.len, 1, name_buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             fs_node_key_t next_iter;
             err = fs_new_key(fs, iter, name_buf[0], &next_iter);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             fs_delete_key(fs, iter);
             iter = next_iter;
@@ -728,18 +728,18 @@ static bool test_fs_zero_resize(void) {
 
     fs_node_key_t child_key;
     err = fs_touch(fs, root_key, "a.txt", &child_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_resize(fs, child_key, 100);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_resize(fs, child_key, 0);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_delete_key(fs, child_key);
 
     err = fs_new_key(fs, root_key, "a.txt", &child_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_delete_key(fs, child_key);
 
@@ -756,14 +756,14 @@ static bool test_fs_exhaust(void) {
 
     fs_node_key_t og_file_key;
     err = fs_touch(fs, root_key, "a.txt", &og_file_key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_resize(fs, og_file_key, buf_size);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     mem_set(buf, 1, buf_size);
     err = fs_write(fs, og_file_key, 0, buf_size, buf);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     char name_buf[FS_MAX_FILENAME_LEN + 1];
 
@@ -773,10 +773,10 @@ static bool test_fs_exhaust(void) {
         str_fmt(name_buf, "%u", created);
 
         err = fs_touch(fs, root_key, name_buf, &key);
-        if (err == FOS_NO_SPACE) {
+        if (err == FOS_E_NO_SPACE) {
             break;
         }
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         // Successfully created a file!
         created++;
@@ -784,20 +784,20 @@ static bool test_fs_exhaust(void) {
         err = fs_resize(fs, key, 2048);
         fs_delete_key(fs, key);
 
-        if (err == FOS_NO_SPACE) {
+        if (err == FOS_E_NO_SPACE) {
             break;
         }
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     err = fs_resize(fs, og_file_key, buf_size + 2048);
-    TEST_EQUAL_HEX(FOS_NO_SPACE, err);
+    TEST_EQUAL_HEX(FOS_E_NO_SPACE, err);
 
     // Confirm reading works even with no space!
 
     mem_set(buf, 0, buf_size);
     err = fs_read(fs, og_file_key, 0, buf_size, buf);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     for (size_t i = 0; i < buf_size; i++) {
         TEST_EQUAL_UINT(1, buf[i]);
@@ -807,12 +807,12 @@ static bool test_fs_exhaust(void) {
     for (size_t i = 0; i < created; i++) {
         str_fmt(name_buf, "%u", i);
         err = fs_remove(fs, root_key, name_buf);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     // Should be able to resize fine here after clearing things up.
     err = fs_resize(fs, og_file_key, buf_size + 2048);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     
     fs_delete_key(fs, og_file_key);
 
@@ -873,20 +873,20 @@ static bool test_fs_manual_steps(void) {
         const step_t step = steps[step_i];
 
         err = fs_new_key(fs, root_key, step.dir_path, &dir_key);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         switch (step.type) {
         case STEP_TOUCH:
             err = fs_touch(fs, dir_key, step.base_name, NULL);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             break;
         case STEP_MKDIR:
             err = fs_mkdir(fs, dir_key, step.base_name, NULL);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             break;
         case STEP_REMOVE:
             err = fs_remove(fs, dir_key, step.base_name);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             break;
         case STEP_READ:
             TEST_TRUE(step.args[1] <= buf_size);
@@ -895,10 +895,10 @@ static bool test_fs_manual_steps(void) {
             mem_set(buf, (uint8_t)(step.args[2]) + 1, step.args[1]);
              
             err = fs_new_key(fs, dir_key, step.base_name, &child_key);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             err = fs_read(fs, child_key, step.args[0], step.args[1], buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             fs_delete_key(fs, child_key);
 
@@ -912,20 +912,20 @@ static bool test_fs_manual_steps(void) {
             mem_set(buf, (uint8_t)(step.args[2]), step.args[1]);
 
             err = fs_new_key(fs, dir_key, step.base_name, &child_key);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             err = fs_write(fs, child_key, step.args[0], step.args[1], buf);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             fs_delete_key(fs, child_key);
 
             break;
         case STEP_RESIZE:
             err = fs_new_key(fs, dir_key, step.base_name, &child_key);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             err = fs_resize(fs, child_key, step.args[0]);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             fs_delete_key(fs, child_key);
             break;
@@ -944,24 +944,24 @@ static bool test_fs_path_helpers(void) {
     fernos_error_t err;
 
     err = fs_touch_path(fs, NULL, "/a.txt", NULL);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_touch_path(fs, root_key, "./b.txt", NULL);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_node_key_t key;
 
     err = fs_mkdir_path(fs, root_key, "./c", &key);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_touch_path(fs, root_key, "./c/b.txt", NULL);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = fs_touch_path(fs, root_key, "./d/b.txt", NULL);
-    TEST_TRUE(FOS_SUCCESS != err);
+    TEST_TRUE(FOS_E_SUCCESS != err);
 
     err = fs_remove_path(fs, key, "b.txt");
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     fs_delete_key(fs, key);
 

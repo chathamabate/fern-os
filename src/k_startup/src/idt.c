@@ -121,5 +121,5 @@ fernos_error_t init_idt(void) {
 
     pic_remap(32, 40);
     
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }

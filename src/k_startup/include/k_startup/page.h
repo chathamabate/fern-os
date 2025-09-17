@@ -192,8 +192,8 @@ void delete_page_table(phys_addr_t pt);
 /**
  * Allocate a range within a page table.
  *
- * Returns FOS_ALREADY_ALLOCATED if we hit an entry which is already allocated.
- * Returns FOS_NO_MEM if we run out of physical pages.
+ * Returns FOS_E_ALREADY_ALLOCATED if we hit an entry which is already allocated.
+ * Returns FOS_E_NO_MEM if we run out of physical pages.
  *
  * e is the exlusive end of the range. (0 <= s < 1024), (0 <= e <= 1024)
  * The final index reached during allocation is always written to *true_e.
@@ -219,8 +219,8 @@ phys_addr_t new_page_directory(void);
  * Add pages (and page table if necessary) to a page directory.
  * The pages will always be marked as writeable. 
  *
- * If we run out of memory, FOS_NO_MEM is returned.
- * If we run into an already page, FOS_ALREADY_ALLOCATED is returned.
+ * If we run out of memory, FOS_E_NO_MEM is returned.
+ * If we run into an already page, FOS_E_ALREADY_ALLOCATED is returned.
  *
  * Use true_e to determine how many pages were actually allocated in case of error.
  */

@@ -79,7 +79,7 @@ struct _plugin_fs_t {
  * NOTE: On deletion, the underlying file system is deleted!
  *
  * NOTE: This plugin is only designed to be deleted on system shutdown.
- * The destructor ALWAYS will return FOS_ABORT_SYSTEM.
+ * The destructor ALWAYS will return FOS_E_ABORT_SYSTEM.
  * (remember, that when the system shutdown, all plugins are deleted, and there error
  * codes are ignored). All the destructor does is flush the file system and return.
  *

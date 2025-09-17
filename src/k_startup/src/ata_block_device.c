@@ -41,7 +41,7 @@ block_device_t *get_ata_block_device(void) {
 
         uint32_t ns;
         err = ata_num_sectors(&ns);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             abd_only_failure_to_init = true;
             return NULL;
         }
@@ -79,11 +79,11 @@ static fernos_error_t abd_read(block_device_t *bd, size_t sector_ind, size_t num
     ata_block_device_t *abd = (ata_block_device_t *)bd;
 
     if (!dest) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (sector_ind >= abd->num_sectors || sector_ind + num_sectors > abd->num_sectors) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     size_t total_sectors_read = 0;
@@ -97,14 +97,14 @@ static fernos_error_t abd_read(block_device_t *bd, size_t sector_ind, size_t num
                 sectors_to_read == 256 ? 0 : (uint8_t)sectors_to_read,
                 (uint8_t *)dest + (total_sectors_read * abd->sector_size));
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
         total_sectors_read += sectors_to_read;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t abd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src) {
@@ -113,11 +113,11 @@ static fernos_error_t abd_write(block_device_t *bd, size_t sector_ind, size_t nu
     ata_block_device_t *abd = (ata_block_device_t *)bd;
 
     if (!src) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (sector_ind >= abd->num_sectors || sector_ind + num_sectors > abd->num_sectors) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     size_t total_sectors_written = 0;
@@ -131,14 +131,14 @@ static fernos_error_t abd_write(block_device_t *bd, size_t sector_ind, size_t nu
                 sectors_to_write == 256 ? 0 : sectors_to_write,
                 (const uint8_t *)src + (total_sectors_written * abd->sector_size));
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
         total_sectors_written += sectors_to_write;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t abd_read_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, void *dest) {
@@ -147,27 +147,27 @@ static fernos_error_t abd_read_piece(block_device_t *bd, size_t sector_ind, size
     ata_block_device_t *abd = (ata_block_device_t *)bd;
 
     if (!dest) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (abd->sector_size > sizeof(abd->piece_buffer)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
 
     if (sector_ind >= abd->num_sectors || offset >= abd->sector_size || offset + len > abd->sector_size ||
             offset + len < offset) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     err = ata_read_pio(sector_ind, 1, abd->piece_buffer);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
     mem_cpy(dest, abd->piece_buffer + offset, len);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t abd_write_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, const void *src) {
@@ -176,31 +176,31 @@ static fernos_error_t abd_write_piece(block_device_t *bd, size_t sector_ind, siz
     ata_block_device_t *abd = (ata_block_device_t *)bd;
 
     if (!src) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (abd->sector_size > sizeof(abd->piece_buffer)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     if (sector_ind >= abd->num_sectors || offset >= abd->sector_size || offset + len > abd->sector_size ||
             offset + len < offset) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     err = ata_read_pio(sector_ind, 1, abd->piece_buffer);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
     mem_cpy(abd->piece_buffer + offset, src, len);
 
     err = ata_write_pio(sector_ind, 1, abd->piece_buffer);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
     
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**

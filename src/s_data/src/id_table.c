@@ -1,7 +1,7 @@
 
 #include "s_data/id_table.h"
 #include "s_mem/allocator.h"
-#include "s_util/ansii.h"
+#include "s_util/ansi.h"
 #include "s_util/misc.h"
 
 #define IDTB_STARTING_CAP 0x4
@@ -76,18 +76,18 @@ void delete_id_table(id_table_t *idtb) {
  */
 static fernos_error_t idtb_resize(id_table_t *idtb, uint32_t new_cap) {
     if (new_cap <= idtb->cap) {
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
     if (new_cap > idtb->max_cap) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     id_table_entry_t *new_tbl = al_realloc(idtb->al, idtb->tbl,
             new_cap * sizeof(id_table_entry_t));
 
     if (!new_tbl) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     const id_t NULL_ID = idtb_null_id(idtb);
@@ -113,14 +113,14 @@ static fernos_error_t idtb_resize(id_table_t *idtb, uint32_t new_cap) {
     idtb->cap = new_cap;
     idtb->tbl = new_tbl;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t idtb_request_id(id_table_t *idtb, id_t id) {
     const id_t NULL_ID = idtb_null_id(idtb);
 
     if (id >= idtb->max_cap) {
-        return FOS_INVALID_INDEX;
+        return FOS_E_INVALID_INDEX;
     }
 
     if (id >= idtb->cap) {
@@ -137,7 +137,7 @@ fernos_error_t idtb_request_id(id_table_t *idtb, id_t id) {
         // Do we need to resize??
         fernos_error_t err = idtb_resize(idtb, new_cap);
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
@@ -145,7 +145,7 @@ fernos_error_t idtb_request_id(id_table_t *idtb, id_t id) {
     // If we make it here, we know id < cap.
     
     if (idtb->tbl[id].allocated) {
-        return FOS_ALREADY_ALLOCATED;
+        return FOS_E_ALREADY_ALLOCATED;
     }
 
     // Ok, now we know we can pop the id!
@@ -180,7 +180,7 @@ fernos_error_t idtb_request_id(id_table_t *idtb, id_t id) {
 
     idtb->tbl[id].allocated = true;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 id_t idtb_pop_id(id_table_t *idtb) {
@@ -193,7 +193,7 @@ id_t idtb_pop_id(id_table_t *idtb) {
         id = idtb->cap;
     }
 
-    if (idtb_request_id(idtb, id) != FOS_SUCCESS) {
+    if (idtb_request_id(idtb, id) != FOS_E_SUCCESS) {
         id = NULL_ID;
     }
 
@@ -280,12 +280,12 @@ void idtb_dump(id_table_t *idtb, void (*pf)(const char *fmt, ...)) {
 
     pf("------ Table ------\n");
     for (id_t id = 0; id < idtb->cap; id++) {
-        pf("[" ANSII_CYAN_FG "0x%X" ANSII_RESET "] ", id);
+        pf("[" ANSI_CYAN_FG "0x%X" ANSI_RESET "] ", id);
 
         if (idtb->tbl[id].allocated) {
-            pf(ANSII_RED_FG "ALLOCATED (0x%X) " ANSII_RESET, idtb->tbl[id].data);
+            pf(ANSI_RED_FG "ALLOCATED (0x%X) " ANSI_RESET, idtb->tbl[id].data);
         } else {
-            pf(ANSII_GREEN_FG "FREE " ANSII_RESET);
+            pf(ANSI_GREEN_FG "FREE " ANSI_RESET);
         }
 
         dump_hex_pairs(pf, 

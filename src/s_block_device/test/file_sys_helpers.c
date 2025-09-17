@@ -160,7 +160,7 @@ static bool test_separate_path(void) {
 
     for (size_t i = 0; i < num_success_cases; i++) {
         err = separate_path(success_cases[i].path, dir, basename); 
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         TEST_TRUE(str_eq(success_cases[i].exp_dir, dir)); 
         TEST_TRUE(str_eq(success_cases[i].exp_basename, basename)); 
@@ -179,7 +179,7 @@ static bool test_separate_path(void) {
 
     for (size_t i = 0; i < num_bad_cases; i++) {
         err = separate_path(bad_cases[i], dir, basename); 
-        TEST_TRUE(err != FOS_SUCCESS);
+        TEST_TRUE(err != FOS_E_SUCCESS);
     }
 
     TEST_SUCCEED();

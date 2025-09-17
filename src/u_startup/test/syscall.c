@@ -34,17 +34,17 @@ static fernos_error_t reap_single(proc_id_t *rcpid, proc_exit_status_t *rces) {
     fernos_error_t err;
     while (1) {
         err = sc_proc_reap(FOS_MAX_PROCS, rcpid, rces);
-        if (err == FOS_SUCCESS) {
+        if (err == FOS_E_SUCCESS) {
             // We clear just in case we were able to reap without waiting on the signal!
             sc_signal_clear(1 << FSIG_CHLD);
         }
 
-        if (err != FOS_EMPTY) {
+        if (err != FOS_E_EMPTY) {
             return err;
         }
 
         err = sc_signal_wait((1 << FSIG_CHLD), NULL);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
@@ -56,7 +56,7 @@ static bool test_simple_fork(void) {
     proc_id_t cpid;
 
     err = sc_proc_fork(&cpid);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     if (cpid == FOS_MAX_PROCS) {
         // We are in the child process!
@@ -66,7 +66,7 @@ static bool test_simple_fork(void) {
 
     // Reaping a non-existent process!
     err = sc_proc_reap(12345, NULL, NULL);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     // Reaping a spceific child process!
 
@@ -75,12 +75,12 @@ static bool test_simple_fork(void) {
 
     while (1) {
         err = sc_proc_reap(cpid, &rcpid, &rces);
-        if (err == FOS_SUCCESS) {
+        if (err == FOS_E_SUCCESS) {
             break;
         }
 
         err = sc_signal_wait((1 << FSIG_CHLD), NULL);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     TEST_EQUAL_HEX(cpid, rcpid);
@@ -105,7 +105,7 @@ static bool test_simple_signal0(void) {
     proc_id_t cpid;
 
     err = sc_proc_fork(&cpid);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     sig_id_t sid;
 
@@ -116,10 +116,10 @@ static bool test_simple_signal0(void) {
         sc_signal_allow(csv);
 
         err = sc_signal(FOS_MAX_PROCS, 3);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         err = sc_signal_wait(csv, &sid);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         TEST_EQUAL_UINT(4, sid);
 
         sc_proc_exit(PROC_ES_SUCCESS);
@@ -128,17 +128,17 @@ static bool test_simple_signal0(void) {
     // In the parent process!
 
     err = sc_signal_wait((1 << 3), &sid);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_UINT(3, sid);
 
     err = sc_signal(cpid, 4);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     proc_exit_status_t rces;
     err = reap_single(NULL, &rces);
     TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
 
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_SUCCEED();
 }
 
@@ -152,19 +152,19 @@ static bool test_simple_signal1(void) {
     sc_signal_allow(full_sig_vector());
 
     err = sc_signal(1234, 1);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     err = sc_signal(FOS_MAX_PROCS, 1);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     err = sc_proc_fork(&cpid);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     if (cpid == FOS_MAX_PROCS) {
         // Send 4,5,6 to the root, then exit.
         for (sig_id_t sid = 4; sid <= 6; sid++) {
             err = sc_signal(FOS_MAX_PROCS, sid);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         }
 
         sc_proc_exit(PROC_ES_SUCCESS);
@@ -173,22 +173,22 @@ static bool test_simple_signal1(void) {
     sig_id_t rsid0;
 
     err = sc_signal_wait((1 << 4) | (1 << 6), &rsid0);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_TRUE(rsid0 == 4 || rsid0 == 6);
 
     sig_id_t rsid1;
 
     err = sc_signal_wait((1 << 4) | (1 << 6), &rsid1);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_TRUE(rsid0 == 4 ? rsid1 == 6 : rsid1 == 4);
 
     sig_id_t final_rsid;
     err = sc_signal_wait((1 << 5), &final_rsid);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_UINT(5, final_rsid);
 
     err = reap_single(NULL, NULL);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_SUCCEED();
 }
@@ -204,18 +204,18 @@ static bool test_signal_allow_exit(void) {
 
     proc_id_t cpid;
     err = sc_proc_fork(&cpid);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     if (cpid == FOS_MAX_PROCS) {
         sc_signal_allow(full_sig_vector()); 
         // Allow all signals in the child!
 
         err = sc_signal(FOS_MAX_PROCS, 4);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         // Wait for the parent to send a 5.
         err = sc_signal_wait((1 << 5), NULL);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         sc_signal_allow(empty_sig_vector());
 
@@ -223,19 +223,19 @@ static bool test_signal_allow_exit(void) {
     }
 
     err = sc_signal_wait((1 << 4), NULL);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = sc_signal(cpid, 4);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     // After signaling 5, the child process should disallow all signals. However, at this point
     // there should be a pending 4... Exiting the child process.
     err = sc_signal(cpid, 5);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     
     proc_exit_status_t rces;
     err = reap_single(NULL, &rces);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_HEX(PROC_ES_SIGNAL, rces);
     
     TEST_SUCCEED();
@@ -247,10 +247,10 @@ static bool test_complex_fork0(void) {
     // First test out some bad reaps.
 
     err = sc_proc_reap(100, NULL, NULL);
-    TEST_EQUAL_HEX(FOS_STATE_MISMATCH, err);
+    TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
     err = sc_proc_reap(FOS_MAX_PROCS, NULL, NULL);
-    TEST_EQUAL_HEX(FOS_EMPTY, err);
+    TEST_EQUAL_HEX(FOS_E_EMPTY, err);
 
     sc_signal_allow((1 << FSIG_CHLD));
 
@@ -265,12 +265,12 @@ static bool test_complex_fork0(void) {
     proc_id_t cpids[3];
 
     err = sc_proc_fork(&(cpids[0]));
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     if (cpids[0] == FOS_MAX_PROCS) {
 
         err = sc_proc_fork(&(cpids[1]));
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         if (cpids[1] == FOS_MAX_PROCS) {
             // inside proc1.
@@ -279,7 +279,7 @@ static bool test_complex_fork0(void) {
         }
 
         err = sc_proc_fork(&(cpids[2]));
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         if (cpids[2] == FOS_MAX_PROCS) {
             // inside proc2
@@ -299,7 +299,7 @@ static bool test_complex_fork0(void) {
     proc_exit_status_t rces;
     for (int i = 0; i < 3; i++) {
         err = reap_single(&rcpid, &rces);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         if (rcpid == cpids[0]) {
             TEST_EQUAL_HEX(PROC_ES_SIGNAL, rces);
@@ -330,7 +330,7 @@ static bool test_complex_fork1(void) {
 
     for (i = 0; i < 3; i++) {
         err = sc_proc_fork(&cpid);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         if (cpid != FOS_MAX_PROCS) {
             break;
@@ -340,13 +340,13 @@ static bool test_complex_fork1(void) {
     if (i == 2) {
         // Kill child 3 with an arbitrary signal.
         err = sc_signal(cpid, 1 << 4);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         while (1);
     } else if (i == 0) {
         for (int i = 0; i < 3; i++) {
             err = reap_single(NULL, NULL);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         }
 
         TEST_SUCCEED();
@@ -370,7 +370,7 @@ static bool test_complex_fork2(void) {
     proc_id_t cpid;
 
     err = sc_proc_fork(&cpid);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     if (cpid == FOS_MAX_PROCS) {
         sc_signal_allow(1 << FSIG_CHLD);
@@ -380,7 +380,7 @@ static bool test_complex_fork2(void) {
         int i;
         for (i = 0; i < 3; i++) {
             err = sc_proc_fork(&(cpids[i]));
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             if (cpids[i] == FOS_MAX_PROCS) {
                 break;
@@ -393,14 +393,14 @@ static bool test_complex_fork2(void) {
 
             proc_id_t rcpid;
             err = reap_single(&rcpid, NULL);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             TEST_EQUAL_HEX(cpids[0], rcpid);
 
             err = sc_signal(cpids[1], 4);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             err = sc_signal(cpids[2], 4);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             sc_proc_exit(PROC_ES_SUCCESS);
         } 
@@ -413,7 +413,7 @@ static bool test_complex_fork2(void) {
         if (cpids[1] == FOS_MAX_PROCS) {
             // proc1
             err = sc_signal(cpids[0], 4);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
             while (1);
         }
@@ -427,7 +427,7 @@ static bool test_complex_fork2(void) {
     for (int i = 0; i < 3; i++) {
         // reap proc, proc1, and proc2
         err = reap_single(NULL, NULL);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     TEST_SUCCEED();
@@ -456,7 +456,7 @@ static bool test_thread_join0(void) {
     for (uint32_t i = 0; i < 5; i++) {
         err = sc_thread_spawn(&(tids[i]), example_worker0, (void *)i);    
         TEST_TRUE(tids[i] < FOS_MAX_THREADS_PER_PROC);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     // Maybe try joining 3 and then 2 just to jazz things up a bit.
@@ -468,7 +468,7 @@ static bool test_thread_join0(void) {
 
     for (uint32_t i = 0; i < 3; i++) {
         err = sc_thread_join(jv, &joined, (void **)&ret_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         // Confirmed the joined tid is tids[0], tids[1], or tids[2]
 
@@ -486,7 +486,7 @@ static bool test_thread_join0(void) {
     jv = full_join_vector(); // Any threads.
     for (uint32_t i = 0; i < 2; i++) {
         err = sc_thread_join(jv, &joined, (void **)&ret_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         if (joined == tids[3]) {
             TEST_EQUAL_UINT(10 * 3, ret_val);
@@ -513,7 +513,7 @@ static void *example_worker1(void *arg) {
     thread_id_t tids[WORKER1_SUB_WORKERS];
     for (uint32_t i = 0; i < WORKER1_SUB_WORKERS; i++) {
         err = sc_thread_spawn(&(tids[i]), example_worker0, arg);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return (void *)(~0U);
         }
     }
@@ -524,7 +524,7 @@ static void *example_worker1(void *arg) {
 
     for (uint32_t i = 0; i < WORKER1_SUB_WORKERS; i++) {
         err = sc_thread_join(1 << tids[i], NULL, (void **)&ret_val);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return (void *)(~0U);
         }
         sum += ret_val;
@@ -544,7 +544,7 @@ static bool test_thread_join1(void) {
 
     for (uint32_t i = 0; i < workers; i++) {
         err = sc_thread_spawn(&(tids[i]), example_worker1, (void *)i);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         jv_add_tid(&jv, tids[i]);
     }
@@ -554,7 +554,7 @@ static bool test_thread_join1(void) {
         uint32_t ret_val;
 
         err = sc_thread_join(jv, &joined, (void **)&ret_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         uint32_t j;
         for (j = 0; j < workers; j++) {
@@ -610,13 +610,13 @@ static void *test_futex0_worker(void *arg) {
             old_val = __sync_val_compare_and_swap(&fut, 1, 0); // Unlock number.
 
             err = sc_futex_wake(&fut, false); // Waking 1 should be ok here.
-            if (err != FOS_SUCCESS) {
+            if (err != FOS_E_SUCCESS) {
                 return (void *)1;
             }
 
         } else { // other thread is using number.
             err = sc_futex_wait(&fut, 1);
-            if (err != FOS_SUCCESS) {
+            if (err != FOS_E_SUCCESS) {
                 return (void *)2;
             } 
         }
@@ -629,28 +629,28 @@ static bool test_futex0(void) {
     fernos_error_t err;
 
     err = sc_futex_register(NULL);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     fut = 0;
     number = 0;
 
     err = sc_futex_register(&fut);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = sc_futex_register(&fut);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     const uint32_t workers = 4;
 
     for (uint32_t i = 0; i < workers; i++) {
         err = sc_thread_spawn(NULL, test_futex0_worker, NULL);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     for (uint32_t i = 0; i < workers; i++) {
         uint32_t ret_val;
         err = sc_thread_join(full_join_vector(), NULL, (void **)&ret_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         TEST_EQUAL_UINT(0, ret_val);
     }
 
@@ -665,13 +665,13 @@ static void *test_futex_early_destruct_workcer(void *arg) {
     (void)arg;
 
     // It will be impossible to determine whether the futex still exists before waiting.
-    // If the futex was already deleted, this should return FOS_INVALID_INDEX.
-    // If the futex still exists, when it is deleted, the wait call will return FOS_STATE_MISMATCH.
+    // If the futex was already deleted, this should return FOS_E_INVALID_INDEX.
+    // If the futex still exists, when it is deleted, the wait call will return FOS_E_STATE_MISMATCH.
     //
     // We'll check for either.
     fernos_error_t err = sc_futex_wait(&fut, 0);    
 
-    if (err == FOS_INVALID_INDEX || err == FOS_STATE_MISMATCH) {
+    if (err == FOS_E_INVALID_INDEX || err == FOS_E_STATE_MISMATCH) {
         return (void *)0;
     }
 
@@ -681,20 +681,20 @@ static void *test_futex_early_destruct_workcer(void *arg) {
 static bool test_futex_early_destruct(void) {
     // We need to create a futex, have multiple threads waiting on the futex,
     // the delete the futex.
-    // Waiting threads should be woken up with FOS_STATE_MISMATCH.
+    // Waiting threads should be woken up with FOS_E_STATE_MISMATCH.
 
     fernos_error_t err;
 
     fut = 0;
 
     err = sc_futex_register(&fut);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     const uint32_t workers = 5;
 
     for (uint32_t i = 0; i < workers; i++) {
         err = sc_thread_spawn(NULL, test_futex_early_destruct_workcer, NULL);    
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     sc_thread_sleep(8);
@@ -705,7 +705,7 @@ static bool test_futex_early_destruct(void) {
         uint32_t ret_val;
 
         err = sc_thread_join(full_join_vector(), NULL, (void **)&ret_val);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         TEST_EQUAL_UINT(0, ret_val);
     }
 
@@ -737,12 +737,12 @@ static bool test_fork_and_thread(void) {
 
     for (uint32_t i = 0; i < workers; i++) {
         err = sc_thread_spawn(&(tids[i]), test_fork_and_thread_worker, NULL);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     proc_id_t cpid;
     err = sc_proc_fork(&cpid);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     if (cpid == FOS_MAX_PROCS) {
         // The point is that in our child process, none of the spawned workers should be duplicated.
@@ -755,12 +755,12 @@ static bool test_fork_and_thread(void) {
 
     for (uint32_t i = 0; i < workers; i++) {
         err = sc_thread_join(full_join_vector(), NULL, NULL); 
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     proc_exit_status_t rces;
     err = reap_single(NULL, &rces);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
 
     TEST_SUCCEED();
@@ -800,12 +800,12 @@ static bool test_stack_pressure(void) {
     for (uint32_t t = 0; t < trials; t++) {
         for (uint32_t i = 0; i < workers; i++) {
             err = sc_thread_spawn(NULL, test_stack_pressure_worker, NULL);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         }
 
         for (uint32_t i = 0; i < workers; i++) {
             err = sc_thread_join(full_join_vector(), NULL, NULL);
-            TEST_EQUAL_HEX(FOS_SUCCESS, err);
+            TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         }
     }
 
@@ -818,7 +818,7 @@ static bool test_fatal_stack_pressure(void) {
     proc_id_t cpid;
 
     err = sc_proc_fork(&cpid);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     if (cpid == FOS_MAX_PROCS) {
         // Overflow the stack!
@@ -827,7 +827,7 @@ static bool test_fatal_stack_pressure(void) {
 
     proc_exit_status_t rces;
     err = reap_single(NULL, &rces);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_HEX(PROC_ES_PF, rces);
 
     TEST_SUCCEED();

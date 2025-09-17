@@ -5,7 +5,7 @@
 #include "k_bios_term/term.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
-#include "s_util/ansii.h"
+#include "s_util/ansi.h"
 #include "s_util/str.h"
 #include "s_mem/allocator.h"
 #include "k_startup/page.h"
@@ -107,7 +107,7 @@ void fos_pf_action(user_ctx_t *ctx) {
     void *new_base = (void *)ALIGN(cr2, M_4K);
 
     fernos_error_t err = ks_expand_stack(kernel, new_base);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         ks_exit_proc(kernel, PROC_ES_PF);
     }
 
@@ -118,7 +118,7 @@ void fos_timer_action(user_ctx_t *ctx) {
     ks_save_ctx(kernel, ctx);
     
     fernos_error_t err = ks_tick(kernel);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         term_put_fmt_s("[Timer Error 0x%X]", err);
         ks_shutdown(kernel);
     }
@@ -129,7 +129,7 @@ void fos_timer_action(user_ctx_t *ctx) {
 void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t arg1, 
         uint32_t arg2, uint32_t arg3) {
     ks_save_ctx(kernel, ctx);
-    fernos_error_t err = FOS_SUCCESS;
+    fernos_error_t err = FOS_E_SUCCESS;
 
     switch (id) {
     case SCID_PROC_FORK:
@@ -195,8 +195,8 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     case SCID_TERM_PUT_S:
         if (!arg0) {
-            kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
-            err = FOS_SUCCESS;
+            kernel->curr_thread->ctx.eax = FOS_E_BAD_ARGS;
+            err = FOS_E_SUCCESS;
             break;
         }
 
@@ -219,8 +219,8 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
             handle_state_t *hs = idtb_get(handle_table, h);
 
             if (!hs) {
-                kernel->curr_thread->ctx.eax = FOS_INVALID_INDEX;
-                err = FOS_SUCCESS;
+                kernel->curr_thread->ctx.eax = FOS_E_INVALID_INDEX;
+                err = FOS_E_SUCCESS;
             } else { // handle found!
                 switch (h_cmd) {
                 case HCID_CLOSE:
@@ -253,20 +253,20 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
             plugin_t *plg = kernel->plugins[plg_id];
 
             if (!plg) {
-                kernel->curr_thread->ctx.eax = FOS_INVALID_INDEX;
-                err = FOS_SUCCESS;
+                kernel->curr_thread->ctx.eax = FOS_E_INVALID_INDEX;
+                err = FOS_E_SUCCESS;
             } else {
                 err = plg_cmd(plg, plg_cmd_id, arg0, arg1, arg2, arg3);
             }
         } else {
-            kernel->curr_thread->ctx.eax = FOS_BAD_ARGS;
-            err = FOS_SUCCESS;
+            kernel->curr_thread->ctx.eax = FOS_E_BAD_ARGS;
+            err = FOS_E_SUCCESS;
         }
 
         break;
     }
 
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         term_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
         ks_shutdown(kernel);
     }

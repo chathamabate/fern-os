@@ -128,7 +128,7 @@ static inline fernos_error_t bd_flush(block_device_t *bd) {
         return bd->impl->bd_flush(bd);
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**

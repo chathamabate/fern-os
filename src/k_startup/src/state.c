@@ -11,7 +11,7 @@
 
 #include "k_bios_term/term.h"
 #include "s_util/str.h"
-#include "s_util/ansii.h"
+#include "s_util/ansi.h"
 
 
 /**
@@ -46,16 +46,16 @@ kernel_state_t *new_kernel_state(allocator_t *al) {
 
 fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *plg) {
     if (plg_id >= FOS_MAX_PLUGINS) {
-        return FOS_INVALID_INDEX;
+        return FOS_E_INVALID_INDEX;
     }
 
     if (ks->plugins[plg_id]) {
-        return FOS_IN_USE;
+        return FOS_E_IN_USE;
     }
 
     ks->plugins[plg_id] = plg;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 void ks_save_ctx(kernel_state_t *ks, user_ctx_t *ctx) {
@@ -106,11 +106,11 @@ fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     if (!IS_ALIGNED(new_base, M_4K)) {
-        return FOS_ALIGN_ERROR;
+        return FOS_E_ALIGN_ERROR;
     }
 
     thread_t *thr = ks->curr_thread;
@@ -121,23 +121,23 @@ fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base) {
     const void *stack_end = (const void *)FOS_THREAD_STACK_END(tid);
 
     if (new_base < true_stack_start || stack_end <= new_base) {
-        return FOS_INVALID_INDEX; // Trying to access an address which isn't really on the stack.
+        return FOS_E_INVALID_INDEX; // Trying to access an address which isn't really on the stack.
     }
 
     if (thr->stack_base <= new_base) {
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
     const void *true_e;
     err = pd_alloc_pages(thr->proc->pd, true, new_base, thr->stack_base, &true_e);
 
-    if (err != FOS_SUCCESS && err != FOS_ALREADY_ALLOCATED) {
+    if (err != FOS_E_SUCCESS && err != FOS_E_ALREADY_ALLOCATED) {
         return err;
     }
 
     thr->stack_base = new_base;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 void ks_shutdown(kernel_state_t *ks) {
@@ -160,7 +160,7 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
     twq_notify(ks->sleep_q, ks->curr_tick);
 
     thread_t *woken_thread;
-    while ((err = twq_pop(ks->sleep_q, (void **)&woken_thread)) == FOS_SUCCESS) {
+    while ((err = twq_pop(ks->sleep_q, (void **)&woken_thread)) == FOS_E_SUCCESS) {
         // Remove reference to sleep queue.
         woken_thread->wq = NULL;
         woken_thread->state = THREAD_STATE_DETATCHED;
@@ -169,7 +169,7 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
         ks_schedule_thread(ks, woken_thread);
     }
 
-    if (err != FOS_EMPTY) {
+    if (err != FOS_E_EMPTY) {
         return err;
     }
 
@@ -186,12 +186,12 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
     // trigger plugin on tick handlers every 16th tick.
     if (((uintptr_t)(ks->curr_thread) & 0xF) == 0) {
         err = plgs_tick(ks->plugins, FOS_MAX_PLUGINS);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc, 
@@ -201,7 +201,7 @@ static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t 
 
 fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
@@ -213,7 +213,7 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
 
     proc_id_t cpid = NULL_PID;
     process_t *child = NULL;
-    fernos_error_t err = FOS_UNKNWON_ERROR;
+    fernos_error_t err = FOS_E_UNKNWON_ERROR;
 
     // Request child process ID.
     cpid = idtb_pop_id(ks->proc_table);
@@ -226,21 +226,21 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     // Attempt to copy handles from parent to child.
     if (child) {
         err = copy_handle_table(proc, child);
-        if (err == FOS_ABORT_SYSTEM) {
-            return FOS_ABORT_SYSTEM;
+        if (err == FOS_E_ABORT_SYSTEM) {
+            return FOS_E_ABORT_SYSTEM;
         }
     }
 
     // Push child on to children list.
-    if (err == FOS_SUCCESS) {
+    if (err == FOS_E_SUCCESS) {
         err = l_push_back(proc->children, &child);
     }
 
     // Now check for errors.
-    if (cpid == NULL_PID || !child || err != FOS_SUCCESS) {
+    if (cpid == NULL_PID || !child || err != FOS_E_SUCCESS) {
         idtb_push_id(ks->proc_table, cpid);
         err = clear_handle_table(child->handle_table);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
         delete_process(child);
@@ -256,19 +256,19 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
         //
         // Thus, we don't need to pop anything from our child list in this error case.
 
-        DUAL_RET(thr, FOS_NO_MEM, FOS_SUCCESS);
+        DUAL_RET(thr, FOS_E_NO_MEM, FOS_E_SUCCESS);
     }
 
     idtb_set(ks->proc_table, cpid, child);
 
     // Remember, now we are working with 2 different user processes!
 
-    child->main_thread->ctx.eax = FOS_SUCCESS;
+    child->main_thread->ctx.eax = FOS_E_SUCCESS;
     ks_schedule_thread(ks, child->main_thread);
 
     // Call the on fork handlers!
     err = plgs_on_fork_proc(ks->plugins, FOS_MAX_PLUGINS, cpid);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -286,7 +286,7 @@ fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
                 sizeof(proc_id_t), NULL);
     }
 
-    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc, 
@@ -331,7 +331,7 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     }
 
     err = l_push_back_all(ks->root_proc->children, proc->children);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -342,7 +342,7 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     }
 
     err = l_push_back_all(ks->root_proc->zombie_children, proc->zombie_children);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -350,7 +350,7 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     // zombie list!
 
     if (!l_pop_ele(proc->parent->children, &proc, l_ptr_cmp, false)) {
-        return FOS_STATE_MISMATCH; // Something very wrong if we can't find this process in
+        return FOS_E_STATE_MISMATCH; // Something very wrong if we can't find this process in
                                    // the parent's children list.
     }
 
@@ -360,29 +360,29 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
 
     // Add to parents zombie children list!
     err = l_push_back(proc->parent->zombie_children, &proc);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
     err = ks_signal_p(ks, proc->parent, FSIG_CHLD);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
     if (signal_root) {
         err = ks_signal_p(ks, ks->root_proc, FSIG_CHLD);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
     }
 
     // This call does not return to any user thread!
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     return ks_exit_proc_p(ks, ks->curr_thread->proc, status);
@@ -393,14 +393,14 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
     process_t *rproc = NULL;
-    fernos_error_t user_err = FOS_UNKNWON_ERROR;
+    fernos_error_t user_err = FOS_E_UNKNWON_ERROR;
 
     // First we retrieve what zombie child we want to reap (and also remove it from the zombie list)
     // If we cannot find an applicable zombie child process, user_err will be set to the correct
@@ -410,23 +410,23 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
         // We are reaping any process!
 
         // Default to error case at first.
-        user_err = FOS_EMPTY;
+        user_err = FOS_E_EMPTY;
 
         if (l_get_len(proc->zombie_children) > 0) {
             err = l_pop_front(proc->zombie_children, &rproc);
 
             // Failing to pop from the zombie list is seen as a fatal kernel error.
             // Should never really happen though.
-            if (err != FOS_SUCCESS) {
+            if (err != FOS_E_SUCCESS) {
                 return err;
             }
 
-            user_err = FOS_SUCCESS;
+            user_err = FOS_E_SUCCESS;
         } 
     } else {
 
         // Default to error case at first.
-        user_err = FOS_STATE_MISMATCH;
+        user_err = FOS_E_STATE_MISMATCH;
 
         // We are reaping a specific process!
         rproc = idtb_get(ks->proc_table, cpid);
@@ -436,33 +436,33 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
 
             if (!removed) {
                 // Something is very wrong if the described process is not in the zombie list.
-                return FOS_STATE_MISMATCH;
+                return FOS_E_STATE_MISMATCH;
             }
 
-            user_err = FOS_SUCCESS;
+            user_err = FOS_E_SUCCESS;
         } 
     }
 
     proc_id_t rcpid = FOS_MAX_PROCS;
     proc_exit_status_t rces = PROC_ES_UNSET;
 
-    // Ok, at this point, user_err is either FOS_SUCCESS, meaning we have a freestanding zombie
+    // Ok, at this point, user_err is either FOS_E_SUCCESS, meaning we have a freestanding zombie
     // process stored in rproc which we can reap!
     //
     // Or, we couldn't find an apt process to reap.
 
-    if (user_err == FOS_SUCCESS) {
+    if (user_err == FOS_E_SUCCESS) {
         // REAP!
         
         // First off, call the on reap handler!
         err = plgs_on_reap_proc(ks->plugins, FOS_MAX_PLUGINS, rproc->pid);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
         // then, try to delete all handles!
         err = clear_handle_table(rproc->handle_table);
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
@@ -483,19 +483,19 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
                 sizeof(proc_id_t), NULL);
     }
     
-    DUAL_RET(thr, user_err, FOS_SUCCESS);
+    DUAL_RET(thr, user_err, FOS_E_SUCCESS);
 }
 
 static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid) {
     fernos_error_t err;
 
     if (!proc || sid >= 32) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     // If it is already set, we do nothing!
     if (proc->sig_vec & (1 << sid)) {
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
     // Set the signal bit no matter what!
@@ -514,14 +514,14 @@ static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t 
     // Otherwise, we notify our wait queue!
     
     err = vwq_notify(proc->signal_queue, sid, VWQ_NOTIFY_FIRST);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
     thread_t *woken_thread;
     err = vwq_pop(proc->signal_queue, (void **)&woken_thread, NULL);
 
-    if (err == FOS_SUCCESS) {
+    if (err == FOS_E_SUCCESS) {
         // We woke a thread up!
         
         // Clear our bit real quick.
@@ -543,20 +543,20 @@ static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t 
                     sizeof(sig_id_t), NULL);
         }
 
-        woken_thread->ctx.eax = FOS_SUCCESS;
-    } else if  (err != FOS_EMPTY) {
-        // If the error was FOS_EMPTY, this is no big deal!
+        woken_thread->ctx.eax = FOS_E_SUCCESS;
+    } else if  (err != FOS_E_EMPTY) {
+        // If the error was FOS_E_EMPTY, this is no big deal!
         return err;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
@@ -571,11 +571,11 @@ fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
 
     if (!recv_proc) {
         // We couldn't find who to send to...
-        DUAL_RET(thr, FOS_STATE_MISMATCH, FOS_SUCCESS);
+        DUAL_RET(thr, FOS_E_STATE_MISMATCH, FOS_E_SUCCESS);
     }
 
     err = ks_signal_p(ks, recv_proc, sid);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -585,15 +585,15 @@ fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
      * So we only return to the thread if the owning process is still alive!
      */
     if (!(thr->proc->exited)) {
-        thr->ctx.eax = FOS_SUCCESS;
+        thr->ctx.eax = FOS_E_SUCCESS;
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH; 
+        return FOS_E_STATE_MISMATCH; 
     }
 
     thread_t *thr = ks->curr_thread;
@@ -608,14 +608,14 @@ fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
         return ks_exit_proc_p(ks, proc, PROC_ES_SIGNAL);
     }
 
-    DUAL_RET(thr, old, FOS_SUCCESS);
+    DUAL_RET(thr, old, FOS_E_SUCCESS);
 }
 
 fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid) {
     fernos_error_t err;
     
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH; 
+        return FOS_E_STATE_MISMATCH; 
     }
 
     thread_t *thr = ks->curr_thread;
@@ -629,7 +629,7 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
                     sizeof(sig_id_t), NULL);
         }
 
-        DUAL_RET(thr, FOS_BAD_ARGS, FOS_SUCCESS);
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
     // Before doing any waiting, let's see if we can service a pending signal immediately!
@@ -653,14 +653,14 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
                         sizeof(sig_id_t), NULL);
             }
 
-            DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+            DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
         }
     }
 
     // We didn't find a match, looks like we'll need to wait!
 
     err = vwq_enqueue(proc->signal_queue, thr, sv);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -669,31 +669,31 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
     thr->state = THREAD_STATE_WAITING;
     thr->wait_ctx[0] = (uint32_t)u_sid;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv) {
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     ks->curr_thread->proc->sig_vec &= ~sv;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
 
     err = twq_enqueue(ks->sleep_q, (void *)thr, 
             ks->curr_tick + ticks);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -703,13 +703,13 @@ fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     thr->wq = (wait_queue_t *)(ks->sleep_q);
     thr->state = THREAD_STATE_WAITING;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 
         thread_entry_t entry, void *arg) {
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
@@ -717,18 +717,18 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
 
     const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
 
-    DUAL_RET_COND(!entry, thr, FOS_BAD_ARGS, FOS_SUCCESS);
+    DUAL_RET_COND(!entry, thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
 
     thread_t *new_thr = proc_new_thread(proc, entry, arg);
 
     if (!new_thr) {
-        thr->ctx.eax = FOS_UNKNWON_ERROR;
+        thr->ctx.eax = FOS_E_UNKNWON_ERROR;
 
         if (u_tid) {
             mem_cpy_to_user(proc->pd, u_tid, &NULL_TID, sizeof(thread_id_t), NULL);
         }
 
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
     // Schedule our new thread!
@@ -740,12 +740,12 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
         mem_cpy_to_user(proc->pd, u_tid, &new_tid, sizeof(thread_id_t), NULL);
     }
 
-    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     fernos_error_t err;
@@ -770,7 +770,7 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     err = vwq_notify_first(proc->join_queue, (uint8_t)tid);
 
     // This really should never happen.
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -780,12 +780,12 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
 
     // No one was waiting on our thread so we just leave here successfully.
     // Remember, we don't reap our thread until someone else joins on it!
-    if (err == FOS_EMPTY) {
-        return FOS_SUCCESS;
+    if (err == FOS_E_EMPTY) {
+        return FOS_E_SUCCESS;
     }
 
     // Some sort of pop error?
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -805,14 +805,14 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
 
         mem_cpy_to_user(proc->pd, u_ret_ptr, &local_ret, sizeof(thread_join_ret_t), NULL);
     }
-    joining_thread->ctx.eax = FOS_SUCCESS;
+    joining_thread->ctx.eax = FOS_E_SUCCESS;
 
     ks_schedule_thread(ks, joining_thread);
 
     // Ok finally, since our exited thread is no longer needed
     proc_delete_thread(proc, thr, true);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
@@ -820,7 +820,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
@@ -828,7 +828,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
 
     DUAL_RET_COND(
         jv == 0 || jv == (1U << thr->tid),
-        thr, FOS_BAD_ARGS, FOS_SUCCESS
+        thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS
     );
 
     // First we search to see if there already is an exited thread we can join on!
@@ -859,7 +859,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
             mem_cpy_to_user(proc->pd, u_join_ret, &local_ret, sizeof(thread_join_ret_t), NULL);
         }
 
-        DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
     // Here, we searched all threads and didn't find one to join on.
@@ -876,52 +876,52 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
     thr->wait_ctx[0] = (uint32_t)u_join_ret; // Save where we will eventually return to!
     thr->state = THREAD_STATE_WAITING;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
     err = proc_register_futex(proc, u_futex);
-    DUAL_RET(thr, err, FOS_SUCCESS);
+    DUAL_RET(thr, err, FOS_E_SUCCESS);
 }
 
 fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
     basic_wait_queue_t *wq = proc_get_futex_wq(proc, u_futex);
-    DUAL_RET_COND(!wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
+    DUAL_RET_COND(!wq, thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
 
     err = bwq_notify_all(wq);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err; // Failing to notify is more of a fatal kernel error tbh.
     }
 
     thread_t *woken_thread;
-    while ((err = bwq_pop(wq, (void **)&woken_thread)) == FOS_SUCCESS) {
+    while ((err = bwq_pop(wq, (void **)&woken_thread)) == FOS_E_SUCCESS) {
         woken_thread->wq = NULL;
-        woken_thread->ctx.eax = FOS_STATE_MISMATCH;
+        woken_thread->ctx.eax = FOS_E_STATE_MISMATCH;
         woken_thread->state = THREAD_STATE_DETATCHED;
 
         ks_schedule_thread(ks, woken_thread);
     }
 
     // Some sort of error with the popping.
-    if (err != FOS_EMPTY) {
+    if (err != FOS_E_EMPTY) {
         return err;
     }
 
@@ -930,14 +930,14 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
 
     proc_deregister_futex(proc, u_futex);
 
-    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
@@ -945,19 +945,19 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
 
     // Get the wait queue.
     basic_wait_queue_t *wq = proc_get_futex_wq(proc, u_futex);
-    DUAL_RET_COND(!wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
+    DUAL_RET_COND(!wq, thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
 
     // Read the futexes actual value.
     futex_t act_val;
     err = mem_cpy_from_user(&act_val, proc->pd, u_futex, sizeof(futex_t), NULL);
 
     // If a futex is in a futex map, it must be accessible, otherwise a fatal error.
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
     // Immediate return if values don't match!
-    DUAL_RET_COND(act_val != exp_val, thr, FOS_SUCCESS, FOS_SUCCESS);
+    DUAL_RET_COND(act_val != exp_val, thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 
     // Ok, here the actual and expected value match. 
     // We can add our thread to the wait queue!
@@ -971,14 +971,14 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     // No context info needed for waiting on a futex.
     thr->state = THREAD_STATE_WAITING;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
-        return FOS_STATE_MISMATCH;
+        return FOS_E_STATE_MISMATCH;
     }
 
     thread_t *thr = ks->curr_thread;
@@ -986,12 +986,12 @@ fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
 
     // Get the wait queue.
     basic_wait_queue_t *wq = proc_get_futex_wq(proc, u_futex);
-    DUAL_RET_COND(!wq, thr, FOS_INVALID_INDEX, FOS_SUCCESS);
+    DUAL_RET_COND(!wq, thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
 
     bwq_notify_mode_t mode = all ? BWQ_NOTIFY_ALL : BWQ_NOTIFY_NEXT;
 
     err = bwq_notify(wq, mode);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err; // fatal kernel error.
     }
 
@@ -999,18 +999,18 @@ fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
     // this loop should only iterate at most once.
 
     thread_t *woken_thread;
-    while ((err = bwq_pop(wq, (void **)&woken_thread)) == FOS_SUCCESS) {
+    while ((err = bwq_pop(wq, (void **)&woken_thread)) == FOS_E_SUCCESS) {
         woken_thread->wq = NULL;
-        woken_thread->ctx.eax = FOS_SUCCESS;
+        woken_thread->ctx.eax = FOS_E_SUCCESS;
         woken_thread->state = THREAD_STATE_DETATCHED;
 
         ks_schedule_thread(ks, woken_thread);
     }
 
-    if (err != FOS_EMPTY) {
+    if (err != FOS_E_EMPTY) {
         return err;
     }
 
-    DUAL_RET(thr, FOS_SUCCESS, FOS_SUCCESS);
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 

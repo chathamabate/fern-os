@@ -63,12 +63,12 @@ static fernos_error_t mbd_read(block_device_t *bd, size_t sector_ind, size_t num
     mem_block_device_t *mbd = (mem_block_device_t *)bd;
 
     if (!dest) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (sector_ind >= mbd->num_sectors || sector_ind + num_sectors > mbd->num_sectors 
             || sector_ind + num_sectors < sector_ind) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     if (num_sectors > 0) {
@@ -78,19 +78,19 @@ static fernos_error_t mbd_read(block_device_t *bd, size_t sector_ind, size_t num
 
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t mbd_write(block_device_t *bd, size_t sector_ind, size_t num_sectors, const void *src) {
     mem_block_device_t *mbd = (mem_block_device_t *)bd;
 
     if (!src) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (sector_ind >= mbd->num_sectors || sector_ind + num_sectors > mbd->num_sectors || 
             sector_ind + num_sectors < sector_ind) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     if (num_sectors > 0) {
@@ -100,45 +100,45 @@ static fernos_error_t mbd_write(block_device_t *bd, size_t sector_ind, size_t nu
 
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t mbd_read_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, void *dest) {
     mem_block_device_t *mbd = (mem_block_device_t *)bd;
 
     if (!dest) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (sector_ind >= mbd->num_sectors || offset >= mbd->sector_size || offset + len > mbd->sector_size ||
             offset + len < offset) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     if (len > 0) {
         mem_cpy(dest, (uint8_t *)(mbd->mem) + (sector_ind * mbd->sector_size) + offset, len);
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t mbd_write_piece(block_device_t *bd, size_t sector_ind, size_t offset, size_t len, const void *src) {
     mem_block_device_t *mbd = (mem_block_device_t *)bd;
 
     if (!src) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (sector_ind >= mbd->num_sectors || offset >= mbd->sector_size || offset + len > mbd->sector_size ||
             offset + len < offset) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     if (len > 0) {
         mem_cpy((uint8_t *)(mbd->mem) + (sector_ind * mbd->sector_size) + offset, src, len);
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 
 }
 

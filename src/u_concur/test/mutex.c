@@ -26,7 +26,7 @@ static void *test_many_workers_worker(void *arg) {
 
     for (uint32_t i = 0; i < TEST_MANY_WORKERS_WORKER_ITERS; i++) {
         err = mut_lock(&mut); 
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         bool odd = (number & 1) == 1;
 
@@ -39,7 +39,7 @@ static void *test_many_workers_worker(void *arg) {
         }
 
         err = mut_unlock(&mut);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     return NULL;
@@ -51,17 +51,17 @@ static bool test_many_workers(void) {
     fernos_error_t err;
 
     err = init_mutex(&mut);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     const uint32_t workers = 10;
     for (uint32_t i = 0; i < workers; i++) {
         err = sc_thread_spawn(NULL, test_many_workers_worker, NULL);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     for (uint32_t i = 0; i < workers; i++) {
         err = sc_thread_join(full_join_vector(), NULL, NULL);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
     cleanup_mutex(&mut);
@@ -78,13 +78,13 @@ static bool test_bad_unlock(void) {
     fernos_error_t err;
 
     err = init_mutex(&mut);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = init_mutex(&mut);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     err = mut_unlock(&mut);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     cleanup_mutex(&mut);
 

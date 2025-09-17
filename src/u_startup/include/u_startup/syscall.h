@@ -35,7 +35,7 @@ int32_t trigger_syscall(uint32_t id, uint32_t arg0, uint32_t arg1, uint32_t arg2
  *
  * On error, an error is returned just in the calling process.
  *
- * On Success, FOS_SUCCESS is returned in BOTH processes.
+ * On Success, FOS_E_SUCCESS is returned in BOTH processes.
  * In the parent process the child's pid is written to *cpid.
  * In the child process FOS_MAX_PROCS is written to *cpid.
  *
@@ -69,10 +69,10 @@ void sc_proc_exit(proc_exit_status_t status);
  * child process!
  * 
  * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
- * process, FOS_STATE_MISMATCH is returned to the user.
+ * process, FOS_E_STATE_MISMATCH is returned to the user.
  *
  * When attempting to reap any zombie process, if there are no zombie children to reap,
- * FOS_EMPTY is returned to the user.
+ * FOS_E_EMPTY is returned to the user.
  *
  * When a process is "reaped", its exit status is retrieved, and its resources are freed!
  * All previously opened file handles are closed!
@@ -114,7 +114,7 @@ sig_vector_t sc_signal_allow(sig_vector_t sv);
  * If an apt signal is pending, this call will not sleep the current thread and instead
  * return immediately.
  *
- * On success, FOS_SUCCESS is returned. If `sid` is given, the recieved signal is written to
+ * On success, FOS_E_SUCCESS is returned. If `sid` is given, the recieved signal is written to
  * `*sid`. The pending bit of the received signal is cleared.
  *
  * An error is returned if sv is 0. (Or something goes wrong inside the kernel)
@@ -157,7 +157,7 @@ void sc_thread_sleep(uint32_t ticks);
 /**
  * Spawn a thread with the given entry point and argument!
  *
- * Returns FOS_SUCCESS on success.
+ * Returns FOS_E_SUCCESS on success.
  *
  * Returns an error otherwise. (The thread is not spawned in this case)
  *
@@ -202,7 +202,7 @@ fernos_error_t sc_futex_register(futex_t *futex);
  *
  * If the given futex exists, it's wait queue will be deleted.
  *
- * All threads waiting on the futex will wake up with FOS_STATE_MISMATCH returned.
+ * All threads waiting on the futex will wake up with FOS_E_STATE_MISMATCH returned.
  */
 void sc_futex_deregister(futex_t *futex);
 
@@ -210,12 +210,12 @@ void sc_futex_deregister(futex_t *futex);
  * This function will check if the futex's value = exp_val from within the kernel.
  *
  * If the values match as expected, the calling thread will be put to sleep.
- * If the values don't match, this call will return immediately with FOS_SUCCESS.
+ * If the values don't match, this call will return immediately with FOS_E_SUCCESS.
  *
  * When a thread is put to sleep it can only be rescheduled by an `sc_futex_wake` call.
- * This will also return FOS_SUCCESS.
+ * This will also return FOS_E_SUCCESS.
  *
- * This call returns FOS_STATE_MISMATCH if the futex is deregistered mid wait!
+ * This call returns FOS_E_STATE_MISMATCH if the futex is deregistered mid wait!
  *
  * This call return other errors if something goes wrong or if the given futex doesn't exist!
  */
@@ -256,7 +256,7 @@ void sc_handle_close(handle_t h);
 /**
  * Write data to a handle, `written` is optional.
  *
- * On success, FOS_SUCCESS is returned, meaning some or all of the given data was written.
+ * On success, FOS_E_SUCCESS is returned, meaning some or all of the given data was written.
  * The exact amount written will be stored in `*written`.
  */
 fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *written);
@@ -264,8 +264,8 @@ fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *
 /**
  * Read data from a handle. `readden` is optional.
  *
- * Returns FOS_EMPTY if there is no data to read.
- * Returns FOS_SUCCESS if some or all of the requested data is read. The exact amount is 
+ * Returns FOS_E_EMPTY if there is no data to read.
+ * Returns FOS_E_SUCCESS if some or all of the requested data is read. The exact amount is 
  * written to `*readden`.
  *
  * (Other errors may be returned)
@@ -275,8 +275,8 @@ fernos_error_t sc_handle_read(handle_t h, void *dest, size_t len, size_t *readde
 /**
  * Block until there is data to read from `h`.
  *
- * Returns FOS_SUCCESS when there is data to read!
- * Returns FOS_EMPTY when there will never be any more data to read from `h`.
+ * Returns FOS_E_SUCCESS when there is data to read!
+ * Returns FOS_E_EMPTY when there will never be any more data to read from `h`.
  *
  * (Other errors may be returned)
  */
@@ -303,7 +303,7 @@ fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len);
  * this function will call `sc_read` in a loop until all bytes are written!
  * (Or an error is encountered)
  *
- * NOTE: like `sc_handle_read`, this will return FOS_EMPTY if there is no more data to
+ * NOTE: like `sc_handle_read`, this will return FOS_E_EMPTY if there is no more data to
  * read.
  */
 fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len);

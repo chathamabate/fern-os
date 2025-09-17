@@ -71,11 +71,11 @@ static fernos_error_t _init_free_list(void) {
     CHECK_ALIGN(INITIAL_FREE_AREA_END, M_4K);
 
     if (INITIAL_FREE_AREA_START == INITIAL_FREE_AREA_END) {
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
     if (INITIAL_FREE_AREA_END < INITIAL_FREE_AREA_START) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     for (phys_addr_t iter = INITIAL_FREE_AREA_START; iter < INITIAL_FREE_AREA_END; iter += M_4K) {
@@ -88,7 +88,7 @@ static fernos_error_t _init_free_list(void) {
     free_list_head = INITIAL_FREE_AREA_START;
     free_list_len = (INITIAL_FREE_AREA_END - INITIAL_FREE_AREA_START) / M_4K;
     
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -121,7 +121,7 @@ static phys_addr_t _pop_free_page(void) {
  */
 static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e, uint8_t flags) {
     if ((flags & _R_IDENTITY) && (flags & _R_ALLOCATE)) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     CHECK_ALIGN(pd, M_4K);
@@ -129,11 +129,11 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
     CHECK_ALIGN(e, M_4K);
 
     if (s == e) {
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
     if (e < s) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     const bool writeable = (flags & _R_WRITEABLE) == _R_WRITEABLE;
@@ -155,7 +155,7 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
             if (!pte_get_present(*pde)) {
                 phys_addr_t new_page = _pop_free_page();
                 if (new_page == NULL_PHYS_ADDR) {
-                    return FOS_NO_MEM;
+                    return FOS_E_NO_MEM;
                 }
 
                 pt_entry_t *new_pt = (pt_entry_t *)new_page;
@@ -173,7 +173,7 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
         uint32_t pti = pi % 1024;
 
         if (pte_get_present(pt[pti])) {
-            return FOS_ALREADY_ALLOCATED;
+            return FOS_E_ALREADY_ALLOCATED;
         }
 
         // This is a little confusing, the point is that, the data a bss sections will start
@@ -190,7 +190,7 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
             // If allocate is marked, we map the virtual address i to a different page.
             page_addr = _pop_free_page();
             if (page_addr == NULL_PHYS_ADDR) {
-                return FOS_NO_MEM;
+                return FOS_E_NO_MEM;
             }
         }
 
@@ -199,7 +199,7 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
             : fos_unique_pt_entry(page_addr, user, writeable);
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -211,7 +211,7 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
 static fernos_error_t _init_kernel_pd(void) {
     phys_addr_t kpd = _pop_free_page();
     if (kpd == NULL_PHYS_ADDR) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     // First, 0 out the whole area.
@@ -246,7 +246,7 @@ static fernos_error_t _init_kernel_pd(void) {
     // Let's get the page table which references fkp.
     pt_entry_t *pte = &(pd[fkp_pdi]);
     if (!pte_get_present(*pte)) {
-        return FOS_UNKNWON_ERROR;
+        return FOS_E_UNKNWON_ERROR;
     }
 
     // Ok, this page table will contain the entry for the free kernel pages!
@@ -262,7 +262,7 @@ static fernos_error_t _init_kernel_pd(void) {
     
     pte = &(pd[fkp_pt_alias_pdi]);
     if (!pte_get_present(*pte)) {
-        return FOS_UNKNWON_ERROR;
+        return FOS_E_UNKNWON_ERROR;
     }
 
     pt_entry_t *fkp_pt_alias_pt = (pt_entry_t *)pte_get_base(*pte);
@@ -284,7 +284,7 @@ static fernos_error_t _init_kernel_pd(void) {
     uint32_t *kpd_entry = (uint32_t *)FOS_KERNEL_STACK_END - 1;
     *kpd_entry = kernel_pd;
     
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -315,7 +315,7 @@ static fernos_error_t _copy_range(pt_entry_t *dest_pd, const pt_entry_t *src_pd,
         mem_cpy(dest_page, src_page, M_4K);
     }
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /**
@@ -324,7 +324,7 @@ static fernos_error_t _copy_range(pt_entry_t *dest_pd, const pt_entry_t *src_pd,
 static fernos_error_t _init_first_user_pd(void) {
     phys_addr_t upd = _pop_free_page();
     if (upd == NULL_PHYS_ADDR) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     pt_entry_t *kpd = (pt_entry_t *)kernel_pd;
@@ -372,13 +372,13 @@ static fernos_error_t _init_first_user_pd(void) {
 
     first_user_pd = upd;
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t init_paging(void) {
     // The functions in this C file require at least 2 kernel free pages.
     if (NUM_FREE_KERNEL_PAGES < 2) {
-        return FOS_NO_MEM;
+        return FOS_E_NO_MEM;
     }
 
     PROP_ERR(_init_free_list());
@@ -388,7 +388,7 @@ fernos_error_t init_paging(void) {
     set_page_directory(kernel_pd);
     enable_paging();
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 /* NOW PAGING HAS BEEN ENABLED */
@@ -482,19 +482,19 @@ fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e,
     CHECK_ALIGN(pt, M_4K);
 
     if (!true_e) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (s > 1023 || e > 1024 || e < s) {
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
     if (s == e) {
         *true_e = e;
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
-    fernos_error_t err = FOS_SUCCESS;
+    fernos_error_t err = FOS_E_SUCCESS;
     uint32_t i;
 
     phys_addr_t old = assign_free_page(0, pt);
@@ -505,13 +505,13 @@ fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e,
         pt_entry_t *pte = &(ptes[i]);
 
         if (pte_get_present(*pte)) {
-            err = FOS_ALREADY_ALLOCATED;
+            err = FOS_E_ALREADY_ALLOCATED;
             break;
         }
 
         phys_addr_t new_page = pop_free_page();
         if (new_page == NULL_PHYS_ADDR) {
-            err = FOS_NO_MEM;
+            err = FOS_E_NO_MEM;
             break;
         }
 
@@ -566,20 +566,20 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e,
     CHECK_ALIGN(e, M_4K);
 
     if (!true_e) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     if (s == e) {
         *true_e = e;
-        return FOS_SUCCESS;
+        return FOS_E_SUCCESS;
     }
 
     if ((uint32_t)e < (uint32_t)s) {
         *true_e = NULL;
-        return FOS_INVALID_RANGE;
+        return FOS_E_INVALID_RANGE;
     }
 
-    fernos_error_t err = FOS_SUCCESS;
+    fernos_error_t err = FOS_E_SUCCESS;
 
     uint32_t pi_s = (uint32_t)s / M_4K;
     uint32_t pi_e = (uint32_t)e / M_4K;
@@ -589,7 +589,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e,
 
     pt_entry_t *pdes = (pt_entry_t *)(free_kernel_pages[0]);
 
-    while (err == FOS_SUCCESS && pi < pi_e) {
+    while (err == FOS_E_SUCCESS && pi < pi_e) {
         uint32_t nb = ALIGN(pi + 1024, 1024);
         if (nb > pi_e) {
             nb = pi_e;
@@ -601,7 +601,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e,
         if (!pte_get_present(*pde)) {
             phys_addr_t new_pt = new_page_table();
             if (new_pt == NULL_PHYS_ADDR) {
-                err = FOS_NO_MEM;
+                err = FOS_E_NO_MEM;
                 break;
             }
 

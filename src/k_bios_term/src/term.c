@@ -1,7 +1,7 @@
 
 #include "k_bios_term/term.h"
 #include "k_sys/io.h"
-#include "s_util/ansii.h"
+#include "s_util/ansi.h"
 #include "s_util/err.h"
 #include "s_util/str.h"
 
@@ -47,7 +47,7 @@ fernos_error_t init_term(void) {
 
     term_clear();
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 static void term_flip_cursor_color(void) {
@@ -258,13 +258,13 @@ void term_put_fmt_s(const char *fmt, ...) {
 }
 
 
-#define _ESP_ID_FMT ANSII_GREEN_FG "%%esp" ANSII_RESET
-#define _ESP_INDEX_FMT ANSII_CYAN_FG "%2X" ANSII_RESET "(" _ESP_ID_FMT ")"
+#define _ESP_ID_FMT ANSI_GREEN_FG "%%esp" ANSI_RESET
+#define _ESP_INDEX_FMT ANSI_CYAN_FG "%2X" ANSI_RESET "(" _ESP_ID_FMT ")"
 
-#define _EVEN_ROW_FMT _ESP_INDEX_FMT " = " ANSII_LIGHT_GREY_FG "%08X" ANSII_RESET "\n"
-#define _ODD_ROW_FMT _ESP_INDEX_FMT " = " ANSII_BRIGHT_LIGHT_GREY_FG "%08X" ANSII_RESET "\n"
+#define _EVEN_ROW_FMT _ESP_INDEX_FMT " = " ANSI_LIGHT_GREY_FG "%08X" ANSI_RESET "\n"
+#define _ODD_ROW_FMT _ESP_INDEX_FMT " = " ANSI_BRIGHT_LIGHT_GREY_FG "%08X" ANSI_RESET "\n"
 
-#define _ESP_VAL_ROW_FMT "   " _ESP_ID_FMT "  = " ANSII_BRIGHT_LIGHT_GREY_FG "%08X" ANSII_RESET "\n"
+#define _ESP_VAL_ROW_FMT "   " _ESP_ID_FMT "  = " ANSI_BRIGHT_LIGHT_GREY_FG "%08X" ANSI_RESET "\n"
 
 void term_put_trace(uint32_t slots, uint32_t *esp) {
     char buf[100];

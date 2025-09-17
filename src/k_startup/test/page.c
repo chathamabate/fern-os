@@ -181,7 +181,7 @@ static bool test_pt_alloc(void) {
     // Should start as all free.
     check_pt_range(vpt, 0, 1024, false, false);
 
-    TEST_EQUAL_HEX(FOS_SUCCESS, pt_alloc_range(pt, true, 0, 100, &true_e));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, pt_alloc_range(pt, true, 0, 100, &true_e));
     TEST_EQUAL_UINT(100, true_e);
     check_pt_range(vpt, 0, 100, true, true);
 
@@ -191,15 +191,15 @@ static bool test_pt_alloc(void) {
     check_pt_range(vpt, 20, 100, true, true);
 
     // Overlapping alloc.
-    TEST_EQUAL_HEX(FOS_ALREADY_ALLOCATED, pt_alloc_range(pt, false, 15, 25, &true_e));
+    TEST_EQUAL_HEX(FOS_E_ALREADY_ALLOCATED, pt_alloc_range(pt, false, 15, 25, &true_e));
     TEST_EQUAL_UINT(20, true_e);
     check_pt_range(vpt, 15, 20, true, false);
     check_pt_range(vpt, 20, 100, true, true);
 
     // Test some bad ranges.
-    TEST_TRUE(FOS_SUCCESS != pt_alloc_range(pt, false, 200, 1025, &true_e));
-    TEST_TRUE(FOS_SUCCESS != pt_alloc_range(pt, false, 1024, 1024, &true_e));
-    TEST_TRUE(FOS_SUCCESS != pt_alloc_range(pt, false, 1020, 1000, &true_e));
+    TEST_TRUE(FOS_E_SUCCESS != pt_alloc_range(pt, false, 200, 1025, &true_e));
+    TEST_TRUE(FOS_E_SUCCESS != pt_alloc_range(pt, false, 1024, 1024, &true_e));
+    TEST_TRUE(FOS_E_SUCCESS != pt_alloc_range(pt, false, 1020, 1000, &true_e));
 
     assign_free_page(0, old);
 
@@ -241,7 +241,7 @@ static bool test_pd_alloc(void) {
 
         const void *true_e;
         fernos_error_t err = pd_alloc_pages(pd, false, c.s, c.e, &true_e);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         // Always assume a full allocation.
         TEST_EQUAL_HEX(c.e, true_e);
@@ -277,22 +277,22 @@ static bool test_pd_overlapping_alloc(void) {
     const void *true_e;
 
     err = pd_alloc_pages(pd, false, S + (2*M_4K), S + (8*M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_HEX(S + (8*M_4K), true_e);
 
     pd_free_pages(pd, S, S + (6*M_4K));
 
     err = pd_alloc_pages(pd, false, S, S + (3*M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_HEX(S + (3*M_4K), true_e);
 
     // 3, 4, and 5 should all be free.
     err = pd_alloc_pages(pd, false, S + (3*M_4K), S + (7*M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_ALREADY_ALLOCATED, err);
+    TEST_EQUAL_HEX(FOS_E_ALREADY_ALLOCATED, err);
     TEST_EQUAL_HEX(S + (6*M_4K), true_e);
 
     err = pd_alloc_pages(pd, false, S + (3*M_4K), S + (7*M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_ALREADY_ALLOCATED, err);
+    TEST_EQUAL_HEX(FOS_E_ALREADY_ALLOCATED, err);
     TEST_EQUAL_HEX(S + (3*M_4K), true_e);
 
     pd_free_pages(pd, S, S + (8*M_4K));
@@ -312,7 +312,7 @@ static bool test_pd_free(void) {
     /* This test isn't really that rigorous tbh */
 
     err = pd_alloc_pages(pd, false, S, S + (5 * M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     num_fps = get_num_free_pages();
 
@@ -322,7 +322,7 @@ static bool test_pd_free(void) {
     /* Test a larger and weirder range */
 
     err = pd_alloc_pages(pd, false, S + (7 * M_4K), S + (3012 * M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     num_fps = get_num_free_pages();
 
@@ -346,7 +346,7 @@ static bool test_pd_free_dangerous(void) {
     const void *true_e;
 
     err = pd_alloc_pages(pd, false, S, S + (4 * M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     *(uint32_t *)S = 1234;
     LOGF_PREFIXED("We have written to S\n");
@@ -368,10 +368,10 @@ static bool test_delete_page_directory(void) {
     const void *true_e;
 
     err = pd_alloc_pages(pd, false, (void *)M_4K, (void *)M_4M, &true_e); 
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = pd_alloc_pages(pd, false, (void *)(4 * M_4M), (void *)(6*M_4M + 12*M_4K), &true_e); 
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     delete_page_directory(pd);
 

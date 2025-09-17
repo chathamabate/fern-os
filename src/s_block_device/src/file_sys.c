@@ -1,7 +1,7 @@
 
 #include "s_block_device/file_sys.h"
 #include "s_util/str.h"
-#include "s_util/ansii.h"
+#include "s_util/ansi.h"
 
 static bool fn_char_map_ready = false;
 static bool fn_char_map[256];
@@ -137,7 +137,7 @@ size_t next_filename(const char *path, char *dest) {
 
 fernos_error_t separate_path(const char *path, char *dir, char *basename) {
     if (!path || !dir || !basename) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
 
     size_t path_len; // length of the path.
@@ -154,11 +154,11 @@ fernos_error_t separate_path(const char *path, char *dir, char *basename) {
     const size_t basename_start = last_slash == FS_MAX_PATH_LEN ? 0 : last_slash + 1;
 
     if (basename_start == path_len) {
-        return FOS_BAD_ARGS; // path ends in a slash :(
+        return FOS_E_BAD_ARGS; // path ends in a slash :(
     }
 
     if (str_eq(".", path + basename_start) || str_eq("..", path + basename_start)) {
-        return FOS_BAD_ARGS; // ends with "." or ".." :,(
+        return FOS_E_BAD_ARGS; // ends with "." or ".." :,(
     }
 
     if (basename_start == 0) {
@@ -170,27 +170,27 @@ fernos_error_t separate_path(const char *path, char *dir, char *basename) {
 
     str_cpy(basename, path + basename_start);
 
-    return FOS_SUCCESS;
+    return FOS_E_SUCCESS;
 }
 
 fernos_error_t fs_touch_path(file_sys_t *fs, fs_node_key_t cwd, const char *path, fs_node_key_t *key) {
     fernos_error_t err;
 
     if (!path || !is_valid_path(path)) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
     
     char dir[FS_MAX_PATH_LEN + 1];
     char basename[FS_MAX_FILENAME_LEN + 1];
 
     err = separate_path(path, dir, basename);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
     fs_node_key_t parent_key;
     err = fs_new_key(fs, cwd, dir, &parent_key);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -205,20 +205,20 @@ fernos_error_t fs_mkdir_path(file_sys_t *fs, fs_node_key_t cwd, const char *path
     fernos_error_t err;
 
     if (!path || !is_valid_path(path)) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
     
     char dir[FS_MAX_PATH_LEN + 1];
     char basename[FS_MAX_FILENAME_LEN + 1];
 
     err = separate_path(path, dir, basename);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
     fs_node_key_t parent_key;
     err = fs_new_key(fs, cwd, dir, &parent_key);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -233,20 +233,20 @@ fernos_error_t fs_remove_path(file_sys_t *fs, fs_node_key_t cwd, const char *pat
     fernos_error_t err;
 
     if (!path || !is_valid_path(path)) {
-        return FOS_BAD_ARGS;
+        return FOS_E_BAD_ARGS;
     }
     
     char dir[FS_MAX_PATH_LEN + 1];
     char basename[FS_MAX_FILENAME_LEN + 1];
 
     err = separate_path(path, dir, basename);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
     fs_node_key_t parent_key;
     err = fs_new_key(fs, cwd, dir, &parent_key);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return err;
     }
 
@@ -276,22 +276,22 @@ static fernos_error_t fs_dump_tree_helper(file_sys_t *fs, void (*pf)(const char 
         // This is really here in the case where the first node will call this funciton on is
         // not a directory. The recursive case below makes sure only to recur when working with 
         // a subdirectory.
-        if (err == FOS_STATE_MISMATCH) {
-            return FOS_SUCCESS;
+        if (err == FOS_E_STATE_MISMATCH) {
+            return FOS_E_SUCCESS;
         }
 
-        if (err != FOS_SUCCESS) {
+        if (err != FOS_E_SUCCESS) {
             return err;
         }
 
         for (size_t i = 0; i < num_names_bufs; i++) {
             if (names_bufs[i][0] == '\0') {
-                return FOS_SUCCESS; // We have process all names!
+                return FOS_E_SUCCESS; // We have process all names!
             }
 
             fs_node_key_t child_node_key;
             err = fs_new_key(fs, nk, names_bufs[i], &child_node_key);
-            if (err != FOS_SUCCESS) {
+            if (err != FOS_E_SUCCESS) {
                 return err;
             }
 
@@ -305,16 +305,16 @@ static fernos_error_t fs_dump_tree_helper(file_sys_t *fs, void (*pf)(const char 
                     pf(".");
                     break;
                 case 1:
-                    pf(ANSII_GREEN_FG "." ANSII_RESET);
+                    pf(ANSI_GREEN_FG "." ANSI_RESET);
                     break;
                 }
             }
 
             if (info.is_dir) {
-                pf(ANSII_BRIGHT_BLUE_FG "%s\n" ANSII_RESET, names_bufs[i]);
+                pf(ANSI_BRIGHT_BLUE_FG "%s\n" ANSI_RESET, names_bufs[i]);
 
                 err = fs_dump_tree_helper(fs, pf, child_node_key, depth + 1);
-                if (err != FOS_SUCCESS) {
+                if (err != FOS_E_SUCCESS) {
                     return err;
                 }
             } else {
@@ -334,7 +334,7 @@ void fs_dump_tree(file_sys_t *fs, void (*pf)(const char *, ...), fs_node_key_t c
     fs_node_key_t key;
 
     err = fs_new_key(fs, cwd, path, &key);
-    if (err != FOS_SUCCESS) {
+    if (err != FOS_E_SUCCESS) {
         return;
     }
     

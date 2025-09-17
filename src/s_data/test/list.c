@@ -63,7 +63,7 @@ static bool test_push(void) {
     TEST_EQUAL_HEX(NULL, l_get_ptr(l, 10));
 
     num = 6;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, 0, &num));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push(l, 0, &num));
     TEST_EQUAL_HEX(1, l_get_len(l));
 
     ptr = (int *)l_get_ptr(l, 0);
@@ -73,7 +73,7 @@ static bool test_push(void) {
     TEST_EQUAL_HEX(NULL, l_get_ptr(l, 1));
 
     num = 8;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, 0, &num));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push(l, 0, &num));
 
     ptr = (int *)l_get_ptr(l, 0);
     TEST_TRUE(ptr != NULL);
@@ -84,10 +84,10 @@ static bool test_push(void) {
     TEST_EQUAL_INT(6, *ptr);
 
     num = 10;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, 1, &num));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push(l, 1, &num));
 
     num = 12;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, 3, &num));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push(l, 3, &num));
 
     ptr = (int *)l_get_ptr(l, 1);
     TEST_TRUE(ptr != NULL);
@@ -111,7 +111,7 @@ static bool test_pop(void) {
 
     // push 0-9
     for (uint8_t i = 0; i < 10; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, i, &i));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push(l, i, &i));
     }
 
     TEST_EQUAL_HEX(10, l_get_len(l));
@@ -121,18 +121,18 @@ static bool test_pop(void) {
     // pop 1-3
     for (uint8_t i = 1; i < 4; i++) {
         
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, 1, &val));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_pop(l, 1, &val));
         TEST_EQUAL_UINT(i, val);
     }
 
     TEST_EQUAL_HEX(7, l_get_len(l));
 
     // pop 9
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, l_get_len(l) - 1, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_pop(l, l_get_len(l) - 1, &val));
     TEST_EQUAL_UINT(9, val);
 
     // pop 0
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, 0, &val)); 
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_pop(l, 0, &val)); 
     TEST_EQUAL_UINT(0, val);
 
     TEST_EQUAL_HEX(5, l_get_len(l));
@@ -157,7 +157,7 @@ static bool test_clear(void) {
     TEST_TRUE(l != NULL);
 
     for (int i = 0; i < 10; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &i));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back(l, &i));
     }
 
     TEST_EQUAL_UINT(10, l_get_len(l));
@@ -167,7 +167,7 @@ static bool test_clear(void) {
     TEST_EQUAL_UINT(0, l_get_len(l));
 
     for (int i = 20; i < 25; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &i));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back(l, &i));
     }
 
     TEST_EQUAL_UINT(5, l_get_len(l));
@@ -189,7 +189,7 @@ static bool test_big(void) {
 
     // 0 => 999
     for (int i = 999; i >= 0; i--) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, 0, &i));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push(l, 0, &i));
     }
 
     // Double every other element.
@@ -203,13 +203,13 @@ static bool test_big(void) {
     // Remove even indexed elements, leaving just the doubled elements.
     for (int i = 999; i >= 0; i -= 2) {
         int val;
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, (size_t)i, &val));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_pop(l, (size_t)i, &val));
         TEST_EQUAL_INT(i, val);
     }
 
     for (int i = 0; i < 1000; i += 2) {
         int val;
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_pop(l, 0, &val));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_pop(l, 0, &val));
         TEST_EQUAL_INT(i * 2, val);
     }
 
@@ -227,7 +227,7 @@ static bool test_basic_iter(void) {
 
     // 0 => 9
     for (int i = 0; i < 10; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, (size_t)i, &i));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push(l, (size_t)i, &i));
     }
 
     int count = 0;
@@ -254,9 +254,9 @@ static bool test_mutate_iter(void) {
     int val;
 
     val = 1;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back(l, &val));
     val = 2;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back(l, &val));
 
     // 1 2
 
@@ -267,10 +267,10 @@ static bool test_mutate_iter(void) {
     TEST_EQUAL_INT(1, *(int *)l_get_iter(l));
 
     val = 4;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_after_iter(l, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_after_iter(l, &val));
 
     val = 6;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_after_iter(l, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_after_iter(l, &val));
 
     // [1] 6 4 2
     
@@ -282,7 +282,7 @@ static bool test_mutate_iter(void) {
 
     // 1 [6] 4 2
 
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop_iter(l, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_pop_iter(l, &val));
     TEST_EQUAL_INT(6, val);
 
     // 1 [4] 2
@@ -300,14 +300,14 @@ static bool test_mutate_iter(void) {
 
     TEST_EQUAL_INT(2, *ptr);
 
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_pop_iter(l, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_pop_iter(l, &val));
     TEST_EQUAL_INT(2, val);
 
     // 1 4
 
     TEST_TRUE(l_get_iter(l) == NULL);
 
-    TEST_TRUE(FOS_SUCCESS != l_push_after_iter(l, &val));
+    TEST_TRUE(FOS_E_SUCCESS != l_push_after_iter(l, &val));
 
     l_reset_iter(l);
 
@@ -316,7 +316,7 @@ static bool test_mutate_iter(void) {
     TEST_EQUAL_INT(1, *(int *)l_get_iter(l));
 
     val = 3;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_before_iter(l, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_before_iter(l, &val));
 
     // 3 [1] 4
 
@@ -327,13 +327,13 @@ static bool test_mutate_iter(void) {
     // 3 1 [4]
     
     val = 2;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_before_iter(l, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_before_iter(l, &val));
 
     // 3 1 2 [4]
     
     ptr = (int *)l_next_iter(l);
     TEST_EQUAL_HEX(NULL, ptr);
-    TEST_TRUE(FOS_SUCCESS != l_push_before_iter(l, &val));
+    TEST_TRUE(FOS_E_SUCCESS != l_push_before_iter(l, &val));
 
     l_reset_iter(l);
 
@@ -359,13 +359,13 @@ static bool test_bad_calls(void) {
     TEST_TRUE(l != NULL);
     
     int val = 10;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push(l, 0, &val));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push(l, 0, &val));
 
-    TEST_TRUE(FOS_SUCCESS != l_push(l, 10, &val));
-    TEST_TRUE(FOS_SUCCESS != l_push(l, 0, NULL));
+    TEST_TRUE(FOS_E_SUCCESS != l_push(l, 10, &val));
+    TEST_TRUE(FOS_E_SUCCESS != l_push(l, 0, NULL));
 
     l_reset_iter(l); 
-    TEST_TRUE(FOS_SUCCESS != l_push_after_iter(l, NULL));
+    TEST_TRUE(FOS_E_SUCCESS != l_push_after_iter(l, NULL));
 
     delete_list(l);
     TEST_SUCCEED();
@@ -380,17 +380,17 @@ static bool test_push_back_all(void) {
     TEST_TRUE(l != NULL);
 
     for (int i = 0; i < 5; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &i));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back(l, &i));
     }
 
     list_t *s = gen_list(sizeof(int));
     TEST_TRUE(s != NULL);
 
     for (int i = 5; i < 8; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(s, &i));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back(s, &i));
     }
 
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back_all(l, s));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back_all(l, s));
 
     TEST_EQUAL_UINT(8, l_get_len(l));
     TEST_EQUAL_UINT(0, l_get_len(s));
@@ -401,8 +401,8 @@ static bool test_push_back_all(void) {
         TEST_EQUAL_INT(i, *ptr);
     }
 
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back_all(s, l));
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back_all(s, l));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back_all(s, l));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back_all(s, l));
 
     TEST_EQUAL_UINT(8, l_get_len(s));
     TEST_EQUAL_UINT(0, l_get_len(l));
@@ -430,7 +430,7 @@ static bool test_pop_ele(void) {
     int *ptr;
 
     for (int i = 0; i < 4; i++) {
-        TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &i));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back(l, &i));
     }
 
     ele = 4;
@@ -452,7 +452,7 @@ static bool test_pop_ele(void) {
     TEST_TRUE(ptr && *ptr == 2);
 
     ele = 0;
-    TEST_EQUAL_HEX(FOS_SUCCESS, l_push_back(l, &ele));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, l_push_back(l, &ele));
 
     TEST_TRUE(l_pop_ele(l, &ele, int_cmp, true));
 

@@ -162,7 +162,7 @@ static bool test_simple_futex(void) {
 
     const void *true_e;
     err = pd_alloc_pages(pd, true, (void *)M_4K, (const void *)(M_4K + M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     futex_t *u_futex0 = (futex_t *)M_4K;
     futex_t *u_futex1 = (futex_t *)M_4K - 1;
@@ -171,18 +171,18 @@ static bool test_simple_futex(void) {
     TEST_TRUE(proc != NULL);
 
     err = proc_register_futex(proc, u_futex0);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = proc_register_futex(proc, u_futex1);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     err = proc_register_futex(proc, u_futex0);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     proc_deregister_futex(proc, u_futex0);
 
     err = proc_register_futex(proc, u_futex0);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     delete_process(proc);
 
@@ -200,7 +200,7 @@ static bool test_complex_process(void) {
 
     const void *true_e;
     err = pd_alloc_pages(pd, true, (void *)M_4K, (const void *)(M_4K + M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     futex_t *u_futex0 = (futex_t *)M_4K;
     futex_t *u_futex1 = (futex_t *)M_4K + 1;
@@ -220,10 +220,10 @@ static bool test_complex_process(void) {
     // Ok, now maybe make a new futex??
     
     err = proc_register_futex(proc, u_futex0);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = proc_register_futex(proc, u_futex1);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     basic_wait_queue_t *wq = proc_get_futex_wq(proc, u_futex1);
     TEST_TRUE(wq != NULL);

@@ -739,7 +739,7 @@ fernos_error_t fat32_sync_fats(fat32_device_t *dev);
  * Traverse a chain starting at `slot_ind`. Each slot in the chain will be written over
  * with value 0.
  *
- * If the chain is malformed, FOS_STATE_MISMATCH is returned.
+ * If the chain is malformed, FOS_E_STATE_MISMATCH is returned.
  * If there is an error with the block device, FOS_UNKNOWN_ERROR is returned.
  */
 fernos_error_t fat32_free_chain(fat32_device_t *dev, uint32_t slot_ind);
@@ -748,9 +748,9 @@ fernos_error_t fat32_free_chain(fat32_device_t *dev, uint32_t slot_ind);
  * Pop a free slot from the free queue and write it to *slot_ind.
  * (The free slot is given the temporary value of EOC before being returned)
  *
- * If a free slot cannot be found FOS_NO_SPACE is returned.
+ * If a free slot cannot be found FOS_E_NO_SPACE is returned.
  * If there is some other error, FOS_UNKNOWN_ERROR is returned.
- * Otherwise FOS_SUCCESS is returned.
+ * Otherwise FOS_E_SUCCESS is returned.
  *
  * It is gauranteed that the value written to `*slot_ind` on success has 0's in the top 4 bits.
  */
@@ -760,12 +760,12 @@ fernos_error_t fat32_pop_free_fat_slot(fat32_device_t *dev, uint32_t *slot_ind);
  * Attempt to create a new chain of length `len`.
  *
  * If we run out of disk space before claiming `len` clusters, the entire chain created thus far
- * is freed. FOS_NO_SPACE is returned.
+ * is freed. FOS_E_NO_SPACE is returned.
  *
  * If there is some unexpected error, a partial/malformed chain may be left over in the BD.
  * In this case, FOS_UNKNOWN_ERROR is returned.
  *
- * FOS_SUCCESS is ONLY returned when the ENTIRE chain is successfully allocated. When this 
+ * FOS_E_SUCCESS is ONLY returned when the ENTIRE chain is successfully allocated. When this 
  * happens, the starting slot index is written to *slot_ind.
  *
  * It is gauranteed that the value written to `*slot_ind` on success has 0's in the top 4 bits.
@@ -779,11 +779,11 @@ fernos_error_t fat32_new_chain(fat32_device_t *dev, uint32_t len, uint32_t *slot
  * If `new_len` > the length of the chain, clusters will be allocated.
  *
  * When extending a chain, if space runs out, all clusters which were newly allocated will be freed.
- * The given chain will remain at its original length. FOS_NO_SPACE will be returned.
+ * The given chain will remain at its original length. FOS_E_NO_SPACE will be returned.
  * If there is some funky error with the underlying block device, FOS_UNKNOWN_ERROR is returned.
- * If there is a malformed chain, FOS_STATE_MISMATCH is returned.
+ * If there is a malformed chain, FOS_E_STATE_MISMATCH is returned.
  *
- * FOS_SUCCESS is returned if and only if the given chain now has exact length `new_len`.
+ * FOS_E_SUCCESS is returned if and only if the given chain now has exact length `new_len`.
  * (A `new_len` value of 0, will free the entire chain)
  */
 fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32_t new_len);
@@ -791,12 +791,12 @@ fernos_error_t fat32_resize_chain(fat32_device_t *dev, uint32_t slot_ind, uint32
 /**
  * Use this function if you want the slot index of a cluster within a chain.
  *
- * `slot_offset` >= the length of the chain, FOS_INVALID_INDEX is returned.
+ * `slot_offset` >= the length of the chain, FOS_E_INVALID_INDEX is returned.
  * (Errors can also be returned if there are issues with the block device)
  *
- * If a bad cluster is reached, FOS_STATE_MISMATCH is returned.
+ * If a bad cluster is reached, FOS_E_STATE_MISMATCH is returned.
  *
- * Otherwise, FOS_SUCCESS is returned, and the requested slot index is written to *slot_stop_ind.
+ * Otherwise, FOS_E_SUCCESS is returned, and the requested slot index is written to *slot_stop_ind.
  *
  * It is gauranteed that the value written to `*slot_ind` on success has 0's in the top 4 bits.
  */
@@ -808,9 +808,9 @@ fernos_error_t fat32_traverse_chain(fat32_device_t *dev, uint32_t slot_ind,
  *
  * `buf` must have size at least `num_sectors` * sector size.
  *
- * If the sector offset is past the end of the chain, FOS_INVALID_INDEX will be returned.
- * If the chain is not large enough, FOS_INVALID_RANGE will be returned.
- * If the given chain is malformed or some way, or if a bad cluster is hit, FOS_STATE_MISMATCH
+ * If the sector offset is past the end of the chain, FOS_E_INVALID_INDEX will be returned.
+ * If the chain is not large enough, FOS_E_INVALID_RANGE will be returned.
+ * If the given chain is malformed or some way, or if a bad cluster is hit, FOS_E_STATE_MISMATCH
  * is returned.
  */
 fernos_error_t fat32_read_write(fat32_device_t *dev, uint32_t slot_ind, 
@@ -838,9 +838,9 @@ static inline fernos_error_t fat32_write(fat32_device_t *dev, uint32_t slot_ind,
  * `len` must be < sector size.
  * `buf` must have size at least `len`.
  *
- * If `sector_offset` is too large, FOS_INVALID_INDEX is returned.
- * If the byte range doesn't fit in one sector FOS_INVALID_RANGE is returned.
- * If the given slot_ind points to a bad cluster FOS_STATE_MISMATCH is returned.
+ * If `sector_offset` is too large, FOS_E_INVALID_INDEX is returned.
+ * If the byte range doesn't fit in one sector FOS_E_INVALID_RANGE is returned.
+ * If the given slot_ind points to a bad cluster FOS_E_STATE_MISMATCH is returned.
  */
 fernos_error_t fat32_read_write_piece(fat32_device_t *dev, uint32_t slot_ind,
         uint32_t sector_offset, uint32_t byte_offset, uint32_t len, void *buf, bool write);

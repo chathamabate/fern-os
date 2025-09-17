@@ -181,19 +181,19 @@ static bool test_id_table_request0(void) {
 
     for (id_t id = 0; id < TEST_ID_TABLE_REQ_MC; id += 2) {
         err = idtb_request_id(idtb, id);
-        TEST_EQUAL_HEX(FOS_SUCCESS, err);
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         
         idtb_set(idtb, id, (void *)id);
     }
 
     err = idtb_request_id(idtb, TEST_ID_TABLE_REQ_MC);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     err = idtb_request_id(idtb, TEST_ID_TABLE_REQ_MC + 10);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     err = idtb_request_id(idtb, 4);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     // Should be half of the ids left.
     for (uint32_t i = 0; i < TEST_ID_TABLE_REQ_MC / 2; i++) {
@@ -202,7 +202,7 @@ static bool test_id_table_request0(void) {
     }
 
     err = idtb_request_id(idtb, 3);
-    TEST_TRUE(err != FOS_SUCCESS);
+    TEST_TRUE(err != FOS_E_SUCCESS);
 
     for (id_t id = 0; id < TEST_ID_TABLE_REQ_MC; id += 2) {
         void *data = idtb_get(idtb, id);
@@ -227,7 +227,7 @@ static bool test_id_table_request1(void) {
 
     fernos_error_t err;
     err = idtb_request_id(idtb, TEST_ID_TABLE_REQ_MC - 1);
-    TEST_EQUAL_HEX(FOS_SUCCESS, err);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     idtb_reset_iterator(idtb);
     size_t iters = 0;
