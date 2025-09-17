@@ -152,31 +152,3 @@ qemu.bin: $(BIN_FILE) | $(TOY_DISK)
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -f $(OS_DEFS_LD)
-
-
-
-ERRS := UNKNWON_ERROR \
-ALIGN_ERROR \
-INVALID_RANGE \
-BAD_ARGS \
-NO_MEM \
-ALREADY_ALLOCATED \
-IDENTITY_OVERWRITE \
-INVALID_INDEX \
-EMPTY \
-STATE_MISMATCH \
-ABORT_SYSTEM \
-NOT_IMPLEMENTED \
-IN_USE \
-NO_SPACE \
-NOT_PERMITTED 
-q:
-	$(foreach err, $(ERRS), echo $(err);)
-
-ALL_FILES := $(shell find . -type f)
-p: 
-	$(foreach err,$(ERRS),sed -i "" -e "s/FOS_$(err)/FOS_E_$(err)/g" $(ALL_FILES);)
-
-
-
-
