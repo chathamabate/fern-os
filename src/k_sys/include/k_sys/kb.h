@@ -164,10 +164,37 @@ static inline void i8042_wait_for_empty_input_buffer(void) {
  * "Command parameters are written to port 0x60 after the command is sent. 
  * Results are returned on port 0x60. Always test the OBF ("Output Buffer Full") 
  * flag before writing commands or parameters to the 8042." - Adam Chapweske
+ *
+ * Unsure why above it says I need to check OBF before writing commands to the I8042.
+ * Maybe the I8042 only returns a value if the output register is empty?
+ *
+ * But anyway, writing to the Command register is kinda confusing as no ACK byte
+ * is ever received. So I guess just be careful? This should only be dealt with
+ * at init time, I doubt I will be sending I8042 commands during any other time.
  */
 
 #define I8042_CMD_READ_CMD_BYTE  (0x20)
 #define I8042_CMD_WRITE_CMD_BYTE (0x60)
+
+/**
+ * Test the I8042 is working correctly, should return 0x55.
+ */
+#define I8042_CMD_CONTROLLER_SELF_TEST (0xAA)
+
+/**
+ * Self test the keyboard interface, should return 0x00.
+ */
+#define I8042_CMD_KB_IF_SELF_TEST (0xAB)
+
+/**
+ * Disable keyboard interface.
+ */
+#define I8042_CMD_DISABLE_KB_IF (0xAD)
+
+/**
+ * Enable keyboard interface.
+ */
+#define I8042_CMD_ENABLE_KB_IF (0xAE)
 
 /**
  * When set, the controller will send IRQ1 when data is available in the input buffer.
@@ -180,9 +207,6 @@ static inline void i8042_wait_for_empty_input_buffer(void) {
  * Otherwise, they are not translated at all.
  */
 #define I8042_CMDBYTE_XLAT (1U << 6)
-
-#define I8042_CMD_DISABLE_KEYBOARD (0xAD)
-#define I8042_CMD_ENABLE_KEYBOARD  (0xAE)
 
 /**
  * If this call is successful, the keyboard should start sending 
