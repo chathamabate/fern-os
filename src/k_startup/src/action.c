@@ -24,6 +24,7 @@
 #include "k_startup/handle.h"
 #include "k_startup/plugin.h"
 
+#include "k_sys/kb.h"
 
 /**
  * This function is pretty special. It is for when the kernel has no threads to schedule.
@@ -269,6 +270,24 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     if (err != FOS_E_SUCCESS) {
         term_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
         ks_shutdown(kernel);
+    }
+
+    return_to_curr_thread();
+}
+
+void fos_irq1_action(user_ctx_t *ctx) {
+    ks_save_ctx(kernel, ctx);
+
+    // Kinda interesting point here, but during keyboard init
+    // the interrupt will be triggered due to the intial PS/2 commands
+    // we send through the I8042.
+
+    uint8_t sr = inb(I8042_R_STATUS_REG_PORT);
+    term_put_fmt_s("SR : 0x%X\n", sr);
+
+    if (sr & I8042_STATUS_REG_OBF) {
+        uint8_t recv_byte = inb(I8042_R_OUTPUT_PORT);
+        term_put_fmt_s("Byte Received: 0x%X\n", recv_byte);
     }
 
     return_to_curr_thread();

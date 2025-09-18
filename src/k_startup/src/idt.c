@@ -95,6 +95,15 @@ fernos_error_t init_idt(void) {
 
     idt[32] = timer_gd;
 
+    // For keyboard.
+    
+    intr_gate_desc_t irq1_gd = intr_gate_desc();
+    gd_set_selector(&irq1_gd, KERNEL_CODE_SELECTOR);
+    gd_set_privilege(&irq1_gd, ROOT_PRVLG);
+    igd_set_base(&irq1_gd, irq1_handler);
+
+    idt[33] = irq1_gd;
+
     // System call handler.
 
     intr_gate_desc_t syscall_gd = intr_gate_desc();

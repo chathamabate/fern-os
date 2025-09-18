@@ -162,6 +162,16 @@ void set_syscall_action(syscall_action_t sa);
  */
 void syscall_handler(void);
 
+/**
+ * Set what should happen on irq1.
+ */
+void set_irq1_action(intr_action_t ia);
+
+/**
+ * I8042 Interrupt (i.e. the keyboard)
+ */
+void irq1_handler(void);
+
 
 
 

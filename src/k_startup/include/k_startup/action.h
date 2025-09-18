@@ -36,3 +36,8 @@ void fos_timer_action(user_ctx_t *ctx);
  */
 void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t arg1, 
         uint32_t arg2, uint32_t arg3);
+
+/**
+ * IRQ1 interrupt action (This is usually for the keyboard/mouse)
+ */
+void fos_irq1_action(user_ctx_t *ctx);

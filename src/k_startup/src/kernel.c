@@ -22,6 +22,8 @@
 #include "k_startup/ata_block_device.h"
 #include "s_util/str.h"
 #include "s_data/id_table.h"
+#include "k_sys/io.h"
+#include "k_sys/kb.h"
 
 #include "s_block_device/cached_block_device.h"
 #include "s_data/test/list.h"
@@ -180,6 +182,7 @@ void start_kernel(void) {
     try_setup_step(init_term(), "Failed to initialize Terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
+    try_setup_step(init_kb(), "Failed to ini keyboard");
 
     init_kernel_state();
     init_kernel_plugins();
@@ -190,6 +193,9 @@ void start_kernel(void) {
 
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
+    set_irq1_action(fos_irq1_action);
+
+    // Enable Keyboard.
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }

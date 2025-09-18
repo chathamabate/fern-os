@@ -137,12 +137,12 @@ t: $(TOY_DISK)
 
 qemu.bin: $(BIN_FILE) | $(TOY_DISK)
 	qemu-system-x86_64 \
-		-display cocoa,zoom-to-fit=on,full-screen=on \
 		-m 4G \
 		-kernel $(BIN_FILE) \
 		-drive file=$(TOY_DISK),format=raw,index=0,media=disk \
+		-display cocoa,full-grab=on,zoom-to-fit=on \
 		-monitor stdio
-
+		
 # NOTE: When we start working with disk read/write... I'd really like to figure out ISO packaging!
 
 # Clean

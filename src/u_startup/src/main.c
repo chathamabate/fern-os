@@ -11,7 +11,10 @@
 #include "u_concur/test/mutex.h"
 
 proc_exit_status_t user_main(void) {
-    // Your code here!
+    while (1) {
+        sc_term_put_s("Hello from user\n");
+        sc_thread_sleep(18);
+    }
 
     return PROC_ES_SUCCESS;
 }

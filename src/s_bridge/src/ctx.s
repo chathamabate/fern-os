@@ -185,3 +185,12 @@ syscall_handler:
     pushl %ebp // ctx *
 
     call *syscall_action
+
+.global irq1_handler
+irq1_handler:
+    pushl $0 // Timer has no error.
+    call enter_intr_ctx
+    call pic_send_master_eoi
+
+    pushl %esp
+    call *irq1_action
