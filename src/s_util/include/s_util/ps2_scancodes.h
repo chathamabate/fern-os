@@ -4,103 +4,106 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/**
+ * Scancode Set 1 code!
+ *
+ * For normal scancodes, the top 8 bits will always be 0.
+ * For extended scancodes, the top 8 bits will be the extension prefix 0xE0.
+ */
+typedef uint16_t scs1_code_t;
+
 /*
  * PS/2 Keyboard Scancode Set 1
  *
  * ChatGPT gave me this, hope it's all correct.
  * Can't believe there was just an easy header file online for this, but whatever.
+ *
+ * The codes below are all the "Make" codes by the way.
  */
 
-#define SCS1_ESC          0x01
-#define SCS1_1            0x02
-#define SCS1_2            0x03
-#define SCS1_3            0x04
-#define SCS1_4            0x05
-#define SCS1_5            0x06
-#define SCS1_6            0x07
-#define SCS1_7            0x08
-#define SCS1_8            0x09
-#define SCS1_9            0x0A
-#define SCS1_0            0x0B
-#define SCS1_MINUS        0x0C  // -
-#define SCS1_EQUALS       0x0D  // =
-#define SCS1_BACKSPACE    0x0E
-#define SCS1_TAB          0x0F
-#define SCS1_Q            0x10
-#define SCS1_W            0x11
-#define SCS1_E            0x12
-#define SCS1_R            0x13
-#define SCS1_T            0x14
-#define SCS1_Y            0x15
-#define SCS1_U            0x16
-#define SCS1_I            0x17
-#define SCS1_O            0x18
-#define SCS1_P            0x19
-#define SCS1_LBRACKET     0x1A  // [
-#define SCS1_RBRACKET     0x1B  // ]
-#define SCS1_ENTER        0x1C
-#define SCS1_LCTRL        0x1D
-#define SCS1_A            0x1E
-#define SCS1_S            0x1F
-#define SCS1_D            0x20
-#define SCS1_F            0x21
-#define SCS1_G            0x22
-#define SCS1_H            0x23
-#define SCS1_J            0x24
-#define SCS1_K            0x25
-#define SCS1_L            0x26
-#define SCS1_SEMICOLON    0x27  // ;
-#define SCS1_APOSTROPHE   0x28  // '
-#define SCS1_GRAVE        0x29  // `
-#define SCS1_LSHIFT       0x2A
-#define SCS1_BACKSLASH    0x2B  // '\'
-#define SCS1_Z            0x2C
-#define SCS1_X            0x2D
-#define SCS1_C            0x2E
-#define SCS1_V            0x2F
-#define SCS1_B            0x30
-#define SCS1_N            0x31
-#define SCS1_M            0x32
-#define SCS1_COMMA        0x33  // ,
-#define SCS1_PERIOD       0x34  // .
-#define SCS1_SLASH        0x35  // /
-#define SCS1_RSHIFT       0x36
-#define SCS1_KP_ASTERISK  0x37  // Keypad *
-#define SCS1_LALT         0x38
-#define SCS1_SPACE        0x39
-#define SCS1_CAPSLOCK     0x3A
-#define SCS1_F1           0x3B
-#define SCS1_F2           0x3C
-#define SCS1_F3           0x3D
-#define SCS1_F4           0x3E
-#define SCS1_F5           0x3F
-#define SCS1_F6           0x40
-#define SCS1_F7           0x41
-#define SCS1_F8           0x42
-#define SCS1_F9           0x43
-#define SCS1_F10          0x44
-#define SCS1_NUMLOCK      0x45
-#define SCS1_SCROLLLOCK   0x46
-#define SCS1_KP_7         0x47
-#define SCS1_KP_8         0x48
-#define SCS1_KP_9         0x49
-#define SCS1_KP_MINUS     0x4A
-#define SCS1_KP_4         0x4B
-#define SCS1_KP_5         0x4C
-#define SCS1_KP_6         0x4D
-#define SCS1_KP_PLUS      0x4E
-#define SCS1_KP_1         0x4F
-#define SCS1_KP_2         0x50
-#define SCS1_KP_3         0x51
-#define SCS1_KP_0         0x52
-#define SCS1_KP_PERIOD    0x53
-
-/**
- * Is a non-extended scan code valid?
- */
-static inline bool scs1_is_valid(uint8_t sc) {
-    return SCS1_ESC <= sc && sc <= SCS1_KP_PERIOD;
-}
+#define SCS1_ESC          0x0001U
+#define SCS1_1            0x0002U
+#define SCS1_2            0x0003U
+#define SCS1_3            0x0004U
+#define SCS1_4            0x0005U
+#define SCS1_5            0x0006U
+#define SCS1_6            0x0007U
+#define SCS1_7            0x0008U
+#define SCS1_8            0x0009U
+#define SCS1_9            0x000AU
+#define SCS1_0            0x000BU
+#define SCS1_MINUS        0x000CU  // -
+#define SCS1_EQUALS       0x000DU  // =
+#define SCS1_BACKSPACE    0x000EU
+#define SCS1_TAB          0x000FU
+#define SCS1_Q            0x0010U
+#define SCS1_W            0x0011U
+#define SCS1_E            0x0012U
+#define SCS1_R            0x0013U
+#define SCS1_T            0x0014U
+#define SCS1_Y            0x0015U
+#define SCS1_U            0x0016U
+#define SCS1_I            0x0017U
+#define SCS1_O            0x0018U
+#define SCS1_P            0x0019U
+#define SCS1_LBRACKET     0x001AU  // [
+#define SCS1_RBRACKET     0x001BU  // ]
+#define SCS1_ENTER        0x001CU
+#define SCS1_LCTRL        0x001DU
+#define SCS1_A            0x001EU
+#define SCS1_S            0x001FU
+#define SCS1_D            0x0020U
+#define SCS1_F            0x0021U
+#define SCS1_G            0x0022U
+#define SCS1_H            0x0023U
+#define SCS1_J            0x0024U
+#define SCS1_K            0x0025U
+#define SCS1_L            0x0026U
+#define SCS1_SEMICOLON    0x0027U  // ;
+#define SCS1_APOSTROPHE   0x0028U  // '
+#define SCS1_GRAVE        0x0029U  // `
+#define SCS1_LSHIFT       0x002AU
+#define SCS1_BACKSLASH    0x002BU  // '\'
+#define SCS1_Z            0x002CU
+#define SCS1_X            0x002DU
+#define SCS1_C            0x002EU
+#define SCS1_V            0x002FU
+#define SCS1_B            0x0030U
+#define SCS1_N            0x0031U
+#define SCS1_M            0x0032U
+#define SCS1_COMMA        0x0033U  // ,
+#define SCS1_PERIOD       0x0034U  // .
+#define SCS1_SLASH        0x0035U  // /
+#define SCS1_RSHIFT       0x0036U
+#define SCS1_KP_ASTERISK  0x0037U  // Keypad *
+#define SCS1_LALT         0x0038U
+#define SCS1_SPACE        0x0039U
+#define SCS1_CAPSLOCK     0x003AU
+#define SCS1_F1           0x003BU
+#define SCS1_F2           0x003CU
+#define SCS1_F3           0x003DU
+#define SCS1_F4           0x003EU
+#define SCS1_F5           0x003FU
+#define SCS1_F6           0x0040U
+#define SCS1_F7           0x0041U
+#define SCS1_F8           0x0042U
+#define SCS1_F9           0x0043U
+#define SCS1_F10          0x0044U
+#define SCS1_NUMLOCK      0x0045U
+#define SCS1_SCROLLLOCK   0x0046U
+#define SCS1_KP_7         0x0047U
+#define SCS1_KP_8         0x0048U
+#define SCS1_KP_9         0x0049U
+#define SCS1_KP_MINUS     0x004AU
+#define SCS1_KP_4         0x004BU
+#define SCS1_KP_5         0x004CU
+#define SCS1_KP_6         0x004DU
+#define SCS1_KP_PLUS      0x004EU
+#define SCS1_KP_1         0x004FU
+#define SCS1_KP_2         0x0050U
+#define SCS1_KP_3         0x0051U
+#define SCS1_KP_0         0x0052U
+#define SCS1_KP_PERIOD    0x0053U
 
 /* 
  * Extended scan codes (0xE0 prefix)
@@ -109,46 +112,30 @@ static inline bool scs1_is_valid(uint8_t sc) {
 
 #define SCS1_EXTEND_PREFIX  0xE0
 
-#define SCS1_E_KP_ENTER     0x1C
-#define SCS1_E_RCTRL        0x1D
-#define SCS1_E_KP_SLASH     0x35
-#define SCS1_E_RALT         0x38
-#define SCS1_E_HOME         0x47
-#define SCS1_E_UP           0x48
-#define SCS1_E_PAGEUP       0x49
-#define SCS1_E_LEFT         0x4B
-#define SCS1_E_RIGHT        0x4D
-#define SCS1_E_END          0x4F
-#define SCS1_E_DOWN         0x50
-#define SCS1_E_PAGEDOWN     0x51
-#define SCS1_E_INSERT       0x52
-#define SCS1_E_DELETE       0x53
-#define SCS1_E_LGUI         0x5B // Windows key
-#define SCS1_E_RGUI         0x5C
-#define SCS1_E_APPS         0x5D
+#define SCS1_E_KP_ENTER     0xE01CU
+#define SCS1_E_RCTRL        0xE01DU
+#define SCS1_E_KP_SLASH     0xE035U
+#define SCS1_E_RALT         0xE038U
+#define SCS1_E_HOME         0xE047U
+#define SCS1_E_UP           0xE048U
+#define SCS1_E_PAGEUP       0xE049U
+#define SCS1_E_LEFT         0xE04BU
+#define SCS1_E_RIGHT        0xE04DU
+#define SCS1_E_END          0xE04FU
+#define SCS1_E_DOWN         0xE050U
+#define SCS1_E_PAGEDOWN     0xE051U
+#define SCS1_E_INSERT       0xE052U
+#define SCS1_E_DELETE       0xE053U
+#define SCS1_E_LGUI         0xE05BU
+#define SCS1_E_RGUI         0xE05CU
+#define SCS1_E_APPS         0xE05DU
 
 /**
- * Is an extended scan code valid?
- *
- * `sc` is the significant byte AFTER the 0xE0.
- * This assumes we already read 0xE0 and that we know we working with
- * an extended scancode!
+ * Is a scan code valid?
  */
-static inline bool scs1_is_ex_valid(uint8_t sc) {
-    return SCS1_E_KP_ENTER <= sc && sc <= SCS1_E_APPS;
+static inline bool scs1_is_valid(scs1_code_t sc) {
+    return (SCS1_ESC <= sc && sc <= SCS1_KP_PERIOD) || (SCS1_E_KP_ENTER <= sc && sc <= SCS1_E_APPS);
 }
-
-/*
- * A "Make" scan code is when a key is pressed.
- * It's Msb is always 0. 
- *
- * A "Break" scan code is when a key is released.
- * It's Msb is always 1.
- *
- * This does not affect the prefix of extended key codes!
- * The prefix is always 0xE0, The bit change applies to the scancode byte which
- * comes after the prefix.
- */
 
 /**
  * Use this map to get the lowercase ASCII equiv of a set 1 scancode.
@@ -159,6 +146,18 @@ static inline bool scs1_is_ex_valid(uint8_t sc) {
 extern const char SCS1_TO_ASCII_LC[256];
 
 /**
+ * Get the lowercase ascii equivelant of a scancode.
+ *
+ * If no such character exists, 0 is returned!
+ */
+static inline char scs1_to_ascii_lc(scs1_code_t sc) {
+    if ((sc & 0xFF00) == 0) {
+        return SCS1_TO_ASCII_LC[sc];
+    }
+    return 0;
+}
+
+/**
  * Use this map to get the uppercase ASCII equiv of a set 1 scancode.
  *
  * If a key has no ascii equivelant, 0 is mapped.
@@ -167,29 +166,52 @@ extern const char SCS1_TO_ASCII_LC[256];
 extern const char SCS1_TO_ASCII_UC[256];
 
 /**
- * Set a scan code as "Make".
+ * Get the uppercase ascii equivelant of a scancode.
+ *
+ * If no such character exists, 0 is returned!
  */
-static inline uint8_t scs1_as_make(uint8_t sc) {
+static inline char scs1_to_ascii_uc(scs1_code_t sc) {
+    if ((sc & 0xFF00) == 0) {
+        return SCS1_TO_ASCII_UC[sc];
+    }
+    return 0;
+}
+
+
+/*
+ * A "Make" scan code is when a key is pressed.
+ * Bit 7 always 0. 
+ *
+ * A "Break" scan code is when a key is released.
+ * Bit 7 always 1. 
+ */
+
+/**
+ * Get the uppercase ascii equivelant of a scancode.
+ *
+ * If no such character exists, 0 is returned!
+ */
+static inline scs1_code_t scs1_as_make(scs1_code_t sc) {
     return sc & ~(1U << 7);
 }
 
 /**
  * Is a scan code a "Make"?
  */
-static inline bool scs1_is_make(uint8_t sc) {
+static inline bool scs1_is_make(scs1_code_t sc) {
     return !(sc & (1U << 7));
 }
 
 /**
  * Set a scan code as "Break".
  */
-static inline uint8_t scs1_as_break(uint8_t sc) {
+static inline scs1_code_t scs1_as_break(scs1_code_t sc) {
     return sc | (1U << 7);
 }
 
 /**
  * Is a scan code a "Break"?
  */
-static inline bool scs1_is_break(uint8_t sc) {
+static inline bool scs1_is_break(scs1_code_t sc) {
     return sc & (1U << 7);
 }

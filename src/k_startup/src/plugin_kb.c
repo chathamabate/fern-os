@@ -36,6 +36,8 @@ static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kc
     (void)arg2;
     (void)arg3;
 
+    scs1_code_t sc;
+
     switch (kcmd) {
 
     /*
@@ -45,10 +47,14 @@ static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kc
      * If a key event of an extended key, `arg0` should be 0xE0 and `arg1` should be the scancode.
      */
     case PLG_KB_KCID_KEY_EVENT: {
-        if (arg0 == SCS1_ENTER) {
+        sc = (scs1_code_t)arg0;
+
+        if (sc == SCS1_ENTER) {
             term_cursor_next_line();
-        } else if (scs1_is_valid(arg0)) {
-            char c = SCS1_TO_ASCII_UC[arg0];
+        } else if (sc == SCS1_E_DOWN) {
+            term_cursor_next_line();
+        } else {
+            char c = scs1_to_ascii_lc(sc);
             if (c) {
                 term_put_c(c);
             }

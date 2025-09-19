@@ -290,18 +290,24 @@ void fos_irq1_action(user_ctx_t *ctx) {
     uint8_t sr = inb(I8042_R_STATUS_REG_PORT);
 
     if (sr & I8042_STATUS_REG_OBF) {
+        scs1_code_t sc = 0;
+
         uint8_t recv_byte = inb(I8042_R_OUTPUT_PORT);
-        uint8_t follow_up_byte = 0;
+
+        sc |= recv_byte;
 
         if (recv_byte == SCS1_EXTEND_PREFIX) {
             i8042_wait_for_full_output_buffer();
-            follow_up_byte = inb(I8042_R_OUTPUT_PORT);
+            recv_byte = inb(I8042_R_OUTPUT_PORT);
+
+            sc <<= 8;
+            sc |= recv_byte;
         }
 
         plugin_t *plg_kb = kernel->plugins[PLG_KEYBOARD_ID];
 
         if (plg_kb) {
-            err = plg_kernel_cmd(plg_kb, PLG_KB_KCID_KEY_EVENT, recv_byte, follow_up_byte, 0, 0);
+            err = plg_kernel_cmd(plg_kb, PLG_KB_KCID_KEY_EVENT, sc, 0, 0, 0);
             if (err != FOS_E_SUCCESS) {
                 term_put_fmt_s("[KeyEvent Error 0x%X]\n", err);
                 ks_shutdown(kernel);
