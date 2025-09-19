@@ -226,6 +226,15 @@ static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cm
  */
 typedef uint32_t plugin_id_t;
 
+/*
+ * Note the Plugin command 0x1 is different from the Plugin kernel command 0x1.
+ */
+
+/**
+ * The Plugin unique ID of a kernel command.
+ */
+typedef uint32_t plugin_kernel_cmd_id_t;
+
 /**
  * The Plugin unique ID of a command.
  */
@@ -280,3 +289,14 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 #define PLG_FS_HCID_SEEK           (NUM_DEFAULT_HCIDS + 0U)
 #define PLG_FS_HCID_FLUSH          (NUM_DEFAULT_HCIDS + 1U)
 
+/*
+ * Keyboard Plugin.
+ */
+
+#define PLG_KEYBOARD_ID (2U)
+
+/*
+ * Keyboard plugin KERNEL commands.
+ */
+
+#define PLG_KB_KCID_KEY_EVENT     (0U)

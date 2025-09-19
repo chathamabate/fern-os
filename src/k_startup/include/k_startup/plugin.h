@@ -1,6 +1,7 @@
 
 #pragma once
 
+
 #include "s_util/err.h"
 #include "k_startup/state.h"
 #include "s_bridge/shared_defs.h"
@@ -26,6 +27,8 @@ typedef struct _plugin_impl_t {
      */
 
     void (*plg_on_shutdown)(plugin_t *plg);
+    fernos_error_t (*plg_kernel_cmd)(plugin_t *plg, plugin_kernel_cmd_id_t kcmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+
     fernos_error_t (*plg_tick)(plugin_t *plg);
     fernos_error_t (*plg_cmd)(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
     fernos_error_t (*plg_on_fork_proc)(plugin_t *plg, proc_id_t cpid);
@@ -64,6 +67,21 @@ static inline void plg_on_shutdown(plugin_t *plg) {
 }
 
 /**
+ * This function gives a plugin and endpoint which is safe to call from within the kernel.
+ * For example, what if one plugin wants to invoke a behavior of another plugin?
+ * `plg_cmd` is always relative to a calling thread, it is a system call.
+ *
+ * This function is NOT! It has no implicitrelation ship with the current thread or userspace.
+ */
+static inline fernos_error_t plg_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd, uint32_t arg0,
+        uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    if (plg->impl->plg_kernel_cmd) {
+        return plg->impl->plg_kernel_cmd(plg, kcmd, arg0, arg1, arg2, arg3);
+    }
+    return FOS_E_SUCCESS;
+}
+
+/**
  * NOTE: The below calls all return fernos errors.
  *
  * When FOS_E_SUCCESS is returned, life is good! continue execution as normal.
@@ -98,7 +116,7 @@ fernos_error_t plgs_tick(plugin_t **plgs, size_t plgs_len);
  *
  * Any non-success error code returned here in kernel-space shuts down the system.
  */
-static inline fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+KS_SYSCALL static inline fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     if (plg->impl->plg_cmd) {
         return plg->impl->plg_cmd(plg, cmd_id, arg0, arg1, arg2, arg3);
     }

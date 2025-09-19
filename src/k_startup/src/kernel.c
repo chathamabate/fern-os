@@ -44,6 +44,7 @@
 #include "s_block_device/test/fat32_file_sys.h"
 #include "k_startup/plugin.h"
 #include "k_startup/plugin_fs.h"
+#include "k_startup/plugin_kb.h"
 
 #include "k_sys/ata.h"
 
@@ -163,7 +164,13 @@ static void init_kernel_plugins(void) {
     if (!plg_fs) {
         setup_fatal("Failed to create File System plugin");
     }
-    try_setup_step(ks_set_plugin(kernel, PLG_FILE_SYS_ID, (plugin_t *)plg_fs), "Failed to set FS Plugin in the kernel");
+    try_setup_step(ks_set_plugin(kernel, PLG_FILE_SYS_ID, plg_fs), "Failed to set FS Plugin in the kernel");
+
+    plugin_t *plg_kb = new_plugin_kb(kernel);
+    if (!plg_kb) {
+        setup_fatal("Failed to create Keyboard plugin");
+    }
+    try_setup_step(ks_set_plugin(kernel, PLG_KEYBOARD_ID, plg_kb), "Failed to set up KB Plugin in the kernel");
 }
 
 void start_kernel(void) {
@@ -182,7 +189,7 @@ void start_kernel(void) {
     try_setup_step(init_term(), "Failed to initialize Terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
-    try_setup_step(init_kb(), "Failed to ini keyboard");
+    try_setup_step(init_kb(), "Failed to init keyboard");
 
     init_kernel_state();
     init_kernel_plugins();

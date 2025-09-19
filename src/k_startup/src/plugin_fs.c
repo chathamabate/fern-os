@@ -13,6 +13,7 @@ static fernos_error_t plg_fs_on_reap_proc(plugin_t *plg, proc_id_t rpid);
 
 static const plugin_impl_t PLUGIN_FS_IMPL = {
     .plg_on_shutdown = plg_fs_on_shutdown,
+    .plg_kernel_cmd = NULL,
     .plg_cmd = plg_fs_cmd,
     .plg_tick = NULL,
     .plg_on_fork_proc = plg_fs_on_fork_proc,

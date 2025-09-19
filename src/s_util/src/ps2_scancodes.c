@@ -1,7 +1,6 @@
 
 #include "s_util/ps2_scancodes.h"
 
-
 const char SCS1_TO_ASCII_LC[256] = {
     /*
      * All keys NOT mentioned here should have their entries init'd to 0.
@@ -108,9 +107,9 @@ const char SCS1_TO_ASCII_UC[256] = {
     [SCS1_K] = 'K',
     [SCS1_L] = 'L',
     [SCS1_SEMICOLON] = ':',
-    [SCS1_APOSTROPHE] = '\'',
+    [SCS1_APOSTROPHE] = '"',
     // [SCS1_GRAVE] = '', Unsure what this maps to on a newer keyboard.
-    [SCS1_BACKSLASH] = '"',
+    [SCS1_BACKSLASH] = '|',
     [SCS1_Z] = 'Z',
     [SCS1_X] = 'X',
     [SCS1_C] = 'C',

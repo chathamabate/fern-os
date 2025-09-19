@@ -23,6 +23,7 @@
 #include "s_util/constraints.h"
 #include "k_startup/handle.h"
 #include "k_startup/plugin.h"
+#include "s_util/ps2_scancodes.h"
 
 #include "k_sys/kb.h"
 
@@ -278,16 +279,34 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 void fos_irq1_action(user_ctx_t *ctx) {
     ks_save_ctx(kernel, ctx);
 
+    fernos_error_t err;
+
     // Kinda interesting point here, but during keyboard init
     // the interrupt will be triggered due to the intial PS/2 commands
     // we send through the I8042.
+    //
+    // We'll just check again always to see if there actually is data to read.
 
     uint8_t sr = inb(I8042_R_STATUS_REG_PORT);
-    term_put_fmt_s("SR : 0x%X\n", sr);
 
     if (sr & I8042_STATUS_REG_OBF) {
         uint8_t recv_byte = inb(I8042_R_OUTPUT_PORT);
-        term_put_fmt_s("Byte Received: 0x%X\n", recv_byte);
+        uint8_t follow_up_byte = 0;
+
+        if (recv_byte == SCS1_EXTEND_PREFIX) {
+            i8042_wait_for_full_output_buffer();
+            follow_up_byte = inb(I8042_R_OUTPUT_PORT);
+        }
+
+        plugin_t *plg_kb = kernel->plugins[PLG_KEYBOARD_ID];
+
+        if (plg_kb) {
+            err = plg_kernel_cmd(plg_kb, PLG_KB_KCID_KEY_EVENT, recv_byte, follow_up_byte, 0, 0);
+            if (err != FOS_E_SUCCESS) {
+                term_put_fmt_s("[KeyEvent Error 0x%X]\n", err);
+                ks_shutdown(kernel);
+            }
+        }
     }
 
     return_to_curr_thread();

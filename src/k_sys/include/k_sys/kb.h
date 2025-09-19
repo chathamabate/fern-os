@@ -210,7 +210,7 @@ static inline void i8042_wait_for_empty_input_buffer(void) {
 
 /**
  * If this call is successful, the keyboard should start sending 
- * interrupts with scancodes!
+ * interrupts with scancodes! (Should call this way before interrupts are enabled)
  */
 fernos_error_t init_kb(void);
 

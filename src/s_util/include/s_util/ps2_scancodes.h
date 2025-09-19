@@ -95,12 +95,19 @@
 #define SCS1_KP_0         0x52
 #define SCS1_KP_PERIOD    0x53
 
+/**
+ * Is a non-extended scan code valid?
+ */
+static inline bool scs1_is_valid(uint8_t sc) {
+    return SCS1_ESC <= sc && sc <= SCS1_KP_PERIOD;
+}
+
 /* 
  * Extended scan codes (0xE0 prefix)
  * These all require 2 bytes. (The first being the prefix)
  */
 
-#define SCSI_EXTEND_PREFIX  0xE0
+#define SCS1_EXTEND_PREFIX  0xE0
 
 #define SCS1_E_KP_ENTER     0x1C
 #define SCS1_E_RCTRL        0x1D
@@ -120,6 +127,17 @@
 #define SCS1_E_RGUI         0x5C
 #define SCS1_E_APPS         0x5D
 
+/**
+ * Is an extended scan code valid?
+ *
+ * `sc` is the significant byte AFTER the 0xE0.
+ * This assumes we already read 0xE0 and that we know we working with
+ * an extended scancode!
+ */
+static inline bool scs1_is_ex_valid(uint8_t sc) {
+    return SCS1_E_KP_ENTER <= sc && sc <= SCS1_E_APPS;
+}
+
 /*
  * A "Make" scan code is when a key is pressed.
  * It's Msb is always 0. 
@@ -138,7 +156,7 @@
  * If a key has no ascii equivelant, 0 is mapped.
  * (Don't use extended scan codes in this map)
  */
-const char SCS1_TO_ASCII_LC[256];
+extern const char SCS1_TO_ASCII_LC[256];
 
 /**
  * Use this map to get the uppercase ASCII equiv of a set 1 scancode.
@@ -146,7 +164,7 @@ const char SCS1_TO_ASCII_LC[256];
  * If a key has no ascii equivelant, 0 is mapped.
  * (Don't use extended scan codes in this map)
  */
-const char SCS1_TO_ASCII_UC[256];
+extern const char SCS1_TO_ASCII_UC[256];
 
 /**
  * Set a scan code as "Make".

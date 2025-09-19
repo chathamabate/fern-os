@@ -10,6 +10,7 @@ _SRCS 		?= kernel.c \
 			   handle.c \
 			   plugin.c \
 			   plugin_fs.c \
+			   plugin_kb.c \
 			   action.c \
 			   tss.c \
 			   gdt.c \
