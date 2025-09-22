@@ -2,6 +2,7 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 /**
  * A Character Display Color uses 4 bits.
@@ -24,18 +25,20 @@ typedef uint8_t char_display_color_t;
 #define CDC_BROWN           (6)
 #define CDC_LIGHT_GREY      (7)
 
+#define CDC_BRIGHT (1U << 4)
+
 /*
  * Bright Alternatives
  */
 
-#define CDC_BRIGHT_BLACK           (8 + 0)
-#define CDC_BRIGHT_BLUE            (8 + 1)
-#define CDC_BRIGHT_GREEN           (8 + 2)
-#define CDC_BRIGHT_CYAN            (8 + 3)
-#define CDC_BRIGHT_RED             (8 + 4)
-#define CDC_BRIGHT_MAGENTA         (8 + 5)
-#define CDC_BRIGHT_BROWN           (8 + 6)
-#define CDC_WHITE                  (8 + 7)
+#define CDC_BRIGHT_BLACK           (CDC_BRIGHT | 0)
+#define CDC_BRIGHT_BLUE            (CDC_BRIGHT | 1)
+#define CDC_BRIGHT_GREEN           (CDC_BRIGHT | 2)
+#define CDC_BRIGHT_CYAN            (CDC_BRIGHT | 3)
+#define CDC_BRIGHT_RED             (CDC_BRIGHT | 4)
+#define CDC_BRIGHT_MAGENTA         (CDC_BRIGHT | 5)
+#define CDC_BRIGHT_BROWN           (CDC_BRIGHT | 6)
+#define CDC_WHITE                  (CDC_BRIGHT | 7)
 
 static inline char_display_color_t cdc_bright(char_display_color_t cdc) {
     return cdc | (1U << 3);
@@ -70,6 +73,14 @@ static inline char_display_color_t cds_bg_color(char_display_style_t cds) {
 
 static inline char_display_color_t cds_fg_color(char_display_style_t cds) {
     return (char_display_color_t)cds & 0x0FU;
+}
+
+/**
+ * Flip the background color and foreground color components of a style.
+ * Keeps Other styles untouched.
+ */
+static inline char_display_style_t cds_flip(char_display_style_t cds) {
+    return char_display_style(cds_bg_color(cds), cds_fg_color(cds)) | (cds & 0xFF00); 
 }
 
 typedef struct _char_display_t char_display_t;
@@ -149,6 +160,11 @@ struct _char_display_t {
      */
     size_t cursor_row;
     size_t cursor_col;
+
+    /**
+     * When true, the cursor position has its bg and fg colors flipped.
+     */
+    bool cursor_visible;
 };
 
 /**
@@ -175,7 +191,6 @@ static inline void delete_char_display(char_display_t *cd) {
  *
  * '\n' - Move cursor to start of next line.
  * '\r' - Move cursor to beginning of current line.
- * '\b` - Move cursor back one space.
  *
  * Otherwise, if `c` is not in the range [32, 127), nothing will happen.
  */
@@ -190,7 +205,6 @@ void cd_put_c(char_display_t *cd, char c);
  *
  * '\n' - Move cursor to start of next line.
  * '\r' - Move cursor to beginning of current line.
- * '\b` - Move cursor back one space.
  *
  * Otherwise, if `c` is not in the range [32, 127), `c` is ignored.
  */
