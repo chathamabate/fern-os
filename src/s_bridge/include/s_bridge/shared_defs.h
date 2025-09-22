@@ -306,4 +306,3 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  */
 
 #define PLG_KB_PCID_OPEN          (0U)
-#define PLG_KB_PCID_READ_SC       (1U)
