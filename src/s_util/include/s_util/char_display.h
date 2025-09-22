@@ -77,6 +77,46 @@ typedef struct _char_display_impl_t char_display_impl_t;
 
 struct _char_display_impl_t {
 
+    void (*delete_char_display)(char_display_t *cd);
+
+    /*
+     * These functions actually won't even be exposed to the user, only used internally
+     * by the char display base implementation.
+     *
+     * (I believe this is similar to private virtual functions in cpp)
+     */
+
+    /**
+     * Place a character on the screen at position (`row`, `col`) with style `style`.
+     *
+     * It is gauranteed:
+     * 0 <= `row` < `rows`
+     * 0 <= `col` < `cols`
+     * 32 <= `c` < 127 (`c` is an ascii printable character)
+     */
+    void (*cd_put_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t style, char c);
+
+    /**
+     * Get a character at a given position on the display.
+     *
+     * 0 <= `row` < `rows`
+     * 0 <= `col` < `cols`
+     *
+     * If `style` is given, the character's style should be written to `*style`.
+     *
+     * NOTE: Your display need not remember styles it does not support. For example, if a white
+     * italic character is placed at (0, 0), but your display doesn't support italics, just "white
+     * FG" can be written to `*style`.
+     */
+    char (*cd_get_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t *style);
+
+    /**
+     * This should efficiently move each row of characters up `shift` rows on the display.
+     * Each new row should be filled with `cols` `fill` characters, each with style `style`.
+     *
+     * If `shift` >= `rows` this will clear the screen.
+     */
+    void (*cd_scroll_down)(char_display_t *cd, size_t shift, char fill, char_display_style_t style);
 };
 
 /**
@@ -89,31 +129,69 @@ struct _char_display_t {
 
     const size_t rows;
     const size_t cols;
+
+    /*
+     * The below fields SHOULD NOT be accessed or modified by the virtual function implementations.
+     */
+
+    /**
+     * When the style is "RESET", this is the style returned to.
+     */
+    char_display_style_t default_style;
+
+    /**
+     * The current style text is displayed as.
+     */
+    char_display_style_t curr_style;
+
+    /**
+     * The current position of the cursor.
+     */
+    size_t cursor_row;
+    size_t cursor_col;
 };
+
+/**
+ * Initialize the char_display_t base class fields.
+ *
+ * This is a helper function to be used in the constructors of derrived classes.
+ */
+void init_char_display_base(char_display_t *base, const char_display_impl_t *impl, size_t rows, size_t cols, 
+        char_display_style_t default_style);
 
 /**
  * Delete the character display.
  */
-void delete_char_display(char_display_t *cd);
+static inline void delete_char_display(char_display_t *cd) {
+    if (cd) {
+        cd->impl->delete_char_display(cd);
+    }
+}
 
 /**
+ * Place character c at the cursor position, and advance the cursor.
  *
- */
-void cd_append_style();
-
-/**
- * Display a character at row `r` and col `c`.
+ * Control Characters Supported:
  *
- * 0 <= `r` < `rows`
- * 0 <= `c` < `cols`
- * 32 <= `ch` < 127 (i.e. `ch` is a printable ascii character)
+ * '\n' - Move cursor to start of next line.
+ * '\r' - Move cursor to beginning of current line.
+ * '\b` - Move cursor back one space.
+ *
+ * Otherwise, if `c` is not in the range [32, 127), nothing will happen.
  */
-void cd_put_char(char_display_t *cd, size_t r, size_t c, char ch);
+void cd_put_c(char_display_t *cd, char c);
 
 /**
- * This should  
+ * Place the contents of a string `s`.
+ *
+ * Control Sequences Supported: See `s_util/ansi.h`.
+ *
+ * Control Characters Supported:
+ *
+ * '\n' - Move cursor to start of next line.
+ * '\r' - Move cursor to beginning of current line.
+ * '\b` - Move cursor back one space.
+ *
+ * Otherwise, if `c` is not in the range [32, 127), `c` is ignored.
  */
-void cd_scroll_down(char_display_t *cd);
-
-
-
+void cd_put_s(char_display_t *cd, const char *s);
