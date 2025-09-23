@@ -71,8 +71,16 @@ static inline char_display_color_t cds_bg_color(char_display_style_t cds) {
     return (char_display_color_t)(cds >> 4) & 0x0FU;
 }
 
+static inline char_display_style_t cds_with_bg_color(char_display_style_t cds, char_display_color_t bg) {
+    return (cds & 0xFF0F) | (bg << 4);
+}
+
 static inline char_display_color_t cds_fg_color(char_display_style_t cds) {
     return (char_display_color_t)cds & 0x0FU;
+}
+
+static inline char_display_style_t cds_with_fg_color(char_display_style_t cds, char_display_color_t fg) {
+    return (cds & 0xFFF0) | fg;
 }
 
 /**
@@ -82,6 +90,13 @@ static inline char_display_color_t cds_fg_color(char_display_style_t cds) {
 static inline char_display_style_t cds_flip(char_display_style_t cds) {
     return char_display_style(cds_bg_color(cds), cds_fg_color(cds)) | (cds & 0xFF00); 
 }
+
+/**
+ * Add an ANSI style to a char display style.
+ *
+ * SEE "s_util/ansi.h".
+ */
+char_display_style_t cds_with_ansi_style_code(char_display_style_t cds, uint8_t ansi_style_code);
 
 typedef struct _char_display_pair_t {
     char_display_style_t style;

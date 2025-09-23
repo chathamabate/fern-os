@@ -134,7 +134,10 @@ static inline char *ansi_scroll_down_n(char *buf, size_t n) {
 }
 
 /*
- * ANSI Color escape sequences:
+ * ANSI Style escape sequences:
+ *
+ * In FernOS for now, all style codes should be passed in there own individual 
+ * escape sequence. CSI FG;BG m is not accepted, only CSI FG m then CSI BG m.
  */
 
 #define ANSI_RESET         ANSI_CSI "0m"
