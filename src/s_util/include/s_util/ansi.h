@@ -117,7 +117,7 @@ static inline char *ansi_set_cursor_position(char *buf, size_t row, size_t col) 
  * Scroll up moves all lines and the cursor up, new lines are added to the bottom of the screen.
  * Scroll down is the opposite.
  *
- * If the cursor is at the border, it'll remain at the border.
+ * The cursor is NOT moved!
  */
 
 #define ANSI_SCROLL_UP      ANSI_CSI "1S"
@@ -138,6 +138,9 @@ static inline char *ansi_scroll_down_n(char *buf, size_t n) {
  */
 
 #define ANSI_RESET         ANSI_CSI "0m"
+
+#define ANSI_BOLD          ANSI_CSI "1m"
+#define ANSI_ITALIC        ANSI_CSI "3m"
 
 #define ANSI_BLACK_FG      ANSI_CSI "30m"
 #define ANSI_BLUE_FG       ANSI_CSI "31m"

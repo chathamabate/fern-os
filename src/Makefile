@@ -16,7 +16,6 @@ MODS := \
 		k_bios_term \
 		k_sys \
 		s_data \
-		s_terminal \
 		s_mem \
 		s_block_device \
 		s_util 
