@@ -7,11 +7,6 @@
 typedef struct _terminal_t terminal_t;
 typedef struct _terminal_impl_t terminal_impl_t;
 
-/**
- * What about control characters though... what do they do again???
- */
-#define TERMINAL_INPUT_BUFFER_SIZE (256U)
-
 struct _terminal_impl_t {
     // Well, I mean, what should happen here... that's the real question I guess...
     // Maybe we could make some key_listener interface first before making this???
@@ -79,6 +74,11 @@ struct _terminal_t {
     size_t cursor_col;
 
     /**
+     * If the cursor is visible.
+     */
+    bool cursor_visible;
+
+    /**
      * When an ANSI Reset code is processed, this is the style returned to.
      */
     char_display_style_t default_style;
@@ -104,6 +104,18 @@ terminal_t *new_terminal(allocator_t *al, char_display_t *cd, size_t num_rows, c
 void delete_terminal(terminal_t *t);
 
 /**
+ * Write a character to the terminal.
+ *
+ * Control Characters Supported:
+ * '\n' - Move cursor to the beginning of the next line. (Scrolling if needed)
+ * '\r` - Move cursor to the beginning of the current line.
+ *
+ * Undefined behavior if `c` is not a ASCII printable character or one of the listed control 
+ * sequences.
+ */
+void t_put_c(terminal_t *t, char c);
+
+/**
  * Write a string to the terminal.
  *
  * Control Characters Supported:
@@ -111,10 +123,8 @@ void delete_terminal(terminal_t *t);
  * '\r` - Move cursor to the beginning of the current line.
  *
  * ANSI Control Sequences Supported: See "s_util/ansi.h"
+ *
+ * Undefined behavior if a non-supported control character or sequence is encountered in `s`.
  */
 void t_put_s(terminal_t *t, const char *s);
 
-// Ok, what if we want to read a line??
-// Or read some sort of input or something... than what??
-// The terminal will be able to handle key presses... so...
-// What if I want to write a line??? Then what??? Well, 
