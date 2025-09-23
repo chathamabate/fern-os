@@ -95,17 +95,12 @@ struct _char_display_impl_t {
     void (*delete_char_display)(char_display_t *cd);
 
     void (*cd_set_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t style, char c);
-    char (*cd_get_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t *style);
 
     void (*cd_put_row)(char_display_t *cd, size_t row, const char_display_pair_t *row_data);
     void (*cd_set_row)(char_display_t *cd, size_t row, char_display_style_t style, char c);
 
-    void (*cd_get_row)(char_display_t *cd, size_t row, char_display_pair_t *row_data);
-
     void (*cd_put_grid)(char_display_t *cd, const char_display_pair_t *grid_data);
     void (*cd_set_grid)(char_display_t *cd, char_display_style_t style, char c);
-
-    void (*cd_get_grid)(char_display_t *cd, char_display_pair_t *grid_data);
 };
 
 /**
@@ -132,7 +127,11 @@ struct _char_display_t {
  *
  * This is a helper function to be used in the constructors of derrived classes.
  */
-void init_char_display_base(char_display_t *base, const char_display_impl_t *impl, size_t rows, size_t cols);
+static inline void init_char_display_base(char_display_t *base, const char_display_impl_t *impl, size_t rows, size_t cols) {
+    *(const char_display_impl_t **)&(base->impl) = impl;
+    *(size_t *)&(base->rows) = rows;
+    *(size_t *)&(base->cols) = cols;
+}
 
 /**
  * Delete the character display.
@@ -152,23 +151,6 @@ static inline void delete_char_display(char_display_t *cd) {
  */
 static inline void cd_set_c(char_display_t *cd, size_t row, size_t col, char_display_style_t style, char c) {
     cd->impl->cd_set_c(cd, row, col, style, c); 
-}
-
-/**
- * Get a character at a given position on the display.
- *
- * This should only do anything if:
- * 0 <= `row` < `rows`
- * 0 <= `col` < `cols`
- *
- * If `style` is given, the character's style should be written to `*style`.
- *
- * NOTE: Your display need not remember styles it does not support. For example, if a white
- * italic character is placed at (0, 0), but your display doesn't support italics, just "white
- * FG" can be written to `*style`.
- */
-static inline char cd_get_c(char_display_t *cd, size_t row, size_t col, char_display_style_t *style) {
-    return cd->impl->cd_get_c(cd, row, col, style);
 }
 
 /**
@@ -195,19 +177,6 @@ static inline void cd_set_row(char_display_t *cd, size_t row, char_display_style
 }
 
 /**
- * Read a full row from the display efficiently.
- *
- * This should only do anything if:
- * 0 <= `row` < `rows`
- * `row_data` is non-NULL.
- *
- * `row_data` should be an array of pairs with size at least `cols`.
- */
-static inline void cd_get_row(char_display_t *cd, size_t row, char_display_pair_t *row_data) {
-    cd->impl->cd_get_row(cd, row, row_data);
-}
-
-/**
  * Write over the entire display efficiently.
  *
  * Only does anything if `grid_data` is non-NULL.
@@ -222,16 +191,3 @@ static inline void cd_put_grid(char_display_t *cd, const char_display_pair_t *gr
 static inline void cd_set_grid(char_display_t *cd, char_display_style_t style, char c) {
     cd->impl->cd_set_grid(cd, style, c);
 }
-
-/**
- * Read out the entire display efficiently.
- *
- * Only does anything if `grid_data` is non-NULL.
- *
- * `grid_data` should be an array of pairs with size at least `rows * cols`.
- */
-static inline void cd_get_grid(char_display_t *cd, char_display_pair_t *grid_data) {
-    cd->impl->cd_get_grid(cd, grid_data);
-}
-
-

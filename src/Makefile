@@ -8,7 +8,6 @@ MODS_DIR    := $(GIT_TOP)/src
 
 THIS_FILE := $(MODS_DIR)/Makefile
 
-# I like to list the modules in order of dependence.
 MODS := \
 		u_concur \
 		k_startup \
@@ -17,6 +16,7 @@ MODS := \
 		k_bios_term \
 		k_sys \
 		s_data \
+		s_terminal \
 		s_mem \
 		s_block_device \
 		s_util 

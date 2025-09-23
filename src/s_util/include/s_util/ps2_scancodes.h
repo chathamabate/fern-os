@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "s_util/err.h"
+
 /**
  * Scancode Set 1 code!
  *
@@ -214,4 +216,71 @@ static inline scs1_code_t scs1_as_break(scs1_code_t sc) {
  */
 static inline bool scs1_is_break(scs1_code_t sc) {
     return sc & (1U << 7);
+}
+
+/*
+ * Scancode Set 1 Listener.
+ */
+
+typedef struct _scs1_listener_t scs1_listener_t; 
+typedef struct _scs1_listener_impl_t scs1_listener_impl_t;
+
+struct _scs1_listener_impl_t {
+    void (*delete_scs1_listener)(scs1_listener_t *scs1_l);
+
+    fernos_error_t (*scs1_l_accept)(scs1_listener_t *scs1_l, scs1_code_t sc);
+    void (*scs1_l_on_focus_change)(scs1_listener_t *scs1_l, bool focus);
+};
+
+/**
+ * A Scan code listener is just some abstract thing which accepts scan codes.
+ *
+ * These will be useful in the key event interrupt handler!
+ */
+struct _scs1_listener_t {
+    const scs1_listener_impl_t * const impl;
+
+    /**
+     * Whether or not this listener is accepting scan codes.
+     */
+    bool focused;
+};
+
+static inline void delete_scs1_listener(scs1_listener_t *scs1_l) {
+    if (scs1_l) {
+        scs1_l->impl->delete_scs1_listener(scs1_l);
+    }
+}
+
+/**
+ * Accept a valid Scancode Set 1 code. 
+ *
+ * Returns FOS_SUCCESS and does nothing if the listener is unfocused.
+ * Otherwise, an error code is propegated from the implementation.
+ */
+static inline fernos_error_t scs1_l_accept(scs1_listener_t *scs1_l, scs1_code_t sc) {
+    if (scs1_l->focused) {
+        return scs1_l->impl->scs1_l_accept(scs1_l, sc);
+    }
+    return FOS_E_SUCCESS;
+}
+
+/**
+ * Set the focus of the listener.
+ *
+ * Only calls the on_focus_change event if the focus value actually changes!
+ */
+static inline void scs1_l_set_focus(scs1_listener_t *scs1_l, bool focused) {
+    if (focused != scs1_l->focused) {
+        scs1_l->focused = focused;
+        scs1_l->impl->scs1_l_on_focus_change(scs1_l, focused);
+    }
+}
+
+static inline bool scs1_get_focus(scs1_listener_t *scs1_l) {
+    return scs1_l->focused;
+}
+
+static inline void scs1_l_toggle_focus(scs1_listener_t *scs1_l) {
+    scs1_l_set_focus(scs1_l, !(scs1_l->focused));
 }
