@@ -83,88 +83,48 @@ static inline char_display_style_t cds_flip(char_display_style_t cds) {
     return char_display_style(cds_bg_color(cds), cds_fg_color(cds)) | (cds & 0xFF00); 
 }
 
+typedef struct _char_display_pair_t {
+    char_display_style_t style;
+    char c;
+} char_display_pair_t;
+
 typedef struct _char_display_t char_display_t;
 typedef struct _char_display_impl_t char_display_impl_t;
 
 struct _char_display_impl_t {
-
     void (*delete_char_display)(char_display_t *cd);
 
-    /*
-     * These functions actually won't even be exposed to the user, only used internally
-     * by the char display base implementation.
-     *
-     * (I believe this is similar to private virtual functions in cpp)
-     */
-
-    /**
-     * Place a character on the screen at position (`row`, `col`) with style `style`.
-     *
-     * It is gauranteed:
-     * 0 <= `row` < `rows`
-     * 0 <= `col` < `cols`
-     * 32 <= `c` < 127 (`c` is an ascii printable character)
-     */
-    void (*cd_put_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t style, char c);
-
-    /**
-     * Get a character at a given position on the display.
-     *
-     * 0 <= `row` < `rows`
-     * 0 <= `col` < `cols`
-     *
-     * If `style` is given, the character's style should be written to `*style`.
-     *
-     * NOTE: Your display need not remember styles it does not support. For example, if a white
-     * italic character is placed at (0, 0), but your display doesn't support italics, just "white
-     * FG" can be written to `*style`.
-     */
+    void (*cd_set_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t style, char c);
     char (*cd_get_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t *style);
 
-    /**
-     * This should efficiently move each row of characters up `shift` rows on the display.
-     * Each new row should be filled with `cols` `fill` characters, each with style `style`.
-     *
-     * If `shift` >= `rows` this will clear the screen.
-     */
-    void (*cd_scroll_down)(char_display_t *cd, size_t shift, char fill, char_display_style_t style);
+    void (*cd_put_row)(char_display_t *cd, size_t row, const char_display_pair_t *row_data);
+    void (*cd_set_row)(char_display_t *cd, size_t row, char_display_style_t style, char c);
+
+    void (*cd_get_row)(char_display_t *cd, size_t row, char_display_pair_t *row_data);
+
+    void (*cd_put_grid)(char_display_t *cd, const char_display_pair_t *grid_data);
+    void (*cd_set_grid)(char_display_t *cd, char_display_style_t style, char c);
+
+    void (*cd_get_grid)(char_display_t *cd, char_display_pair_t *grid_data);
 };
 
 /**
  * A Char Display is some sort of abstract grid of characters.
  *
  * The grid has a constant number of rows and columns.
+ *
+ * A character display has no notion of history. 
+ *
+ * The char display should be able to handle all ASCII printable characters 
+ * (i.e. in the range [32, 127))
+ *
+ * Undefined behavior if any other characters are passed into the functions below.
  */
 struct _char_display_t {
     const char_display_impl_t * const impl;
 
     const size_t rows;
     const size_t cols;
-
-    /*
-     * The below fields SHOULD NOT be accessed or modified by the virtual function implementations.
-     */
-
-    /**
-     * When the style is "RESET", this is the style returned to.
-     */
-    char_display_style_t default_style;
-
-    /**
-     * The current style text is displayed as.
-     */
-    char_display_style_t curr_style;
-
-    /**
-     * The current position of the cursor.
-     */
-    size_t cursor_row;
-    size_t cursor_col;
-
-    /**
-     * When true, the cursor position has its bg and fg colors flipped.
-     */
-    bool cursor_visible;
 };
 
 /**
@@ -172,8 +132,7 @@ struct _char_display_t {
  *
  * This is a helper function to be used in the constructors of derrived classes.
  */
-void init_char_display_base(char_display_t *base, const char_display_impl_t *impl, size_t rows, size_t cols, 
-        char_display_style_t default_style);
+void init_char_display_base(char_display_t *base, const char_display_impl_t *impl, size_t rows, size_t cols);
 
 /**
  * Delete the character display.
@@ -185,27 +144,94 @@ static inline void delete_char_display(char_display_t *cd) {
 }
 
 /**
- * Place character c at the cursor position, and advance the cursor.
- *
- * Control Characters Supported:
- *
- * '\n' - Move cursor to start of next line.
- * '\r' - Move cursor to beginning of current line.
- *
- * Otherwise, if `c` is not in the range [32, 127), nothing will happen.
+ * Place a character on the screen at position (`row`, `col`) with style `style`.
+ * 
+ * This should only do anything if:
+ * 0 <= `row` < `rows`
+ * 0 <= `col` < `cols`
  */
-void cd_put_c(char_display_t *cd, char c);
+static inline void cd_set_c(char_display_t *cd, size_t row, size_t col, char_display_style_t style, char c) {
+    cd->impl->cd_set_c(cd, row, col, style, c); 
+}
 
 /**
- * Place the contents of a string `s`.
+ * Get a character at a given position on the display.
  *
- * Control Sequences Supported: See `s_util/ansi.h`.
+ * This should only do anything if:
+ * 0 <= `row` < `rows`
+ * 0 <= `col` < `cols`
  *
- * Control Characters Supported:
+ * If `style` is given, the character's style should be written to `*style`.
  *
- * '\n' - Move cursor to start of next line.
- * '\r' - Move cursor to beginning of current line.
- *
- * Otherwise, if `c` is not in the range [32, 127), `c` is ignored.
+ * NOTE: Your display need not remember styles it does not support. For example, if a white
+ * italic character is placed at (0, 0), but your display doesn't support italics, just "white
+ * FG" can be written to `*style`.
  */
-void cd_put_s(char_display_t *cd, const char *s);
+static inline char cd_get_c(char_display_t *cd, size_t row, size_t col, char_display_style_t *style) {
+    return cd->impl->cd_get_c(cd, row, col, style);
+}
+
+/**
+ * Write a full row to the display efficiently.
+ *
+ * This should only do anything if:
+ * 0 <= `row` < `rows`
+ * `row_data` is non-NULL.
+ *
+ * `row_data` should be an array of pairs with size at least `cols`.
+ */
+static inline void cd_put_row(char_display_t *cd, size_t row, const char_display_pair_t *row_data) {
+    cd->impl->cd_put_row(cd, row, row_data);
+}
+
+/**
+ * Set an entire row to a single character.
+ *
+ * This should only do anything if:
+ * 0 <= `row` < `rows`
+ */
+static inline void cd_set_row(char_display_t *cd, size_t row, char_display_style_t style, char c) {
+    cd->impl->cd_set_row(cd, row, style, c);
+}
+
+/**
+ * Read a full row from the display efficiently.
+ *
+ * This should only do anything if:
+ * 0 <= `row` < `rows`
+ * `row_data` is non-NULL.
+ *
+ * `row_data` should be an array of pairs with size at least `cols`.
+ */
+static inline void cd_get_row(char_display_t *cd, size_t row, char_display_pair_t *row_data) {
+    cd->impl->cd_get_row(cd, row, row_data);
+}
+
+/**
+ * Write over the entire display efficiently.
+ *
+ * Only does anything if `grid_data` is non-NULL.
+ */
+static inline void cd_put_grid(char_display_t *cd, const char_display_pair_t *grid_data) { 
+    cd->impl->cd_put_grid(cd, grid_data);
+}
+
+/**
+ * Set the entire grid to a single character with a single style.
+ */
+static inline void cd_set_grid(char_display_t *cd, char_display_style_t style, char c) {
+    cd->impl->cd_set_grid(cd, style, c);
+}
+
+/**
+ * Read out the entire display efficiently.
+ *
+ * Only does anything if `grid_data` is non-NULL.
+ *
+ * `grid_data` should be an array of pairs with size at least `rows * cols`.
+ */
+static inline void cd_get_grid(char_display_t *cd, char_display_pair_t *grid_data) {
+    cd->impl->cd_get_grid(cd, grid_data);
+}
+
+

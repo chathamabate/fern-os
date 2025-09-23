@@ -1,41 +1,51 @@
 
 #pragma once
 
-#define ANSI_RESET         "\x1B[0m"
+#define ANSI_CSI "\x1B["
 
-#define ANSI_BLACK_FG      "\x1B[30m"
-#define ANSI_BLUE_FG       "\x1B[31m"
-#define ANSI_GREEN_FG      "\x1B[32m"
-#define ANSI_CYAN_FG       "\x1B[33m"
-#define ANSI_RED_FG        "\x1B[34m"
-#define ANSI_MAGENTA_FG    "\x1B[35m"
-#define ANSI_BROWN_FG      "\x1B[36m"
-#define ANSI_LIGHT_GREY_FG "\x1B[37m"
+/*
+ * ANSI Movement sequences:
+ */
 
-#define ANSI_BRIGHT_BLACK_FG      "\x1B[90m"
-#define ANSI_BRIGHT_BLUE_FG       "\x1B[91m"
-#define ANSI_BRIGHT_GREEN_FG      "\x1B[92m"
-#define ANSI_BRIGHT_CYAN_FG       "\x1B[93m"
-#define ANSI_BRIGHT_RED_FG        "\x1B[94m"
-#define ANSI_BRIGHT_MAGENTA_FG    "\x1B[95m"
-#define ANSI_BRIGHT_BROWN_FG      "\x1B[96m"
-#define ANSI_BRIGHT_LIGHT_GREY_FG "\x1B[97m"
+/*
+ * ANSI Color escape sequences:
+ */
 
-#define ANSI_BLACK_BG      "\x1B[40m"
-#define ANSI_BLUE_BG       "\x1B[41m"
-#define ANSI_GREEN_BG      "\x1B[42m"
-#define ANSI_CYAN_BG       "\x1B[43m"
-#define ANSI_RED_BG        "\x1B[44m"
-#define ANSI_MAGENTA_BG    "\x1B[45m"
-#define ANSI_BROWN_BG      "\x1B[46m"
-#define ANSI_LIGHT_GREY_BG "\x1B[47m"
+#define ANSI_RESET         ANSI_CSI "0m"
 
-#define ANSI_BRIGHT_BLACK_BG      "\x1B[100m"
-#define ANSI_BRIGHT_BLUE_BG       "\x1B[101m"
-#define ANSI_BRIGHT_GREEN_BG      "\x1B[102m"
-#define ANSI_BRIGHT_CYAN_BG       "\x1B[103m"
-#define ANSI_BRIGHT_RED_BG        "\x1B[104m"
-#define ANSI_BRIGHT_MAGENTA_BG    "\x1B[105m"
-#define ANSI_BRIGHT_BROWN_BG      "\x1B[106m"
-#define ANSI_BRIGHT_LIGHT_GREY_BG "\x1B[107m"
+#define ANSI_BLACK_FG      ANSI_CSI "30m"
+#define ANSI_BLUE_FG       ANSI_CSI "31m"
+#define ANSI_GREEN_FG      ANSI_CSI "32m"
+#define ANSI_CYAN_FG       ANSI_CSI "33m"
+#define ANSI_RED_FG        ANSI_CSI "34m"
+#define ANSI_MAGENTA_FG    ANSI_CSI "35m"
+#define ANSI_BROWN_FG      ANSI_CSI "36m"
+#define ANSI_LIGHT_GREY_FG ANSI_CSI "37m"
+
+#define ANSI_BRIGHT_BLACK_FG      ANSI_CSI "90m"
+#define ANSI_BRIGHT_BLUE_FG       ANSI_CSI "91m"
+#define ANSI_BRIGHT_GREEN_FG      ANSI_CSI "92m"
+#define ANSI_BRIGHT_CYAN_FG       ANSI_CSI "93m"
+#define ANSI_BRIGHT_RED_FG        ANSI_CSI "94m"
+#define ANSI_BRIGHT_MAGENTA_FG    ANSI_CSI "95m"
+#define ANSI_BRIGHT_BROWN_FG      ANSI_CSI "96m"
+#define ANSI_BRIGHT_LIGHT_GREY_FG ANSI_CSI "97m"
+
+#define ANSI_BLACK_BG      ANSI_CSI "40m"
+#define ANSI_BLUE_BG       ANSI_CSI "41m"
+#define ANSI_GREEN_BG      ANSI_CSI "42m"
+#define ANSI_CYAN_BG       ANSI_CSI "43m"
+#define ANSI_RED_BG        ANSI_CSI "44m"
+#define ANSI_MAGENTA_BG    ANSI_CSI "45m"
+#define ANSI_BROWN_BG      ANSI_CSI "46m"
+#define ANSI_LIGHT_GREY_BG ANSI_CSI "47m"
+
+#define ANSI_BRIGHT_BLACK_BG      ANSI_CSI "100m"
+#define ANSI_BRIGHT_BLUE_BG       ANSI_CSI "101m"
+#define ANSI_BRIGHT_GREEN_BG      ANSI_CSI "102m"
+#define ANSI_BRIGHT_CYAN_BG       ANSI_CSI "103m"
+#define ANSI_BRIGHT_RED_BG        ANSI_CSI "104m"
+#define ANSI_BRIGHT_MAGENTA_BG    ANSI_CSI "105m"
+#define ANSI_BRIGHT_BROWN_BG      ANSI_CSI "106m"
+#define ANSI_BRIGHT_LIGHT_GREY_BG ANSI_CSI "107m"
 

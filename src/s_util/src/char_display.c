@@ -29,19 +29,39 @@ static void cd_flip_cursor(char_display_t *cd) {
     }
 }
 
+/**
+ * Move the cursor down to the beginning of the next line.
+ * If there is no next line, scroll the screen down one line.
+ */
+static void cd_newline_cursor(char_display_t *cd) {
+    if (cd->cursor_row + 1 < cd->rows) {
+        cd->cursor_row++; // Only increase cursor row if we can.
+    } else {
+        // Otherwise scroll the screen down one line.
+        cd->impl->cd_scroll_down(cd, 1, ' ', cd->default_style);
+    }
+
+    cd->cursor_col = 0;
+}
+
+/**
+ * Move the cursor one spot to the right.
+ * If we are at the end of a row, move down to the next row.
+ */
+static void cd_advance_cursor(char_display_t *cd) {
+    cd->cursor_col++;
+
+    if (cd->cursor_col == cd->cols) { // Check to see if we've made it to the end of a line.
+        cd_newline_cursor(cd);
+    }
+}
+
 void cd_put_c(char_display_t *cd, char c) {
     cd_flip_cursor(cd);
 
     switch (c) {
     case '\n':
-        if (cd->cursor_row + 1 < cd->rows) {
-            cd->cursor_row++; // Only increase cursor row if we can.
-        } else {
-            // Otherwise scroll the screen down one line.
-            cd->impl->cd_scroll_down(cd, 1, ' ', cd->default_style);
-        }
-
-        cd->cursor_col = 0;
+        cd_newline_cursor(cd);
         break;
 
     case '\r': // Move the cursor to the beginning of the current line.
@@ -53,18 +73,7 @@ void cd_put_c(char_display_t *cd, char c) {
             cd->impl->cd_put_c(cd, cd->cursor_row, cd->cursor_col, cd->curr_style, c);
         }
 
-        cd->cursor_col++;
-
-        if (cd->cursor_col == cd->cols) { // Check to see if we've made it to the end of a line.
-            if (cd->cursor_row + 1 < cd->rows) {
-                cd->cursor_row++; // Only increase cursor row if we can.
-            } else {
-                // Otherwise scroll the screen down one line.
-                cd->impl->cd_scroll_down(cd, 1, ' ', cd->default_style);
-            }
-
-            cd->cursor_col = 0;
-        }
+        cd_advance_cursor(cd);
         break;
     }
 
