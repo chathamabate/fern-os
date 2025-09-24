@@ -1,7 +1,8 @@
 
 #pragma once
 
-#include <stdlib.h>
+#include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 
 /**
@@ -109,10 +110,6 @@ typedef struct _char_display_impl_t char_display_impl_t;
 struct _char_display_impl_t {
     void (*delete_char_display)(char_display_t *cd);
 
-    void (*cd_get_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t *style, char *c);
-    void (*cd_get_row)(char_display_t *cd, size_t row, char_display_pair_t *row_data);
-    void (*cd_get_grid)(char_display_t *cd, char_display_pair_t *grid_data);
-
     /*
      * The below functions will be "private virtual". The user will only interact with
      * a character display using the put_s and put_c functions.
@@ -120,6 +117,14 @@ struct _char_display_impl_t {
      * THEY SHOULD NEVER modify the state within the char_display base class.
      * (They should have no knowledge of a cursor)
      */
+
+    /**
+     * Get the value of a single cell in the grid.
+     *
+     * If `style` is non-NULL, the style of the given cell is written to `*style`.
+     * If `c` is non-NULL, the character displayed in the given cell is written to `*c`.
+     */
+    void (*cd_get_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t *style, char *c);
 
     /**
      * Place a character on the screen at position (`row`, `col`) with style `style`.
@@ -160,29 +165,6 @@ struct _char_display_impl_t {
      * Set the entire grid to a single character with a single style.
      */
     void (*cd_set_grid)(char_display_t *cd, char_display_style_t style, char c);
-
-    /*
-     * We'll see if we actually need the functions below.
-     */
-
-    /**
-     * Write a full row to the display efficiently.
-     *
-     * This should only do anything if:
-     * 0 <= `row` < `rows`
-     * `row_data` is non-NULL.
-     *
-     * `row_data` should be an array of pairs with size at least `cols`.
-     */
-    //void (*cd_put_row)(char_display_t *cd, size_t row, const char_display_pair_t *row_data);
-
-    /**
-     * Write over the entire display efficiently.
-     *
-     * Only does anything if `grid_data` is non-NULL.
-     */
-    //void (*cd_put_grid)(char_display_t *cd, const char_display_pair_t *grid_data);
-
 };
 
 /**
@@ -237,38 +219,6 @@ static inline void delete_char_display(char_display_t *cd) {
     if (cd) {
         cd->impl->delete_char_display(cd);
     }
-}
-
-/**
- * Get the value of a single cell in the grid.
- *
- * If `style` is non-NULL, the style of the given cell is written to `*style`.
- * If `c` is non-NULL, the character displayed in the given cell is written to `*c`.
- */
-static inline void cd_get_c(char_display_t *cd, size_t row, size_t col, char_display_style_t *style, char *c) {
-    cd->impl->cd_get_c(cd, row, col, style, c);
-}
-
-/**
- * Get the values in a single row within the grid.
- *
- * `row_data` should have length of at least `cd->rows`.
- *
- * Does nothing if `row_data` is NULL.
- */
-static inline void cd_get_row(char_display_t *cd, size_t row, char_display_pair_t *row_data) {
-    cd->impl->cd_get_row(cd, row, row_data);
-}
-
-/**
- * Get the values in the entire grid of the character display.
- *
- * `grid_data` should have length at least `cd->rows * cd->cols`.
- *
- * Does nothing if `grid_data` is NULL.
- */
-static inline void cd_get_grid(char_display_t *cd, char_display_pair_t *grid_data) {
-    cd->impl->cd_get_grid(cd, grid_data);
 }
 
 /**

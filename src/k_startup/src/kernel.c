@@ -26,6 +26,8 @@
 #include "k_startup/plugin_fs.h"
 #include "k_startup/plugin_kb.h"
 
+#include "s_util/test/char_display.h"
+
 #include <stdint.h>
 
 static uint8_t init_err_style;
@@ -179,6 +181,9 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
+
+    test_char_display();
+    lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }

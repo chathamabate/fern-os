@@ -91,7 +91,7 @@ static void cd_flip_cursor(char_display_t *cd) {
     char_display_style_t style;
     char c; 
 
-    cd_get_c(cd, cd->cursor_row, cd->cursor_col, &style, &c);
+    cd->impl->cd_get_c(cd, cd->cursor_row, cd->cursor_col, &style, &c);
     cd->impl->cd_set_c(cd, cd->cursor_row, cd->cursor_col, cds_flip(style), c);
 }
 
