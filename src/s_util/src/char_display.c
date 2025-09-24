@@ -1,8 +1,8 @@
 
 #include "s_util/char_display.h"
+#include "s_util/str.h"
 
-// DELETE ME
-#include "k_bios_term/term.h"
+#include <stdarg.h>
 
 char_display_style_t cds_with_ansi_style_code(char_display_style_t cds, uint8_t ansi_style_code) {
     switch (ansi_style_code) {
@@ -361,4 +361,15 @@ void cd_put_s(char_display_t *cd, const char *s) {
     }
 
     cd_flip_cursor(cd);
+}
+
+void cd_put_fmt_s(char_display_t *cd, const char *fmt, ...) {
+    char cd_fmt_buf[CHAR_DISPLAY_FMT_BUF_SIZE];
+
+    va_list va;
+    va_start(va, fmt);
+    str_vfmt(cd_fmt_buf, fmt, va);
+    va_end(va);
+
+    cd_put_s(cd, cd_fmt_buf);
 }

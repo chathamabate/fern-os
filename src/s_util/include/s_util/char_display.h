@@ -251,4 +251,6 @@ void cd_put_c(char_display_t *cd, char c);
  */
 void cd_put_s(char_display_t *cd, const char *s);
 
+#define CHAR_DISPLAY_FMT_BUF_SIZE 1024
+void cd_put_fmt_s(char_display_t *cd, const char *fmt, ...);
 

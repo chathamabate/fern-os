@@ -1,5 +1,6 @@
 
 #include "s_util/char_display.h"
+#include "s_util/ansi.h"
 #include "s_util/str.h"
 #include "s_util/rand.h"
 #include "k_bios_term/term.h"
@@ -276,13 +277,87 @@ static bool test_simple_cursor_movements(void) {
     TEST_SUCCEED();
 }
 
+static bool test_next_and_prev_line(void) {
+    TEST_TRUE(dcd->rows >= 4);
 
+    // Put a character in every row but the last.
+    for (size_t row = 0; row < dcd->rows - 1; row++) {
+        cd_put_c(dcd, 'a' + (row % 26));
+        cd_put_s(dcd, "\n"); // Quick put s cntl character test.
+    }
+
+    char buf[16];
+
+    // We want to test scroll.
+    cd_put_s(dcd, ansi_previous_line_n(buf, dcd->rows));
+
+    // Now there is one new line on the top.
+
+    TEST_EQUAL_HEX(' ', grid[0][0].c);
+    TEST_EQUAL_HEX(cds_flip(dcd->default_style), grid[0][0].style);
+
+    for (size_t row = 1; row < dcd->rows; row++) {
+        TEST_EQUAL_HEX('a' + ((row - 1) % 26), (uint8_t)(grid[row][0].c));
+    }
+
+    cd_put_s(dcd, ansi_previous_line_n(buf, 2));
+    
+    // Now there are 3 new lines at the top. (2 cut off from the bottom)
+
+    cd_put_s(dcd, ansi_next_line_n(buf, 3));
+    TEST_EQUAL_HEX('a', (uint8_t)(grid[3][0].c));
+    TEST_EQUAL_HEX(cds_flip(dcd->default_style), grid[3][0].style);
+
+    cd_put_s(dcd, ansi_next_line_n(buf, dcd->rows - 3));
+
+    // Cursor is at a bottom empty line.
+
+    TEST_EQUAL_HEX(' ', (uint8_t)(grid[dcd->rows - 1][0].c));
+    TEST_EQUAL_HEX('a' + ((dcd->rows - 4) % 26), (uint8_t)(grid[dcd->rows - 2][0].c));
+
+    TEST_SUCCEED();
+}
+
+static bool test_clear_options(void) {
+    cd_put_s(dcd, "Hello\r" ANSI_CLEAR_TO_BOL);
+    TEST_EQUAL_HEX(' ', grid[0][0].c);
+    TEST_EQUAL_HEX('e', grid[0][1].c);
+
+    cd_put_s(dcd, ANSI_CURSOR_RIGHT ANSI_CURSOR_RIGHT ANSI_CLEAR_TO_EOL);
+    TEST_EQUAL_HEX('e', grid[0][1].c);
+    TEST_EQUAL_HEX(' ', grid[0][2].c);
+    TEST_EQUAL_HEX(' ', grid[0][3].c);
+
+    cd_put_s(dcd, "aye" ANSI_CLEAR_LINE);
+    for (size_t i = 0; i < dcd->cols; i++) {
+        TEST_EQUAL_HEX(' ', grid[0][i].c);
+    }
+
+    TEST_EQUAL_HEX(cds_flip(dcd->default_style), grid[0][5].style);
+
+    cd_put_s(dcd, "WOO\nAYE YO\nTOOOBO\n" ANSI_CLEAR_DISPLAY);
+
+    for (size_t row = 0; row < dcd->rows; row++) {
+        for (size_t col = 0; col < dcd->cols; col++) {
+            TEST_EQUAL_HEX(' ', grid[row][col].c);
+            const char_display_style_t exp_style = row == 0 && col == 0 
+                ? cds_flip(dcd->default_style) 
+                : dcd->default_style;
+            TEST_EQUAL_HEX(exp_style, grid[row][col].style);
+        }
+    }
+
+
+    TEST_SUCCEED();
+}
 
 bool test_char_display(void) {
     BEGIN_SUITE("Character Display");
     RUN_TEST(test_put_c0);
     RUN_TEST(test_put_c1);
     RUN_TEST(test_simple_cursor_movements);
+    RUN_TEST(test_next_and_prev_line);
+    RUN_TEST(test_clear_options);
     return END_SUITE();
 }
 
