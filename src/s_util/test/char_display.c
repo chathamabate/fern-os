@@ -347,6 +347,56 @@ static bool test_clear_options(void) {
         }
     }
 
+    TEST_SUCCEED();
+}
+
+static bool test_set_cursor_position(void) {
+    char buf[16];
+
+    for (size_t col = 1; col <= dcd->cols; col++) { // 1-indexed loop
+        cd_put_s(dcd, ansi_set_cursor_col(buf, col)); 
+        TEST_EQUAL_HEX(cds_flip(dcd->default_style), grid[0][col - 1].style);
+    }
+
+    cd_put_s(dcd, ansi_set_cursor_col(buf, dcd->cols * 2));
+    TEST_EQUAL_HEX(cds_flip(dcd->default_style), grid[0][dcd->cols - 1].style);
+
+    for (size_t col = 0; col < dcd->cols - 1; col++) {
+        TEST_EQUAL_HEX(dcd->default_style, grid[0][col].style);
+    }
+
+    // Now test set cursor position... RANDOM!
+
+    cd_put_c(dcd, '\r');
+
+    rand_t r = rand(0);
+
+    size_t cursor_row = 0; 
+    size_t cursor_col = 0;
+
+    for (size_t iter = 0; iter < 100; iter++) {
+        size_t new_row = next_rand_u8(&r) % (dcd->rows + 10);
+        size_t new_col = next_rand_u8(&r) % (dcd->cols + 10);
+
+        cd_put_s(dcd, ansi_set_cursor_position(buf, new_row + 1, new_col + 1));
+
+        if (new_row >= dcd->rows) {
+            new_row = dcd->rows - 1;
+        }
+
+        if (new_col >= dcd->cols) {
+            new_col = dcd->cols - 1;
+        }
+
+        if (new_row != cursor_row || new_col != cursor_col) {
+            TEST_EQUAL_HEX(dcd->default_style, grid[cursor_row][cursor_col].style);
+        }
+
+        TEST_EQUAL_HEX(cds_flip(dcd->default_style), grid[new_row][new_col].style);
+
+        cursor_row = new_row;
+        cursor_col = new_col;
+    }
 
     TEST_SUCCEED();
 }
@@ -358,6 +408,7 @@ bool test_char_display(void) {
     RUN_TEST(test_simple_cursor_movements);
     RUN_TEST(test_next_and_prev_line);
     RUN_TEST(test_clear_options);
+    RUN_TEST(test_set_cursor_position);
     return END_SUITE();
 }
 
