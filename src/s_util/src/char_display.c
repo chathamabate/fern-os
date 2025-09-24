@@ -1,6 +1,9 @@
 
 #include "s_util/char_display.h"
 
+// DELETE ME
+#include "k_bios_term/term.h"
+
 char_display_style_t cds_with_ansi_style_code(char_display_style_t cds, uint8_t ansi_style_code) {
     switch (ansi_style_code) {
     default:
@@ -325,6 +328,8 @@ static size_t cd_interp_esc_seq(char_display_t *cd, const char *s) {
 }
 
 void cd_put_s(char_display_t *cd, const char *s) {
+    cd_flip_cursor(cd);
+
     const char *iter = s;
     char c;
 
@@ -354,4 +359,6 @@ void cd_put_s(char_display_t *cd, const char *s) {
 
         }
     }
+
+    cd_flip_cursor(cd);
 }

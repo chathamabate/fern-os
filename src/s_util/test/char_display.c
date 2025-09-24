@@ -1,6 +1,7 @@
 
 #include "s_util/char_display.h"
 #include "s_util/str.h"
+#include "s_util/rand.h"
 #include "k_bios_term/term.h"
 
 static bool pretest(void);
@@ -227,10 +228,61 @@ static bool test_put_c1(void) {
     TEST_SUCCEED();
 }
 
+static bool test_simple_cursor_movements(void) {
+    // We'll confirm the cursor moved by seeing if the color of the destination cell
+    // flipped. This is gonna be a random test btw!!!
+
+    size_t row = 0;
+    size_t col = 0;
+
+    rand_t r = rand(0);
+    char buf[32];
+
+    for (size_t i = 0; i < 100; i++) {
+        uint8_t amt = next_rand_u8(&r) % 16;
+
+        size_t new_row = row;
+        size_t new_col = col;
+
+        if (next_rand_u1(&r)) {
+            if (next_rand_u1(&r)) { // Up
+                cd_put_s(dcd, ansi_cursor_up_n(buf, amt));
+                new_row = amt > row ? 0 : row - amt;
+            } else { // Down
+                cd_put_s(dcd, ansi_cursor_down_n(buf, amt));
+                new_row = amt + row >= dcd->rows ? dcd->rows - 1 : amt + row;
+            }
+        } else {
+            if (next_rand_u1(&r)) { // Left
+                cd_put_s(dcd, ansi_cursor_left_n(buf, amt));
+                new_col = amt > col ? 0 : col - amt;
+            } else { // Right
+                cd_put_s(dcd, ansi_cursor_right_n(buf, amt));
+                new_col = amt + col >= dcd->cols ? dcd->cols - 1 : amt + col;
+            }
+        }
+
+        if (new_row != row || new_col != col) {
+            TEST_EQUAL_HEX(dcd->default_style, grid[row][col].style);
+        }
+
+        TEST_EQUAL_HEX(cds_flip(dcd->default_style), 
+                grid[new_row][new_col].style);
+
+        row = new_row;
+        col = new_col;
+    }
+
+    TEST_SUCCEED();
+}
+
+
+
 bool test_char_display(void) {
     BEGIN_SUITE("Character Display");
     RUN_TEST(test_put_c0);
     RUN_TEST(test_put_c1);
+    RUN_TEST(test_simple_cursor_movements);
     return END_SUITE();
 }
 
