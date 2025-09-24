@@ -85,6 +85,10 @@ void init_char_display_base(char_display_t *base, const char_display_impl_t *imp
     *(size_t *)&(base->cols) = cols;
 
     *(char_display_style_t *)&(base->default_style) = default_style;
+
+    base->cursor_row = 0;
+    base->cursor_col = 0;
+    base->curr_style = default_style;
 }
 
 static void cd_flip_cursor(char_display_t *cd) {

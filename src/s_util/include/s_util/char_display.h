@@ -208,6 +208,11 @@ struct _char_display_t {
  * Initialize the char_display_t base class fields.
  *
  * This is a helper function to be used in the constructors of derrived classes.
+ *
+ * The starting cursor position will be the top left corner (0, 0)
+ * NOTE: THIS DOES NOT call any of the given virtual functions AT ALL.
+ *
+ * Make sure your derrived constructor clears the display and renders the cursor!
  */
 void init_char_display_base(char_display_t *base, const char_display_impl_t *impl, size_t rows, size_t cols,
         char_display_style_t default_style);
