@@ -2,7 +2,7 @@
 #include "s_data/test/map.h"
 #include "s_data/map.h"
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "s_mem/allocator.h"
 
 #include "s_util/str.h"

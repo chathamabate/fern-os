@@ -1,5 +1,5 @@
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "s_util/char_display.h"
 #include "s_util/ansi.h"
 #include "k_sys/io.h"

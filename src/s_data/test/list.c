@@ -8,7 +8,7 @@
 
 #include "s_mem/allocator.h"
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "s_util/err.h"
 
 static bool pretest(void);

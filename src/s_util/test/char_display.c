@@ -3,7 +3,7 @@
 #include "s_util/ansi.h"
 #include "s_util/str.h"
 #include "s_util/rand.h"
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 
 static bool pretest(void);
 
@@ -454,6 +454,16 @@ static bool test_styles(void) {
     TEST_SUCCEED();
 }
 
+static bool test_bad_sequences(void) {
+    cd_put_s(dcd, ANSI_CSI);
+    TEST_EQUAL_HEX(' ', grid[0][0].c);
+
+    cd_put_s(dcd, "\r" ANSI_CSI "$@");
+    TEST_EQUAL_HEX('@', grid[0][0].c);
+
+    TEST_SUCCEED();
+}
+
 bool test_char_display(void) {
     BEGIN_SUITE("Character Display");
     RUN_TEST(test_put_c0);
@@ -464,6 +474,7 @@ bool test_char_display(void) {
     RUN_TEST(test_set_cursor_position);
     RUN_TEST(test_scroll_up_and_down);
     RUN_TEST(test_styles);
+    RUN_TEST(test_bad_sequences);
     return END_SUITE();
 }
 

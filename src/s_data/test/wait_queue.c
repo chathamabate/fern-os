@@ -2,7 +2,7 @@
 #include "s_data/wait_queue.h"
 #include "s_data/test/wait_queue.h"
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "s_util/err.h"
 #include <stdint.h>
 

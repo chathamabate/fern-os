@@ -10,7 +10,7 @@
 #include "s_util/str.h"
 #include "u_startup/main.h"
 #include "k_startup/page.h"
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "s_util/str.h"
 
 thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg) {

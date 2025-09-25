@@ -2,7 +2,7 @@
 
 #include "k_sys/debug.h"
 #include "s_bridge/ctx.h"
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
 #include "s_mem/allocator.h"

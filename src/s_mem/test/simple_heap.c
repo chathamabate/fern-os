@@ -1,5 +1,5 @@
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 
 #include "s_mem/allocator.h"
 #include "s_mem/simple_heap.h"

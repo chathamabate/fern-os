@@ -1,5 +1,5 @@
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 
 // NOTE: This is a cyclic dependency, but we'll allow it.
 #define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)

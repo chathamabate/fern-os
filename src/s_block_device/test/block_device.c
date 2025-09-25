@@ -2,7 +2,7 @@
 #include "s_block_device/test/block_device.h"
 
 #include <stdbool.h>
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "s_block_device/block_device.h"
 #include "s_mem/allocator.h"
 #include "s_util/str.h"

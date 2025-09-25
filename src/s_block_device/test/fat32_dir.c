@@ -10,7 +10,7 @@
 #include "s_block_device/mem_block_device.h"
 #include "s_block_device/fat32.h"
 #include "s_block_device/fat32_dir.h"
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "s_util/rand.h"
 
 static bool pretest(void);

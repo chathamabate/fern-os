@@ -1,6 +1,6 @@
 
 #include "k_startup/kernel.h"
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "k_startup/page.h"
 #include "k_startup/gdt.h"
 #include "k_startup/idt.h"
@@ -26,7 +26,8 @@
 #include "k_startup/plugin_fs.h"
 #include "k_startup/plugin_kb.h"
 
-#include "k_startup/vga_term.h"
+#include "s_util/char_display.h"
+#include "k_startup/vga_cd.h"
 
 #include <stdint.h>
 

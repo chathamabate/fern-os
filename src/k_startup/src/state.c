@@ -9,7 +9,7 @@
 #include "k_startup/handle.h"
 #include "k_startup/plugin.h"
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "s_util/str.h"
 #include "s_util/ansi.h"
 

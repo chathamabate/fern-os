@@ -3,7 +3,7 @@
 #include "k_startup/page.h"
 #include "k_sys/page.h"
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "k_sys/debug.h"
 #include "s_util/err.h"
 #include "s_util/constraints.h"

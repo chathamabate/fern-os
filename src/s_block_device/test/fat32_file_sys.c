@@ -42,7 +42,7 @@ bool test_fat32_file_sys(void) {
     return test_file_sys("FAT32 File Sys", gen_fat32_fs);
 }
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 
 static bool pretest(void);
 static bool posttest(void);

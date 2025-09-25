@@ -1,7 +1,7 @@
 
 #include "k_sys/ata.h"
 
-#include "k_startup/vga_term.h"
+#include "k_startup/vga_cd.h"
 #include "k_sys/io.h"
 
 #include <stdint.h>
