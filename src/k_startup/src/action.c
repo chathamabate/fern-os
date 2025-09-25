@@ -2,25 +2,19 @@
 
 #include "k_sys/debug.h"
 #include "s_bridge/ctx.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_term.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
-#include "s_util/ansi.h"
-#include "s_util/str.h"
 #include "s_mem/allocator.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
-#include "k_startup/process.h"
 #include "k_startup/kernel.h"
 #include <stdint.h>
 #include "k_startup/state.h"
 #include "k_sys/debug.h"
-#include "s_data/wait_queue.h"
-#include "k_startup/thread.h"
 #include "k_startup/gdt.h"
 #include "k_sys/intr.h"
 #include "k_startup/plugin.h"
-#include "s_util/constraints.h"
 #include "k_startup/handle.h"
 #include "k_startup/plugin.h"
 #include "s_util/ps2_scancodes.h"
@@ -77,13 +71,13 @@ static void return_to_curr_thread(void) {
 
 void fos_lock_up_action(user_ctx_t *ctx) {
     (void)ctx;
-    out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), "Lock Up Triggered");
+    out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), "Lock Up Triggered");
     lock_up();
 }
 
 void fos_gpf_action(user_ctx_t *ctx) {
     if (ctx->cr3 == get_kernel_pd()) { // Are we currently in the kernel?
-        out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
+        out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), 
                 "Kernel Locking up in GPF Action");
         lock_up();
     }
@@ -98,7 +92,7 @@ void fos_pf_action(user_ctx_t *ctx) {
     // handler with some special stack.
 
     if (ctx->cr3 == get_kernel_pd()) {
-        out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
+        out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), 
                 "Kernel Locking up in PF Action");
         lock_up();
     }

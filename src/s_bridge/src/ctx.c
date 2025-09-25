@@ -3,7 +3,7 @@
 
 #include "k_sys/page.h"
 #include "k_sys/intr.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_term.h"
 
 
 intr_action_t gpf_action = NULL;

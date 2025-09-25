@@ -1,6 +1,6 @@
 
 #include "k_startup/kernel.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_term.h"
 #include "k_startup/page.h"
 #include "k_startup/gdt.h"
 #include "k_startup/idt.h"
@@ -27,14 +27,11 @@
 #include "k_startup/plugin_kb.h"
 
 #include "k_startup/vga_term.h"
-#include "s_util/ansi.h"
 
 #include <stdint.h>
 
-static uint8_t init_err_style;
-
 static inline void setup_fatal(const char *msg) {
-    out_bios_vga(init_err_style, msg);
+    out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), msg);
     lock_up();
 }
 
@@ -155,8 +152,6 @@ static void init_kernel_plugins(void) {
 }
 
 void start_kernel(void) {
-    init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-
     try_setup_step(validate_constraints(), "Failed to validate memory areas");
 
     try_setup_step(init_gdt(), "Failed to initialize GDT");
@@ -167,12 +162,10 @@ void start_kernel(void) {
     set_gpf_action(fos_lock_up_action);
     set_pf_action(fos_lock_up_action);
 
-    try_setup_step(init_term(), "Failed to initialize Terminal");
+    try_setup_step(init_vga_char_display(), "Failed to init VGA terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     try_setup_step(init_kb(), "Failed to init keyboard");
-    try_setup_step(init_vga_char_display(), "Failed to init VGA terminal");
-
 
     init_kernel_state();
     init_kernel_plugins();
@@ -184,8 +177,6 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
-
-    lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }

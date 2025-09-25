@@ -3,7 +3,7 @@
 #include "s_util/str.h"
 #include "s_mem/test/allocator.h"
 #include "s_mem/allocator.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_term.h"
 
 
 static bool pretest(void);

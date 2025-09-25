@@ -1,6 +1,6 @@
 
 #include "s_block_device/test/file_sys.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_term.h"
 
 #define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
 

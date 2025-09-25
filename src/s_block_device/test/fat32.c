@@ -9,7 +9,7 @@
 #include "s_block_device/block_device.h"
 #include "s_block_device/mem_block_device.h"
 #include "s_block_device/fat32.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_term.h"
 
 static bool pretest(void);
 static bool posttest(void);

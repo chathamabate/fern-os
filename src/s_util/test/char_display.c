@@ -3,13 +3,23 @@
 #include "s_util/ansi.h"
 #include "s_util/str.h"
 #include "s_util/rand.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_term.h"
 
 static bool pretest(void);
 
 #define PRETEST() pretest()
 
-// NOTE: This is a cyclic dependency, but we'll allow it.
+/*
+ * WARNING THIS IS HIGHLY CYCLIC!
+ *
+ * The VGA terminal now itself uses a char_display_t under the hood.
+ *
+ * If there is an issue with the char display base implementation, it is likely the test
+ * results won't even be printed out correctly.
+ *
+ * If the tests pass though, we'd expect everything to be printed out correctly.
+ */
+
 #define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
 
 #include "s_util/test.h"

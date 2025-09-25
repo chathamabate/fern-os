@@ -25,7 +25,7 @@ plugin_t *new_plugin_kb(kernel_state_t *ks) {
     return (plugin_t *)plg_kb;
 }
 
-#include "k_bios_term/term.h"
+#include "k_startup/vga_term.h"
 
 static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd, uint32_t arg0,
         uint32_t arg1, uint32_t arg2, uint32_t arg3) {
@@ -50,9 +50,9 @@ static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kc
         sc = (scs1_code_t)arg0;
 
         if (sc == SCS1_ENTER) {
-            term_cursor_next_line();
+            term_put_c('\n');
         } else if (sc == SCS1_E_DOWN) {
-            term_cursor_next_line();
+            term_put_c('\n');
         } else {
             char c = scs1_to_ascii_lc(sc);
             if (c) {
