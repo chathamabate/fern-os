@@ -401,6 +401,49 @@ static bool test_set_cursor_position(void) {
     TEST_SUCCEED();
 }
 
+static bool test_scroll_up_and_down(void) {
+    // The behavior of scrolling as been tested in many ways already.
+    // This is really just testing that the scroll escape sequence is interpreted correctly.
+
+    TEST_TRUE(dcd->rows >= 6);
+
+    cd_put_s(dcd, "A\r");
+
+    char buf[16];
+
+    cd_put_s(dcd, ansi_scroll_down_n(buf, 5));
+    TEST_EQUAL_HEX('A', grid[5][0].c);
+
+    cd_put_s(dcd, ansi_scroll_up_n(buf, 2));
+    TEST_EQUAL_HEX('A', grid[3][0].c);
+    TEST_EQUAL_HEX(dcd->default_style, grid[3][0].style);
+
+    TEST_EQUAL_HEX(cds_flip(dcd->default_style), grid[0][0].style);
+
+    TEST_SUCCEED();
+}
+
+static bool test_styles(void) {
+    cd_put_s(dcd, ANSI_BLUE_FG ANSI_BLACK_BG "A" ANSI_ITALIC "B" ANSI_RED_BG "C" 
+            ANSI_GREEN_FG "D" ANSI_RESET "E");
+
+    const char_display_pair_t exp_pairs[] = {
+        {char_display_style(CDC_BLUE, CDC_BLACK), 'A'},
+        {CDS_ITALIC | char_display_style(CDC_BLUE, CDC_BLACK), 'B'},
+        {CDS_ITALIC | char_display_style(CDC_BLUE, CDC_RED), 'C'},
+        {CDS_ITALIC | char_display_style(CDC_GREEN, CDC_RED), 'D'},
+        {dcd->default_style, 'E'},
+    };
+    const size_t num_exp_pairs = sizeof(exp_pairs) / sizeof(exp_pairs[0]);
+
+    for (size_t i = 0; i < num_exp_pairs; i++) {
+        TEST_EQUAL_HEX(exp_pairs[i].style, grid[0][i].style);
+        TEST_EQUAL_HEX(exp_pairs[i].c, grid[0][i].c);
+    }
+
+    TEST_SUCCEED();
+}
+
 bool test_char_display(void) {
     BEGIN_SUITE("Character Display");
     RUN_TEST(test_put_c0);
@@ -409,6 +452,8 @@ bool test_char_display(void) {
     RUN_TEST(test_next_and_prev_line);
     RUN_TEST(test_clear_options);
     RUN_TEST(test_set_cursor_position);
+    RUN_TEST(test_scroll_up_and_down);
+    RUN_TEST(test_styles);
     return END_SUITE();
 }
 

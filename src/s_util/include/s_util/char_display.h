@@ -26,7 +26,7 @@ typedef uint8_t char_display_color_t;
 #define CDC_BROWN           (6)
 #define CDC_LIGHT_GREY      (7)
 
-#define CDC_BRIGHT (1U << 4)
+#define CDC_BRIGHT (1U << 3)
 
 /*
  * Bright Alternatives
@@ -42,7 +42,7 @@ typedef uint8_t char_display_color_t;
 #define CDC_WHITE                  (CDC_BRIGHT | 7)
 
 static inline char_display_color_t cdc_bright(char_display_color_t cdc) {
-    return cdc | (1U << 3);
+    return cdc | (1U << CDC_BRIGHT);
 }
 
 /**
