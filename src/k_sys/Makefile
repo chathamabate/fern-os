@@ -4,7 +4,7 @@
 MOD_NAME 	?= k_sys
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= tss.c gdt.c idt.c intr.c page.c debug.c ata.c kb.c
+_SRCS 		?= tss.c gdt.c idt.c intr.c ata.c kb.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= tss.s io.s page.s gdt.s idt.s intr.s debug.s
