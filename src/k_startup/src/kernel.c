@@ -26,7 +26,8 @@
 #include "k_startup/plugin_fs.h"
 #include "k_startup/plugin_kb.h"
 
-#include "s_util/test/char_display.h"
+#include "k_startup/vga_term.h"
+#include "s_util/ansi.h"
 
 #include <stdint.h>
 
@@ -170,6 +171,8 @@ void start_kernel(void) {
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     try_setup_step(init_kb(), "Failed to init keyboard");
+    try_setup_step(init_vga_char_display(), "Failed to init VGA terminal");
+
 
     init_kernel_state();
     init_kernel_plugins();
@@ -182,7 +185,6 @@ void start_kernel(void) {
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
 
-    test_char_display();
     lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));
