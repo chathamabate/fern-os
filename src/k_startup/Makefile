@@ -11,6 +11,7 @@ _SRCS 		?= kernel.c \
 			   plugin.c \
 			   plugin_fs.c \
 			   plugin_kb.c \
+			   plugin_vga_cd.c \
 			   action.c \
 			   tss.c \
 			   gdt.c \

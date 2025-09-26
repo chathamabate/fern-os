@@ -262,7 +262,7 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 
 
 /*
- * File System Plugin.
+ * ***** File System Plugin *****
  */
 
 #define PLG_FILE_SYS_ID (1U)
@@ -290,7 +290,7 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 #define PLG_FS_HCID_FLUSH          (NUM_DEFAULT_HCIDS + 1U)
 
 /*
- * Keyboard Plugin.
+ * ***** Keyboard Plugin ******
  */
 
 #define PLG_KEYBOARD_ID (2U)
@@ -306,3 +306,15 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  */
 
 #define PLG_KB_PCID_OPEN          (0U)
+
+/*
+ * ***** VGA Character Display Plugin *****
+ */
+
+#define PLG_VGA_CD_SYS_ID         (3U)
+
+/*
+ * VGA Character Display Plugin commands.
+ */
+
+#define PLG_VGA_CD_PCID_OPEN      (0U)
