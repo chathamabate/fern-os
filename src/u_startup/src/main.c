@@ -22,7 +22,19 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    sc_handle_write_fmt_s(h, "Number: " ANSI_BRIGHT_CYAN_FG ANSI_MAGENTA_BG "%d" ANSI_RESET "\n", 39);
+    proc_id_t pid;
+    err = sc_proc_fork(&pid);
+
+    if (err != FOS_E_SUCCESS) {
+        return PROC_ES_FAILURE;
+    }
+
+    if (pid == FOS_MAX_PROCS) {
+        sc_handle_write_s(h, "AYE YO");
+        return PROC_ES_SUCCESS;
+    }
+
+    while (1);
 
     return PROC_ES_SUCCESS;
 }

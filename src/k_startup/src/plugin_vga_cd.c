@@ -39,8 +39,12 @@ static fernos_error_t delete_vga_cd_handle_state(handle_state_t *hs) {
 }
 
 /**
- * When writing a string to the VGA Character Display, the given length should be the length of
- * the string NOT INCLUDING the NT.
+ * Writing to the VGA Character display expects a string without a null terminator.
+ *
+ * `len` should be equal to `str_len(string to print)`.
+ *
+ * Undefined behavior if the string to print contains non-supported control characters or
+ * sequences.
  */
 static fernos_error_t vga_cd_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
     fernos_error_t err;

@@ -1,14 +1,81 @@
 
 #include "k_startup/plugin_kb.h"
 #include "s_util/ps2_scancodes.h"
+#include "k_startup/vga_cd.h"
+#include "k_startup/handle.h"
+
+/*
+ * Keyboard handle state stuff.
+ */
+
+static fernos_error_t copy_kb_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
+static fernos_error_t delete_kb_handle_state(handle_state_t *hs);
+
+static fernos_error_t kb_hs_read(handle_state_t *hs, void *u_dest, size_t len, size_t *u_readden);
+static fernos_error_t kb_hs_wait(handle_state_t *hs);
+static fernos_error_t kb_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, 
+        uint32_t arg2, uint32_t arg3);
+
+const handle_state_impl_t KB_HS_IMPL = {
+    .copy_handle_state = copy_kb_handle_state,
+    .delete_handle_state = delete_kb_handle_state,
+    .hs_write = NULL,
+    .hs_read = kb_hs_read,
+    .hs_wait = kb_hs_wait,
+    .hs_cmd = kb_hs_cmd
+};
+
+static fernos_error_t copy_kb_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
+    plugin_kb_handle_state_t *plg_hs = (plugin_kb_handle_state_t *)hs;
+
+    plugin_kb_handle_state_t *plg_hs_copy = al_malloc(hs->ks->al, sizeof(plugin_kb_handle_state_t));
+    if (!plg_hs_copy) {
+        return FOS_E_NO_MEM;
+    }
+
+    init_base_handle((handle_state_t *)plg_hs_copy, &KB_HS_IMPL, hs->ks, proc, hs->handle);
+    *(plugin_kb_t **)&(plg_hs_copy->plg_kb) = plg_hs->plg_kb;
+    plg_hs_copy->pos = plg_hs->pos;
+
+    *out = (handle_state_t *)plg_hs_copy;
+
+    return FOS_E_SUCCESS;
+}
+
+static fernos_error_t delete_kb_handle_state(handle_state_t *hs) {
+    al_free(hs->ks->al, hs);
+    return FOS_E_SUCCESS;
+}
+
+/**
+ * If there are no moare keys to read at this moment FOS_E_EMPTY is returned.
+ */
+static fernos_error_t kb_hs_read(handle_state_t *hs, void *u_dest, size_t len, size_t *u_readden) {
+
+
+}
+
+static fernos_error_t kb_hs_wait(handle_state_t *hs) {
+
+}
+static fernos_error_t kb_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, 
+        uint32_t arg2, uint32_t arg3) {
+
+}
+
+/*
+ * Keyboard plugin state stuff.
+ */
 
 static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd, uint32_t arg0,
         uint32_t arg1, uint32_t arg2, uint32_t arg3);
+static fernos_error_t plg_kb_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1,
+        uint32_t arg2, uint32_t arg3);
 
 static const plugin_impl_t PLUGIN_KB_IMPL = {
     .plg_on_shutdown = NULL,
     .plg_kernel_cmd = plg_kb_kernel_cmd,
-    .plg_cmd = NULL,
+    .plg_cmd = plg_kb_cmd,
     .plg_tick = NULL,
     .plg_on_fork_proc = NULL,
     .plg_on_reap_proc = NULL,
@@ -16,16 +83,23 @@ static const plugin_impl_t PLUGIN_KB_IMPL = {
 
 plugin_t *new_plugin_kb(kernel_state_t *ks) {
     plugin_kb_t *plg_kb = al_malloc(ks->al, sizeof(plugin_kb_t));
-    if (!plg_kb) {
+    basic_wait_queue_t *bwq = new_basic_wait_queue(ks->al);
+
+    if (!plg_kb || !bwq) {
+        delete_wait_queue((wait_queue_t *)bwq);
+        al_free(ks->al, plg_kb);
         return NULL;
     }
 
+    // Success!
+
     init_base_plugin((plugin_t *)plg_kb, &PLUGIN_KB_IMPL, ks);
+
+    plg_kb->sc_buf_pos = 0;
+    *(basic_wait_queue_t **)&(plg_kb->bwq) = bwq;
 
     return (plugin_t *)plg_kb;
 }
-
-#include "k_startup/vga_cd.h"
 
 static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd, uint32_t arg0,
         uint32_t arg1, uint32_t arg2, uint32_t arg3) {
@@ -68,4 +142,9 @@ static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kc
     }
 
     }
+}
+
+static fernos_error_t plg_kb_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1,
+        uint32_t arg2, uint32_t arg3) {
+
 }

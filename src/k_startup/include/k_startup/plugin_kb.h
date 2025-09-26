@@ -2,12 +2,18 @@
 #pragma once
 
 #include "plugin.h"
+#include "s_data/wait_queue.h"
 
 typedef struct _plugin_kb_t plugin_kb_t;
 typedef struct _plugin_kb_handle_state_t plugin_kb_handle_state_t;
 
 struct _plugin_kb_handle_state_t {
     handle_t super;
+
+    /**
+     * The keyboard plugin which created this handle state.
+     */
+    plugin_kb_t * const plg_kb;
 
     /**
      * The next position in the scancode buffer to attempt to read from!
@@ -41,6 +47,11 @@ struct _plugin_kb_t {
      * We are using uint16_t to make it easy to store extended scancodes and normal scancodes.
      */
     uint16_t sc_buf[PLG_KB_BUFFER_SIZE];
+
+    /**
+     * For threads waiting on a keypress.
+     */
+    basic_wait_queue_t * const bwq;
 };
 
 plugin_t *new_plugin_kb(kernel_state_t *ks);

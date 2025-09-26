@@ -308,6 +308,12 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 #define PLG_KB_PCID_OPEN          (0U)
 
 /*
+ * Keyboard plugin handle commands
+ */
+
+#define PLG_KB_HCID_SKIP_FWD      (0U)
+
+/*
  * ***** VGA Character Display Plugin *****
  */
 
