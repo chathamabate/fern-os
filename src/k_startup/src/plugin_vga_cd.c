@@ -7,6 +7,8 @@
 #include "k_startup/vga_cd.h"
 #include "s_bridge/shared_defs.h"
 
+#define ANSI_CSI_LOOK_BACK (32U)
+
 static fernos_error_t copy_vga_cd_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
 static fernos_error_t delete_vga_cd_handle_state(handle_state_t *hs);
 static fernos_error_t vga_cd_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
@@ -70,7 +72,7 @@ static fernos_error_t vga_cd_hs_write(handle_state_t *hs, const void *u_src, siz
         // ansi control sequence. Let's check the final 32 characters.
         
         // This loop will only work when PLG_VGA_CD_TX_MAX_LEN > 32. Which should always be the case.
-        for (size_t i = amt_to_print - 1; i >= amt_to_print - 1 - 32; i--) {
+        for (size_t i = amt_to_print - 1; i >= amt_to_print - ANSI_CSI_LOOK_BACK; i--) {
             // We found the start of a control sequence, cut off here and break the loop.
             if (buf[i] == '\x1B') {
                 buf[i] = '\0';
@@ -106,6 +108,10 @@ static const plugin_impl_t PLUGIN_VGA_CD_IMPL = {
  * This just returns a pointer to the singleton.
  */
 plugin_t *new_plugin_vga_cd(kernel_state_t *ks) {
+    if (PLG_VGA_CD_TX_MAX_LEN <= ANSI_CSI_LOOK_BACK) {
+        return NULL;
+    }
+
     plugin_t *vga_cd_plg = al_malloc(ks->al, sizeof(plugin_t));
     if (!vga_cd_plg) {
         return NULL;

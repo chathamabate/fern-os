@@ -135,6 +135,21 @@ fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len) {
     return FOS_E_SUCCESS;
 }
 
+fernos_error_t sc_handle_write_s(handle_t h, const char *str) {
+    return sc_handle_write_full(h, str, str_len(str));
+}
+
+fernos_error_t sc_handle_write_fmt_s(handle_t h, const char *fmt, ...) {
+    char buf[SC_HANDLE_WRITE_FMT_S_BUFFER_SIZE];
+
+    va_list va; 
+    va_start(va, fmt);
+    str_vfmt(buf, fmt, va);
+    va_end(va);
+
+    return sc_handle_write_s(h, buf);
+}
+
 fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
     fernos_error_t err;
 

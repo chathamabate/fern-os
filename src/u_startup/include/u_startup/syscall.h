@@ -299,6 +299,21 @@ fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t a
 fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len);
 
 /**
+ * This won't return until the full given string is written (EXCLUDING THE NT)
+ * or an error is encountered.
+ */
+fernos_error_t sc_handle_write_s(handle_t h, const char *str);
+
+/**
+ * Just like `sc_handle_write_s`, but a fmt string is accepted with varargs.
+ *
+ * Formatting is run on a buffer with size `SC_HANDLE_WRITE_FMT_S_BUFFER_SIZE`.
+ * Undefined behavior if the resulting string overflows this buffer!
+ */
+#define SC_HANDLE_WRITE_FMT_S_BUFFER_SIZE (1024U)
+fernos_error_t sc_handle_write_fmt_s(handle_t h, const char *fmt, ...);
+
+/**
  * When using a handle which may read a partial amount on success,
  * this function will call `sc_read` in a loop until all bytes are written!
  * (Or an error is encountered)
