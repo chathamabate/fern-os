@@ -311,7 +311,7 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  * ***** VGA Character Display Plugin *****
  */
 
-#define PLG_VGA_CD_SYS_ID         (3U)
+#define PLG_VGA_CD_ID         (3U)
 
 /*
  * VGA Character Display Plugin commands.

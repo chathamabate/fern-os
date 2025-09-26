@@ -4,6 +4,7 @@
 #include "k_startup/plugin.h"
 #include "k_startup/handle.h"
 #include "k_startup/page_helpers.h"
+#include "k_startup/vga_cd.h"
 #include "s_bridge/shared_defs.h"
 
 static fernos_error_t copy_vga_cd_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
@@ -35,9 +36,59 @@ static fernos_error_t delete_vga_cd_handle_state(handle_state_t *hs) {
     return FOS_E_SUCCESS;
 }
 
+/**
+ * When writing a string to the VGA Character Display, the given length should be the length of
+ * the string NOT INCLUDING the NT.
+ */
 static fernos_error_t vga_cd_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
-    // If it's too large we'll need to back track to see if there are any control sequences...
-    // Make sure not to print those.
+    fernos_error_t err;
+
+    thread_t *thr = hs->ks->curr_thread;
+
+    if (!u_src || !u_written) {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    size_t amt_to_copy = len;
+    if (len > PLG_VGA_CD_TX_MAX_LEN) {
+        amt_to_copy = PLG_VGA_CD_TX_MAX_LEN;
+    }
+
+    char buf[PLG_VGA_CD_TX_MAX_LEN + 1];
+
+    err = mem_cpy_from_user(buf, thr->proc->pd, u_src, amt_to_copy, NULL);
+    if (err != FOS_E_SUCCESS) {
+        DUAL_RET(thr, err, FOS_E_SUCCESS);
+    }
+
+    buf[amt_to_copy] = '\0';
+
+    size_t amt_to_print = amt_to_copy;
+    if (amt_to_print < len) {
+        // If the given buffer was cut off, i.e. we will not be printing everything here in one go,
+        // there is a small chance that the final few characters in the buffer are an incomplete
+        // ansi control sequence. Let's check the final 32 characters.
+        
+        // This loop will only work when PLG_VGA_CD_TX_MAX_LEN > 32. Which should always be the case.
+        for (size_t i = amt_to_print - 1; i >= amt_to_print - 1 - 32; i--) {
+            // We found the start of a control sequence, cut off here and break the loop.
+            if (buf[i] == '\x1B') {
+                buf[i] = '\0';
+                amt_to_print = i;
+                break;
+            }
+        }
+    }
+
+    err = mem_cpy_to_user(thr->proc->pd, u_written, &amt_to_print, sizeof(size_t), NULL);
+    if (err != FOS_E_SUCCESS) {
+        DUAL_RET(thr, err, FOS_E_SUCCESS);
+    }
+
+    // success!
+    cd_put_s(VGA_CD, buf);
+
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 static fernos_error_t vga_cd_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);

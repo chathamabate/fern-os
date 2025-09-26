@@ -25,6 +25,7 @@
 #include "s_block_device/file_sys.h"
 #include "k_startup/plugin_fs.h"
 #include "k_startup/plugin_kb.h"
+#include "k_startup/plugin_vga_cd.h"
 
 #include "s_util/char_display.h"
 #include "k_startup/vga_cd.h"
@@ -150,6 +151,13 @@ static void init_kernel_plugins(void) {
         setup_fatal("Failed to create Keyboard plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_KEYBOARD_ID, plg_kb), "Failed to set up KB Plugin in the kernel");
+
+    plugin_t *plg_vga_cd = new_plugin_vga_cd(kernel);
+    if (!plg_vga_cd) {
+        setup_fatal("Failed to create VGA Character Display plugin");
+    }
+    try_setup_step(ks_set_plugin(kernel, PLG_VGA_CD_ID, plg_vga_cd), "Failed to set VGA CD Plugin in the kernel");
+
 }
 
 void start_kernel(void) {

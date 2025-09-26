@@ -11,9 +11,9 @@
 #include "u_concur/test/mutex.h"
 
 proc_exit_status_t user_main(void) {
-    while (1) {
-        sc_thread_sleep(18);
-    }
+    fernos_error_t err;
+
+    handle_t h;
 
     return PROC_ES_SUCCESS;
 }
