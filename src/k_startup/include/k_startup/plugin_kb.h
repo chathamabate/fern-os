@@ -2,13 +2,14 @@
 #pragma once
 
 #include "plugin.h"
+#include "k_startup/handle.h"
 #include "s_data/wait_queue.h"
 
 typedef struct _plugin_kb_t plugin_kb_t;
 typedef struct _plugin_kb_handle_state_t plugin_kb_handle_state_t;
 
 struct _plugin_kb_handle_state_t {
-    handle_t super;
+    handle_state_t super;
 
     /**
      * The keyboard plugin which created this handle state.
