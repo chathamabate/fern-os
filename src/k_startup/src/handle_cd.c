@@ -1,6 +1,8 @@
 
 #include "k_startup/handle_cd.h"
 #include "s_mem/allocator.h"
+#include "s_bridge/shared_defs.h"
+#include "k_startup/page_helpers.h"
 
 #define ANSI_CSI_LOOK_BACK (32U)
 
@@ -54,7 +56,7 @@ static fernos_error_t delete_handle_cd_state(handle_state_t *hs) {
 }
 
 /**
- * Writing to the VGA Character display expects a string without a null terminator.
+ * Writing to a Character display expects a string without a null terminator.
  *
  * `len` should be equal to `str_len(string to print)`.
  *
@@ -63,6 +65,7 @@ static fernos_error_t delete_handle_cd_state(handle_state_t *hs) {
  */
 static fernos_error_t hs_cd_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
     fernos_error_t err;
+    handle_cd_state_t *hs_cd = (handle_cd_state_t *)hs;
 
     thread_t *thr = hs->ks->curr_thread;
 
@@ -71,11 +74,11 @@ static fernos_error_t hs_cd_write(handle_state_t *hs, const void *u_src, size_t 
     }
 
     size_t amt_to_copy = len;
-    if (len > PLG_VGA_CD_TX_MAX_LEN) {
-        amt_to_copy = PLG_VGA_CD_TX_MAX_LEN;
+    if (len > HANDLE_CD_TX_MAX_LEN) {
+        amt_to_copy = HANDLE_CD_TX_MAX_LEN;
     }
 
-    char buf[PLG_VGA_CD_TX_MAX_LEN + 1];
+    char buf[HANDLE_CD_TX_MAX_LEN + 1];
 
     err = mem_cpy_from_user(buf, thr->proc->pd, u_src, amt_to_copy, NULL);
     if (err != FOS_E_SUCCESS) {
@@ -90,7 +93,7 @@ static fernos_error_t hs_cd_write(handle_state_t *hs, const void *u_src, size_t 
         // there is a small chance that the final few characters in the buffer are an incomplete
         // ansi control sequence. Let's check the final 32 characters.
         
-        // This loop will only work when PLG_VGA_CD_TX_MAX_LEN > 32. Which should always be the case.
+        // This loop will only work when HANDLE_CD_TX_MAX_LEN > 32. Which should always be the case.
         for (size_t i = amt_to_print - 1; i >= amt_to_print - ANSI_CSI_LOOK_BACK; i--) {
             // We found the start of a control sequence, cut off here and break the loop.
             if (buf[i] == '\x1B') {
@@ -107,13 +110,46 @@ static fernos_error_t hs_cd_write(handle_state_t *hs, const void *u_src, size_t 
     }
 
     // success!
-    cd_put_s(VGA_CD, buf);
+    cd_put_s(hs_cd->cd, buf);
 
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 static fernos_error_t hs_cd_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, 
         uint32_t arg2, uint32_t arg3) {
+    fernos_error_t err;
+    handle_cd_state_t *hs_cd = (handle_cd_state_t *)hs;
 
+    (void)arg2;
+    (void)arg3;
+
+    thread_t *thr = hs->ks->curr_thread;
+
+    switch (cmd) {
+
+    /*
+     * Get the dimensions of the character display!
+     */
+    case CD_HCID_GET_DIMS: {
+        size_t *u_rows = (size_t *)arg0; 
+        if (u_rows) {
+            err = mem_cpy_to_user(thr->proc->pd, u_rows, &(hs_cd->cd->rows), sizeof(size_t), NULL);
+            DUAL_RET_FOS_ERR(err, thr);
+        }
+
+        size_t *u_cols = (size_t *)arg1;
+        if (u_cols) {
+            err = mem_cpy_to_user(thr->proc->pd, u_cols, &(hs_cd->cd->cols), sizeof(size_t), NULL);
+            DUAL_RET_FOS_ERR(err, thr);
+        }
+
+        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    default: {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS); 
+    }
+
+    }
 }
 
