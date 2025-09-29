@@ -5,6 +5,12 @@
 #include "handle.h"
 #include "s_util/char_display.h"
 
+/**
+ * The max number of characters which can be written to a character 
+ * display from userspace in one go.
+ */
+#define HANDLE_CD_TX_MAX_LEN (2048U)
+
 typedef struct _handle_cd_state_t handle_cd_state_t;
 
 /**
@@ -23,4 +29,4 @@ struct _handle_cd_state_t {
  *
  * This uses the allocator found in `ks`.
  */
-handle_cd_state_t *new_handle_cd_state(kernel_state_t *ks, process_t *proc, handle_t h);
+handle_state_t *new_handle_cd_state(kernel_state_t *ks, process_t *proc, handle_t h, char_display_t *cd);

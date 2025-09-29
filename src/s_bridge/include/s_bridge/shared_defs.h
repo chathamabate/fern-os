@@ -176,7 +176,6 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
  * [24:31] 0x40
  */
 
-
 /**
  * NOTE: a handle will only ever require 8 bits, but because handles will be placed
  * in ID Tables, the "NULL" handle will be 256 (which does not fit in 8 bits)
@@ -210,6 +209,15 @@ static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cm
     *h = (scid >> 16) & 0xFF;
     *hcid = (handle_cmd_id_t)scid;
 }
+
+/*
+ * ***** Character Display Handle *****
+ *
+ * A handle which references a character display will support the following command IDs.
+ */
+
+#define CD_HCID_GET_DIMS (NUM_DEFAULT_HCIDS + 0)
+
 
 /*
  * Plugin Command syntax
