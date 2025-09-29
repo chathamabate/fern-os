@@ -628,7 +628,7 @@ static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t 
 
     thread_t *thr = hs->ks->curr_thread;
 
-    if (!u_src || !u_written) {
+    if (!u_src) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
@@ -679,7 +679,10 @@ static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t 
 
     if (err == FOS_E_SUCCESS) {
         fs_hs->pos += bytes_to_write;
-        err = mem_cpy_to_user(thr->proc->pd, u_written, &bytes_to_write, sizeof(size_t), NULL);
+
+        if (u_written) {
+            err = mem_cpy_to_user(thr->proc->pd, u_written, &bytes_to_write, sizeof(size_t), NULL);
+        }
     }
 
     thr->ctx.eax = err;
@@ -743,7 +746,7 @@ static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, si
 
     thread_t *thr = hs->ks->curr_thread;
 
-    if (!u_dst || !u_readden) {
+    if (!u_dst) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
@@ -785,8 +788,10 @@ static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, si
     err = mem_cpy_to_user(hs->proc->pd, u_dst, rx_buf, bytes_to_read, NULL);
     DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
 
-    err = mem_cpy_to_user(hs->proc->pd, u_readden, &bytes_to_read, sizeof(size_t), NULL);
-    DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+    if (u_readden) {
+        err = mem_cpy_to_user(hs->proc->pd, u_readden, &bytes_to_read, sizeof(size_t), NULL);
+        DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+    }
     
     // SUCCESS!
 

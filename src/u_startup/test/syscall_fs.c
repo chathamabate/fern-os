@@ -99,9 +99,12 @@ static bool test_simple_rw(void) {
     TEST_TRUE(str_eq(msg, rx_buf));
 
     // When there isn't more to read, this should return FOS_E_EMPTY without blocking.
-    size_t readden;
-    err = sc_handle_read(fh, rx_buf, msg_size, &readden);
+    err = sc_handle_read(fh, rx_buf, msg_size, NULL);
     TEST_EQUAL_HEX(FOS_E_EMPTY, err);
+
+    // This confirms NULL is ok for the written pointer argument.
+    err = sc_handle_write(fh, msg, msg_size, NULL);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = sc_fs_remove("./a.txt");
     TEST_EQUAL_HEX(FOS_E_IN_USE, err);

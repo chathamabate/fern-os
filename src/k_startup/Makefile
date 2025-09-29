@@ -8,6 +8,7 @@ _SRCS 		?= kernel.c \
 			   process.c \
 			   state.c \
 			   handle.c \
+			   handle_cd.c \
 			   plugin.c \
 			   plugin_fs.c \
 			   plugin_kb.c \

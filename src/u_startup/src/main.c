@@ -15,6 +15,7 @@
 proc_exit_status_t user_main(void) {
     fernos_error_t err;
 
+    /*
     handle_t h;
 
     err = sc_vga_cd_open(&h);
@@ -35,6 +36,7 @@ proc_exit_status_t user_main(void) {
     }
 
     while (1);
+    */
 
     return PROC_ES_SUCCESS;
 }

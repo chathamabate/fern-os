@@ -244,7 +244,7 @@ void sc_term_put_fmt_s(const char *fmt, ...);
  */
 
 /**
- * Execute a handle command.
+ * Execute a handle specific command.
  */
 fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
@@ -266,7 +266,7 @@ fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *
  *
  * Returns FOS_E_EMPTY if there is no data to read.
  * Returns FOS_E_SUCCESS if some or all of the requested data is read. The exact amount is 
- * written to `*readden`.
+ * written to `*readden`. This should NOT block.
  *
  * (Other errors may be returned)
  */
