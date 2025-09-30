@@ -421,3 +421,45 @@ KS_SYSCALL fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, fu
  * Returns user error if arguements are invalid.
  */
 KS_SYSCALL fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all);
+
+/**
+ * Set the default input handle of the calling process. If the given input handle is invalid,
+ * this will set the defualt Input handle to the NULL_HANDLE.
+ *
+ * Always returns FOS_E_SUCCESS in both kernel and userspace.
+ */
+KS_SYSCALL fernos_error_t ks_set_in_handle(kernel_state_t *ks, handle_t in);
+
+/**
+ * Read from default input handle.
+ *
+ * If the default input handle is not currently initialized this returns FOS_E_INVALID_INDEX
+ * to userspace.
+ */
+KS_SYSCALL fernos_error_t ks_in_read(kernel_state_t *ks, void *u_dest, size_t len, size_t *u_readden);
+
+/**
+ * Wait on default input handle.
+ *
+ * If the default input handle is not currently initialized this returns FOS_E_INVALID_INDEX
+ * to userspace.
+ */
+KS_SYSCALL fernos_error_t ks_in_wait(kernel_state_t *ks);
+
+/**
+ * Set the default output handle of the calling process. If the given output handle is invalid,
+ * this will set the defualt output handle to the NULL_HANDLE.
+ *
+ * Always returns FOS_E_SUCCESS in both kernel and userspace.
+ */
+KS_SYSCALL fernos_error_t ks_set_out_handle(kernel_state_t *ks, handle_t out);
+
+/**
+ * Write to default output handle.
+ *
+ * If the default output handle is not currently initialized this returns FOS_E_INVALID_INDEX
+ * to userspace.
+ */
+KS_SYSCALL fernos_error_t ks_out_write(kernel_state_t *ks, const void *u_src, size_t len, size_t *u_written);
+
+

@@ -189,18 +189,24 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_wake_futex(kernel, (futex_t *)arg0, (bool)arg1);
         break;
 
-    case SCID_TERM_PUT_S:
-        if (!arg0) {
-            kernel->curr_thread->ctx.eax = FOS_E_BAD_ARGS;
-            err = FOS_E_SUCCESS;
-            break;
-        }
+    case SCID_SET_IN_HANDLE:
+        err = ks_set_in_handle(kernel, (handle_t)arg0);
+        break;
 
-        char *buf = da_malloc(arg1);
-        mem_cpy_from_user(buf, ctx->cr3, (const void *)arg0, arg1, NULL);
-        term_put_s(buf);
-        da_free(buf);
+    case SCID_IN_READ:
+        err = ks_in_read(kernel, (void *)arg0, (size_t)arg1, (size_t *)arg2);
+        break;
 
+    case SCID_IN_WAIT:
+        err = ks_in_wait(kernel);
+        break;
+
+    case SCID_SET_OUT_HANDLE:
+        err = ks_set_out_handle(kernel, (handle_t)arg0);
+        break;
+
+    case SCID_OUT_WRITE:
+        err = ks_out_write(kernel, (const void *)arg0, (size_t)arg1, (size_t *)arg2);
         break;
 
     default:

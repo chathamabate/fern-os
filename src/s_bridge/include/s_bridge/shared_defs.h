@@ -161,8 +161,12 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 #define SCID_FUTEX_WAIT       (0x202U)
 #define SCID_FUTEX_WAKE       (0x203U)
 
-/* Term Puts syscalls */
-#define SCID_TERM_PUT_S (0x400U)
+/* Default IO Syscalls (See Handle Syscalls) */
+#define SCID_SET_IN_HANDLE  (0x300U)
+#define SCID_IN_READ        (0x301U)
+#define SCID_IN_WAIT        (0x302U)
+#define SCID_SET_OUT_HANDLE (0x303U)
+#define SCID_OUT_WRITE      (0x304U) 
 
 /*
  * Handle Syscalls

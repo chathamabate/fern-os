@@ -11,8 +11,6 @@
 
 #include "k_startup/vga_cd.h"
 #include "s_util/str.h"
-#include "s_util/ansi.h"
-
 
 /**
  * Creates a new kernel state with basically no fleshed out details.
@@ -1013,4 +1011,95 @@ fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
 
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
+
+KS_SYSCALL fernos_error_t ks_set_in_handle(kernel_state_t *ks, handle_t in) {
+    if (!(ks->curr_thread)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    handle_t NULL_HANDLE = idtb_null_id(proc->handle_table);
+
+    if (in >= idtb_max_cap(proc->handle_table)) {
+        proc->in_handle = NULL_HANDLE; 
+    } else {
+        proc->in_handle = in;
+    }
+
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+}
+
+KS_SYSCALL fernos_error_t ks_in_read(kernel_state_t *ks, void *u_dest, size_t len, size_t *u_readden) {
+    if (!(ks->curr_thread)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    handle_state_t *hs = idtb_get(proc->handle_table, proc->in_handle);
+    if (!hs) {
+        DUAL_RET(thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
+    }
+
+    // If the handle is mapped, default to handle read.
+    return hs_read(hs, u_dest, len, u_readden);
+}
+
+KS_SYSCALL fernos_error_t ks_in_wait(kernel_state_t *ks) {
+    if (!(ks->curr_thread)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    handle_state_t *hs = idtb_get(proc->handle_table, proc->in_handle);
+    if (!hs) {
+        DUAL_RET(thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
+    }
+
+    // If the handle is mapped, default to handle wait
+    return hs_wait(hs);
+}
+
+KS_SYSCALL fernos_error_t ks_set_out_handle(kernel_state_t *ks, handle_t out) {
+    if (!(ks->curr_thread)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    handle_t NULL_HANDLE = idtb_null_id(proc->handle_table);
+
+    if (out >= idtb_max_cap(proc->handle_table)) {
+        proc->out_handle = NULL_HANDLE; 
+    } else {
+        proc->out_handle = out;
+    }
+
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+}
+
+KS_SYSCALL fernos_error_t ks_out_write(kernel_state_t *ks, const void *u_src, size_t len, size_t *u_written) {
+    if (!(ks->curr_thread)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+
+    handle_state_t *hs = idtb_get(proc->handle_table, proc->in_handle);
+    if (!hs) {
+        DUAL_RET(thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
+    }
+
+    // If the handle is mapped, default to handle write.
+    return hs_write(hs, u_src, len, u_written);
+}
+
+
 
