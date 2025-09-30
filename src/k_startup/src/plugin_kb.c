@@ -50,6 +50,8 @@ static fernos_error_t delete_kb_handle_state(handle_state_t *hs) {
     return FOS_E_SUCCESS;
 }
 
+// DELETE ME
+#include "k_startup/vga_cd.h"
 /**
  * If there are no more keys to read at this moment FOS_E_EMPTY is returned.
  *
@@ -154,6 +156,8 @@ static fernos_error_t kb_hs_wait(handle_state_t *hs) {
 
         err = bwq_enqueue(bwq, thr);
         DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+
+        ks_deschedule_thread(ks, thr);
 
         thr->wq = (wait_queue_t *)bwq;
         thr->wait_ctx[0] = (uint32_t)plg_kb_hs;

@@ -157,7 +157,6 @@ static void init_kernel_plugins(void) {
         setup_fatal("Failed to create VGA Character Display plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_VGA_CD_ID, plg_vga_cd), "Failed to set VGA CD Plugin in the kernel");
-
 }
 
 void start_kernel(void) {
