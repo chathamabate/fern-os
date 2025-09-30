@@ -18,11 +18,18 @@ struct _plugin_kb_handle_state_t {
 
     /**
      * The next position in the scancode buffer to attempt to read from!
+     *
+     * NOTE: Remember this will be a byte index! Scancodes will
+     * always begin at even positions within the buffer. However, this
+     * position can take on odd values if the user desires.
      */
     size_t pos;
 };
 
-#define PLG_KB_BUFFER_SIZE (128)
+/**
+ * This MUST be divisible by the size of a scancode (2 bytes)
+ */
+#define PLG_KB_BUFFER_SIZE (256)
 
 struct _plugin_kb_t {
     plugin_t super;
@@ -32,6 +39,8 @@ struct _plugin_kb_t {
      *
      * Reading from this position will always result in FOS_EMPTY.
      * Waiting at this position will cause the calling thread to block.
+     *
+     * NOTE: This will always be a multiple of sizeof(scs1_code_t)
      *
      * NOTE: Just keep in mind that if the user doesn't read fast enough,
      * key events will be lost from their perspective. This plugin does not 
@@ -45,9 +54,13 @@ struct _plugin_kb_t {
      * the valid scan codes received from the keyboard.
      * (Assuming scan code set1)
      *
-     * We are using uint16_t to make it easy to store extended scancodes and normal scancodes.
-     */
-    uint16_t sc_buf[PLG_KB_BUFFER_SIZE];
+     * NOTE: This will be a buffer of `uint8_t` because the user is allowed to read a just a 
+     * single byte should they choose. (This would be a stupid decision, but an allowed one)
+     *
+     * Scancodes are gauranteed to be stored little endian WITH 0 padding
+     * for non-extended codes. (i.e. ALL codes will take up 2 bytes in the below buffer)
+     */ 
+    uint8_t sc_buf[PLG_KB_BUFFER_SIZE];
 
     /**
      * For threads waiting on a keypress.

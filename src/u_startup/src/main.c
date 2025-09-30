@@ -16,6 +16,9 @@
 proc_exit_status_t user_main(void) {
     fernos_error_t err;
 
+    test_syscall_fs();
+    while (1);
+
     handle_t h;
 
     err = sc_vga_cd_open(&h);

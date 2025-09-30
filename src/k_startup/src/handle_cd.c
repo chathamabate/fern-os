@@ -69,7 +69,7 @@ static fernos_error_t hs_cd_write(handle_state_t *hs, const void *u_src, size_t 
 
     thread_t *thr = hs->ks->curr_thread;
 
-    if (!u_src || !u_written) {
+    if (!u_src || len == 0) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
@@ -81,9 +81,7 @@ static fernos_error_t hs_cd_write(handle_state_t *hs, const void *u_src, size_t 
     char buf[HANDLE_CD_TX_MAX_LEN + 1];
 
     err = mem_cpy_from_user(buf, thr->proc->pd, u_src, amt_to_copy, NULL);
-    if (err != FOS_E_SUCCESS) {
-        DUAL_RET(thr, err, FOS_E_SUCCESS);
-    }
+    DUAL_RET_FOS_ERR(err, thr);
 
     buf[amt_to_copy] = '\0';
 
@@ -104,9 +102,9 @@ static fernos_error_t hs_cd_write(handle_state_t *hs, const void *u_src, size_t 
         }
     }
 
-    err = mem_cpy_to_user(thr->proc->pd, u_written, &amt_to_print, sizeof(size_t), NULL);
-    if (err != FOS_E_SUCCESS) {
-        DUAL_RET(thr, err, FOS_E_SUCCESS);
+    if (u_written) {
+        err = mem_cpy_to_user(thr->proc->pd, u_written, &amt_to_print, sizeof(size_t), NULL);
+        DUAL_RET_FOS_ERR(err, thr);
     }
 
     // success!

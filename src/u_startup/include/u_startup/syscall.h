@@ -258,6 +258,8 @@ void sc_handle_close(handle_t h);
  *
  * On success, FOS_E_SUCCESS is returned, meaning some or all of the given data was written.
  * The exact amount written will be stored in `*written`.
+ *
+ * Returns FOS_E_BAD_ARGS if `len` = 0.
  */
 fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *written);
 
@@ -265,6 +267,7 @@ fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *
  * Read data from a handle. `readden` is optional.
  *
  * Returns FOS_E_EMPTY if there is no data to read.
+ * Returns FOS_E_BAD_ARGS if `len` = 0.
  * Returns FOS_E_SUCCESS if some or all of the requested data is read. The exact amount is 
  * written to `*readden`. This should NOT block.
  *

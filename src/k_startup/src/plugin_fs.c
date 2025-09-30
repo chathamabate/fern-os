@@ -628,7 +628,7 @@ static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t 
 
     thread_t *thr = hs->ks->curr_thread;
 
-    if (!u_src) {
+    if (!u_src || len == 0) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
@@ -746,7 +746,7 @@ static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, si
 
     thread_t *thr = hs->ks->curr_thread;
 
-    if (!u_dst) {
+    if (!u_dst || len == 0) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
@@ -841,6 +841,9 @@ static fernos_error_t fs_hs_wait(handle_state_t *hs) {
         thr->wq = (wait_queue_t *)bwq;
         thr->wait_ctx[0] = (uint32_t)fs_hs;
         thr->state = THREAD_STATE_WAITING;
+
+        // Current thread is now waiting, just return one code to kernel space.
+        return FOS_E_SUCCESS;
     }
 
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
