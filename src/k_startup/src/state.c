@@ -1040,8 +1040,12 @@ KS_SYSCALL fernos_error_t ks_in_read(kernel_state_t *ks, void *u_dest, size_t le
     process_t *proc = thr->proc;
 
     handle_state_t *hs = idtb_get(proc->handle_table, proc->in_handle);
-    if (!hs) {
-        DUAL_RET(thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
+    if (!hs) { // Dummy read implementation.
+        if (!u_dest) {
+            DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
     }
 
     // If the handle is mapped, default to handle read.
@@ -1058,7 +1062,7 @@ KS_SYSCALL fernos_error_t ks_in_wait(kernel_state_t *ks) {
 
     handle_state_t *hs = idtb_get(proc->handle_table, proc->in_handle);
     if (!hs) {
-        DUAL_RET(thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
+        DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
     }
 
     // If the handle is mapped, default to handle wait
@@ -1089,12 +1093,23 @@ KS_SYSCALL fernos_error_t ks_out_write(kernel_state_t *ks, const void *u_src, si
         return FOS_E_STATE_MISMATCH;
     }
 
+    fernos_error_t err;
+
     thread_t *thr = ks->curr_thread;
     process_t *proc = thr->proc;
 
-    handle_state_t *hs = idtb_get(proc->handle_table, proc->in_handle);
-    if (!hs) {
-        DUAL_RET(thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
+    handle_state_t *hs = idtb_get(proc->handle_table, proc->out_handle);
+    if (!hs) { // dummy write implementation.
+        if (!u_src) {
+            DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        if (u_written) {
+            err = mem_cpy_to_user(proc->pd, u_written, &len, sizeof(size_t), NULL);
+            DUAL_RET_FOS_ERR(err, thr);
+        }
+
+        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
     // If the handle is mapped, default to handle write.

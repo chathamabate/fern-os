@@ -18,33 +18,27 @@
 proc_exit_status_t user_main(void) {
     fernos_error_t err;
 
+
     handle_t cd;
     err = sc_vga_cd_open(&cd);
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
-
-    sc_handle_write_s(cd, "Openning keyboard\n");
+    sc_set_out_handle(cd);
 
     handle_t kb;
     err = sc_kb_open(&kb);
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
-
-    sc_handle_write_s(cd, "Starting loop\n");
+    sc_set_in_handle(kb);
 
     while (1) {
         scs1_code_t sc;
 
-        err = sc_handle_read(kb, &sc, sizeof(sc), NULL);
-        if (err == FOS_E_EMPTY) {
-            err = sc_handle_wait(kb);
-            sc_handle_write_fmt_s(cd, "Wait Error: 0x%X\n", err);        
-        } else if (err != FOS_E_SUCCESS) {
-            sc_handle_write_fmt_s(cd, "Read Error: 0x%X\n", err);        
-        } else {
-            sc_handle_write_fmt_s(cd, "KeyCode: 0x%X\n", sc);
+        err = sc_in_read_full(&sc, sizeof(sc));
+        if (err == FOS_E_SUCCESS) {
+            sc_out_write_fmt_s("U16: %04X\n", sc);
         }
     }
 

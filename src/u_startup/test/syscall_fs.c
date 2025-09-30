@@ -4,9 +4,8 @@
 #include "s_util/constraints.h"
 #include "s_util/str.h"
 #include <stdarg.h>
-#include "s_data/map.h"
 
-#define LOGF_METHOD(...) sc_term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
 
 static bool pretest(void);

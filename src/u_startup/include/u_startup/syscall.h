@@ -239,19 +239,19 @@ fernos_error_t sc_futex_wake(futex_t *futex, bool all);
  * Set the default input handle of the calling process. If the given input handle is invalid,
  * this will set the defualt Input handle to the NULL_HANDLE.
  */
-void ks_set_in_handle(handle_t in);
+void sc_set_in_handle(handle_t in);
 
 /**
  * Read from default input handle.
  *
- * If the default input handle is not currently initialized this returns FOS_E_INVALID_INDEX.
+ * If the default input handle is not currently initialized this returns FOS_E_EMPTY.
  */
 fernos_error_t sc_in_read(void *u_dest, size_t len, size_t *u_readden);
 
 /**
  * Wait on default input handle.
- *
- * If the default input handle is not currently initialized this returns FOS_E_INVALID_INDEX.
+ * 
+ * If the default input handle is not currently initialized this returns FOS_E_EMPTY.
  */
 fernos_error_t sc_in_wait(void);
 
@@ -264,7 +264,8 @@ void sc_set_out_handle(handle_t out);
 /**
  * Write to default output handle.
  *
- * If the default output handle is not currently initialized this returns FOS_E_INVALID_INDEX.
+ * If the default output handle is not currently initialized this behaves as if all bytes were
+ * successfully written.
  */
 fernos_error_t sc_out_write(const void *u_src, size_t len, size_t *u_written);
 

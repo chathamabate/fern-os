@@ -79,7 +79,7 @@ fernos_error_t sc_futex_wake(futex_t *futex, bool all) {
     return (fernos_error_t)trigger_syscall(SCID_FUTEX_WAKE, (uint32_t)futex, all, 0, 0);
 }
 
-void ks_set_in_handle(handle_t in) {
+void sc_set_in_handle(handle_t in) {
     (void)trigger_syscall(SCID_SET_IN_HANDLE, (uint32_t)in, 0, 0, 0);
 }
 

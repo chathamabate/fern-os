@@ -433,16 +433,14 @@ KS_SYSCALL fernos_error_t ks_set_in_handle(kernel_state_t *ks, handle_t in);
 /**
  * Read from default input handle.
  *
- * If the default input handle is not currently initialized this returns FOS_E_INVALID_INDEX
- * to userspace.
+ * If the default input handle is not currently initialized this returns FOS_E_EMPTY to userspace.
  */
 KS_SYSCALL fernos_error_t ks_in_read(kernel_state_t *ks, void *u_dest, size_t len, size_t *u_readden);
 
 /**
  * Wait on default input handle.
  *
- * If the default input handle is not currently initialized this returns FOS_E_INVALID_INDEX
- * to userspace.
+ * If the default input handle is not currently initialized this returns FOS_E_EMPTY to userspace.
  */
 KS_SYSCALL fernos_error_t ks_in_wait(kernel_state_t *ks);
 
@@ -457,8 +455,8 @@ KS_SYSCALL fernos_error_t ks_set_out_handle(kernel_state_t *ks, handle_t out);
 /**
  * Write to default output handle.
  *
- * If the default output handle is not currently initialized this returns FOS_E_INVALID_INDEX
- * to userspace.
+ * If the default output handle is not currently initialized this returns acts as if all bytes
+ * were successfully written.
  */
 KS_SYSCALL fernos_error_t ks_out_write(kernel_state_t *ks, const void *u_src, size_t len, size_t *u_written);
 

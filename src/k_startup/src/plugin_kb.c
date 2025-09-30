@@ -50,8 +50,6 @@ static fernos_error_t delete_kb_handle_state(handle_state_t *hs) {
     return FOS_E_SUCCESS;
 }
 
-// DELETE ME
-#include "k_startup/vga_cd.h"
 /**
  * If there are no more keys to read at this moment FOS_E_EMPTY is returned.
  *
