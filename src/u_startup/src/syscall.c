@@ -79,19 +79,24 @@ fernos_error_t sc_futex_wake(futex_t *futex, bool all) {
     return (fernos_error_t)trigger_syscall(SCID_FUTEX_WAKE, (uint32_t)futex, all, 0, 0);
 }
 
-void sc_term_put_s(const char *s) {
-    (void)trigger_syscall(SCID_TERM_PUT_S, (uint32_t)s, str_len(s) + 1, 0, 0);
+void ks_set_in_handle(handle_t in) {
+    (void)trigger_syscall(SCID_SET_IN_HANDLE, (uint32_t)in, 0, 0, 0);
 }
 
-void sc_term_put_fmt_s(const char *fmt, ...) {
-    char buf[256];
+fernos_error_t sc_in_read(void *u_dest, size_t len, size_t *u_readden) {
+    return (fernos_error_t)trigger_syscall(SCID_IN_READ, (uint32_t)u_dest, (uint32_t)len, (uint32_t)u_readden, 0);
+}
 
-    va_list va; 
-    va_start(va, fmt);
-    str_vfmt(buf, fmt, va);
-    va_end(va);
+fernos_error_t sc_in_wait(void) {
+    return (fernos_error_t)trigger_syscall(SCID_IN_WAIT, 0, 0, 0, 0);
+}
 
-    sc_term_put_s(buf);
+void sc_set_out_handle(handle_t out) {
+    (void)trigger_syscall(SCID_SET_OUT_HANDLE, (uint32_t)out, 0, 0, 0);
+}
+
+fernos_error_t sc_out_write(const void *u_src, size_t len, size_t *u_written) {
+    return (fernos_error_t)trigger_syscall(SCID_OUT_WRITE, (uint32_t)u_src, (uint32_t)len, (uint32_t)u_written, 0);
 }
 
 fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
