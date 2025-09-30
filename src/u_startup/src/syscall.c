@@ -123,6 +123,14 @@ fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t a
     return (fernos_error_t)trigger_syscall(plugin_cmd_scid(plg_id, cmd_id), arg0, arg1, arg2, arg3);
 }
 
+/*
+ * Helpers.
+ *
+ * NOTE: The default helpers are all copy and pastes of the handle helpers.
+ * I kinda wanted to avoid having a `get_default_in/out` handle system call.
+ * I may change this later though.
+ */
+
 fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len) {
     fernos_error_t err;
 
@@ -140,8 +148,29 @@ fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len) {
     return FOS_E_SUCCESS;
 }
 
+fernos_error_t sc_out_write_full(const void *src, size_t len) {
+    fernos_error_t err;
+
+    size_t written = 0;
+    while (written < len) {
+        size_t tmp_written;
+        err = sc_out_write((const uint8_t *)src + written, len - written, &tmp_written);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        written += tmp_written;
+    }
+
+    return FOS_E_SUCCESS;
+}
+
 fernos_error_t sc_handle_write_s(handle_t h, const char *str) {
     return sc_handle_write_full(h, str, str_len(str));
+}
+
+fernos_error_t sc_out_write_s(const char *str) {
+    return sc_out_write_full(str, str_len(str));
 }
 
 fernos_error_t sc_handle_write_fmt_s(handle_t h, const char *fmt, ...) {
@@ -155,6 +184,17 @@ fernos_error_t sc_handle_write_fmt_s(handle_t h, const char *fmt, ...) {
     return sc_handle_write_s(h, buf);
 }
 
+fernos_error_t sc_out_write_fmt_s(const char *fmt, ...) {
+    char buf[SC_HANDLE_WRITE_FMT_S_BUFFER_SIZE];
+
+    va_list va; 
+    va_start(va, fmt);
+    str_vfmt(buf, fmt, va);
+    va_end(va);
+
+    return sc_out_write_s(buf);
+}
+
 fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
     fernos_error_t err;
 
@@ -165,6 +205,29 @@ fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
 
         if (err == FOS_E_EMPTY) { // block!
             err = sc_handle_wait(h);
+            if (err != FOS_E_SUCCESS) {
+                return err;
+            }
+        } else if (err == FOS_E_SUCCESS) {
+            readden += tmp_readden; // Successful read.
+        } else {
+            return err; // Unexpected error.
+        }
+    }
+
+    return FOS_E_SUCCESS;
+}
+
+fernos_error_t sc_in_read_full(void *dest, size_t len) {
+    fernos_error_t err;
+
+    size_t readden = 0;
+    while (readden < len) {
+        size_t tmp_readden;
+        err = sc_in_read((uint8_t *)dest + readden, len - readden, &tmp_readden);
+
+        if (err == FOS_E_EMPTY) { // block!
+            err = sc_in_wait();
             if (err != FOS_E_SUCCESS) {
                 return err;
             }

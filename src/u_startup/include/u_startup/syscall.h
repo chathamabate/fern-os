@@ -327,10 +327,20 @@ fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t a
 fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len);
 
 /**
+ * Same as `sc_handle_write_full`, but with the default out handle.
+ */
+fernos_error_t sc_out_write_full(const void *src, size_t len);
+
+/**
  * This won't return until the full given string is written (EXCLUDING THE NT)
  * or an error is encountered.
  */
 fernos_error_t sc_handle_write_s(handle_t h, const char *str);
+
+/**
+ * Same as `sc_handle_write_s`, but with the default out handle.
+ */
+fernos_error_t sc_out_write_s(const char *str);
 
 /**
  * Just like `sc_handle_write_s`, but a fmt string is accepted with varargs.
@@ -342,6 +352,11 @@ fernos_error_t sc_handle_write_s(handle_t h, const char *str);
 fernos_error_t sc_handle_write_fmt_s(handle_t h, const char *fmt, ...);
 
 /**
+ * Same as `sc_handle_write_fmt_s`, but with the default out handle.
+ */
+fernos_error_t sc_out_write_fmt_s(const char *fmt, ...);
+
+/**
  * When using a handle which may read a partial amount on success,
  * this function will call `sc_read` in a loop until all bytes are written!
  * (Or an error is encountered)
@@ -350,5 +365,10 @@ fernos_error_t sc_handle_write_fmt_s(handle_t h, const char *fmt, ...);
  * read.
  */
 fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len);
+
+/**
+ * Same as `sc_handle_read_full`, but with the default in handle.
+ */
+fernos_error_t sc_in_read_full(void *dest, size_t len);
 
 
