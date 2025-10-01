@@ -19,10 +19,16 @@
 proc_exit_status_t user_main(void) {
     fernos_error_t err;
 
-    err = test_syscall_cd_big();
+    handle_t cd;
+
+    err = sc_vga_cd_open(&cd);
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
+
+    sc_set_out_handle(cd);
+
+    test_syscall_fs();
 
     return PROC_ES_SUCCESS;
 }
