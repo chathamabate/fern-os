@@ -15,6 +15,7 @@
 #include "u_concur/test/mutex.h"
 #include "s_util/ps2_scancodes.h"
 #include "u_startup/test/syscall_cd.h"
+#include "u_startup/test/syscall_default_io.h"
 
 proc_exit_status_t user_main(void) {
     fernos_error_t err;
@@ -26,9 +27,7 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    sc_set_out_handle(cd);
-
-    test_syscall_fs();
+    test_syscall_default_io(cd);
 
     return PROC_ES_SUCCESS;
 }
