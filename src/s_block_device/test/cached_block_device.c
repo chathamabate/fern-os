@@ -5,7 +5,7 @@
 #include "s_block_device/block_device.h"
 #include "s_block_device/cached_block_device.h"
 #include "s_block_device/mem_block_device.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_cd.h"
 #include "s_util/rand.h"
 #include "s_util/str.h"
 

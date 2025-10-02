@@ -3,6 +3,10 @@
 #include "s_util/err.h"
 #include "s_util/misc.h"
 
+/*
+ * TODO: Consider changing below checks to preprocessor errors.
+ */
+
 /**
  * From the linker script.
  */

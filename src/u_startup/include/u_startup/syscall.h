@@ -228,14 +228,6 @@ fernos_error_t sc_futex_wait(futex_t *futex, futex_t exp_val);
  */
 fernos_error_t sc_futex_wake(futex_t *futex, bool all);
 
-/**
- * Output a string to the BIOS terminal.
- *
- * (Probably will take this out later)
- */
-void sc_term_put_s(const char *s);
-void sc_term_put_fmt_s(const char *fmt, ...);
-
 /*
  * Now for handle and plugin system calls!
  *
@@ -244,7 +236,41 @@ void sc_term_put_fmt_s(const char *fmt, ...);
  */
 
 /**
- * Execute a handle command.
+ * Set the default input handle of the calling process. If the given input handle is invalid,
+ * this will set the defualt Input handle to the NULL_HANDLE.
+ */
+void sc_set_in_handle(handle_t in);
+
+/**
+ * Read from default input handle.
+ *
+ * If the default input handle is not currently initialized this returns FOS_E_EMPTY.
+ */
+fernos_error_t sc_in_read(void *u_dest, size_t len, size_t *u_readden);
+
+/**
+ * Wait on default input handle.
+ * 
+ * If the default input handle is not currently initialized this returns FOS_E_EMPTY.
+ */
+fernos_error_t sc_in_wait(void);
+
+/**
+ * Set the default output handle of the calling process. If the given output handle is invalid,
+ * this will set the defualt output handle to the NULL_HANDLE.
+ */
+void sc_set_out_handle(handle_t out);
+
+/**
+ * Write to default output handle.
+ *
+ * If the default output handle is not currently initialized this behaves as if all bytes were
+ * successfully written.
+ */
+fernos_error_t sc_out_write(const void *u_src, size_t len, size_t *u_written);
+
+/**
+ * Execute a handle specific command.
  */
 fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
@@ -258,6 +284,8 @@ void sc_handle_close(handle_t h);
  *
  * On success, FOS_E_SUCCESS is returned, meaning some or all of the given data was written.
  * The exact amount written will be stored in `*written`.
+ *
+ * Returns FOS_E_BAD_ARGS if `len` = 0.
  */
 fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *written);
 
@@ -265,8 +293,9 @@ fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *
  * Read data from a handle. `readden` is optional.
  *
  * Returns FOS_E_EMPTY if there is no data to read.
+ * Returns FOS_E_BAD_ARGS if `len` = 0.
  * Returns FOS_E_SUCCESS if some or all of the requested data is read. The exact amount is 
- * written to `*readden`.
+ * written to `*readden`. This should NOT block.
  *
  * (Other errors may be returned)
  */
@@ -299,6 +328,36 @@ fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t a
 fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len);
 
 /**
+ * Same as `sc_handle_write_full`, but with the default out handle.
+ */
+fernos_error_t sc_out_write_full(const void *src, size_t len);
+
+/**
+ * This won't return until the full given string is written (EXCLUDING THE NT)
+ * or an error is encountered.
+ */
+fernos_error_t sc_handle_write_s(handle_t h, const char *str);
+
+/**
+ * Same as `sc_handle_write_s`, but with the default out handle.
+ */
+fernos_error_t sc_out_write_s(const char *str);
+
+/**
+ * Just like `sc_handle_write_s`, but a fmt string is accepted with varargs.
+ *
+ * Formatting is run on a buffer with size `SC_HANDLE_WRITE_FMT_S_BUFFER_SIZE`.
+ * Undefined behavior if the resulting string overflows this buffer!
+ */
+#define SC_HANDLE_WRITE_FMT_S_BUFFER_SIZE (1024U)
+fernos_error_t sc_handle_write_fmt_s(handle_t h, const char *fmt, ...);
+
+/**
+ * Same as `sc_handle_write_fmt_s`, but with the default out handle.
+ */
+fernos_error_t sc_out_write_fmt_s(const char *fmt, ...);
+
+/**
  * When using a handle which may read a partial amount on success,
  * this function will call `sc_read` in a loop until all bytes are written!
  * (Or an error is encountered)
@@ -307,5 +366,10 @@ fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len);
  * read.
  */
 fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len);
+
+/**
+ * Same as `sc_handle_read_full`, but with the default in handle.
+ */
+fernos_error_t sc_in_read_full(void *dest, size_t len);
 
 

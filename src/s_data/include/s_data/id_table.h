@@ -9,7 +9,7 @@
 /**
  * An ID is really just an index into the ID table.
  *
- * For this reason, it is a gaurantee that all ids are less than their table's capacity.
+ * For this reason, it is a gaurantee that all ids are less than their table's max capacity.
  */
 typedef uint32_t id_t;
 
@@ -106,6 +106,10 @@ static inline id_table_t *new_da_id_table(uint32_t mc) {
 void delete_id_table(id_table_t *idtb);
 
 static inline id_t idtb_null_id(id_table_t *idtb) { 
+    return idtb->max_cap;
+}
+
+static inline uint32_t idtb_max_cap(id_table_t *idtb) {
     return idtb->max_cap;
 }
 

@@ -1,17 +1,12 @@
 
 #include "k_sys/page.h"
 
-#include "u_startup/main.h"
-#include "k_bios_term/term.h"
 #include "k_startup/page.h"
-#include "k_sys/debug.h"
 #include "os_defs.h"
 #include "s_util/misc.h"
 #include "s_util/err.h"
 #include "s_util/str.h"
 #include <stdbool.h>
-#include "s_bridge/ctx.h"
-#include "k_bios_term/term_sys_helpers.h"
 #include "s_util/constraints.h"
 
 /*

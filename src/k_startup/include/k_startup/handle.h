@@ -111,8 +111,10 @@ static inline fernos_error_t delete_handle_state(handle_state_t *hs) {
 /**
  * This will map to the close handle system call. It simply calls the destructor and returns
  * the given handle ID to the handle table.
+ *
+ * Close is a void function from the user's perspective.
  */
-static inline fernos_error_t hs_close(handle_state_t *hs) {
+KS_SYSCALL static inline fernos_error_t hs_close(handle_state_t *hs) {
     fernos_error_t err;
     handle_t h = hs->handle;
 
@@ -136,7 +138,7 @@ static inline fernos_error_t hs_close(handle_state_t *hs) {
  * `u_written` is optional. On success, if `u_written` is provided, the number of bytes successfully
  * written should be stored in `*u_written`.
  */
-static inline fernos_error_t hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
+KS_SYSCALL static inline fernos_error_t hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
     if (hs->impl->hs_write) {
         return hs->impl->hs_write(hs, u_src, len, u_written);
     }
@@ -157,7 +159,7 @@ static inline fernos_error_t hs_write(handle_state_t *hs, const void *u_src, siz
  *
  * This call should NEVER BLOCK. 
  */
-static inline fernos_error_t hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden) {
+KS_SYSCALL static inline fernos_error_t hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden) {
     if (hs->impl->hs_read) {
         return hs->impl->hs_read(hs, u_dst, len, u_readden);
     }
@@ -170,7 +172,7 @@ static inline fernos_error_t hs_read(handle_state_t *hs, void *u_dst, size_t len
  * FOS_E_SUCCESS means there is data to read!
  * FOS_E_EMPTY means there will NEVER be anymore data to read from this handle!
  */
-static inline fernos_error_t hs_wait(handle_state_t *hs) {
+KS_SYSCALL static inline fernos_error_t hs_wait(handle_state_t *hs) {
     if (hs->impl->hs_wait) {
         return hs->impl->hs_wait(hs);
     }
@@ -180,7 +182,7 @@ static inline fernos_error_t hs_wait(handle_state_t *hs) {
 /**
  * Perform a custom command on the handle.
  */
-static inline fernos_error_t hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+KS_SYSCALL static inline fernos_error_t hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     if (hs->impl->hs_cmd) {
         return hs->impl->hs_cmd(hs, cmd, arg0, arg1, arg2, arg3);
     }

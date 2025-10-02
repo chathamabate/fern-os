@@ -161,8 +161,12 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 #define SCID_FUTEX_WAIT       (0x202U)
 #define SCID_FUTEX_WAKE       (0x203U)
 
-/* Term Puts syscalls */
-#define SCID_TERM_PUT_S (0x400U)
+/* Default IO Syscalls (See Handle Syscalls) */
+#define SCID_SET_IN_HANDLE  (0x300U)
+#define SCID_IN_READ        (0x301U)
+#define SCID_IN_WAIT        (0x302U)
+#define SCID_SET_OUT_HANDLE (0x303U)
+#define SCID_OUT_WRITE      (0x304U) 
 
 /*
  * Handle Syscalls
@@ -175,7 +179,6 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
  * [16:23] handle
  * [24:31] 0x40
  */
-
 
 /**
  * NOTE: a handle will only ever require 8 bits, but because handles will be placed
@@ -212,6 +215,15 @@ static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cm
 }
 
 /*
+ * ***** Character Display Handle *****
+ *
+ * A handle which references a character display will support the following command IDs.
+ */
+
+#define CD_HCID_GET_DIMS (NUM_DEFAULT_HCIDS + 0)
+
+
+/*
  * Plugin Command syntax
  *
  * [0:15]  plugin_cmd_id
@@ -225,6 +237,15 @@ static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cm
  * This is 32 bits for the same reason `handle_t` is 32 bits.
  */
 typedef uint32_t plugin_id_t;
+
+/*
+ * Note the Plugin command 0x1 is different from the Plugin kernel command 0x1.
+ */
+
+/**
+ * The Plugin unique ID of a kernel command.
+ */
+typedef uint32_t plugin_kernel_cmd_id_t;
 
 /**
  * The Plugin unique ID of a command.
@@ -253,7 +274,7 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 
 
 /*
- * File System Plugin.
+ * ***** File System Plugin *****
  */
 
 #define PLG_FILE_SYS_ID (1U)
@@ -280,3 +301,38 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 #define PLG_FS_HCID_SEEK           (NUM_DEFAULT_HCIDS + 0U)
 #define PLG_FS_HCID_FLUSH          (NUM_DEFAULT_HCIDS + 1U)
 
+/*
+ * ***** Keyboard Plugin ******
+ */
+
+#define PLG_KEYBOARD_ID (2U)
+
+/*
+ * Keyboard plugin KERNEL commands.
+ */
+
+#define PLG_KB_KCID_KEY_EVENT     (0U)
+
+/*
+ * Keyboard plugin commands.
+ */
+
+#define PLG_KB_PCID_OPEN          (0U)
+
+/*
+ * Keyboard plugin handle commands
+ */
+
+#define PLG_KB_HCID_SKIP_FWD      (NUM_DEFAULT_HCIDS + 0U)
+
+/*
+ * ***** VGA Character Display Plugin *****
+ */
+
+#define PLG_VGA_CD_ID         (3U)
+
+/*
+ * VGA Character Display Plugin commands.
+ */
+
+#define PLG_VGA_CD_PCID_OPEN      (0U)

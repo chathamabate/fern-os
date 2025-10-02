@@ -8,13 +8,11 @@ MODS_DIR    := $(GIT_TOP)/src
 
 THIS_FILE := $(MODS_DIR)/Makefile
 
-# I like to list the modules in order of dependence.
 MODS := \
 		u_concur \
 		k_startup \
 		u_startup \
 		s_bridge \
-		k_bios_term \
 		k_sys \
 		s_data \
 		s_mem \
@@ -137,12 +135,12 @@ t: $(TOY_DISK)
 
 qemu.bin: $(BIN_FILE) | $(TOY_DISK)
 	qemu-system-x86_64 \
-		-display cocoa,zoom-to-fit=on,full-screen=on \
 		-m 4G \
 		-kernel $(BIN_FILE) \
 		-drive file=$(TOY_DISK),format=raw,index=0,media=disk \
+		-display cocoa,zoom-to-fit=on,full-grab=on \
 		-monitor stdio
-
+		
 # NOTE: When we start working with disk read/write... I'd really like to figure out ISO packaging!
 
 # Clean
@@ -152,31 +150,3 @@ qemu.bin: $(BIN_FILE) | $(TOY_DISK)
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -f $(OS_DEFS_LD)
-
-
-
-ERRS := UNKNWON_ERROR \
-ALIGN_ERROR \
-INVALID_RANGE \
-BAD_ARGS \
-NO_MEM \
-ALREADY_ALLOCATED \
-IDENTITY_OVERWRITE \
-INVALID_INDEX \
-EMPTY \
-STATE_MISMATCH \
-ABORT_SYSTEM \
-NOT_IMPLEMENTED \
-IN_USE \
-NO_SPACE \
-NOT_PERMITTED 
-q:
-	$(foreach err, $(ERRS), echo $(err);)
-
-ALL_FILES := $(shell find . -type f)
-p: 
-	$(foreach err,$(ERRS),sed -i "" -e "s/FOS_$(err)/FOS_E_$(err)/g" $(ALL_FILES);)
-
-
-
-

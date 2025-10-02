@@ -126,6 +126,22 @@ struct _process_t {
      * This maps handle_t's -> handle_state_t *'s.
      */
     id_table_t *handle_table;
+
+    /**
+     * The default input handle. 
+     *
+     * NOTE: This is really just an index into `handle_table`. It is OK if `handle_table` is yet to 
+     * have an entry for this index. In such a case, default input does nothing.
+     */
+    handle_t in_handle;
+
+    /**
+     * The default output handle.
+     *
+     * NOTE: This is really just an index into `handle_table`. It is OK if `handle_table` is yet to 
+     * have an entry for this index. In such a case, default output does nothing.
+     */
+    handle_t out_handle;
 };
 
 /**
@@ -155,7 +171,7 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  *
  * VERY IMPORTANT: Handle states in the Handle table ARE NOT COPIED! This is because copying a
  * handle state can result in a catastrophic error. So, it's the kernel's responsibility to copy over
- * handles one layer up.
+ * handles one layer up. (This will copy over the defualt in/out indeces though, but this is trivial)
  *
  * Returns NULL if there are insufficient resources or if the arguments are bad.
  *

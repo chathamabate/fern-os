@@ -1,7 +1,7 @@
 
-#include "k_bios_term/term.h"
+#include "k_startup/vga_cd.h"
 
-// Allowing this for now.
+// NOTE: This is a cyclic dependency, but we'll allow it.
 #define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
 
 #include "s_util/test.h"

@@ -4,9 +4,8 @@
 #include "s_util/constraints.h"
 #include "s_util/str.h"
 #include <stdarg.h>
-#include "s_data/map.h"
 
-#define LOGF_METHOD(...) sc_term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
 
 static bool pretest(void);
@@ -99,9 +98,12 @@ static bool test_simple_rw(void) {
     TEST_TRUE(str_eq(msg, rx_buf));
 
     // When there isn't more to read, this should return FOS_E_EMPTY without blocking.
-    size_t readden;
-    err = sc_handle_read(fh, rx_buf, msg_size, &readden);
+    err = sc_handle_read(fh, rx_buf, msg_size, NULL);
     TEST_EQUAL_HEX(FOS_E_EMPTY, err);
+
+    // This confirms NULL is ok for the written pointer argument.
+    err = sc_handle_write(fh, msg, msg_size, NULL);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = sc_fs_remove("./a.txt");
     TEST_EQUAL_HEX(FOS_E_IN_USE, err);
@@ -494,13 +496,19 @@ static bool test_many_handles(void) {
     fernos_error_t err;
 
     handle_t handles[FOS_MAX_HANDLES_PER_PROC];
+    size_t num_handles = 0;
 
     err = sc_fs_touch("./a.txt");
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    for (size_t i = 0; i < FOS_MAX_HANDLES_PER_PROC; i++) {
-        err = sc_fs_open("./a.txt", handles + i);
-        TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
+    for (num_handles = 0; num_handles < FOS_MAX_HANDLES_PER_PROC; num_handles++) {
+        err = sc_fs_open("./a.txt", handles + num_handles);
+
+        // This test will expect that the calling process may not have an empty
+        // handle table. Thus, we'll create as many handles as we can until error.
+        if (err != FOS_E_SUCCESS) {
+            break;
+        }
     }
 
     proc_id_t cpid;
@@ -518,7 +526,7 @@ static bool test_many_handles(void) {
     if (cpid == FOS_MAX_PROCS) {
         // Alright this is going to be a bit tricky!
         // Remember, that all handles have their OWN positions!!!
-        for (size_t i = 0; i < FOS_MAX_HANDLES_PER_PROC; i++) {
+        for (size_t i = 0; i < num_handles; i++) {
             mem_set(buf, i, i + 1);
 
             err = sc_handle_write_full(handles[i], buf, i + 1);
@@ -533,25 +541,25 @@ static bool test_many_handles(void) {
         err = sc_fs_get_info("./a.txt", &info);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-        TEST_EQUAL_UINT(FOS_MAX_HANDLES_PER_PROC, info.len);
+        TEST_EQUAL_UINT(num_handles, info.len);
 
         sc_proc_exit(PROC_ES_SUCCESS);
     }
 
-    err = sc_handle_read_full(handles[0], buf, FOS_MAX_HANDLES_PER_PROC);
+    err = sc_handle_read_full(handles[0], buf, num_handles);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     // Since we read the full buffer each time, after the second read, we can gaurantee
     // we are reading the entire file in its final state.
     
-    err = sc_handle_read_full(handles[1], buf, FOS_MAX_HANDLES_PER_PROC);
+    err = sc_handle_read_full(handles[1], buf, num_handles);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    for (size_t i = 0 ; i < sizeof(buf); i++) {
-        TEST_EQUAL_UINT(FOS_MAX_HANDLES_PER_PROC - 1, buf[i]);
+    for (size_t i = 0 ; i < num_handles; i++) {
+        TEST_EQUAL_UINT(num_handles - 1, buf[i]);
     }
 
-    for (size_t i = 0; i < FOS_MAX_HANDLES_PER_PROC; i++) {
+    for (size_t i = 0; i < num_handles; i++) {
         sc_handle_close(handles[i]);
     }
 

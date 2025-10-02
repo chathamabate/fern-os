@@ -68,6 +68,10 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     proc->futexes = futexes;
     proc->handle_table = handle_table;
 
+    const handle_t NULL_HANDLE = idtb_null_id(handle_table);
+    proc->in_handle = NULL_HANDLE;
+    proc->out_handle = NULL_HANDLE;
+
     return proc;
 }
 
@@ -106,7 +110,6 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
         return NULL;
     }
 
-
     // From this point on, `child` owns `new_pd`.
     // Deleting `child` will delete `new_pd`.
 
@@ -124,6 +127,11 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
 
     idtb_set(child->thread_table, child_main_thr->tid, child_main_thr);
     child->main_thread = child_main_thr;
+
+    // Remember, actual handle copying will happen one layer up.
+    // This copy is shallow and simple.
+    child->in_handle = proc->in_handle;
+    child->out_handle = proc->out_handle;
 
     return child;
 }

@@ -3,7 +3,7 @@
 
 #include "k_sys/page.h"
 #include "k_sys/intr.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_cd.h"
 
 
 intr_action_t gpf_action = NULL;
@@ -28,4 +28,10 @@ syscall_action_t syscall_action = NULL;
 
 void set_syscall_action(syscall_action_t sa) {
     syscall_action = sa;
+}
+
+intr_action_t irq1_action = NULL;
+
+void set_irq1_action(intr_action_t ia) {
+    irq1_action = ia;
 }

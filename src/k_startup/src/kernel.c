@@ -1,13 +1,11 @@
 
 #include "k_startup/kernel.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_cd.h"
 #include "k_startup/page.h"
 #include "k_startup/gdt.h"
 #include "k_startup/idt.h"
 #include "k_startup/state.h"
 #include "k_startup/process.h"
-#include "k_startup/test/page.h"
-#include "k_startup/thread.h"
 #include "k_startup/tss.h"
 #include "k_startup/action.h"
 #include "k_sys/page.h"
@@ -15,42 +13,27 @@
 #include "s_mem/simple_heap.h"
 #include "s_bridge/ctx.h"
 #include "s_util/constraints.h"
-#include "k_startup/test/page.h"
-#include "k_startup/test/page_helpers.h"
-#include "s_block_device/test/mem_block_device.h"
-#include "k_startup/test/ata_block_device.h"
 #include "k_startup/ata_block_device.h"
-#include "s_util/str.h"
 #include "s_data/id_table.h"
+#include "k_sys/kb.h"
 
 #include "s_block_device/cached_block_device.h"
-#include "s_data/test/list.h"
-#include "s_data/test/wait_queue.h"
-#include "s_data/test/map.h"
-#include "k_startup/test/process.h"
 #include "s_block_device/block_device.h"
 #include "s_block_device/fat32.h"
-#include "s_block_device/test/cached_block_device.h"
-#include "s_util/rand.h"
 #include "s_block_device/fat32.h"
-#include "s_block_device/fat32_dir.h"
-#include "s_block_device/test/fat32.h"
-#include "s_block_device/test/fat32_dir.h"
 #include "s_block_device/fat32_file_sys.h"
 #include "s_block_device/file_sys.h"
-#include "s_block_device/test/file_sys_helpers.h"
-#include "s_block_device/test/fat32_file_sys.h"
-#include "k_startup/plugin.h"
 #include "k_startup/plugin_fs.h"
+#include "k_startup/plugin_kb.h"
+#include "k_startup/plugin_vga_cd.h"
 
-#include "k_sys/ata.h"
+#include "s_util/char_display.h"
+#include "k_startup/vga_cd.h"
 
 #include <stdint.h>
 
-static uint8_t init_err_style;
-
 static inline void setup_fatal(const char *msg) {
-    out_bios_vga(init_err_style, msg);
+    out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), msg);
     lock_up();
 }
 
@@ -161,12 +144,22 @@ static void init_kernel_plugins(void) {
     if (!plg_fs) {
         setup_fatal("Failed to create File System plugin");
     }
-    try_setup_step(ks_set_plugin(kernel, PLG_FILE_SYS_ID, (plugin_t *)plg_fs), "Failed to set FS Plugin in the kernel");
+    try_setup_step(ks_set_plugin(kernel, PLG_FILE_SYS_ID, plg_fs), "Failed to set FS Plugin in the kernel");
+
+    plugin_t *plg_kb = new_plugin_kb(kernel);
+    if (!plg_kb) {
+        setup_fatal("Failed to create Keyboard plugin");
+    }
+    try_setup_step(ks_set_plugin(kernel, PLG_KEYBOARD_ID, plg_kb), "Failed to set up KB Plugin in the kernel");
+
+    plugin_t *plg_vga_cd = new_plugin_vga_cd(kernel);
+    if (!plg_vga_cd) {
+        setup_fatal("Failed to create VGA Character Display plugin");
+    }
+    try_setup_step(ks_set_plugin(kernel, PLG_VGA_CD_ID, plg_vga_cd), "Failed to set VGA CD Plugin in the kernel");
 }
 
 void start_kernel(void) {
-    init_err_style = vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-
     try_setup_step(validate_constraints(), "Failed to validate memory areas");
 
     try_setup_step(init_gdt(), "Failed to initialize GDT");
@@ -177,9 +170,10 @@ void start_kernel(void) {
     set_gpf_action(fos_lock_up_action);
     set_pf_action(fos_lock_up_action);
 
-    try_setup_step(init_term(), "Failed to initialize Terminal");
+    try_setup_step(init_vga_char_display(), "Failed to init VGA terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
+    try_setup_step(init_kb(), "Failed to init keyboard");
 
     init_kernel_state();
     init_kernel_plugins();
@@ -190,6 +184,7 @@ void start_kernel(void) {
 
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
+    set_irq1_action(fos_irq1_action);
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }

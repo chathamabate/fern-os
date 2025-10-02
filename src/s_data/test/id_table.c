@@ -2,7 +2,7 @@
 #include "s_data/test/id_table.h"
 #include "s_data/id_table.h"
 
-#include "k_bios_term/term.h"
+#include "k_startup/vga_cd.h"
 #include "s_mem/allocator.h"
 
 static bool pretest(void);

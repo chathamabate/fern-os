@@ -2,28 +2,24 @@
 
 #include "k_sys/debug.h"
 #include "s_bridge/ctx.h"
-#include "k_bios_term/term.h"
+#include "k_startup/vga_cd.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
-#include "s_util/ansi.h"
-#include "s_util/str.h"
 #include "s_mem/allocator.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
-#include "k_startup/process.h"
 #include "k_startup/kernel.h"
 #include <stdint.h>
 #include "k_startup/state.h"
 #include "k_sys/debug.h"
-#include "s_data/wait_queue.h"
-#include "k_startup/thread.h"
 #include "k_startup/gdt.h"
 #include "k_sys/intr.h"
 #include "k_startup/plugin.h"
-#include "s_util/constraints.h"
 #include "k_startup/handle.h"
 #include "k_startup/plugin.h"
+#include "s_util/ps2_scancodes.h"
 
+#include "k_sys/kb.h"
 
 /**
  * This function is pretty special. It is for when the kernel has no threads to schedule.
@@ -75,13 +71,13 @@ static void return_to_curr_thread(void) {
 
 void fos_lock_up_action(user_ctx_t *ctx) {
     (void)ctx;
-    out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), "Lock Up Triggered");
+    out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), "Lock Up Triggered");
     lock_up();
 }
 
 void fos_gpf_action(user_ctx_t *ctx) {
     if (ctx->cr3 == get_kernel_pd()) { // Are we currently in the kernel?
-        out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
+        out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), 
                 "Kernel Locking up in GPF Action");
         lock_up();
     }
@@ -96,7 +92,7 @@ void fos_pf_action(user_ctx_t *ctx) {
     // handler with some special stack.
 
     if (ctx->cr3 == get_kernel_pd()) {
-        out_bios_vga(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK), 
+        out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), 
                 "Kernel Locking up in PF Action");
         lock_up();
     }
@@ -193,18 +189,24 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_wake_futex(kernel, (futex_t *)arg0, (bool)arg1);
         break;
 
-    case SCID_TERM_PUT_S:
-        if (!arg0) {
-            kernel->curr_thread->ctx.eax = FOS_E_BAD_ARGS;
-            err = FOS_E_SUCCESS;
-            break;
-        }
+    case SCID_SET_IN_HANDLE:
+        err = ks_set_in_handle(kernel, (handle_t)arg0);
+        break;
 
-        char *buf = da_malloc(arg1);
-        mem_cpy_from_user(buf, ctx->cr3, (const void *)arg0, arg1, NULL);
-        term_put_s(buf);
-        da_free(buf);
+    case SCID_IN_READ:
+        err = ks_in_read(kernel, (void *)arg0, (size_t)arg1, (size_t *)arg2);
+        break;
 
+    case SCID_IN_WAIT:
+        err = ks_in_wait(kernel);
+        break;
+
+    case SCID_SET_OUT_HANDLE:
+        err = ks_set_out_handle(kernel, (handle_t)arg0);
+        break;
+
+    case SCID_OUT_WRITE:
+        err = ks_out_write(kernel, (const void *)arg0, (size_t)arg1, (size_t *)arg2);
         break;
 
     default:
@@ -269,6 +271,48 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     if (err != FOS_E_SUCCESS) {
         term_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
         ks_shutdown(kernel);
+    }
+
+    return_to_curr_thread();
+}
+
+void fos_irq1_action(user_ctx_t *ctx) {
+    ks_save_ctx(kernel, ctx);
+
+    fernos_error_t err;
+
+    // Kinda interesting point here, but during keyboard init
+    // the interrupt will be triggered due to the intial PS/2 commands
+    // we send through the I8042.
+    //
+    // We'll just check again always to see if there actually is data to read.
+
+    uint8_t sr = inb(I8042_R_STATUS_REG_PORT);
+
+    if (sr & I8042_STATUS_REG_OBF) {
+        scs1_code_t sc = 0;
+
+        uint8_t recv_byte = inb(I8042_R_OUTPUT_PORT);
+
+        sc |= recv_byte;
+
+        if (recv_byte == SCS1_EXTEND_PREFIX) {
+            i8042_wait_for_full_output_buffer();
+            recv_byte = inb(I8042_R_OUTPUT_PORT);
+
+            sc <<= 8;
+            sc |= recv_byte;
+        }
+
+        plugin_t *plg_kb = kernel->plugins[PLG_KEYBOARD_ID];
+
+        if (plg_kb) {
+            err = plg_kernel_cmd(plg_kb, PLG_KB_KCID_KEY_EVENT, sc, 0, 0, 0);
+            if (err != FOS_E_SUCCESS) {
+                term_put_fmt_s("[KeyEvent Error 0x%X]\n", err);
+                ks_shutdown(kernel);
+            }
+        }
     }
 
     return_to_curr_thread();

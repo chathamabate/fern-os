@@ -1,12 +1,186 @@
 
-#include "k_bios_term/term.h"
-#include "k_bios_term/term_sys_helpers.h"
-#include "k_sys/page.h"
+#include "k_startup/vga_cd.h"
+#include "s_util/char_display.h"
 #include "s_util/ansi.h"
+#include "k_sys/io.h"
 #include "s_util/str.h"
-#include <stdint.h>
+#include <stdarg.h>
 
-#include "k_sys/gdt.h"
+/*
+ * Basic helpers for using the BIOS VGA Terminal.
+ */
+
+#define VGA_ROWS 25
+#define VGA_COLS 80
+static volatile uint16_t (* const VGA_TERMINAL_BUFFER)[VGA_COLS] = (volatile uint16_t (*)[VGA_COLS])0xB8000;
+
+void out_bios_vga(char_display_style_t style, const char *str) {
+    uint32_t i = 0;
+    char c;
+
+    while ((c = str[i]) != '\0') {
+       VGA_TERMINAL_BUFFER[0][i] = (uint8_t)style | c;
+       i++; 
+    }
+}
+
+static void delete_vga_char_display(char_display_t *cd) {
+    (void)cd;
+}
+
+static void vcd_get_c(char_display_t *cd, size_t row, size_t col, char_display_style_t *style, char *c) {
+    (void)cd;
+
+    uint16_t entry =  VGA_TERMINAL_BUFFER[row][col];
+
+    if (style) {
+        *style = (char_display_style_t)((entry & 0xFF00) >> 8);
+    }
+
+    if (c) {
+        *c = (char)(entry & 0xFF);
+    }
+}
+
+static void vcd_set_c(char_display_t *cd, size_t row, size_t col, char_display_style_t style, char c) {
+    (void)cd;
+    
+    VGA_TERMINAL_BUFFER[row][col] = ((style & 0xFF) << 8) | c;
+}
+
+static void vcd_scroll_up(char_display_t *cd, size_t shift) {
+    if (shift == 0) {
+        return;
+    }
+
+    if (shift > cd->rows) {
+        shift = cd->rows;
+    }
+
+    for (size_t row = 0; row < cd->rows - shift; row++) {
+        mem_cpy((void *)(VGA_TERMINAL_BUFFER[row]), 
+                (const void *)(VGA_TERMINAL_BUFFER[row + shift]), sizeof(VGA_TERMINAL_BUFFER[row]));
+    }
+
+    for (size_t row = cd->rows - shift; row < cd->rows; row++) {
+        for (size_t col = 0; col < cd->cols; col++) {
+            VGA_TERMINAL_BUFFER[row][col] = (cd->default_style << 8) | ' ';
+        }
+    }
+
+}
+
+static void vcd_scroll_down(char_display_t *cd, size_t shift) {
+    if (shift == 0) {
+        return;
+    }
+
+    if (shift > cd->rows) {
+        shift = cd->rows;
+    }
+
+    for (size_t row = cd->rows - 1; row != shift - 1; row--) {
+        mem_cpy((void *)VGA_TERMINAL_BUFFER[row], 
+                (const void *)VGA_TERMINAL_BUFFER[row - shift], 
+                sizeof(VGA_TERMINAL_BUFFER[row]));
+    }
+
+    for (size_t row = 0; row < shift; row++) {
+        for (size_t col = 0; col < cd->cols; col++) {
+            VGA_TERMINAL_BUFFER[row][col] = (cd->default_style << 8) | ' ';
+        }
+    }
+}
+
+static void vcd_set_row(char_display_t *cd, size_t row, char_display_style_t style, char c) {
+    if (row < cd->rows) {
+        for (size_t col = 0; col < cd->cols; col++) {
+            VGA_TERMINAL_BUFFER[row][col] = (style << 8) | c;
+        }
+    }
+}
+
+static void vcd_set_grid(char_display_t *cd, char_display_style_t style, char c) {
+    for (size_t row = 0; row < cd->rows; row++) {
+        for (size_t col = 0; col < cd->cols; col++) {
+            VGA_TERMINAL_BUFFER[row][col] = (style << 8) | c;
+        }
+    }
+}
+
+static const char_display_impl_t _VGA_CD_IMPL = {
+    .delete_char_display = delete_vga_char_display,
+    .cd_get_c = vcd_get_c,
+    .cd_set_c = vcd_set_c,
+    .cd_scroll_up = vcd_scroll_up,
+    .cd_scroll_down = vcd_scroll_down,
+    .cd_set_row = vcd_set_row,
+    .cd_set_grid = vcd_set_grid
+};
+
+
+static char_display_t _VGA_CD;
+char_display_t * const VGA_CD = &_VGA_CD;
+
+static void disable_bios_cursor(void) {
+    outb(0x3D4, 0x0A);
+    outb(0x3D5, 0x20);
+}
+
+fernos_error_t init_vga_char_display(void) {
+    disable_bios_cursor();
+
+    init_char_display_base(VGA_CD, &_VGA_CD_IMPL, VGA_ROWS, VGA_COLS, 
+            char_display_style(CDC_WHITE, CDC_BLACK));
+
+    // Now before we return, let's clear the display and display its cursor.
+
+    vcd_set_grid(VGA_CD, VGA_CD->default_style, ' ');
+    vcd_set_c(VGA_CD, 0, 0, cds_flip(VGA_CD->default_style), ' ');
+
+    return FOS_E_SUCCESS;
+}
+
+/*
+ * Legacy compatibilty functions!
+ */
+
+static char VGA_TERM_FMT_BUF[TERM_FMT_BUF_SIZE];
+void term_put_fmt_s(const char *fmt, ...) {
+    va_list va;
+    va_start(va, fmt);
+    str_vfmt(VGA_TERM_FMT_BUF, fmt, va);
+    va_end(va);
+
+    term_put_s(VGA_TERM_FMT_BUF);
+}
+
+#define _ESP_ID_FMT ANSI_GREEN_FG "%%esp" ANSI_RESET
+#define _ESP_INDEX_FMT ANSI_CYAN_FG "%2X" ANSI_RESET "(" _ESP_ID_FMT ")"
+
+#define _EVEN_ROW_FMT _ESP_INDEX_FMT " = " ANSI_LIGHT_GREY_FG "%08X" ANSI_RESET "\n"
+#define _ODD_ROW_FMT _ESP_INDEX_FMT " = " ANSI_BRIGHT_LIGHT_GREY_FG "%08X" ANSI_RESET "\n"
+
+#define _ESP_VAL_ROW_FMT "   " _ESP_ID_FMT "  = " ANSI_BRIGHT_LIGHT_GREY_FG "%08X" ANSI_RESET "\n"
+
+void term_put_trace(uint32_t slots, uint32_t *esp) {
+    char buf[100];
+
+    for (size_t i = 0; i < slots; i++) {
+        size_t j = slots - 1 - i; 
+
+        if (j % 2 == 0) {
+            str_fmt(buf, _EVEN_ROW_FMT, j * sizeof(uint32_t), esp[j]);
+        } else {
+            str_fmt(buf, _ODD_ROW_FMT, j * sizeof(uint32_t), esp[j]);
+        }
+
+        term_put_s(buf);
+    }
+
+    str_fmt(buf, _ESP_VAL_ROW_FMT, esp);
+    term_put_s(buf);
+}
 
 static void term_put_64bit(uint64_t v) {
     term_put_fmt_s(ANSI_CYAN_FG "[4] " ANSI_RESET "%08X" "\n", (uint32_t)(v >> 32));

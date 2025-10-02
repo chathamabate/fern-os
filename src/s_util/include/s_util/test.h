@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "s_util/misc.h"
 #include "s_util/ansi.h"
+#include "s_util/err.h"
 
 #define HBAR "-----------------------------\n"
 
@@ -56,6 +57,7 @@ static uint32_t _total_run;
 #define TEST_EQUAL_INT(exp, act) TEST_EQUAL_W_FMT("%d", exp, act)
 #define TEST_EQUAL_UINT(exp, act) TEST_EQUAL_W_FMT("%u", exp, act)
 #define TEST_EQUAL_HEX(exp, act) TEST_EQUAL_W_FMT("0x%X", exp, act)
+#define TEST_SUCCESS(expr) TEST_EQUAL_HEX(FOS_E_SUCCESS, expr)
 
 #define TEST_TRUE(cond) \
     do { \
