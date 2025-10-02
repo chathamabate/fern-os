@@ -154,6 +154,14 @@ void cd_put_c(char_display_t *cd, char c) {
     case '\r':
         cd->cursor_col = 0;
         break;
+    case '\b':
+        if (cd->cursor_col > 0) {
+            cd->cursor_col--;
+        } else if (cd->cursor_row > 0) {
+            cd->cursor_row--;
+            cd->cursor_col = cd->cols - 1;
+        }
+        break;
     default: {
         char c_to_print = 32 <= c && c < 127 ? c : ' ';
         cd->impl->cd_set_c(cd, cd->cursor_row, cd->cursor_col, cd->curr_style, c_to_print);
@@ -344,6 +352,15 @@ void cd_put_s(char_display_t *cd, const char *s) {
 
         case '\r':
             cd->cursor_col = 0;
+            break;
+
+        case '\b':
+            if (cd->cursor_col > 0) {
+                cd->cursor_col--;
+            } else if (cd->cursor_row > 0) {
+                cd->cursor_row--;
+                cd->cursor_col = cd->cols - 1;
+            }
             break;
 
         case '\x1B':

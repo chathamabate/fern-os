@@ -138,7 +138,8 @@ qemu.bin: $(BIN_FILE) | $(TOY_DISK)
 		-m 4G \
 		-kernel $(BIN_FILE) \
 		-drive file=$(TOY_DISK),format=raw,index=0,media=disk \
-		-display cocoa,zoom-to-fit=on,full-grab=on \
+		-display sdl \
+		-full-screen \
 		-monitor stdio
 		
 # NOTE: When we start working with disk read/write... I'd really like to figure out ISO packaging!

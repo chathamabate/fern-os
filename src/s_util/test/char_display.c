@@ -208,11 +208,16 @@ static bool test_put_c0(void) {
 }
 
 static bool test_put_c1(void) {
-    // Now try the two control sequences '\r' and '\n'  
+    // Now try the two control sequences '\r', '\n', and '\b'
 
     const size_t cols_to_write = 10;
     TEST_TRUE(cols_to_write < dcd->cols); // Must have at least one space 
                                           // at the end of the line.
+
+    // An initial backspace should do nothing.
+    cd_put_c(dcd, '\b');
+    TEST_EQUAL_HEX(cds_flip(dcd->default_style), 
+            grid[0][0].style);
 
     for (size_t iter = 0; iter < cols_to_write; iter++) {
         for (size_t col = 0; col < cols_to_write - iter; col++) {
@@ -235,6 +240,14 @@ static bool test_put_c1(void) {
     }
 
     TEST_EQUAL_HEX('B', grid[0][0].c);
+
+    cd_put_c(dcd, '\b');
+    TEST_EQUAL_HEX(cds_flip(dcd->default_style), 
+            grid[dcd->rows - 2][dcd->cols - 1].style);
+
+    cd_put_c(dcd, '\b');
+    TEST_EQUAL_HEX(cds_flip(dcd->default_style), 
+            grid[dcd->rows - 2][dcd->cols - 2].style);
 
     TEST_SUCCEED();
 }

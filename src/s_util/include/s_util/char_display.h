@@ -232,6 +232,7 @@ static inline void delete_char_display(char_display_t *cd) {
  * Control Characters Supported:
  * '\n' - Move cursor to the beginning of the next line. (Scrolling if needed)
  * '\r` - Move cursor to the beginning of the current line.
+ * '\b' - Move the cursor one position backwards. 
  *
  * Undefined behavior if `c` is not a ASCII printable character or one of the listed control 
  * sequences.
@@ -244,6 +245,7 @@ void cd_put_c(char_display_t *cd, char c);
  * Control Characters Supported:
  * '\n' - Move cursor to the beginning of the next line. (Scrolling if needed)
  * '\r` - Move cursor to the beginning of the current line.
+ * '\b' - Move the cursor one position backwards. 
  *
  * ANSI Control Sequences Supported: See "s_util/ansi.h"
  *

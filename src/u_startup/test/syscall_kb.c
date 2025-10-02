@@ -6,8 +6,6 @@
 #include "s_util/misc.h"
 #include "s_util/ps2_scancodes.h"
 #include "s_util/ansi.h"
-#include "u_startup/syscall_vga_cd.h"
-#include "u_startup/syscall_cd.h"
 
 fernos_error_t test_kb_simple_prompt(void) {
     // Again, this is just a test program, it only cleans up the keybaord handle 
@@ -16,7 +14,7 @@ fernos_error_t test_kb_simple_prompt(void) {
     handle_t kb;
     PROP_ERR(sc_kb_open(&kb));
 
-    char msg_buf[60];
+    char msg_buf[128];
     const size_t msg_buf_len = sizeof(msg_buf) - 1; // Include 1 char for the NT.
 
     while (true) {
@@ -53,7 +51,7 @@ fernos_error_t test_kb_simple_prompt(void) {
 
             case SCS1_BACKSPACE:
                 if (make && i > 0) {
-                    PROP_ERR(sc_out_write_s(ANSI_CURSOR_LEFT " " ANSI_CURSOR_LEFT)); 
+                    PROP_ERR(sc_out_write_s("\b \b")); 
                     i--;
                 }
                 break;
