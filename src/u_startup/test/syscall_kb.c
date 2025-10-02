@@ -79,3 +79,27 @@ fernos_error_t test_kb_simple_prompt(void) {
         }
     }
 }
+
+fernos_error_t test_kb_funky(void) {
+    handle_t kb;
+    PROP_ERR(sc_kb_open(&kb));
+
+    uint8_t data_buf[10];
+
+    while (true) {
+        PROP_ERR(sc_out_write_s("Reading...\n"));
+        PROP_ERR(sc_handle_read_full(kb, data_buf, sizeof(data_buf) / 2));
+
+        PROP_ERR(sc_out_write_s("Reading MORE...\n"));
+        PROP_ERR(sc_handle_read_full(kb, data_buf + (sizeof(data_buf) / 2), sizeof(data_buf) / 2));
+
+        PROP_ERR(sc_out_write_s("Enough Data Received!\n"));
+        for (size_t i = 0; i < sizeof(data_buf); i++) {
+            PROP_ERR(sc_out_write_fmt_s("%X ", data_buf[i]));
+        }
+
+        PROP_ERR(sc_out_write_s("\nSleeping (Ignoring presses)\n"));
+        sc_thread_sleep(48);
+        sc_kb_skip_forward(kb); // After the sleep we skip ahead.
+    }
+}
