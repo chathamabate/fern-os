@@ -18,7 +18,8 @@ _ASMS		?= main.s syscall.s
 _TEST_SRCS 	?= syscall.c \
 			   syscall_fs.c \
 			   syscall_cd.c \
-			   syscall_default_io.c
+			   syscall_default_io.c \
+			   syscall_kb.c
 
 -include ../mod_stub.mk
 
