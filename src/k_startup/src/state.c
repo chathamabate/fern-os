@@ -680,6 +680,62 @@ fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv) {
     return FOS_E_SUCCESS;
 }
 
+fernos_error_t ks_request_mem(kernel_state_t *ks, void *s, const void *e, const void **u_true_e) {
+    fernos_error_t err;
+
+    if (!(ks->curr_thread)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    phys_addr_t pd = thr->proc->pd;
+
+    if (!u_true_e) {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    if ((uintptr_t)s < FOS_FREE_AREA_START || (uintptr_t)s >= FOS_FREE_AREA_END) {
+        DUAL_RET(thr, FOS_E_INVALID_RANGE, FOS_E_SUCCESS);
+    }
+
+    if ((uintptr_t)e < FOS_FREE_AREA_START || (uintptr_t)e > FOS_FREE_AREA_END) {
+        DUAL_RET(thr, FOS_E_INVALID_RANGE, FOS_E_SUCCESS);
+    }
+    
+    // All other errors should be handled in `pd_alloc_pages`.
+
+    const void *true_e = NULL;
+    err = pd_alloc_pages(pd, true, s, e, &true_e);
+
+    // Sadly we are not going to error check here, but this should really always succeed
+    // unless the user gives a bad address, in which case it doesn't matter anyway.
+    mem_cpy_to_user(pd, u_true_e, &true_e, sizeof(*u_true_e), NULL);
+
+    DUAL_RET(thr, err, FOS_E_SUCCESS);
+}
+
+fernos_error_t ks_return_mem(kernel_state_t *ks, void *s, const void *e) {
+    if (!(ks->curr_thread)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    phys_addr_t pd = thr->proc->pd;
+
+    if ((uintptr_t)s < FOS_FREE_AREA_START || (uintptr_t)s >= FOS_FREE_AREA_END) {
+        return FOS_E_SUCCESS;
+    }
+
+    if ((uintptr_t)e < FOS_FREE_AREA_START || (uintptr_t)e > FOS_FREE_AREA_END) {
+        return FOS_E_SUCCESS;
+    }
+
+    // All other error cases are checked inside `pd_free_pages`.
+    pd_free_pages(pd, s, e);
+
+    return FOS_E_SUCCESS;
+}
+
 fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     fernos_error_t err;
 

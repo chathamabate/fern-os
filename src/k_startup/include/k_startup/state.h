@@ -322,6 +322,34 @@ KS_SYSCALL fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, si
 KS_SYSCALL fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv);
 
 /**
+ * Request memory in a process's free area.
+ *
+ * FOS_E_BAD_ARGS if `u_true_e` is NULL.
+ * FOS_E_ALIGN_ERROR if `s` or `e` aren't 4K aligned.
+ * FOS_E_INVALID_RANGE if `e` < `s` OR if `s` or `e` are outside the free area.
+ *
+ * In the above three cases, this call does nothing.
+ *
+ * Otherwise, memory will be attempted to be allocated.
+ *
+ * FOS_E_SUCCESS is returned if the entire allocation succeeds.
+ * If we run out of memory, FOS_E_NO_MEM is returned.
+ * If we run into an already page, FOS_E_ALREADY_ALLOCATED is returned.
+ * In all of these cases, the end of the last allocated page is written to `*u_true_e`
+ */
+KS_SYSCALL fernos_error_t ks_request_mem(kernel_state_t *ks, void *s, const void *e, const void **u_true_e);
+
+/**
+ * Returns memory in the proccess's free area.
+ *
+ * Does nothing if `s` or `e` aren't 4K aligned, `e` < `s`, or `s` or `e` are outside
+ * the process free area.
+ *
+ * Returns nothing to the user thread.
+ */
+KS_SYSCALL fernos_error_t ks_return_mem(kernel_state_t *ks, void *s, const void *e);
+
+/**
  * Take the current thread, deschedule it, and add it it to the sleep wait queue.
  *
  * Kernel error if there is no current thread.

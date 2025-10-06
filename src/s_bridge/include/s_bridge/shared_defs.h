@@ -149,13 +149,17 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 #define SCID_SIGNAL_WAIT  (0x92U)
 #define SCID_SIGNAL_CLEAR (0x93U)
 
+/* Process Memory Management */
+#define SCID_MEM_REQUEST  (0xA0U)
+#define SCID_MEM_RETURN   (0xA1U)
+
 /* Thread Syscalls */
 #define SCID_THREAD_EXIT  (0x100U)
 #define SCID_THREAD_SLEEP (0x101U)
 #define SCID_THREAD_SPAWN (0x102U)
 #define SCID_THREAD_JOIN  (0x103U)
 
-/* Futex Syscalls */
+/* Futex Syscalls (Consider making futex's a plugin) */
 #define SCID_FUTEX_REGISTER   (0x200U)
 #define SCID_FUTEX_DEREGISTER (0x201U)
 #define SCID_FUTEX_WAIT       (0x202U)

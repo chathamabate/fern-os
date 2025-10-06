@@ -219,10 +219,15 @@ phys_addr_t new_page_directory(void);
  * Add pages (and page table if necessary) to a page directory.
  * The pages will always be marked as writeable. 
  *
+ * FOS_E_ALIGN_ERROR if `pd`, `s`, or `e` aren't 4K aligned.
+ * FOS_E_BAD_ARGS if `true_e` is NULL.
+ * FOS_E_INVALID_RANGE if `e` < `s`.
+ *
+ * Otherwise, pages are attempted to be allocated.
+ * If all pages are allocated, FOS_E_SUCCESS is returned.
  * If we run out of memory, FOS_E_NO_MEM is returned.
  * If we run into an already page, FOS_E_ALREADY_ALLOCATED is returned.
- *
- * Use true_e to determine how many pages were actually allocated in case of error.
+ * In these three cases, the true end of the allocated section is written to `*true_e`.
  */
 fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e, const void **true_e);
 

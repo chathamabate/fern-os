@@ -30,7 +30,15 @@ fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid) {
 }
 
 void sc_signal_clear(sig_vector_t sv) {
-    trigger_syscall(SCID_SIGNAL_CLEAR, (uint32_t)sv, 0, 0, 0);
+    (void)trigger_syscall(SCID_SIGNAL_CLEAR, (uint32_t)sv, 0, 0, 0);
+}
+
+fernos_error_t sc_mem_request(void *s, const void *e, const void **true_e) {
+    return (fernos_error_t)trigger_syscall(SCID_MEM_REQUEST, (uint32_t)s, (uint32_t)e, (uint32_t)true_e, 0);
+}
+
+void sc_mem_return(void *s, const void *e) {
+    (void)trigger_syscall(SCID_MEM_RETURN, (uint32_t)s, (uint32_t)e, 0, 0);
 }
 
 void sc_thread_exit(void *retval) {

@@ -134,6 +134,32 @@ fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid);
 void sc_signal_clear(sig_vector_t sv);
 
 /**
+ * Request memory in this process's free area.
+ *
+ * FOS_E_BAD_ARGS if `true_e` is NULL.
+ * FOS_E_ALIGN_ERROR if `s` or `e` aren't 4K aligned.
+ * FOS_E_INVALID_RANGE if `e` < `s` OR if `s` or `e` are outside the free area.
+ *
+ * In the above three cases, this call does nothing.
+ *
+ * Otherwise, memory will be attempted to be allocated.
+ *
+ * FOS_E_SUCCESS is returned if the entire allocation succeeds.
+ * If we run out of memory, FOS_E_NO_MEM is returned.
+ * If we run into an already page, FOS_E_ALREADY_ALLOCATED is returned.
+ * In all of these cases, the end of the last allocated page is written to `*true_e`
+ */
+fernos_error_t sc_mem_request(void *s, const void *e, const void **true_e);
+
+/**
+ * Returns memory in this proccess's free area.
+ *
+ * Does nothing if `s` or `e` aren't 4K aligned, `e` < `s`, or `s` or `e` are outside
+ * the process free area.
+ */
+void sc_mem_return(void *s, const void *e);
+
+/**
  * Exit the current thread.
  *
  * If this thread is the "main thread", the full process will exit.

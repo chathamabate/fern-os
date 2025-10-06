@@ -156,6 +156,14 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_signal_clear(kernel, (sig_vector_t)arg0);
         break;
 
+    case SCID_MEM_REQUEST:
+        err = ks_request_mem(kernel, (void *)arg0, (const void *)arg1, (const void **)arg2);
+        break;
+
+    case SCID_MEM_RETURN:
+        err = ks_return_mem(kernel, (void *)arg0, (const void *)arg1);
+        break;
+
     case SCID_THREAD_EXIT:
         err = ks_exit_thread(kernel, (void *)arg0);
         break;
