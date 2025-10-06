@@ -14,9 +14,10 @@ MODS := \
 		u_startup \
 		s_bridge \
 		k_sys \
+		s_block_device \
+		s_elf \
 		s_data \
 		s_mem \
-		s_block_device \
 		s_util 
 
 # Static memory layout header and linker generation:
@@ -110,20 +111,20 @@ C_COMPILER := i686-elf-gcc
 
 LDSCRIPT := $(MODS_DIR)/linker.ld
 
-BIN_FILE := $(BUILD_DIR)/$(OS_NAME).bin
+ELF_FILE := $(BUILD_DIR)/$(OS_NAME).elf
 
 $(BUILD_DIR):
 	mkdir -p $@
 
 LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod)_test -l$(mod))
 
-$(BIN_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
+$(ELF_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
 		-Wl,--start-group $(LIB_FLAGS) -lgcc -Wl,--end-group
 
 .PHONY: bin qemu.bin
 
-bin: $(BIN_FILE)
+bin: $(ELF_FILE)
 
 TOY_DISK := $(BUILD_DIR)/hdd.img
 $(TOY_DISK): | $(BUILD_DIR)
@@ -133,10 +134,10 @@ $(TOY_DISK): | $(BUILD_DIR)
 t: $(TOY_DISK)
 	mkfs.fat -F 32 -s 2 $(TOY_DISK)
 
-qemu.bin: $(BIN_FILE) | $(TOY_DISK)
+qemu.bin: $(ELF_FILE) | $(TOY_DISK)
 	qemu-system-x86_64 \
 		-m 4G \
-		-kernel $(BIN_FILE) \
+		-kernel $(ELF_FILE) \
 		-drive file=$(TOY_DISK),format=raw,index=0,media=disk \
 		-display sdl \
 		-full-screen \

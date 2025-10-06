@@ -11,6 +11,7 @@
 #include "s_util/constraints.h"
 
 #include "s_util/str.h"
+#include "s_elf/elf32.h"
 #include <stdarg.h>
 
 static fernos_error_t setup_user_heap(void) {
@@ -57,6 +58,7 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
+    sc_out_write_fmt_s("HDR SIZE: %X\n", sizeof(elf32_header_t));
 
     return PROC_ES_SUCCESS;
 }
