@@ -13,5 +13,5 @@
  * NOTE: I am a little frustrated that these tests rely on the allocator having a certain amount
  * of memory. It'd be better if these tests succeeded regardless of what allocator was being used.
  */
-bool test_allocator(const char *name, allocator_t *(*gen)(void));
+bool test_allocator(const char *name, allocator_t *(*gen)(void), void (*lf)(const char *fmt, ...));
 

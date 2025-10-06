@@ -12,7 +12,15 @@ static bool posttest(void);
 #define PRETEST() pretest()
 #define POSTTEST() posttest()
 
-#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+/**
+ * The logging function used by this test.
+ *
+ * This is stored in memory so that this suite is runnable from
+ * either userspace OR kernel space!
+ */
+static void (*logf)(const char *fmt, ...) = NULL;
+
+#define LOGF_METHOD(...) logf(__VA_ARGS__)
 
 #include "s_util/test.h"
 
@@ -387,8 +395,9 @@ static bool test_exhaust(void) {
     TEST_SUCCEED();
 }
 
-bool test_allocator(const char *name, allocator_t *(*gen)(void)) {
+bool test_allocator(const char *name, allocator_t *(*gen)(void), void (*lf)(const char *fmt, ...)) {
     gen_allocator = gen;
+    logf = lf;
 
     BEGIN_SUITE(name);
     RUN_TEST(test_nop_args);

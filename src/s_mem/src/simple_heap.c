@@ -430,7 +430,7 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
     // After doing an initial search of both lists, are we still yet to find a large enough free 
     // block? If so, check if we can request more memory.
     if (!fb && !(shal->exhausted)) {
-        size_t mem_needed = bytes;
+        size_t mem_needed = bytes + (2 * sizeof(mem_block_border_t)); 
         if (!IS_ALIGNED(mem_needed, M_4K)) {
             mem_needed = ALIGN(mem_needed + M_4K, M_4K);
         }
@@ -450,7 +450,7 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
                 // If not large enough, just add it back to the free list.
                 shal_add_fb(shal, new_fb);
             }
-        }
+        } 
     }
 
     // Have we still not found a match? Let's exhaust our small free list.

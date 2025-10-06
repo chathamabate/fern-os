@@ -30,6 +30,8 @@
 #include "s_util/char_display.h"
 #include "k_startup/vga_cd.h"
 
+#include "s_mem/test/simple_heap.h"
+
 #include <stdint.h>
 
 static inline void setup_fatal(const char *msg) {
