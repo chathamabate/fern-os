@@ -58,7 +58,7 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    sc_out_write_fmt_s("HDR SIZE: %X\n", sizeof(elf32_header_t));
+    sc_out_write_fmt_s("HDR SIZE: %X\n", sizeof(elf32_program_header_t));
 
     return PROC_ES_SUCCESS;
 }

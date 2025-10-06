@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 typedef struct _elf32_header_t elf32_header_t;
+typedef struct _elf32_program_header_t elf32_program_header_t;
+typedef struct _elf32_section_header_t elf32_section_header_t;
 
 /**
  * In little endian this should be 
@@ -116,4 +118,75 @@ struct _elf32_header_t {
      * names.
      */
     uint16_t section_names_header_index;
+} __attribute__ ((packed));
+
+typedef uint32_t elf32_segment_type_t;
+
+#define ELF32_SEG_TYPE_NULL       (0UL)
+#define ELF32_SEG_TYPE_LOADABLE   (1UL)
+#define ELF32_SEG_TYPE_DYNAMIC    (2UL)
+#define ELF32_SEG_TYPE_INTERP     (3UL)
+#define ELF32_SEG_TYPE_NOTE       (4UL)
+#define ELF32_SEG_TYPE_SHLIB      (5UL)
+#define ELF32_SEG_TYPE_HDR_TBL    (6UL)
+#define ELF32_SEG_TYPE_TLS        (7UL)
+// There are more, but I think these are the only ones we'll ever care about.
+
+
+typedef uint32_t elf32_segment_flags_t;
+
+#define ELF32_SEG_FLAG_EXECUTABLE (1UL << 0)
+#define ELF32_SEG_FLAG_WRITEABLE  (1UL << 1)
+#define ELF32_SEG_FLAG_READABLE   (1UL << 2)
+
+/**
+ * A program header describes a segment of data within the ELF file.
+ */
+struct _elf32_program_header_t {
+    /**
+     * The type of the segment this header points to.
+     */
+    elf32_segment_type_t type;
+
+    /**
+     * Offset into the ELF file of the segment this header describes.
+     */
+    uint32_t offset;
+
+    /**
+     * Virtual address for this segment to be loaded to.
+     */
+    void *vaddr;
+
+    /**
+     * Physical address for this segment. (We will likely not use this)
+     */
+    uint32_t paddr;
+
+    /**
+     * Size of the corresponding segment in the ELF file. (Can be 0)
+     */
+    uint32_t size_in_file;
+
+    /**
+     * Size of the segment in memory. (Can be 0)
+     */
+    uint32_t size_in_mem;
+
+    /**
+     * Flags for this segment.
+     */
+    elf32_segment_flags_t flags;
+
+    /**
+     * 0 or 1 mean No alignment.
+     *
+     * Otherwise a power of 2.
+     */
+    uint32_t align;
+} __attribute__ ((packed));
+
+struct _elf32_section_header_t {
+    
+
 } __attribute__ ((packed));
