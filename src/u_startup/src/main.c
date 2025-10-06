@@ -4,6 +4,7 @@
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_cd.h"
 #include "u_startup/syscall_vga_cd.h"
+#include "u_startup/test/syscall.h"
 
 proc_exit_status_t user_main(void) {
     // User code here! 
@@ -21,7 +22,7 @@ proc_exit_status_t user_main(void) {
 
     sc_set_out_handle(cd);
 
-    sc_out_write_s("Hello World!!!\n");
+    test_syscall();
 
     return PROC_ES_SUCCESS;
 }

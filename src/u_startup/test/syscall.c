@@ -433,6 +433,97 @@ static bool test_complex_fork2(void) {
     TEST_SUCCEED();
 }
 
+/* 
+ * Free Memory Tests 
+ * 
+ * NOTE: The memory system calls are really just wrappers around paging funtions
+ * which have already been tested. Here we are just confirming the system calls generally
+ * work, that's all. Nothing too rigorous.
+ */
+
+static bool test_simple_memory(void) {
+    fernos_error_t err;
+
+    const void *true_e;
+
+    err = sc_mem_request((void *)(FOS_FREE_AREA_START - M_4K), (const void *)(FOS_FREE_AREA_END), &true_e);
+    TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
+
+    err = sc_mem_request((void *)(FOS_FREE_AREA_START), (const void *)(FOS_FREE_AREA_END + M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
+
+    // This tests the errors of the wrapped pd alloc function are bubbled up correctly.
+    err = sc_mem_request((void *)(FOS_FREE_AREA_START + (2 * M_4K)), (const void *)(FOS_FREE_AREA_END + M_4K), &true_e);
+    TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
+
+    // Going to assume this single page allocation always works!
+    TEST_SUCCESS(sc_mem_request((void *)(FOS_FREE_AREA_START), (const void *)(FOS_FREE_AREA_START + M_4K), &true_e));
+    TEST_EQUAL_HEX((const void *)(FOS_FREE_AREA_START + M_4K), true_e);
+
+    // Make sure this doesn't crash the process.
+    *(int *)(FOS_FREE_AREA_START) = 4;
+
+    sc_mem_return((void *)(FOS_FREE_AREA_START), (const void *)(FOS_FREE_AREA_START + M_4K));
+
+    TEST_SUCCEED();
+}
+
+static bool test_memory_forks(void) {
+    // Here we are going to confirm that allocating and deallocating actually affects the current
+    // process's memory space! We are going to use child processes to do crashing behaviors.
+
+    proc_id_t cpid;
+    proc_exit_status_t rces;
+    const void *true_e;
+
+    // Child Proc 1.
+
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) {
+        *(int *)(FOS_FREE_AREA_START) = 4; // this shouldn't be allocated yet, and thus
+                                           // should crash.
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &rces));
+    TEST_TRUE(rces != PROC_ES_SUCCESS);
+
+    // Child Proc 2.
+
+    TEST_SUCCESS(sc_mem_request((void *)FOS_FREE_AREA_START, (const void *)(FOS_FREE_AREA_START + M_4K), &true_e));
+
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) {
+        *(int *)(FOS_FREE_AREA_START) = 4; // this shouldn't crash, because it IS allocated!
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &rces));
+    TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
+
+    // Child Proc 3.
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) {
+        // Does returning work?
+        sc_mem_return((void *)FOS_FREE_AREA_START, (const void *)(FOS_FREE_AREA_START + M_4K));
+        *(int *)(FOS_FREE_AREA_START) = 4; // This SHOULD Crash!
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &rces));
+    TEST_TRUE(rces != PROC_ES_SUCCESS);
+
+    TEST_SUCCEED();
+}
+
+
 /* Multithreading Tests */
 
 /**
@@ -843,6 +934,10 @@ bool test_syscall(void) {
     RUN_TEST(test_complex_fork0);
     RUN_TEST(test_complex_fork1);
     RUN_TEST(test_complex_fork2);
+
+    // Memory tests
+    RUN_TEST(test_simple_memory);
+    RUN_TEST(test_memory_forks);
 
     // Threading tests
 
