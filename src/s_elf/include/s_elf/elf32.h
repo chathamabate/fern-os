@@ -186,7 +186,86 @@ struct _elf32_program_header_t {
     uint32_t align;
 } __attribute__ ((packed));
 
-struct _elf32_section_header_t {
-    
+typedef uint32_t elf32_section_type_t;
 
+#define ELF32_SEC_TYPE_NULL             (0UL)
+#define ELF32_SEC_TYPE_PROGBITS         (1UL)
+#define ELF32_SEC_TYPE_SYMTAB           (2UL)
+#define ELF32_SEC_TYPE_STRTAB           (3UL)
+#define ELF32_SEC_TYPE_RELA             (4UL)
+#define ELF32_SEC_TYPE_HASH             (5UL)
+#define ELF32_SEC_TYPE_DYNAMIC          (6UL)
+#define ELF32_SEC_TYPE_NOTES            (7UL)
+#define ELF32_SEC_TYPE_NOBITS           (8UL)
+#define ELF32_SEC_TYPE_SHLIB            (9UL)
+#define ELF32_SEC_TYPE_DYNSYM           (10UL)
+#define ELF32_SEC_TYPE_INIT_ARRAY       (12UL)
+#define ELF32_SEC_TYPE_FINI_ARRAY       (13UL)
+#define ELF32_SEC_TYPE_PRE_INIT_ARRAY   (14UL)
+#define ELF32_SEC_TYPE_GROUP            (15UL)
+#define ELF32_SEC_TYPE_SYMTAB_SHNDX     (16UL)
+
+typedef uint32_t elf32_section_flags_t;
+
+#define ELF32_SEC_FLAG_WRITE            (1UL << 0)
+#define ELF32_SEC_FLAG_ALLOC            (1UL << 1)
+#define ELF32_SEC_FLAG_EXEC             (1UL << 2)
+#define ELF32_SEC_FLAG_MERGE            (1UL << 4)
+#define ELF32_SEC_FLAG_STRINGS          (1UL << 5)
+#define ELF32_SEC_FLAG_INFO_LINK        (1UL << 6)
+#define ELF32_SEC_FLAG_LINK_ORDER       (1UL << 7)
+#define ELF32_SEC_FLAG_OS_NONCONFORMING (1UL << 8)
+#define ELF32_SEC_FLAG_GROUP            (1UL << 9)
+#define ELF32_SEC_FLAG_TLS              (1UL << 10)
+
+/**
+ * A section header describes a section within the ELF file.
+ */
+struct _elf32_section_header_t {
+    /**
+     * Offset into the section header string table containing the name of this section.
+     */
+    uint32_t name_offset; 
+
+    /**
+     * Type of the section being described.
+     *
+     * (Type NULL means this header isn't in use)
+     */
+    elf32_section_type_t type;
+
+    /**
+     * Flags for this section.
+     */
+    elf32_section_flags_t flags;
+
+    /**
+     * Virtual address for loadable sections.
+     */
+    void *vaddr;
+
+    /**
+     * Offset of this section in the ELF file.
+     */
+    uint32_t offset;
+
+    /**
+     * Size in bytes of this section (Can be 0)
+     */
+    uint32_t size;
+
+    uint32_t link;
+
+    uint32_t info;
+
+    /**
+     * Required alignment for this section (Must be a power of 2).
+     */
+    uint32_t align;
+
+    /**
+     * Contains entry size for sections which are a table of fixed sized entries.
+     * Otherwise, this contains 0.
+     */
+    uint32_t entry_size;
 } __attribute__ ((packed));
