@@ -2,7 +2,6 @@
 #include "u_startup/main.h"
 
 #include "u_startup/syscall.h"
-#include "u_startup/syscall_cd.h"
 #include "u_startup/syscall_fs.h"
 #include "u_startup/syscall_vga_cd.h"
 #include "u_startup/test/syscall.h"
@@ -11,7 +10,6 @@
 #include "s_mem/simple_heap.h"
 #include "s_util/constraints.h"
 
-#include "s_util/str.h"
 #include "s_elf/elf32.h"
 #include <stdarg.h>
 
@@ -44,7 +42,6 @@ static fernos_error_t setup_user_heap(void) {
 proc_exit_status_t user_main(void) {
     // User code here! 
     
-
     fernos_error_t err;
 
     handle_t cd;
