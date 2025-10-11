@@ -22,6 +22,10 @@ INCLUDE "os_defs.ld"
  */
 
 FERNOS_LENGTH = FERNOS_END - FERNOS_START + 1;
+FERNOS_KERNEL_LENGTH = FERNOS_KERNEL_END - FERNOS_KERNEL_START + 1;
+FERNOS_APP_LENGTH = FERNOS_APP_END - FERNOS_APP_START + 1;
+FERNOS_FREE_LENGTH = FERNOS_FREE_END - FERNOS_FREE_START + 1;
+FERNOS_STACK_LENGTH = FERNOS_STACK_END - FERNOS_STACK_START + 1;
 
 MEMORY 
 {
@@ -29,11 +33,12 @@ MEMORY
 
     prologue       : ORIGIN = PROLOGUE_START, LENGTH = PROLOGUE_END - PROLOGUE_START + 1
 
-    /* 
-     * We make the "fernos area" purposely smaller, so we can gaurantee enough room 
-     * for an initial stack.
-     */
-    fernos_area    : ORIGIN = FERNOS_START, LENGTH  = FERNOS_LENGTH
+    /* Likely only the kernel area will be needed below by this linker script */
+    fernos_kernel_area : ORIGIN = FERNOS_KERNEL_START, LENGTH = FERNOS_KERNEL_LENGTH
+
+    fernos_app_area : ORIGIN = FERNOS_APP_START, LENGTH = FERNOS_APP_LENGTH
+    fernos_free_area : ORIGIN = FERNOS_FREE_START, LENGTH = FERNOS_FREE_LENGTH
+    fernos_stack_area : ORIGIN = FERNOS_STACK_START, LENGTH = FERNOS_STACK_LENGTH
 
     epilogue       : ORIGIN = EPILOGUE_START, LENGTH = EPILOGUE_END - EPILOGUE_START + 1
 }
@@ -64,7 +69,7 @@ SECTIONS
         _tss_end = .;
         . = ALIGN(4K);
         _sys_tables_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     /*
      * Three types of areas (shared, kernel, and user)
@@ -81,7 +86,7 @@ SECTIONS
         *libs_*.a:*.o(.rodata)
         . = ALIGN(4K);
         _ro_shared_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     .text.kernel : {
         . = ALIGN(4K);
@@ -90,7 +95,7 @@ SECTIONS
         *libk_*.a:*.o(.rodata)
         . = ALIGN(4K);
         _ro_kernel_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     .text.user : {
         . = ALIGN(4K);
@@ -99,7 +104,7 @@ SECTIONS
         *libu_*.a:*.o(.rodata)
         . = ALIGN(4K);
         _ro_user_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     /* BSS and Data Sections */
 
@@ -110,7 +115,7 @@ SECTIONS
         *libs_*.a:*.o(COMMON)
         . = ALIGN(4K);
         _bss_shared_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     .data.shared : {
         . = ALIGN(4K);
@@ -118,7 +123,7 @@ SECTIONS
         *libs_*.a:*.o(.data)
         . = ALIGN(4K);
         _data_shared_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     .bss.kernel (NOLOAD) : {
         . = ALIGN(4K);
@@ -127,7 +132,7 @@ SECTIONS
         *libk_*.a:*.o(COMMON)
         . = ALIGN(4K);
         _bss_kernel_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     .data.kernel : {
         . = ALIGN(4K);
@@ -135,7 +140,7 @@ SECTIONS
         *libk_*.a:*.o(.data)
         . = ALIGN(4K);
         _data_kernel_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     .bss.user (NOLOAD) : {
         . = ALIGN(4K);
@@ -144,7 +149,7 @@ SECTIONS
         *libu_*.a:*.o(COMMON)
         . = ALIGN(4K);
         _bss_user_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     .data.user : {
         . = ALIGN(4K);
@@ -152,10 +157,10 @@ SECTIONS
         *libu_*.a:*.o(.data)
         . = ALIGN(4K);
         _data_user_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 
     .misc : {
         . = ALIGN(4K);
         _static_area_end = .;
-    } > fernos_area
+    } > fernos_kernel_area
 }

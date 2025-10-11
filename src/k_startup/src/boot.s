@@ -57,7 +57,7 @@ _start:
     Also, the last 4 bytes of the stack area will always be reserved for the kernel 
     page directory (We must -4)
     */
-	movl $(FERNOS_END+1-4), %esp
+	movl $(FERNOS_STACK_END+1-4), %esp
     movl %esp, %ebp
 
     call start_kernel

@@ -132,7 +132,6 @@ typedef uint32_t elf32_segment_type_t;
 #define ELF32_SEG_TYPE_TLS        (7UL)
 // There are more, but I think these are the only ones we'll ever care about.
 
-
 typedef uint32_t elf32_segment_flags_t;
 
 #define ELF32_SEG_FLAG_EXECUTABLE (1UL << 0)

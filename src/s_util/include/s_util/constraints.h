@@ -8,21 +8,19 @@
 /*
  * Some definitions which specify FernOS Limitations.
  *
- *  The fernOS memory space will have 3 areas:
- *
- *  Code and Data Area 
- *  Free Area
- *  Stack Area
+ *  The fernOS memory space will have 4 areas.
+ *  The boundaries of these area are defined in the top level Makefile. (Which generates os_defs.h)
+ * 
+ *  Kernel Area - Where kernel code and data lives.
+ *  App Area - Where application code and data will live.
+ *  Free Area - Where the free area will live for the kernel and user processes.
+ *  Stack Area - Where the kernel and user stacks will live.
  *
  *  NOTE: These areas are not necessarily snug. There will likely be unmapped pages between them.
  *  The code and data area is populate with the contents of the kernel elf file.
  *
  *  The free area is an area of the memory space which is gauranteed to be unused and mappable.
  *  (Where you should place your heap)
- *
- *  The stack area will be where all stacks are placed.
- *
- *  Other virtual areas may be free, but really shouldn't be used!
  *
  *  NOTE: If any area definitons below lead to overlapping areas, the kernel should fail to boot.
  */
@@ -37,20 +35,42 @@
  */
 
 /**
- * EDITABLE
- *
- * If the kernel elf contents exceed this end, the kernel should fail to boot.
+ * The entire FernOS memory space! (Likely not the full 4GB of mem)
  */
-#define FOS_CODE_AND_DATA_AREA_END (0x8000000U)
+#define FOS_AREA_START (FERNOS_START)
+#define FOS_AREA_END   (FERNOS_END + 1)
+#define FOS_AREA_SIZE  (FOS_AREA_END - FOS_AREA_START)
 
 /**
- * EDITABLE
+ * Where Kernel stuff is placed.
  *
- * The free area!
+ * NOTE: The linker script exposes much more fine grained boundaries for finding
+ * where things like the bss and text sections live exactly.
  */
-#define FOS_FREE_AREA_START (0x10000000U)
-#define FOS_FREE_AREA_END   (0x30000000U)
+#define FOS_KERNEL_AREA_START (FERNOS_KERNEL_START)
+#define FOS_KERNEL_AREA_END   (FERNOS_KERNEL_END + 1)
+#define FOS_KERNEL_AREA_SIZE  (FOS_KERNEL_AREA_END - FOS_KERNEL_AREA_START)
+
+/**
+ * Where application binaries will be placed.
+ */
+#define FOS_APP_AREA_START (FERNOS_APP_START)
+#define FOS_APP_AREA_END   (FERNOS_APP_END + 1)
+#define FOS_APP_AREA_SIZE  (FOS_APP_AREA_END - FOS_APP_AREA_START)
+
+/**
+ * Where the free area will live.
+ */
+#define FOS_FREE_AREA_START (FERNOS_FREE_START)
+#define FOS_FREE_AREA_END   (FERNOS_FREE_END + 1)
 #define FOS_FREE_AREA_SIZE  (FOS_FREE_AREA_END - FOS_FREE_AREA_START)
+
+/**
+ * Where the stacks will live.
+ */
+#define FOS_STACK_AREA_START (FERNOS_STACK_START)
+#define FOS_STACK_AREA_END   (FERNOS_STACK_END + 1)
+#define FOS_STACK_AREA_SIZE  (FOS_STACK_AREA_END - FOS_STACK_AREA_START)
 
 /**
  * EDITABLE
@@ -65,7 +85,7 @@
  *
  * The kernel depends on the kernel stack spanning the final pages of the FERNOS memory space.
  */
-#define FOS_KERNEL_STACK_END   (FERNOS_END + 1)
+#define FOS_KERNEL_STACK_END   (FOS_STACK_AREA_END)
 #define FOS_KERNEL_STACK_START (FOS_KERNEL_STACK_END - FOS_KERNEL_STACK_SIZE) 
 
 /**
@@ -92,20 +112,10 @@
 #define FOS_THREAD_STACK_START(i)   (FOS_THREAD_STACK_END(i) - FOS_THREAD_STACK_SIZE) 
 
 /**
- * The "stack area" includes all thread stacks and the kernel stack.
+ * Given Threads Per Proc, Thread Stack Size, and Kernel Stack Size, this is the minimum required
+ * size of the stack area. Anything smaller, and the kernel will fail to boot.
  */
-#define FOS_STACK_AREA_SIZE   ((FOS_MAX_THREADS_PER_PROC * FOS_THREAD_STACK_SIZE) + FOS_KERNEL_STACK_SIZE)
-#define FOS_STACK_AREA_END    (FOS_KERNEL_STACK_END)
-#define FOS_STACK_AREA_START  (FOS_STACK_AREA_END - FOS_STACK_AREA_SIZE)
-
-/**
- * EDITABLE
- *
- * If the stack area size exceeds this value, the kernel should fail to boot!
- *
- * The "stack area" includes all thread stacks of a proceess, and the kernel stack.
- */
-#define FOS_STACK_AREA_MAX_SIZE (M_256M)
+#define FOS_MIN_STACK_AREA_SIZE   ((FOS_MAX_THREADS_PER_PROC * FOS_THREAD_STACK_SIZE) + FOS_KERNEL_STACK_SIZE)
 
 /**
  * EDITABLE

@@ -44,6 +44,7 @@ static fernos_error_t setup_user_heap(void) {
 proc_exit_status_t user_main(void) {
     // User code here! 
     
+
     fernos_error_t err;
 
     handle_t cd;
@@ -53,6 +54,9 @@ proc_exit_status_t user_main(void) {
     }
 
     sc_set_out_handle(cd);
+    test_syscall();
+    while (1);
+
 
     err = setup_user_heap();
     if (err != FOS_E_SUCCESS) {
