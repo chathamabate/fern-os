@@ -127,7 +127,9 @@ $(CLANGD_CLEAN_TARS): clean.clangd.%:
 
 clean.clangd: $(CLANGD_CLEAN_TARS)
 
-# Finally now for actual kernel packaging!
+####################################################################################################
+
+# Kernel Compilation
 
 OS_NAME := fernos
 C_COMPILER := i686-elf-gcc
@@ -146,26 +148,46 @@ $(ELF_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
 		-Wl,--start-group $(LIB_FLAGS) -lgcc -Wl,--end-group
 
+# The symbols file is useful for compiling user application binaries.
 $(ELF_SYMS): $(ELF_FILE) | $(BUILD_DIR)
 	i386-elf-objcopy --extract-symbol $< $@
-
-DUMMY_APP_CFLAGS := -m32 -std=gnu99 -nostartfiles -ffreestanding -Wall -Wextra -Wpedantic
-DUMMY_APP := $(BUILD_DIR)/dummy_app
-$(DUMMY_APP): $(SRC_DIR)/dummy_app.c $(ELF_SYMS) | $(BUILD_DIR)
-	$(C_COMPILER) $< -o $@ $(DUMMY_APP_CFLAGS) -O2 -nostdlib -lgcc -Wl,--just-symbols=$(ELF_SYMS) \
-		-I$(INCLUDE_DIR)
-
-t: $(DUMMY_APP)
 
 .PHONY: bin qemu.bin
 
 bin: $(ELF_FILE)
 
+####################################################################################################
+
+# Disk Setup
+
+# NOTE: One annoying caveat of mtools is that they don't give an easy way to force the usage of 
+# a long filename. FernOS right now ONLY recognizes entries with long filenames 
+# (besides "." and "..").
+#
+# So, when adding files and directory to the disk from a host machine, the filenames used MUST
+# have MORE than 8 characters before the extension. Otherwise, FernOS will not be able to locate
+# said files. (Files/directories created from within FernOS will always be given long filenames
+# and thus can have any name length)
+
 TOY_DISK := $(BUILD_DIR)/hdd.img
 $(TOY_DISK): | $(BUILD_DIR)
-	qemu-img create -f raw $(TOY_DISK) 1M
+	qemu-img create -f raw $@ 256M
+	mkfs.fat -F 32 -s 2 $@
+	mmd -i $@ ::/core_apps
 
-qemu.bin: $(ELF_FILE) | $(TOY_DISK)
+APP_LDSCRIPT := $(SRC_DIR)/linker_app.ld
+
+# We will place one "dummy application" into the disk.
+# Other user applications will likely live in a different repo.
+DUMMY_APP_CFLAGS := -m32 -std=gnu99 -nostartfiles -ffreestanding -Wall -Wextra -Wpedantic -O2
+DUMMY_APP := $(BUILD_DIR)/dummy_app
+$(DUMMY_APP): $(SRC_DIR)/dummy_app.c $(ELF_SYMS) | $(BUILD_DIR) $(TOY_DISK)
+	$(C_COMPILER) $< -o $@ -T $(APP_LDSCRIPT) $(DUMMY_APP_CFLAGS) -nostdlib -lgcc \
+		-Wl,--just-symbols=$(ELF_SYMS) \
+		-L$(INSTALL_DIR) -I$(INCLUDE_DIR) 
+	mcopy -i $(TOY_DISK) $@ ::/core_apps/$(notdir $@)
+
+qemu.bin: $(ELF_FILE) $(DUMMY_APP) | $(TOY_DISK)
 	qemu-system-x86_64 \
 		-m 4G \
 		-kernel $(ELF_FILE) \
@@ -174,8 +196,6 @@ qemu.bin: $(ELF_FILE) | $(TOY_DISK)
 		-full-screen \
 		-monitor stdio
 		
-# NOTE: When we start working with disk read/write... I'd really like to figure out ISO packaging!
-
 # Clean
 
 .PHONY: clean

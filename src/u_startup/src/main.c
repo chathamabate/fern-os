@@ -4,7 +4,6 @@
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_fs.h"
 #include "u_startup/syscall_vga_cd.h"
-#include "u_startup/test/syscall.h"
 
 #include "s_mem/allocator.h"
 #include "s_mem/simple_heap.h"
@@ -51,9 +50,6 @@ proc_exit_status_t user_main(void) {
     }
 
     sc_set_out_handle(cd);
-    test_syscall();
-    while (1);
-
 
     err = setup_user_heap();
     if (err != FOS_E_SUCCESS) {
@@ -61,7 +57,7 @@ proc_exit_status_t user_main(void) {
     }
 
     fs_node_info_t info; 
-    err = sc_fs_get_info("my_big_elf_file.elf", &info);
+    err = sc_fs_get_info("/core_apps/dummy_app", &info);
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
@@ -70,7 +66,7 @@ proc_exit_status_t user_main(void) {
     sc_out_write_fmt_s("ELF File Size: %u\n", info.len);
 
     handle_t fh;
-    err = sc_fs_open("my_big_elf_file.elf", &fh);
+    err = sc_fs_open("/core_apps/dummy_app", &fh);
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }

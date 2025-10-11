@@ -9,6 +9,12 @@
  */
 ENTRY(app_main)
 
+/*
+ * In would be nice if in the future this linker script (or another) gave the user
+ * the ability to compile and link C++ code. But, I am starting to learn this is actually
+ * a little more difficult than expected.
+ */
+
 INCLUDE "os_defs.ld"
 
 MEMORY 
@@ -35,7 +41,7 @@ SECTIONS
         *(.rodata)
     } > fernos_app_area
 
-    .bss (NOLOAD) ALIGN(4K) : {
+    .bss (NOLOAD) : ALIGN(4K) {
         *(.bss)
         *(COMMON)
     } > fernos_app_area
