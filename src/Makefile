@@ -1,12 +1,12 @@
 
 GIT_TOP ?= $(shell git rev-parse --show-toplevel)
 
-BUILD_DIR   := $(GIT_TOP)/build
+SRC_DIR    := $(GIT_TOP)/src
+BUILD_DIR   := $(GIT_TOP)/src/build
 INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
-MODS_DIR    := $(GIT_TOP)/src
 
-THIS_FILE := $(MODS_DIR)/Makefile
+THIS_FILE := $(SRC_DIR)/Makefile
 
 MODS := \
 		u_concur \
@@ -71,7 +71,7 @@ HDRS_INSTALL_TARS := $(addprefix hdrs.install.,$(MODS))
 hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
 
 $(HDRS_INSTALL_TARS): hdrs.install.%:
-	make -C $(MODS_DIR)/$* hdrs.install test_hdrs.install 
+	make -C $(SRC_DIR)/$* hdrs.install test_hdrs.install 
 
 # Install Libs (For now we'll just always build the test and normal libs)
 
@@ -81,10 +81,10 @@ LIB_INSTALL_TARS := $(addprefix lib.install.,$(MODS))
 # This is "unsafe" since there is no gaurantee that the headers have been installed.
 lib.unsafe_install: $(LIB_INSTALL_TARS)
 $(LIB_INSTALL_TARS): lib.install.%:
-	make -C $(MODS_DIR)/$* lib.install test_lib.install
+	make -C $(SRC_DIR)/$* lib.install test_lib.install
 
 lib.install: hdrs.install
-	make -C $(MODS_DIR) lib.unsafe_install
+	make -C $(SRC_DIR) lib.unsafe_install
 
 # Clangd Helpers
 
@@ -92,7 +92,7 @@ CLANGD_TARS := $(addprefix clangd.,$(MODS))
 .PHONY: clangd $(CLANGD_TARS)
 
 $(CLANGD_TARS): clangd.%:
-	make -C $(MODS_DIR)/$* clangd
+	make -C $(SRC_DIR)/$* clangd
 
 clangd: $(CLANGD_TARS)
 
@@ -100,7 +100,7 @@ CLANGD_CLEAN_TARS := $(addprefix clean.clangd.,$(MODS))
 .PHONY: clean.clangd $(CLANGD_CLEAN_TARS)
 
 $(CLANGD_CLEAN_TARS): clean.clangd.%:
-	make -C $(MODS_DIR)/$* clean.clangd
+	make -C $(SRC_DIR)/$* clean.clangd
 
 clean.clangd: $(CLANGD_CLEAN_TARS)
 
@@ -109,9 +109,10 @@ clean.clangd: $(CLANGD_CLEAN_TARS)
 OS_NAME := fernos
 C_COMPILER := i686-elf-gcc
 
-LDSCRIPT := $(MODS_DIR)/linker.ld
+LDSCRIPT := $(SRC_DIR)/linker.ld
 
 ELF_FILE := $(BUILD_DIR)/$(OS_NAME).elf
+ELF_SYMS := $(BUILD_DIR)/$(OS_NAME).syms
 
 $(BUILD_DIR):
 	mkdir -p $@
@@ -122,6 +123,17 @@ $(ELF_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
 		-Wl,--start-group $(LIB_FLAGS) -lgcc -Wl,--end-group
 
+$(ELF_SYMS): $(ELF_FILE) | $(BUILD_DIR)
+	i386-elf-objcopy --extract-symbol $< $@
+
+DUMMY_APP_CFLAGS := -m32 -std=gnu99 -nostartfiles -ffreestanding -Wall -Wextra -Wpedantic
+DUMMY_APP := $(BUILD_DIR)/dummy_app
+$(DUMMY_APP): $(SRC_DIR)/dummy_app.c $(ELF_SYMS) | $(BUILD_DIR)
+	$(C_COMPILER) $< -o $@ $(DUMMY_APP_CFLAGS) -O2 -nostdlib -lgcc -Wl,--just-symbols=$(ELF_SYMS) \
+		-I$(INCLUDE_DIR)
+
+t: $(DUMMY_APP)
+
 .PHONY: bin qemu.bin
 
 bin: $(ELF_FILE)
@@ -129,10 +141,6 @@ bin: $(ELF_FILE)
 TOY_DISK := $(BUILD_DIR)/hdd.img
 $(TOY_DISK): | $(BUILD_DIR)
 	qemu-img create -f raw $(TOY_DISK) 1M
-
-# Used for FAT32 testing.
-t: $(TOY_DISK)
-	mkfs.fat -F 32 -s 2 $(TOY_DISK)
 
 qemu.bin: $(ELF_FILE) | $(TOY_DISK)
 	qemu-system-x86_64 \

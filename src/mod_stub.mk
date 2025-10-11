@@ -14,10 +14,10 @@ _ASMS		?=
 _TEST_SRCS 	?=
 
 # OPTIONAL: Where to place build artifacts
-BUILD_DIR   ?= $(GIT_TOP)/build/mods/$(MOD_NAME)
+BUILD_DIR   ?= $(GIT_TOP)/src/build/mods/$(MOD_NAME)
 
 # OPTIONAL: Where to place .a files and headers
-INSTALL_DIR ?= $(GIT_TOP)/build/install
+INSTALL_DIR ?= $(GIT_TOP)/src/build/install
 
 # OPTIONAL: Extra C flags to use
 EXTRA_CFLAGS ?=
