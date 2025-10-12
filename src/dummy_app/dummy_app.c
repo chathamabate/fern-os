@@ -1,6 +1,5 @@
 
 
-#include "s_util/str.h"
 #include "u_startup/syscall.h"
 #include "s_mem/simple_heap.h"
 #include "s_bridge/shared_defs.h"
@@ -20,8 +19,6 @@ fernos_error_t app_main(const char * const *args, size_t num_args) {
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
-
-
 
     return 0;
 }

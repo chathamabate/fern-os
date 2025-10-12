@@ -152,7 +152,7 @@ $(ELF_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 
 # The symbols file is useful for compiling user application binaries.
 $(ELF_SYMS): $(ELF_FILE) | $(BUILD_DIR)
-	i386-elf-objcopy --extract-symbol $< $@
+	i686-elf-objcopy --extract-symbol $< $@
 
 .PHONY: bin qemu.bin
 
@@ -187,7 +187,7 @@ core_apps: $(ELF_SYMS) $(OS_DEFS_LD) hdrs.install | $(CORE_APPS_HOST)
 		HOST_CORE_APPS_DIR=$(CORE_APPS_HOST) \
 		INSTALL_DIR=$(INSTALL_DIR) \
 		ELF_SYMS=$(ELF_SYMS) \
-		bin
+		bin clangd
 
 $(TOY_DISK): core_apps | $(BUILD_DIR)
 	qemu-img create -f raw $@ 256M

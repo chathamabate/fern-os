@@ -34,10 +34,10 @@ APP_NAME := dummy_app
 SRC_DIR    	  := $(GIT_TOP)/src
 DUMMY_APP_DIR := $(SRC_DIR)/$(APP_NAME)
 APP_LDSCRIPT  := $(SRC_DIR)/linker_app.ld
-INCLUDE_DIR := $(INSTALL_DIR)/include
+INCLUDE_DIR   := $(INSTALL_DIR)/include
 
 DUMMY_APP   	:= $(BUILD_DIR)/$(APP_NAME)
-DUMMY_APP_CORE 	:= $(HOST_CORE_APPS)/$(APP_NAME)
+DUMMY_APP_CORE 	:= $(HOST_CORE_APPS_DIR)/$(APP_NAME)
 
 $(BUILD_DIR):
 	mkdir -p $@
@@ -46,17 +46,18 @@ $(BUILD_DIR):
 _SRCS := dummy_app.c
 SRCS  := $(addprefix $(DUMMY_APP_DIR)/,$(_SRCS))
 OBJS  := $(patsubst %.c,$(BUILD_DIR)/%.o,$(_SRCS)) 
+LIB   := $(BUILD_DIR)/lib$(APP_NAME).a
 
 CFLAGS := -m32 -std=gnu99 -ffreestanding -Wall -Wextra -Wpedantic 
 
 $(OBJS): $(BUILD_DIR)/%.o: $(DUMMY_APP_DIR)/%.c $(ELF_SYMS) | $(BUILD_DIR)
-	$(C_COMPILER) $< -c -o $@ $(CFLAGS) -I$(INCLUDE_DIR)
+	$(C_COMPILER) -c $(CFLAGS) -I$(INCLUDE_DIR) -o $@ $<
 
 # NOTE: in the below recipe we give -L$(INSTALL_DIR) so we have access to os_defs.ld
 # This recipe DOES NOT use any FernOS libraries directly! (The point of the symbols file)
 $(DUMMY_APP): $(OBJS) | $(BUILD_DIR)
-	$(C_COMPILER) -T $(APP_LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -lgcc -L$(INSTALL_DIR) \
-		-Wl,--just-symbols=$(ELF_SYMS) $^
+	$(C_COMPILER) -T $(APP_LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
+	    -lgcc -Wl,--just-symbols=$(ELF_SYMS) $^
 
 $(DUMMY_APP_CORE): $(DUMMY_APP)
 	cp $< $@
@@ -67,9 +68,6 @@ bin: $(DUMMY_APP_CORE)
 
 clean:
 	rm -rf $(BUILD_DIR)
-
-# NOTE: The clangd templates do not require any of this file arguments to run.
-# i.e. running `make clangd` from this directory will work fine!
 
 # Expects 
 # $(1): Clangd File
@@ -87,6 +85,7 @@ $(CLANGD):
 .PHONY: clangd clean.clangd
 
 clangd: $(CLANGD)
+	@echo > /dev/null
 
 clean.clangd:
 	rm -f $(CLANGD)
