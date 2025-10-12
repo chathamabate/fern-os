@@ -6,6 +6,8 @@ BUILD_DIR   := $(GIT_TOP)/src/build
 INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
 
+MY_MAKE := make --no-print-directory
+
 THIS_FILE := $(SRC_DIR)/Makefile
 
 MODS := \
@@ -94,7 +96,7 @@ HDRS_INSTALL_TARS := $(addprefix hdrs.install.,$(MODS))
 hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
 
 $(HDRS_INSTALL_TARS): hdrs.install.%:
-	make -C $(SRC_DIR)/$* hdrs.install test_hdrs.install 
+	$(MY_MAKE) -C $(SRC_DIR)/$* hdrs.install test_hdrs.install 
 
 # Install Libs (For now we'll just always build the test and normal libs)
 
@@ -104,10 +106,10 @@ LIB_INSTALL_TARS := $(addprefix lib.install.,$(MODS))
 # This is "unsafe" since there is no gaurantee that the headers have been installed.
 lib.unsafe_install: $(LIB_INSTALL_TARS)
 $(LIB_INSTALL_TARS): lib.install.%:
-	make -C $(SRC_DIR)/$* lib.install test_lib.install
+	$(MY_MAKE) -C $(SRC_DIR)/$* lib.install test_lib.install
 
 lib.install: hdrs.install
-	make -C $(SRC_DIR) lib.unsafe_install
+	$(MY_MAKE) -C $(SRC_DIR) lib.unsafe_install
 
 # Clangd Helpers
 
@@ -115,7 +117,7 @@ CLANGD_TARS := $(addprefix clangd.,$(MODS))
 .PHONY: clangd $(CLANGD_TARS)
 
 $(CLANGD_TARS): clangd.%:
-	make -C $(SRC_DIR)/$* clangd
+	$(MY_MAKE) -C $(SRC_DIR)/$* clangd
 
 clangd: $(CLANGD_TARS)
 
@@ -123,7 +125,7 @@ CLANGD_CLEAN_TARS := $(addprefix clean.clangd.,$(MODS))
 .PHONY: clean.clangd $(CLANGD_CLEAN_TARS)
 
 $(CLANGD_CLEAN_TARS): clean.clangd.%:
-	make -C $(SRC_DIR)/$* clean.clangd
+	$(MY_MAKE) -C $(SRC_DIR)/$* clean.clangd
 
 clean.clangd: $(CLANGD_CLEAN_TARS)
 
@@ -170,22 +172,30 @@ bin: $(ELF_FILE)
 # and thus can have any name length)
 
 TOY_DISK := $(BUILD_DIR)/hdd.img
-$(TOY_DISK): | $(BUILD_DIR)
+CORE_APPS_GUEST := ::/core_apps
+CORE_APPS_HOST  := $(BUILD_DIR)/core_apps
+
+.PHONY: core_apps disk
+
+$(CORE_APPS_HOST):
+	mkdir -p $@
+
+# Maybe later this will include some sort of external repo iteration!
+core_apps: $(ELF_SYMS) $(OS_DEFS_LD) hdrs.install | $(CORE_APPS_HOST)
+	$(MY_MAKE) -C $(SRC_DIR)/dummy_app \
+		BUILD_DIR=$(BUILD_DIR)/dummy_app \
+		HOST_CORE_APPS_DIR=$(CORE_APPS_HOST) \
+		INSTALL_DIR=$(INSTALL_DIR) \
+		ELF_SYMS=$(ELF_SYMS) \
+		bin
+
+$(TOY_DISK): core_apps | $(BUILD_DIR)
 	qemu-img create -f raw $@ 256M
 	mkfs.fat -F 32 -s 2 $@
-	mmd -i $@ ::/core_apps
+	mcopy -i $@ $(CORE_APPS_HOST) $(CORE_APPS_GUEST)
 
-APP_LDSCRIPT := $(SRC_DIR)/linker_app.ld
-
-# We will place one "dummy application" into the disk.
-# Other user applications will likely live in a different repo.
-DUMMY_APP_CFLAGS := -m32 -std=gnu99 -nostartfiles -ffreestanding -Wall -Wextra -Wpedantic -O2
-DUMMY_APP := $(BUILD_DIR)/dummy_app
-$(DUMMY_APP): $(SRC_DIR)/dummy_app.c $(ELF_SYMS) | $(BUILD_DIR) $(TOY_DISK)
-	$(C_COMPILER) $< -o $@ -T $(APP_LDSCRIPT) $(DUMMY_APP_CFLAGS) -nostdlib -lgcc \
-		-Wl,--just-symbols=$(ELF_SYMS) \
-		-L$(INSTALL_DIR) -I$(INCLUDE_DIR) 
-	mcopy -i $(TOY_DISK) $@ ::/core_apps/$(notdir $@)
+# Normal qemu.bin does not force a disk rebuild, this will.
+disk: $(TOY_DISK)
 
 qemu.bin: $(ELF_FILE) $(DUMMY_APP) | $(TOY_DISK)
 	qemu-system-x86_64 \

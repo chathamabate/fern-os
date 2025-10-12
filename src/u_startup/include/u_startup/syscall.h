@@ -6,6 +6,7 @@
 
 #include "s_util/err.h"
 #include "s_bridge/shared_defs.h"
+#include "s_mem/allocator.h"
 
 /**
  * Trigger a system call from user space.
@@ -158,6 +159,13 @@ fernos_error_t sc_mem_request(void *s, const void *e, const void **true_e);
  * the process free area.
  */
 void sc_mem_return(void *s, const void *e);
+
+/**
+ * This is a memory managenment pair which holds the above two
+ * system calls. When creating a heap allocator in userspace, you'll likely
+ * want to use this pair.
+ */
+extern const mem_manage_pair_t USER_MMP;
 
 /**
  * Exit the current thread.

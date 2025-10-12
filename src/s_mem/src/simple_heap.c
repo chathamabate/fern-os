@@ -1,12 +1,12 @@
 
 
 #include "s_mem/simple_heap.h"
-#include "k_startup/vga_cd.h"
 #include "s_mem/allocator.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
 #include "s_util/str.h"
 #include "s_util/ansi.h"
+#include "s_util/constraints.h"
 #include <stdarg.h>
 
 static void *shal_malloc(allocator_t *al, size_t bytes);
@@ -656,4 +656,27 @@ static void delete_simple_heap_allocator(allocator_t *al) {
 
     // Remember, we only return up to the break pointer.
     shal->attrs.mmp.return_mem(shal->attrs.start, shal->brk_ptr);
+}
+
+fernos_error_t setup_default_simple_heap(mem_manage_pair_t mmp) {
+    allocator_t *al = new_simple_heap_allocator(
+        (simple_heap_attrs_t) {
+            .start = (void *)FOS_FREE_AREA_START,
+            .end = (const void *)(FOS_FREE_AREA_END),
+
+            .mmp = mmp,
+
+            .small_fl_cutoff = 0x100,
+            .small_fl_search_amt = 0x20,
+            .large_fl_search_amt = 0x200
+        }
+    );
+
+    if (!al) {
+        return FOS_E_UNKNWON_ERROR;
+    }
+
+    set_default_allocator(al);
+
+    return FOS_E_SUCCESS;
 }

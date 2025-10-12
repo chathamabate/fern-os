@@ -41,6 +41,11 @@ void sc_mem_return(void *s, const void *e) {
     (void)trigger_syscall(SCID_MEM_RETURN, (uint32_t)s, (uint32_t)e, 0, 0);
 }
 
+const mem_manage_pair_t USER_MMP = {
+    .request_mem = sc_mem_request,
+    .return_mem = sc_mem_return
+};
+
 void sc_thread_exit(void *retval) {
     (void)trigger_syscall(SCID_THREAD_EXIT, (uint32_t)retval, 0, 0, 0);
 

@@ -117,18 +117,26 @@ $(INSTALL_HDRS_DIR) $(INSTALL_TEST_HDRS_DIR):
 .PHONY: hdrs.install lib.install test_hdrs.install test_lib.install
 
 hdrs.install: $(INSTALL_HDRS)
+	@echo > /dev/null
+
 $(INSTALL_HDRS): $(INSTALL_HDRS_DIR)/%.h: $(INC_DIR)/$(MOD_NAME)/%.h | $(INSTALL_HDRS_DIR)
 	cp $< $@
 
 lib.install: $(INSTALL_LIB) 
+	@echo > /dev/null
+
 $(INSTALL_LIB): $(BUILD_LIB) | $(INSTALL_DIR)
 	cp $< $@
 
 test_hdrs.install: $(INSTALL_TEST_HDRS)
+	@echo > /dev/null
+
 $(INSTALL_TEST_HDRS): $(INSTALL_TEST_HDRS_DIR)/%.h: $(INC_DIR)/$(MOD_NAME)/test/%.h | $(INSTALL_TEST_HDRS_DIR)
 	cp $< $@
 
 test_lib.install: $(INSTALL_TEST_LIB)
+	@echo > /dev/null
+
 $(INSTALL_TEST_LIB): $(BUILD_TEST_LIB) | $(INSTALL_DIR)
 	cp $< $@
 
