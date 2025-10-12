@@ -6,7 +6,8 @@ BUILD_DIR   := $(GIT_TOP)/src/build
 INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
 
-MY_MAKE := make --no-print-directory
+MY_MAKE := @make --no-print-directory
+DONE_MSG = @echo "\x1B[1;97m>> \x1B[1;92m$1 \x1B[1;97m<<\x1b[0m\n"
 
 THIS_FILE := $(SRC_DIR)/Makefile
 
@@ -94,6 +95,7 @@ HDRS_INSTALL_TARS := $(addprefix hdrs.install.,$(MODS))
 
 .PHONY: hdrs.install $(HDRS_INSTALL_TARS)
 hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
+	$(call DONE_MSG,Headers Installed)
 
 $(HDRS_INSTALL_TARS): hdrs.install.%:
 	$(MY_MAKE) -C $(SRC_DIR)/$* hdrs.install test_hdrs.install 
@@ -110,6 +112,7 @@ $(LIB_INSTALL_TARS): lib.install.%:
 
 lib.install: hdrs.install
 	$(MY_MAKE) -C $(SRC_DIR) lib.unsafe_install
+	$(call DONE_MSG,Libraries Installed)
 
 # Clangd Helpers
 
@@ -146,11 +149,14 @@ $(BUILD_DIR):
 
 LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod)_test -l$(mod))
 
+# Kinda frustrating that this always runs! (But I guess it's not a huge deal)
 $(ELF_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
 		-Wl,--start-group $(LIB_FLAGS) -lgcc -Wl,--end-group
+	$(call DONE_MSG, Kernel ELF Built)
 
 # The symbols file is useful for compiling user application binaries.
+# (This also always runs)
 $(ELF_SYMS): $(ELF_FILE) | $(BUILD_DIR)
 	i686-elf-objcopy --extract-symbol $< $@
 
@@ -193,11 +199,12 @@ $(TOY_DISK): core_apps | $(BUILD_DIR)
 	qemu-img create -f raw $@ 256M
 	mkfs.fat -F 32 -s 2 $@
 	mcopy -i $@ $(CORE_APPS_HOST) $(CORE_APPS_GUEST)
+	$(call DONE_MSG,Disk Built)
 
 # Normal qemu.bin does not force a disk rebuild, this will.
 disk: $(TOY_DISK)
 
-qemu.bin: $(ELF_FILE) $(DUMMY_APP) | $(TOY_DISK)
+qemu.bin: $(ELF_FILE) | $(TOY_DISK)
 	qemu-system-x86_64 \
 		-m 4G \
 		-kernel $(ELF_FILE) \
