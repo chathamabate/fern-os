@@ -36,7 +36,7 @@ MEMORY
 
 SECTIONS
 {
-    .text ALIGN(4K) : {
+    .text : ALIGN(4K) {
         *(.text)
         *(.rodata)
     } > fernos_app_area
@@ -46,7 +46,7 @@ SECTIONS
         *(COMMON)
     } > fernos_app_area
 
-    .data ALIGN(4K) : {
+    .data : ALIGN(4K) {
         *(.data)
     } > fernos_app_area
 }
