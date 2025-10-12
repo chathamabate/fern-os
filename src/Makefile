@@ -201,10 +201,19 @@ $(TOY_DISK): core_apps | $(BUILD_DIR)
 	mcopy -i $@ $(CORE_APPS_HOST) $(CORE_APPS_GUEST)
 	$(call DONE_MSG,Disk Built)
 
-# Normal qemu.bin does not force a disk rebuild, this will.
 disk: $(TOY_DISK)
 
-qemu.bin: $(ELF_FILE) | $(TOY_DISK)
+####################################################################################################
+
+# Bringing it all together
+
+.PHONY: all
+
+all: bin disk
+
+# NOTE: This depends on the TOY_DISK existing.
+# Order only deps are annoying, so it's not listed here.
+qemu.bin: $(ELF_FILE)
 	qemu-system-x86_64 \
 		-m 4G \
 		-kernel $(ELF_FILE) \
