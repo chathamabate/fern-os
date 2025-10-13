@@ -2,6 +2,7 @@
 #pragma once
 
 #include "s_data/id_table.h"
+#include "s_mem/allocator.h"
 
 /*
  * This header includes type definitions which are significant in both user and kernel space.
@@ -87,10 +88,10 @@ struct _user_app_area_entry_t {
      * Given bytes to be loaded directly into the user process.
      * (Can be NULL if `given_size` = 0)
      */
-    const void *u_given;
+    const void *given;
 
     /**
-     * Size of the buffer pointed to by `u_given`. Must be <= `area_size`.
+     * Size of the buffer pointed to by `given`. Must be <= `area_size`.
      * Excess bytes in the area will be zero'd.
      */
     size_t given_size;
@@ -103,6 +104,11 @@ struct _user_app_area_entry_t {
 #define FOS_MAX_APP_AREAS (10U)
 
 struct _user_app_t {
+    /**
+     * Allocator used to alloc this app.
+     */
+    allocator_t *al; 
+
     /**
      * Where the entry point of the application is. Must be in the FOS_APP_AREA.
      */
@@ -124,22 +130,33 @@ struct _user_app_t {
      * 'a', 'r', 'g', '1', 0,   "arg1"
      * 'a', 'r', 'g', '2', 0    "arg2"
      *
+     * `arg_block_size` = 22 (or 0x16)
+     *
      * At load time, this block of data will be copied directly into the user process. However,
      * first, each index will be replace with the correct virtual address.
      *
      * A pointer to the beginning of this block is what is provided to the user main funciton.
      * (i.e. of type: const char * const *)
      */
-    const void *u_args_block;
+    const void *args_block;
     
     /**
      * The size of `u_args_block`, can be 0 for no args.
      *
      * NOTE: The actual number of arguments need not be provided as it can be infered via the
-     * contents of `u_args_block`.
+     * contents of `args_block`.
      */
     size_t args_block_size;
 };
+
+/**
+ * Free a user app structure.
+ *
+ * Make sure that when the user app structure is completely copied into kernel space that the 
+ * allocator field is set to the kernel allocator! Otherwise, the user allocator will attempt
+ * to be used during deletion!
+ */
+void delete_user_app(user_app_t *ua);
 
 /**
  * The process unique ID of a thread. (Can be 0)

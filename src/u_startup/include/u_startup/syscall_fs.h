@@ -104,4 +104,4 @@ fernos_error_t sc_fs_seek(handle_t h, size_t pos);
  */
 fernos_error_t sc_fs_flush(handle_t h);
 
-
+fernos_error_t sc_fs_
