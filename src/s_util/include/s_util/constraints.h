@@ -59,6 +59,13 @@
 #define FOS_APP_AREA_SIZE  (FOS_APP_AREA_END - FOS_APP_AREA_START)
 
 /**
+ * Where application arguments are placed.
+ */
+#define FOS_APP_ARGS_AREA_START (FERNOS_APP_ARGS_START)
+#define FOS_APP_ARGS_AREA_END   (FERNOS_APP_ARGS_END + 1)
+#define FOS_APP_ARGS_AREA_SIZE  (FOS_APP_ARGS_AREA_END - FOS_APP_ARGS_AREA_START)
+
+/**
  * Where the free area will live.
  */
 #define FOS_FREE_AREA_START (FERNOS_FREE_START)

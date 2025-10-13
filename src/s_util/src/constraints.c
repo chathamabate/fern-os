@@ -27,6 +27,11 @@
 #error "APP_AREA is invalid!"
 #endif
 
+#if !IS_VALID_AREA(FOS_APP_ARGS_AREA_START, FOS_APP_ARGS_AREA_END)
+#pragma message("APP_ARGS_AREA (Start: " STRINGIFY(FOS_APP_ARGS_AREA_START) ", END: " STRINGIFY(FOS_APP_ARGS_AREA_END) ")")
+#error "APP_ARGS_AREA is invalid!"
+#endif
+
 #if !IS_VALID_AREA(FOS_FREE_AREA_START, FOS_FREE_AREA_END)
 #pragma message("FREE_AREA (Start: " STRINGIFY(FOS_FREE_AREA_START) ", END: " STRINGIFY(FOS_FREE_AREA_END) ")")
 #error "FREE_AREA is invalid!"
@@ -74,8 +79,12 @@
 #error "KERNEL_AREA overlaps APP_AREA!"
 #endif
 
-#if FOS_APP_AREA_END > FOS_FREE_AREA_START
-#error "APP_AREA overlaps FREE_AREA!"
+#if FOS_APP_AREA_END > FOS_APP_ARGS_AREA_START
+#error "APP_AREA overlaps APP_ARGS_AREA!"
+#endif
+
+#if FOS_APP_ARGS_AREA_END > FOS_FREE_AREA_START
+#error "APP_ARGS_AREA overlaps FREE_AREA!"
 #endif
 
 #if FOS_FREE_AREA_END > FOS_STACK_AREA_START

@@ -1,6 +1,12 @@
 
 #pragma once
 
+/*
+ * NOTE: This used to be in its own module, but I decided I didn't
+ * want a separate module for a few struct definitions.
+ * So, now they're here in s_util.
+ */
+
 #include <stdint.h>
 
 typedef struct _elf32_header_t elf32_header_t;

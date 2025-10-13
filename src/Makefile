@@ -18,7 +18,6 @@ MODS := \
 		s_bridge \
 		k_sys \
 		s_block_device \
-		s_elf \
 		s_data \
 		s_mem \
 		s_util 
@@ -43,8 +42,12 @@ FERNOS_KERNEL_START := 	0x00400000
 FERNOS_KERNEL_END   := 	0x01FFFFFF
 
 # Where User applications will be loaded.
-FERNOS_APP_START    :=  0x02000000
-FERNOS_APP_END      :=  0x02FFFFFF
+FERNOS_APP_START      :=  0x02000000
+FERNOS_APP_END        :=  0x02FFFFFF
+
+# Where User application arguments will be loaded.
+FERNOS_APP_ARGS_START := 0x03000000
+FERNOS_APP_ARGS_END   := 0x03003FFF
 
 # Where the dynamic memory area will live for all processes
 FERNOS_FREE_START   :=  0x10000000
@@ -63,6 +66,7 @@ SECT_DEFS := PROLOGUE_START PROLOGUE_END \
 			 FERNOS_START \
 			 FERNOS_KERNEL_START FERNOS_KERNEL_END \
 			 FERNOS_APP_START FERNOS_APP_END \
+			 FERNOS_APP_ARGS_START FERNOS_APP_ARGS_END \
 			 FERNOS_FREE_START FERNOS_FREE_END \
 			 FERNOS_STACK_START FERNOS_STACK_END \
 			 FERNOS_END \

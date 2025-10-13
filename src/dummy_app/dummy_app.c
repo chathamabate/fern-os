@@ -27,7 +27,6 @@ const char *cap_args[10];
  */
 const char *prefix = ANSI_BRIGHT_GREEN_FG "> " ANSI_RESET;
 
-
 fernos_error_t app_main(const char * const *args, size_t num_args) {
     fernos_error_t err;
 

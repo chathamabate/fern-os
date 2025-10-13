@@ -68,8 +68,40 @@ proc_exit_status_t user_main(void) {
     sc_out_write_fmt_s("Num Sect Headers: %u\n", elf_header->num_section_headers);
     sc_out_write_fmt_s("Name Section Index: %u\n", elf_header->section_names_header_index);
 
+    for (size_t i = 0; i < elf_header->num_program_headers; i++) {
+        // Alright so we are looking for sections marked loadable,
+        // the difference between the file and mem size is what should be zero'd
+        // according to deepseek. Ok, the real hard part is how arguments should be handled!
+        // We could always just give it as another ro section???
+        // I guess IDK for sure...
+        // I want to load these sections into memory and hand them to the kernel directly so that
+        // the kernel doesn't need to do any slow file reading.
+        // I guess IDK for sure...
+        // Why not just define some specific arguments section that's outside the app area??
+        // Not the worst idea in the world tbh.
+        //
+        // Ok, now there's an args area...
+        // So what do we do now??? I don't really know tbh.
+        
+        sc_out_write_fmt_s(
+            "PG[%u] TYPE: 0x%X FLAGS: 0x%X VADDR: 0x%X FSIZE: 0x%X MSIZE: 0x%X\n",
+            i,
+            pg_hdr_table[i].type,
+            pg_hdr_table[i].flags,
+            pg_hdr_table[i].vaddr,
+            pg_hdr_table[i].size_in_file,
+            pg_hdr_table[i].size_in_mem
+        ); 
+    }
+
     for (size_t i = 0; i < elf_header->num_section_headers; i++) {
-        sc_out_write_fmt_s("%s\n", &(names[sect_hdr_table[i].name_offset]));
+        if (sect_hdr_table[i].type != ELF32_SEC_TYPE_NULL) {
+            sc_out_write_fmt_s("%s VADDR: 0x%X OFFSET: 0x%X SIZE: 0x%X\n", 
+                    &(names[sect_hdr_table[i].name_offset]),
+                    sect_hdr_table[i].vaddr,
+                    sect_hdr_table[i].offset,
+                    sect_hdr_table[i].size);
+        }
     }
 
     // Damn, it's kinda cool that this all works!
