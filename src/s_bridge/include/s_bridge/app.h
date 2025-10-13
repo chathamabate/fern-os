@@ -110,3 +110,8 @@ void delete_user_app(user_app_t *ua);
 fernos_error_t new_args_block(allocator_t *al, const char * const *args, size_t num_args, 
         const void **out, size_t *out_len);
 
+static inline fernos_error_t new_da_args_block(const char * const *args, size_t num_args, 
+        const void **out, size_t *out_len) {
+    return new_args_block(get_default_allocator(), args, num_args, out, out_len);
+}
+

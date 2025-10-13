@@ -15,7 +15,7 @@ void delete_user_app(user_app_t *ua) {
 
 fernos_error_t new_args_block(allocator_t *al, const char * const *args, size_t num_args, 
         const void **out, size_t *out_len) {
-    if (!out || !out_len) {
+    if (!al || !out || !out_len) {
         return FOS_E_BAD_ARGS;
     }
 
@@ -50,7 +50,7 @@ fernos_error_t new_args_block(allocator_t *al, const char * const *args, size_t 
     // Ok, now for the placement!
     size_t next_str_ind = 0;
     for (size_t i = 0; i < num_args; i++) {
-        tbl_area[i] = (uint32_t)next_str_ind; 
+        tbl_area[i] = (uint32_t)(tbl_area_size + next_str_ind); 
         str_cpy(str_area + next_str_ind, args[i]);
         next_str_ind += str_len(args[i]) + 1;
     }

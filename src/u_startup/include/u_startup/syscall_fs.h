@@ -103,5 +103,3 @@ fernos_error_t sc_fs_seek(handle_t h, size_t pos);
  * Call the flush command on a given handle.
  */
 fernos_error_t sc_fs_flush(handle_t h);
-
-fernos_error_t sc_fs_
