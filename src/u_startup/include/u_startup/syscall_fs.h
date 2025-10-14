@@ -6,6 +6,7 @@
 
 #include "s_util/err.h"
 #include "s_bridge/shared_defs.h"
+#include "s_bridge/app.h"
 
 #include "s_block_device/file_sys.h"
 
@@ -103,3 +104,14 @@ fernos_error_t sc_fs_seek(handle_t h, size_t pos);
  * Call the flush command on a given handle.
  */
 fernos_error_t sc_fs_flush(handle_t h);
+
+/**
+ * Given a path to an ELF file, parse its contents into a new user app structure.
+ *
+ * On success, a pointer to the allocated user app is written to `*ua`.
+ *
+ * NOTE: this is not a standalone system call, it's more a helper. I am putting it here since it
+ * takes advantage of the behaviors specific to file handles. A simpler parse function could be
+ * generic, but require the full elf file be loaded in to memory first. This would be mid.
+ */
+fernos_error_t sc_fs_parse_elf32(allocator_t *al, const char *path, user_app_t **ua);

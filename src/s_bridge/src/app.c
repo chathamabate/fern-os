@@ -3,7 +3,27 @@
 #include "s_bridge/app.h"
 #include "s_util/str.h"
 
+user_app_t *new_user_app(allocator_t *al) {
+    user_app_t *ua = al_malloc(al, sizeof(user_app_t));
+    if (!ua) {
+        return NULL;
+    }
+
+    ua->al = al;
+    ua->entry = NULL;
+
+    for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
+        ua->areas[i].occupied = false;
+    }
+
+    return ua;
+}
+
 void delete_user_app(user_app_t *ua) {
+    if (!ua) {
+        return;
+    }
+
     for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
         if (ua->areas[i].occupied && ua->areas[i].given_size > 0) {
             al_free(ua->al, (void *)(ua->areas[i].given));

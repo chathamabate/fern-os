@@ -76,7 +76,7 @@ struct _elf32_header_t {
     /**
      * Entry point of the ELF File.
      */
-    uint32_t entry;
+    const void *entry;
 
     /**
      * The start of the program header table.

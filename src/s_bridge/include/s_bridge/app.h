@@ -72,6 +72,18 @@ struct _user_app_t {
 };
 
 /**
+ * Create a new empty user app, all entries will be marked unoccupied.
+ * `entry` will be set to NULL.
+ *
+ * Returns NULL if there isn't enough memory.
+ */
+user_app_t *new_user_app(allocator_t *al);
+
+static inline user_app_t *new_da_user_app(void) {
+    return new_user_app(get_default_allocator());
+}
+
+/**
  * Free a user app structure.
  *
  * Make sure that when the user app structure is completely copied into kernel space that the 
