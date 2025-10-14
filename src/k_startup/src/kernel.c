@@ -32,6 +32,7 @@
 
 #include "s_mem/test/simple_heap.h"
 #include "s_bridge/test/app.h"
+#include "s_bridge/app.h"
 
 #include <stdint.h>
 
@@ -188,9 +189,6 @@ void start_kernel(void) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
-
-    test_app();
-    lock_up();
 
     return_to_ctx(&(kernel->curr_thread->ctx));
 }

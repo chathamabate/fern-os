@@ -33,6 +33,23 @@ void delete_user_app(user_app_t *ua) {
     al_free(ua->al, ua);
 }
 
+void ua_dump(const user_app_t *ua, void (*pf)(const char *fmt, ...)) {
+    pf("User App [Entry: 0x%X]\n", ua->entry);
+    for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
+        pf("AREA[%u] ", i);
+        const user_app_area_entry_t *area_entry = ua->areas + i;
+        if (area_entry->occupied) {
+            pf("LPOS: 0x%X AS: 0x%X GS: 0x%X WR: %u\n",
+                    area_entry->load_position, 
+                    area_entry->area_size,
+                    area_entry->given_size,
+                    area_entry->writeable);
+        } else {
+            pf("UNOCCUPIED\n");
+        }
+    }
+}
+
 fernos_error_t new_args_block(allocator_t *al, const char * const *args, size_t num_args, 
         const void **out, size_t *out_len) {
     if (!al || !out || !out_len) {

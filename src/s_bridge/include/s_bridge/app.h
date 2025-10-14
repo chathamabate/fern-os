@@ -93,6 +93,11 @@ static inline user_app_t *new_da_user_app(void) {
 void delete_user_app(user_app_t *ua);
 
 /**
+ * Print out a user app structure in human readable form!
+ */
+void ua_dump(const user_app_t *ua, void (*pf)(const char *fmt, ...));
+
+/**
  * Create a new arguments block from a list of args.
  *
  * On success, FOS_E_SUCCESS is returned, a pointer to the new block is written to `*out` 
