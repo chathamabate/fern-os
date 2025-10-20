@@ -179,5 +179,5 @@ fernos_error_t sc_fs_parse_elf32(allocator_t *al, const char *path, user_app_t *
 
     sc_handle_close(fh);
 
-    return FOS_E_SUCCESS;
+    return err;
 }

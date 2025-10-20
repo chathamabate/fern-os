@@ -807,8 +807,10 @@ static bool test_elf32_parsing(void) {
     );
 
     TEST_TRUE(elf_data != NULL);
+
+    elf32_header_t * const elf_header = (elf32_header_t *)elf_data;
     
-    *(elf32_header_t *)elf_data = (elf32_header_t) {
+    *elf_header = (elf32_header_t) {
         .header_magic = ELF_HEADER_MAGIC,
         .cls = 1, .endian = 1, .version0 = 1, .os_abi = 0xFF,
         .os_abi_version = 0, .pad0 = { 0 }, .obj_type = 0, 
@@ -933,6 +935,26 @@ static bool test_elf32_parsing(void) {
     delete_user_app(ua);
 
     // Ok, finally, now onto failure cases!
+
+    // Lengths too short.
+    TEST_TRUE(test_bad_elf32_file(elf_data, 1));
+    TEST_TRUE(test_bad_elf32_file(elf_data, sizeof(elf32_header_t)));
+    TEST_TRUE(test_bad_elf32_file(elf_data, sizeof(elf32_header_t) 
+                + ((num_pg_headers - 1) * sizeof(elf32_program_header_t))));
+    TEST_TRUE(test_bad_elf32_file(elf_data, sizeof(elf32_header_t) 
+                + (num_pg_headers * sizeof(elf32_program_header_t))));
+
+    // Bad magic value
+    elf_header->header_magic++;
+    TEST_TRUE(test_bad_elf32_file(elf_data, elf_size));
+    elf_header->header_magic--;
+
+    // Too many program headers!
+    elf_header->num_program_headers = 10000;
+    TEST_TRUE(test_bad_elf32_file(elf_data, elf_size));
+    elf_header->num_program_headers = num_pg_headers;
+
+    // Alright, I could always add more cases, but I think we get the point.
 
     da_free(elf_data);
 
