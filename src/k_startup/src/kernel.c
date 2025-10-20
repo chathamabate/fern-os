@@ -89,7 +89,7 @@ static void init_kernel_state(void) {
         setup_fatal("Failed to pop root pid");
     }
 
-    phys_addr_t user_pd = pop_initial_user_info();
+    phys_addr_t user_pd = pop_initial_user_pd_copy();
     if (user_pd == NULL_PHYS_ADDR) {
         setup_fatal("Failed to get user PD");
     }

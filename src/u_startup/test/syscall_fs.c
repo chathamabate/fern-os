@@ -32,9 +32,12 @@ static bool posttest(void);
 #define _TEMP_TEST_DIR_PATH "syscall_fs_test"
 #define TEMP_TEST_DIR_PATH "/" _TEMP_TEST_DIR_PATH 
 
-sig_vector_t old_sv;
+static sig_vector_t old_sv;
+static size_t old_user_al;
 
 static bool pretest(void) {
+    old_user_al = al_num_user_blocks(get_default_allocator());
+
     fernos_error_t err;
 
     // Since we will be working with child processes, we will allow the 
@@ -63,6 +66,9 @@ static bool posttest(void) {
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     sc_signal_allow(old_sv);
+
+    size_t new_user_al = al_num_user_blocks(get_default_allocator());
+    TEST_EQUAL_UINT(old_user_al, new_user_al);
 
     TEST_SUCCEED();
 }

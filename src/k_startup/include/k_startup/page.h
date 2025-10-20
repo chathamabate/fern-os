@@ -61,10 +61,6 @@ extern uint8_t _static_area_end[];
  * A shared entry points to a non-identity page which is referenced by many page tables.
  * These functions offer little support for shared entries. It is the job the kernel to manage
  * such pages correctly.
- *
- * NOTE: In my pt_entry helpers below, I take a writeable bool. Since I am always running in 
- * supervisor role, this option is pointless. However, I will leave it in to remind the user
- * that certain pages shouldn't be written to.
  */
 
 #define IDENTITY_ENTRY (0)
@@ -137,15 +133,14 @@ fernos_error_t init_paging(void);
 phys_addr_t get_kernel_pd(void);
 
 /**
- * When paging is initialized, a memory space is set up to be used by the very first user process.
- * To switch into this space, you just need the page directory physical address.
+ * When paging is initialized, a memory space is set up as a template for all user processes.
  *
- * NOTE: This function is only meant to be used once. An error will be returned if you try to
- * call this function two times.
+ * The page directory of this memory space is always private. However, using this function,
+ * a copy can be returned. Returns NULL_PHYS_ADDR if the copy fails.
  *
- * NOTE: The first user page directory has no space allocated for user threads!
+ * NOTE: The copy has NO pages allocated in the user stack area.
  */
-phys_addr_t pop_initial_user_info(void);
+phys_addr_t pop_initial_user_pd_copy(void);
 
 /**
  * The number of free kernel pages exposed. MUST BE A POWER OF 2.

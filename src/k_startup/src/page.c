@@ -9,6 +9,9 @@
 #include <stdbool.h>
 #include "s_util/constraints.h"
 
+// page and page_helpers reference each other.
+#include "k_startup/page_helpers.h"
+
 /*
  * NOTE: Functions starting with `_` in this file denote functions which can only be
  * called before virtual memory is enabled.
@@ -26,7 +29,7 @@ static phys_addr_t kernel_pd = NULL_PHYS_ADDR;
  *
  * Once consumed by the first user task, this field should be set back to NULL.
  */
-static phys_addr_t first_user_pd = NULL_PHYS_ADDR;
+static phys_addr_t user_pd_template = NULL_PHYS_ADDR;
 
 /**
  * A set of reserved pages in the kernel to be used for page table editing.
@@ -365,7 +368,7 @@ static fernos_error_t _init_first_user_pd(void) {
      */
     PROP_ERR(_place_range(pd, kstack_start, kstack_end, _R_WRITEABLE | _R_IDENTITY));
 
-    first_user_pd = upd;
+    user_pd_template = upd;
 
     return FOS_E_SUCCESS;
 }
@@ -392,14 +395,8 @@ phys_addr_t get_kernel_pd(void) {
     return kernel_pd;    
 }
 
-phys_addr_t pop_initial_user_info(void) {
-    phys_addr_t ret_addr = first_user_pd;
-
-    if (first_user_pd != NULL_PHYS_ADDR) {
-        first_user_pd = NULL_PHYS_ADDR;
-    }
-
-    return ret_addr;
+phys_addr_t pop_initial_user_pd_copy(void) {
+   return copy_page_directory(user_pd_template);
 }
 
 phys_addr_t assign_free_page(uint32_t slot, phys_addr_t p) {
