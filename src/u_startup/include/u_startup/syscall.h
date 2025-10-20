@@ -392,6 +392,14 @@ fernos_error_t sc_handle_write_fmt_s(handle_t h, const char *fmt, ...);
 fernos_error_t sc_out_write_fmt_s(const char *fmt, ...);
 
 /**
+ * Same as `sc_out_write_fmt_s` but with a void return type.
+ *
+ * This is useful for data structur dump debug functions which require a logging
+ * function with a void return type.
+ */
+void sc_out_write_fmt_s_lf(const char *fmt, ...);
+
+/**
  * When using a handle which may read a partial amount on success,
  * this function will call `sc_read` in a loop until all bytes are written!
  * (Or an error is encountered)

@@ -795,7 +795,8 @@ static bool test_elf32_parsing(void) {
     //
     // Afterwards, I will screw around with the elf file and confirm failures!
 
-    const size_t num_pg_headers = 5;
+    void * const dummy_entry = (void *)0x555U;
+    const size_t num_pg_headers = 5; 
     const size_t bin_area_offset = sizeof(elf32_header_t) +
         (num_pg_headers * sizeof(elf32_program_header_t));
     const size_t bin_area_size = 0x1000U;
@@ -813,7 +814,7 @@ static bool test_elf32_parsing(void) {
         .os_abi_version = 0, .pad0 = { 0 }, .obj_type = 0, 
         .machine = 0x03,
         .version1 = 1,
-        .entry = 0x0U, // An invalid entry at the parse stage shouldn't matter.
+        .entry = dummy_entry, 
         .program_header_table = sizeof(elf32_header_t),
         .section_header_table = elf_size, // Not being used
         .flags = 0,
@@ -865,19 +866,75 @@ static bool test_elf32_parsing(void) {
         .align = 2
     };
 
-    // Unused entries.
     pg_headers[3] = (elf32_program_header_t) {
-        .type = ELF32_SEG_TYPE_NULL
+        .type = ELF32_SEG_TYPE_LOADABLE,
+        .offset = 0,
+        .vaddr = (void *)0x3000U,
+        .paddr = 0,
+        .size_in_file = 0,  // No file component!
+        .size_in_mem =  0x200U,
+        .flags = ELF32_SEG_FLAG_READABLE | ELF32_SEG_FLAG_WRITEABLE,
+        .align = 2
     };
 
+    // Unused entries.
     pg_headers[4] = (elf32_program_header_t) {
         .type = ELF32_SEG_TYPE_NULL
     };
 
+    // Ok, now let's write out the ELF Files, and confirm it parses!
+    
+    TEST_SUCCESS(sc_fs_touch(TEST_ELF_FILENAME));
 
-    // Ok, now some program headers.
+    handle_t fh;
+    TEST_SUCCESS(sc_fs_open(TEST_ELF_FILENAME, &fh));
+    TEST_SUCCESS(sc_handle_write_full(fh, elf_data, elf_size));
+    sc_handle_close(fh);
 
+    user_app_t *ua;
+    TEST_SUCCESS(sc_fs_parse_elf32(get_default_allocator(), TEST_ELF_FILENAME, &ua));
+    TEST_TRUE(ua != NULL);
 
+    // Remove the test file since we don't need it anymore!
+    TEST_SUCCESS(sc_fs_remove(TEST_ELF_FILENAME));
+
+    // Let's confirm our user app looks right!
+    TEST_EQUAL_HEX(dummy_entry, ua->entry);
+
+    const size_t loaded_hdr_inds[] = {
+        0, 2, 3 // The headers which should've been loaded into
+                            // the resulting user app.
+    };
+    const size_t num_loaded_hdr_inds = sizeof(loaded_hdr_inds) / sizeof(loaded_hdr_inds[0]);
+
+    for (size_t i = 0; i < num_loaded_hdr_inds; i++) {
+        const size_t hdr_ind = loaded_hdr_inds[i];
+        TEST_TRUE(ua->areas[i].occupied);
+        if (pg_headers[hdr_ind].flags & ELF32_SEG_FLAG_WRITEABLE) {
+            TEST_TRUE(ua->areas[i].writeable);
+        }
+        TEST_EQUAL_HEX(pg_headers[hdr_ind].vaddr, ua->areas[i].load_position);
+        TEST_EQUAL_HEX(pg_headers[hdr_ind].size_in_file, ua->areas[i].given_size);
+        TEST_EQUAL_HEX(pg_headers[hdr_ind].size_in_mem, ua->areas[i].area_size);
+
+        if (pg_headers[hdr_ind].size_in_file > 0) {
+            TEST_TRUE(ua->areas[i].given != NULL);
+        }
+    }
+
+    TEST_TRUE(mem_cmp(ua->areas[0].given, seg0_area, seg0_size_in_file));
+    TEST_TRUE(mem_cmp(ua->areas[1].given, seg2_area, seg2_size_in_file));
+
+    // Confirm unoccupied areas!
+    for (size_t i = num_loaded_hdr_inds; i < FOS_MAX_APP_AREAS; i++) {
+        TEST_FALSE(ua->areas[i].occupied);
+    }
+
+    delete_user_app(ua);
+
+    // Ok, finally, now onto failure cases!
+
+    da_free(elf_data);
 
     TEST_SUCCEED();
 }

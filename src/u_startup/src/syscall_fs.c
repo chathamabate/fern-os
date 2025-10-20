@@ -66,7 +66,7 @@ static fernos_error_t sc_fs_parse_elf32_helper(handle_t fh, size_t file_len, use
     // Must be 32-bit little-endian targeting x86 with an entry point!
     if (elf32_header.header_magic != ELF_HEADER_MAGIC || 
             elf32_header.cls != 1 || elf32_header.endian != 1 ||
-            elf32_header.machine != 0x03 || !(elf32_header.entry) ||
+            elf32_header.machine != 0x03 || 
             elf32_header.this_header_size != sizeof(elf32_header_t) ||
             elf32_header.program_header_size != sizeof(elf32_program_header_t) ||
             elf32_header.section_header_size != sizeof(elf32_section_header_t)) {

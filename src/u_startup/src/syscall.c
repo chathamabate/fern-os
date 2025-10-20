@@ -1,7 +1,6 @@
 
 #include "u_startup/syscall.h"
 #include "s_bridge/shared_defs.h"
-#include "s_bridge/ctx.h"
 #include "s_util/str.h"
 
 fernos_error_t sc_proc_fork(proc_id_t *cpid) {
@@ -206,6 +205,17 @@ fernos_error_t sc_out_write_fmt_s(const char *fmt, ...) {
     va_end(va);
 
     return sc_out_write_s(buf);
+}
+
+void sc_out_write_fmt_s_lf(const char *fmt, ...) {
+    char buf[SC_HANDLE_WRITE_FMT_S_BUFFER_SIZE];
+
+    va_list va; 
+    va_start(va, fmt);
+    str_vfmt(buf, fmt, va);
+    va_end(va);
+
+    (void)sc_out_write_s(buf);
 }
 
 fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
