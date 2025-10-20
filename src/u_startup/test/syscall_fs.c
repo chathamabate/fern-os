@@ -3,6 +3,7 @@
 #include "u_startup/syscall_fs.h"
 #include "s_util/constraints.h"
 #include "s_util/str.h"
+#include "s_util/elf.h"
 #include <stdarg.h>
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
@@ -759,6 +760,128 @@ static bool test_bad_fs_calls(void) {
     TEST_SUCCEED();
 }
 
+/*
+ * ELF parser testing. Consider moving this to another file?
+ */
+
+#define TEST_ELF_FILENAME "test.elf"
+
+/**
+ * Helper for `test_elf32_parsing`.
+ */
+static bool test_bad_elf32_file(const void *bad_elf_data, size_t elf_len) {
+    TEST_SUCCESS(sc_fs_touch(TEST_ELF_FILENAME));
+
+    handle_t fh;
+
+    // Write out test elf data.
+    TEST_SUCCESS(sc_fs_open(TEST_ELF_FILENAME, &fh));
+    TEST_SUCCESS(sc_handle_write_full(fh, bad_elf_data, elf_len));
+    sc_handle_close(fh);
+
+    // Now try to parse, this should fail!
+
+    user_app_t *ua;
+    TEST_FAILURE(sc_fs_parse_elf32(get_default_allocator(), TEST_ELF_FILENAME, &ua));
+
+    TEST_SUCCESS(sc_fs_remove(TEST_ELF_FILENAME));
+
+    TEST_SUCCEED();
+}
+
+static bool test_elf32_parsing(void) {
+    // Ok, for this test I am going to setup a "real" elf file in memory.
+    // I will confirm that this parses successfully.
+    //
+    // Afterwards, I will screw around with the elf file and confirm failures!
+
+    const size_t num_pg_headers = 5;
+    const size_t bin_area_offset = sizeof(elf32_header_t) +
+        (num_pg_headers * sizeof(elf32_program_header_t));
+    const size_t bin_area_size = 0x1000U;
+    const size_t elf_size = bin_area_offset + bin_area_size;
+
+    uint8_t *elf_data = da_malloc(
+        elf_size
+    );
+
+    TEST_TRUE(elf_data != NULL);
+    
+    *(elf32_header_t *)elf_data = (elf32_header_t) {
+        .header_magic = ELF_HEADER_MAGIC,
+        .cls = 1, .endian = 1, .version0 = 1, .os_abi = 0xFF,
+        .os_abi_version = 0, .pad0 = { 0 }, .obj_type = 0, 
+        .machine = 0x03,
+        .version1 = 1,
+        .entry = 0x0U, // An invalid entry at the parse stage shouldn't matter.
+        .program_header_table = sizeof(elf32_header_t),
+        .section_header_table = elf_size, // Not being used
+        .flags = 0,
+        .this_header_size = sizeof(elf32_header_t),
+        .program_header_size = sizeof(elf32_program_header_t),
+        .num_program_headers = num_pg_headers,
+        .section_header_size = sizeof(elf32_section_header_t),
+        .num_section_headers = 0,
+        .section_names_header_index = 0,
+    };
+
+    elf32_program_header_t *pg_headers = (elf32_program_header_t *)((elf32_header_t *)elf_data + 1);
+    
+    // Maybe 3 program non-null program headers?
+
+    uint8_t * const seg0_area = (uint8_t *)elf_data + bin_area_offset;
+    const size_t seg0_size_in_file = 0x100U;
+
+    mem_set(seg0_area, 0xAB, seg0_size_in_file);
+
+    pg_headers[0] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_LOADABLE,
+        .offset = (uintptr_t)seg0_area - (uintptr_t)elf_data,
+        .vaddr = (void *)0x2000U,
+        .paddr = 0,
+        .size_in_file = seg0_size_in_file, 
+        .size_in_mem =  0x1000U,
+        .flags = ELF32_SEG_FLAG_READABLE | ELF32_SEG_FLAG_WRITEABLE,
+        .align = 2
+    };
+
+    pg_headers[1] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_DYNAMIC, // Should be ignored by the parser.
+    };
+
+    uint8_t * const seg2_area = (uint8_t *)elf_data + bin_area_offset + 0x200U;
+    const size_t seg2_size_in_file = 0x200U;
+
+    mem_set(seg2_area, 0xCD, seg2_size_in_file);
+
+    pg_headers[2] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_LOADABLE,
+        .offset = (uintptr_t)seg2_area - (uintptr_t)elf_data,
+        .vaddr = (void *)0x1000U,
+        .paddr = 0,
+        .size_in_file = seg2_size_in_file, 
+        .size_in_mem =  0x200U,
+        .flags = ELF32_SEG_FLAG_READABLE | ELF32_SEG_FLAG_EXECUTABLE,
+        .align = 2
+    };
+
+    // Unused entries.
+    pg_headers[3] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_NULL
+    };
+
+    pg_headers[4] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_NULL
+    };
+
+
+    // Ok, now some program headers.
+
+
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_fs(void) {
     BEGIN_SUITE("FS Syscalls");
     RUN_TEST(test_simple_rw);
@@ -771,5 +894,6 @@ bool test_syscall_fs(void) {
     RUN_TEST(test_dir_functions);
     RUN_TEST(test_big_file);
     RUN_TEST(test_bad_fs_calls);
+    RUN_TEST(test_elf32_parsing);
     return END_SUITE();
 }

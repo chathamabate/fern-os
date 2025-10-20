@@ -110,6 +110,10 @@ fernos_error_t sc_fs_flush(handle_t h);
  *
  * On success, a pointer to the allocated user app is written to `*ua`.
  *
+ * User app sections are gauranteed to appear in the order of corresponding program headers within
+ * the elf file. (i.e. the first loadable program segment in the ELF file will be the first user
+ * app section)
+ *
  * NOTE: this is not a standalone system call, it's more a helper. I am putting it here since it
  * takes advantage of the behaviors specific to file handles. A simpler parse function could be
  * generic, but require the full elf file be loaded in to memory first. This would be mid.
