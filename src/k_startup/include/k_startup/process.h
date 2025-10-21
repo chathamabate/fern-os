@@ -7,6 +7,7 @@
 #include "s_data/wait_queue.h"
 #include "s_data/map.h"
 #include "s_block_device/file_sys.h"
+#include "s_bridge/app.h"
 
 #include <stdbool.h>
 
@@ -195,6 +196,26 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid);
  * undefided behavior later on!!
  */
 void delete_process(process_t *proc);
+
+/**
+ * Have a process execute a user application.
+ * This overwirtes the process's current state.
+ *
+ * `proc` retains its process ID, but its page directory is deleted and replaced
+ * with a fresh page directory.
+ *
+ * `proc`'s parent process remains the same.
+ * All threads are deleted, a new main thread is created to kick off the given app.
+ * The `proc`'s signal vectors are cleared.
+ * All futexes are deleted.
+ * Default IO handles are preserved, but all other handles are deleted!
+ *
+ * In case of error, the process remains in its original state.
+ *
+ * NOTE: VERY IMPORTANT: This call DOES NOT modify the zombie children and living children
+ * lists!!! This reposibility is defered to the caller!!! 
+ */
+fernos_error_t proc_exec(process_t *proc, user_app_t *ua, const void *args_block, size_t args_block_size);
 
 /**
  * Create a thread within a process with the given entry point and argument!

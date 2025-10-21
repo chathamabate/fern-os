@@ -6,6 +6,7 @@
 
 #include "s_util/err.h"
 #include "s_bridge/shared_defs.h"
+#include "s_bridge/app.h"
 #include "s_mem/allocator.h"
 
 /**
@@ -84,6 +85,21 @@ void sc_proc_exit(proc_exit_status_t status);
  * On error, FOS_MAX_PROCS is written to *rcpid, and PROC_ES_UNSET is written to *rces.
  */
 fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t *rces);
+
+/**
+ * Execute a user application. 
+ *
+ * This call overwrites the calling process by loading a binary dynamically!
+ * 
+ * On success, this call does NOT return, it enters the given app's main function
+ * providing the given args as parameters.
+ * In this case, the child processes, signal vectors, zombie processes, and default IO handles
+ * are all preserved from the calling process.
+ * All futexes, non-default handles, and threads of the original process are destroyed.
+ *
+ * On failure, an error is returned, the calling process remains in its original state.
+ */
+fernos_error_t sc_proc_exec(user_app_t *ua, const void *args_block, size_t args_block_size);
 
 /**
  * Send a signal to a process with pid `pid`.

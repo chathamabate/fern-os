@@ -9,6 +9,7 @@
 #include "s_util/constraints.h"
 #include "s_bridge/ctx.h"
 #include "s_data/map.h"
+#include "s_bridge/app.h"
 
 #include "s_block_device/file_sys.h"
 
@@ -269,6 +270,22 @@ KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t st
  */
 KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, 
         proc_exit_status_t *u_rces);
+
+/**
+ * Execute a user application in the current process.
+ *
+ * This call overwrites the calling process by loading a binary dynamically!
+ * 
+ * On success, this call does NOT return to the user process, it enters the given app's main function
+ * providing the given args as parameters.
+ * In this case, the child processes, signal vectors, zombie processes, and default IO handles
+ * are all preserved from the calling process.
+ * All futexes, non-default handles, and threads of the original process are destroyed.
+ *
+ * On failure, an error is returned to user space, the calling process remains in its original state.
+ */
+KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_args_block,
+        size_t u_args_block_size);
 
 /** 
  * Send a signal to a process with pid `pid`.

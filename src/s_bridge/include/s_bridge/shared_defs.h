@@ -143,6 +143,7 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 #define SCID_PROC_FORK (0x80U)
 #define SCID_PROC_EXIT (0x81U)
 #define SCID_PROC_REAP (0x82U)
+#define SCID_PROC_EXEC (0x83U)
 
 /* Signal Syscalls (process adjacent) */
 #define SCID_SIGNAL       (0x90U)

@@ -16,6 +16,11 @@ fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t
             (uint32_t)rces, 0);
 }
 
+fernos_error_t sc_proc_exec(user_app_t *ua, const void *args_block, size_t args_block_size) {
+    return (fernos_error_t)trigger_syscall(SCID_PROC_EXEC, (uint32_t)ua, (uint32_t)args_block, 
+            (uint32_t)args_block_size, 0);
+}
+
 fernos_error_t sc_signal(proc_id_t pid, sig_id_t sid) {
     return (fernos_error_t)trigger_syscall(SCID_SIGNAL, (uint32_t)pid, (uint32_t)sid, 0, 0);
 }

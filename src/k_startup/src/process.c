@@ -177,6 +177,63 @@ void delete_process(process_t *proc) {
     al_free(proc->al, proc);
 }
 
+fernos_error_t proc_exec(process_t *proc, user_app_t *ua, const void *args_block, size_t args_block_size) {
+    if (!ua) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    // First confirm args block is seemingly valid.
+
+    if (args_block_size > 0 && !args_block) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (args_block_size > FOS_APP_ARGS_AREA_SIZE) {
+        return FOS_E_INVALID_RANGE;
+    }
+    
+    // Next check that the user app is seemingly valid.
+
+    if (ua->entry < (void *)FOS_APP_AREA_START || (void *)FOS_APP_AREA_END <= ua->entry) {
+        return FOS_E_INVALID_RANGE; // Entry point must be within the app area!
+    }
+
+    // Ok, let's first confirm that `ua` is loadable!
+    for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
+        if (ua->areas[i].occupied) {
+            if (ua->areas[i].area_size == 0) {
+                return FOS_E_INVALID_RANGE; // We'll say all loadable regions must have
+                                            // non-zero size!
+            }
+
+            const void *start = ua->areas[i].load_position;
+            const void *end = (uint8_t *)start + ua->areas[i].area_size;
+
+            if (end < start) { // Wrap case! 
+                return FOS_E_INVALID_RANGE;
+            }
+
+            // NOTE: The end of the loadable area CAN be the end of the app area!
+            if (start < (void *)FOS_APP_AREA_START || (void *)FOS_APP_AREA_END < end) {
+                return FOS_E_INVALID_RANGE;
+            }
+        }
+    }
+
+    // Looks like our args block and user app are both somewhat loadable!!
+
+    // First off, we need to setup the page directory for our new application.
+    // If we fail at any point, we can just easily delete the page directory and return
+    // without modifying the calling process at all!
+    
+    phys_addr_t new_pd = pop_initial_user_pd_copy();
+    if (new_pd == NULL_PHYS_ADDR) {
+        return FOS_E_NO_MEM;
+    }
+
+
+}
+
 /**
  * Allocate a new thread, and its initial stack pages.
  */

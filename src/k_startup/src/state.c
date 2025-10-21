@@ -484,6 +484,28 @@ fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     DUAL_RET(thr, user_err, FOS_E_SUCCESS);
 }
 
+/**
+ * Helper which copies
+ */
+static user_app_t *ua_copy_from_user(user_app_t *u_ua) {
+
+}
+
+fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_args_block,
+        size_t u_args_block_size) {
+    fernos_error_t err;
+
+    if (!(ks->curr_thread)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = ks->curr_thread;
+    process_t *proc = thr->proc;
+    phys_addr_t pd = proc->pd;
+
+    // First off, we must copy over
+}
+
 static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid) {
     fernos_error_t err;
 
