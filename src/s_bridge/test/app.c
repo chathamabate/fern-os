@@ -120,9 +120,36 @@ static bool test_bad_new_args_block(void) {
     TEST_SUCCEED();
 }
 
+static bool test_args_block_make_absolute(void) {
+    const char *args0[] = {
+        "a1", "arg2", 
+    };
+    const size_t num_args0 = sizeof(args0) / sizeof(args0[0]);
+    
+    const void *args_block;
+    size_t args_block_size;
+    TEST_SUCCESS(new_da_args_block(args0, num_args0, &args_block, &args_block_size));
+
+    uint32_t offsets[sizeof(args0) / sizeof(args0[0])];
+    const uint32_t *tbl_area = (uint32_t *)args_block;
+    for (size_t i = 0; i < num_args0; i++) {
+        offsets[i] = tbl_area[i];
+    }
+
+    args_block_make_absolute((void *)args_block, 10);
+    for (size_t i = 0; i < num_args0; i++) {
+        TEST_EQUAL_UINT(offsets[i] + 10, tbl_area[i]);
+    }
+
+    da_free((void *)args_block);
+
+    TEST_SUCCEED();
+}
+
 bool test_app(void) {
     BEGIN_SUITE("App");
     RUN_TEST(test_new_args_block);
     RUN_TEST(test_bad_new_args_block);
+    RUN_TEST(test_args_block_make_absolute);
     return END_SUITE();
 }

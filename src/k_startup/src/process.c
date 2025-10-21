@@ -7,6 +7,7 @@
 #include "s_util/constraints.h"
 #include "s_util/str.h"
 
+#include "s_util/misc.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
 
@@ -178,6 +179,8 @@ void delete_process(process_t *proc) {
 }
 
 fernos_error_t proc_exec(process_t *proc, user_app_t *ua, const void *args_block, size_t args_block_size) {
+    fernos_error_t err;
+
     if (!ua) {
         return FOS_E_BAD_ARGS;
     }
@@ -231,7 +234,52 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua, const void *args_block
         return FOS_E_NO_MEM;
     }
 
+    // First, let's deal with the args block. 
+    
+    if (args_block) { // Remember, args_block is allowed to be NULL!
+                      // If no args block is given, we don't need to do much!
 
+        // First let's reserve the area necessary in the page directory for the args block!
+        size_t args_block_alloc_size = args_block_size;
+        if (!IS_ALIGNED(args_block_alloc_size, M_4K)) {
+            args_block_alloc_size = ALIGN(args_block_alloc_size + M_4K, M_4K);
+        }
+
+        const void *true_e;
+        err = pd_alloc_pages(new_pd, true, (void *)FOS_APP_ARGS_AREA_START, 
+                (void *)(FOS_APP_ARGS_AREA_START + args_block_alloc_size), &true_e);
+
+        if (err != FOS_E_SUCCESS) {
+            delete_page_directory(new_pd);
+            return err;
+        }
+
+        // The given args block is relative so, we need to next create an absolute version
+        // of it's "index tbl".
+
+        uint32_t * const index_tbl = (uint32_t *)args_block;
+        uint32_t *abs_args = NULL; // We will not be modifying the given args block,
+                                   // we will instead fill out a new buffer with the absolute
+                                   // offsets!
+
+        size_t num_args = 0;
+        while (index_tbl[num_args]) { 
+            num_args++;
+        }
+
+        abs_args = al_malloc(proc->al, sizeof(uint32_t) * num_args);
+        if (!abs_args) {
+            delete_page_directory(new_pd);
+            return FOS_E_NO_MEM;
+        }
+
+        for (size_t i = 0; i < num_args; i++) {
+            abs_args[i] = index_tbl[i] + FOS_APP_ARGS_AREA_START;
+        }
+
+    }
+
+    return FOS_E_NOT_IMPLEMENTED;
 }
 
 /**

@@ -99,3 +99,15 @@ fernos_error_t new_args_block(allocator_t *al, const char * const *args, size_t 
 
     return FOS_E_SUCCESS;
 }
+
+void args_block_make_absolute(void *args_block, uint32_t offset) {
+    if (!args_block) {
+        return; // It is OK for an args block to be NULL!
+    }
+
+    uint32_t * const tbl_area = (uint32_t *)args_block;
+
+    for (size_t i = 0; tbl_area[i]; i++) {
+        tbl_area[i] += offset;
+    }
+}

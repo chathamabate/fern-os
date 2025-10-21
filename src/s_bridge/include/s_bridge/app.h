@@ -132,3 +132,9 @@ static inline fernos_error_t new_da_args_block(const char * const *args, size_t 
     return new_args_block(get_default_allocator(), args, num_args, out, out_len);
 }
 
+/**
+ * When an args block is created, all of its offsets are relative.
+ *
+ * This function will add `offset` to all indeces within the beginning of the args block!
+ */
+void args_block_make_absolute(void *args_block, uint32_t offset);
