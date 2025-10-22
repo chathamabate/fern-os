@@ -204,9 +204,12 @@ void delete_process(process_t *proc);
  * `proc` retains its process ID, but its page directory is deleted and replaced
  * with a fresh page directory.
  *
+ * All loadable areas MUST have a 4K aligned load position, or else this fails.
+ * The size of each area need not be 4K aligned. 
+ *
  * `proc`'s parent process remains the same.
  * All threads are deleted, a new main thread is created to kick off the given app.
- * The `proc`'s signal vectors are cleared.
+ * The `proc`'s signal vectors are cleared. (Including the allow vector)
  * All futexes are deleted.
  * Default IO handles are preserved, but all other handles are deleted!
  *

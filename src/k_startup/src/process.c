@@ -210,6 +210,10 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua,
             const void *start = ua->areas[i].load_position;
             const void *end = (uint8_t *)start + ua->areas[i].area_size;
 
+            if (!IS_ALIGNED(start, M_4K)) {
+                return FOS_E_ALIGN_ERROR;
+            }
+
             if (end < start) { // Wrap case! 
                 return FOS_E_INVALID_RANGE;
             }
@@ -245,6 +249,8 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua,
 
     // First, let's deal with the args block. 
     
+    err = FOS_E_SUCCESS;
+
     if (abs_args_block) { // Remember, abs_args_block is allowed to be NULL!
                       // If no args block is given, we don't need to do much!
 
@@ -258,27 +264,54 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua,
         err = pd_alloc_pages(new_pd, true, (void *)FOS_APP_ARGS_AREA_START, 
                 (void *)(FOS_APP_ARGS_AREA_START + abs_args_block_alloc_size), &true_e);
 
-        if (err != FOS_E_SUCCESS) {
-            delete_page_directory(new_pd);
-            return err;
-        }
 
         // Ok, now we copy the args block into the app args area!  (This is why the args block must 
         // be absolute when given)
 
-        err = mem_cpy_to_user(new_pd, (void *)FOS_APP_ARGS_AREA_START, abs_args_block, 
-                abs_args_block_size, NULL);
-        if (err != FOS_E_SUCCESS) {
-            delete_page_directory(new_pd);
-            return err;
+        if (err == FOS_E_SUCCESS) {
+            err = mem_cpy_to_user(new_pd, (void *)FOS_APP_ARGS_AREA_START, abs_args_block, 
+                    abs_args_block_size, NULL);
         }
     }
 
     // Now we can move onto loading app sections!
 
-    for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
-        // Ok, we also need some mem_set stuff here???
+    for (size_t i = 0; err == FOS_E_SUCCESS && i < FOS_MAX_APP_AREAS; i++) {
+        user_app_area_entry_t *uaa = ua->areas + i;
+
+        if (!(uaa->occupied)) {
+            continue;;
+        }
+
+        // We know from above that at this point, all occupied areas must have a non zero
+        // area size! (This doesn't really change that much, but whatever!
+        //
+        // We also know that each load position in 4K Aligned!
+        // We'll round up sizes to 4K which shouldn't cause any problems since load positions
+        // are 4K aligned!
+
+        size_t area_size = uaa->area_size;
+        if (!IS_ALIGNED(area_size, M_4K)) {
+            area_size = ALIGN(area_size, M_4K) + M_4K;
+        }
+        
+        const void *true_e;
+        err = pd_alloc_pages(new_pd, true, uaa->load_position, 
+                (uint8_t *)(uaa->load_position) + area_size, &true_e);
+
+        if (err == FOS_E_SUCCESS && uaa->given_size > 0) {
+            err = mem_cpy_to_user(new_pd, uaa->load_position, uaa->given, uaa->given_size, NULL);
+        }
+
+        const size_t bytes_to_set = uaa->area_size - uaa->given_size;
+
+        if (err == FOS_E_SUCCESS && bytes_to_set > 0) {
+            err = mem_set_to_user(new_pd, 
+                    (uint8_t *)(uaa->load_position) + uaa->given_size, 0, bytes_to_set);
+        }
     }
+
+    // Ok, we now need to set up the stack!
 
     return FOS_E_NOT_IMPLEMENTED;
 }

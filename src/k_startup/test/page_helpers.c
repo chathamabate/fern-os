@@ -529,17 +529,22 @@ static bool test_mem_set_user(void) {
         {
             (void *)(MEM_TEST_AREA_START + 13),
             (void *)(MEM_TEST_AREA_START + (2*M_4K) + 15),
-            0xAD
+            0xCC
         },
         {
             (void *)(MEM_TEST_AREA_START),
             (void *)(MEM_TEST_AREA_START + (2*M_4K)),
-            0xAD
+            0xCB
         },
         {
             (void *)(MEM_TEST_AREA_START + 24),
             (void *)(MEM_TEST_AREA_START + (2*M_4K)),
-            0xAD
+            0xA0
+        },
+        {
+            (void *)(MEM_TEST_AREA_START),
+            (void *)(MEM_TEST_AREA_START),
+            0xA1
         }
     };
     const size_t NUM_CASES = sizeof(CASES) / sizeof(CASES[0]);
