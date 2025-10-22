@@ -85,7 +85,7 @@
  * NOTE: The kernel stack should be completely allocated at boot time.
  * (Excluding the redzone page of course)
  */
-#define FOS_KERNEL_STACK_SIZE  (32 * M_4K)
+#define FOS_KERNEL_STACK_SIZE  (64 * M_4K)
 
 /**
  * NOT EDITABLE!

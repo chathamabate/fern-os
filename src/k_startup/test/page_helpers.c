@@ -660,6 +660,127 @@ static bool test_bad_mem_set(void) {
     TEST_SUCCEED();
 }
 
+static bool test_new_user_app_pd(void) {
+    enable_loss_check();
+
+    // Because the page directory being created here is intended for a user process,
+    // we won't switch to it in this test like we do in the above tests. In theory, such
+    // a move could still work as the kernel stack is in all page directoreis, but probs not
+    // worth the risk.
+
+    // NOTE: because these tests assume no heap, everything for this test is allocated on the
+    // kernel stack. We'll just loosely require the kernel stack to be pretty large before
+    // running this test.
+
+    TEST_TRUE(FOS_KERNEL_STACK_SIZE >= (M_4K * 24));
+
+    user_app_t ua = {
+        .al = NULL, // These tests cannot depend on a heap being set up.
+        .entry = (const void *)FOS_APP_AREA_START,
+        .areas = {
+            (user_app_area_entry_t) {
+                .occupied = true,
+                .load_position = (void *)FOS_APP_AREA_START,
+                .area_size = M_4K,
+                .given = NULL,
+                .given_size = 0,
+                .writeable = false
+            },
+            (user_app_area_entry_t) {
+                .occupied = true,
+                .load_position = (void *)(FOS_APP_AREA_START + M_4K),
+                .area_size = 16,
+                .given = "hello",
+                .given_size = 6,
+                .writeable = false
+            },
+            (user_app_area_entry_t) {
+                .occupied = true,
+                .load_position = (void *)(FOS_APP_AREA_START + (3 * M_4K)),
+                .area_size = 8,
+                .given = "goodbye",
+                .given_size = 8,
+                .writeable = false
+            } ,
+            (user_app_area_entry_t) {
+                .occupied = true,
+                .load_position = (void *)(FOS_APP_AREA_START + (5 * M_4K)),
+                .area_size = (2 * M_4K) + 10,
+                .given = NULL,
+                .given_size = 0,
+                .writeable = false
+            } 
+        }
+    };
+
+    // Remember, the args block is just copied directly into the page directory.
+    // For this test, it doesn't need actual string args.
+    uint8_t mock_args_block[(2 * M_4K) + 5];
+    const size_t mock_args_block_size = sizeof(mock_args_block);
+    for (size_t i = 0; i < mock_args_block_size; i++) {
+        mock_args_block[i] = (uint8_t)i;
+    }
+
+    phys_addr_t upd;
+    TEST_SUCCESS(new_user_app_pd(&ua, mock_args_block, mock_args_block_size, &upd));
+
+
+    // This is hard on the kernel stack
+    // The size of this array MUST be larger than any single area described in the user app above!
+    uint8_t dummy_pages[8 * M_4K];
+
+    for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
+        const user_app_area_entry_t *uae = ua.areas + i;
+        if (!(uae->occupied)) {
+            continue;
+        }
+
+        TEST_SUCCESS(mem_cpy_from_user(dummy_pages, upd, uae->load_position, 
+                    uae->area_size, NULL));
+
+        TEST_TRUE(mem_cmp(dummy_pages, uae->given, uae->given_size));
+        TEST_TRUE(mem_chk(dummy_pages + uae->given_size, 0, 
+                    uae->area_size - uae->given_size));
+    }
+
+    // Now check args block!
+    TEST_SUCCESS(mem_cpy_from_user(dummy_pages, upd, (const void *)FOS_APP_ARGS_AREA_START, 
+                mock_args_block_size, NULL));
+    TEST_TRUE(mem_cmp(mock_args_block, dummy_pages, mock_args_block_size));
+
+    delete_page_directory(upd);
+
+    // Oh, let's make sure a NULL args block works.
+    TEST_SUCCESS(new_user_app_pd(&ua, NULL, 0, &upd));
+    delete_page_directory(upd);
+
+    // Ok, now let's try fucking up the original user app a bit.
+    // expecting errors!
+
+    // Bad entry point.
+    const void *og_entry = ua.entry;
+    ua.entry = (const void *)(FOS_APP_AREA_START + (10 * M_4K));  
+    TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, mock_args_block_size, &upd));
+    ua.entry = og_entry;
+
+    // Areas too large.
+    uint32_t og_size = ua.areas[0].area_size;
+    ua.areas[0].area_size = FOS_APP_AREA_SIZE + M_4K;
+    TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, mock_args_block_size, &upd));
+    ua.areas[0].area_size = og_size;
+
+    // Overlapping areas.
+    og_size = ua.areas[0].area_size;
+    ua.areas[0].area_size = 10 * M_4K;
+    TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, mock_args_block_size, &upd));
+    ua.areas[0].area_size = og_size;
+
+    // Args block too large!
+    TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, FOS_APP_ARGS_AREA_SIZE + M_4K, &upd));
+
+    TEST_SUCCEED();
+}
+
 bool test_page_helpers(void) {
     BEGIN_SUITE("Page Helpers");
 
@@ -670,6 +791,7 @@ bool test_page_helpers(void) {
     RUN_TEST(test_bad_mem_cpy);
     RUN_TEST(test_mem_set_user);
     RUN_TEST(test_bad_mem_set);
+    RUN_TEST(test_new_user_app_pd);
 
     return END_SUITE();
 }
