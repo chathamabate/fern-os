@@ -936,6 +936,7 @@ bool test_syscall(void) {
     RUN_TEST(test_complex_fork2);
 
     // Memory tests
+
     RUN_TEST(test_simple_memory);
     RUN_TEST(test_memory_forks);
 

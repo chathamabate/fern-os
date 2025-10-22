@@ -795,7 +795,7 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
 
     DUAL_RET_COND(!entry, thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
 
-    thread_t *new_thr = proc_new_thread(proc, entry, arg);
+    thread_t *new_thr = proc_new_thread(proc, (uintptr_t)entry, (uint32_t)arg, 0, 0);
 
     if (!new_thr) {
         thr->ctx.eax = FOS_E_UNKNWON_ERROR;

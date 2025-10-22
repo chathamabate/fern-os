@@ -187,8 +187,8 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua,
  * Allocate a new thread, and its initial stack pages.
  */
 static thread_t *proc_new_thread_with_stack(process_t *proc,
-        thread_id_t tid, thread_entry_t entry, void *arg) {
-    thread_t *new_thr = new_thread(proc, tid, entry, arg);
+        thread_id_t tid, uintptr_t entry, uint32_t arg0, uint32_t arg1, uint32_t arg2) {
+    thread_t *new_thr = new_thread(proc, tid, entry, arg0, arg1, arg2);
     if (!new_thr) {
         return NULL;
     }
@@ -213,7 +213,8 @@ static thread_t *proc_new_thread_with_stack(process_t *proc,
     return new_thr;
 }
 
-thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg) {
+thread_t *proc_new_thread(process_t *proc, uintptr_t entry, uint32_t arg0, uint32_t arg1,
+        uint32_t arg2) {
     if (!proc || !entry) {
         return NULL;
     }
@@ -225,7 +226,7 @@ thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg) {
         return NULL;
     }
 
-    thread_t *new_thr = proc_new_thread_with_stack(proc, tid, entry, arg);
+    thread_t *new_thr = proc_new_thread_with_stack(proc, tid, entry, arg0, arg1, arg2);
     if (!new_thr) {
         idtb_push_id(proc->thread_table, tid);
         return NULL;

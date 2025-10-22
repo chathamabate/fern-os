@@ -103,15 +103,11 @@ static void init_kernel_state(void) {
     kernel->root_proc = proc;
     idtb_set(kernel->proc_table, pid, proc);
 
-    // The first thread spawned will not get a void * arg, nor will it return one.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
     thread_t *thr = proc_new_thread(kernel->root_proc, 
-            (thread_entry_t)user_main, NULL);
+            (uintptr_t)user_main, 0, 0, 0);
     if (!thr) {
         setup_fatal("Failed to allocate first thread");
     }
-#pragma GCC diagnostic pop
 
     // Finally, schedule our first thread!
     ks_schedule_thread(kernel, thr);

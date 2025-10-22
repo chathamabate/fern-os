@@ -106,7 +106,8 @@ struct _thread_t {
  *
  * Lastly, threads assume the same allocator has the parent process.
  */
-thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg);
+thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry, 
+        uint32_t arg0, uint32_t arg1, uint32_t arg2);
 
 /**
  * Copy a given thread.

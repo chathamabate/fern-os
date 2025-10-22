@@ -2,18 +2,15 @@
 #include "k_startup/thread.h"
 #include "k_startup/fwd_defs.h"
 #include "k_startup/gdt.h"
-#include "s_data/wait_queue.h"
 #include "s_mem/allocator.h"
 #include "s_util/constraints.h"
 #include "k_startup/process.h"
-#include "s_util/err.h"
 #include "s_util/str.h"
 #include "u_startup/main.h"
-#include "k_startup/page.h"
-#include "k_startup/vga_cd.h"
 #include "s_util/str.h"
 
-thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg) {
+thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry, 
+        uint32_t arg0, uint32_t arg1, uint32_t arg2) {
     if (tid >= FOS_MAX_THREADS_PER_PROC) {
         return NULL;
     }
@@ -53,8 +50,10 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
         .ds = USER_DATA_SELECTOR,
         .cr3 = proc->pd,
 
-        .eax = (uint32_t)entry,
-        .ecx = (uint32_t)arg,
+        .eax = entry,
+        .ebx = arg0,
+        .ecx = arg1,
+        .edx = arg2,
 
         .eip = (uint32_t)thread_entry_routine,
         .cs = USER_CODE_SELECTOR,

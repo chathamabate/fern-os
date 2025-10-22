@@ -231,14 +231,13 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua,
  *
  * If this process doesn't have a main thread yet, the created thread will be set as main.
  *
- * (Remember, entry and arg should both be userspace pointers!)
- *
  * On Success, the a pointer to the created thread is returned.
  * On error, NULL is returned.
  *
  * NOTE: This uses the same allocator which was used for `proc`.
  */
-thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg);
+thread_t *proc_new_thread(process_t *proc, uintptr_t entry, uint32_t arg0, uint32_t arg1,
+        uint32_t arg2);
 
 /**
  * Given a process and one of its threads, delete the thread entirely from the process!

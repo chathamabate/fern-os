@@ -60,12 +60,12 @@ static bool test_new_thread(void) {
     process_t *proc = new_da_process(0, pd, NULL);
     TEST_TRUE(proc != NULL);
 
-    thread_t *thr0 = proc_new_thread(proc, fake_entry, NULL);
+    thread_t *thr0 = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
     TEST_TRUE(thr0 != NULL);
     TEST_EQUAL_HEX(THREAD_STATE_DETATCHED, thr0->state);
     TEST_EQUAL_HEX(proc->main_thread, thr0);
 
-    thread_t *thr1 = proc_new_thread(proc, fake_entry, NULL);
+    thread_t *thr1 = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
     TEST_TRUE(thr1 != NULL);
     TEST_EQUAL_HEX(THREAD_STATE_DETATCHED, thr1->state);
     TEST_TRUE(thr1 != proc->main_thread);
@@ -83,11 +83,11 @@ static bool test_many_threads(void) {
     TEST_TRUE(proc != NULL);
 
     for (size_t i = 0; i < FOS_MAX_THREADS_PER_PROC; i++) {
-        thread_t *thr = proc_new_thread(proc, fake_entry, NULL);
+        thread_t *thr = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
         TEST_TRUE(thr != NULL);
     }
 
-    thread_t *null_thr = proc_new_thread(proc, fake_entry, NULL);
+    thread_t *null_thr = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
     TEST_EQUAL_HEX(NULL, null_thr);
 
     // Now, make sure all added threads make sense.
@@ -126,10 +126,10 @@ static bool test_fork_process(void) {
     process_t *proc = new_da_process(0, pd, NULL);
     TEST_TRUE(proc != NULL);
 
-    thread_t *main_thread = proc_new_thread(proc, fake_entry, NULL);
+    thread_t *main_thread = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
     TEST_TRUE(main_thread != NULL);
 
-    thread_t *secondary_thread = proc_new_thread(proc, fake_entry, NULL);
+    thread_t *secondary_thread = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
     TEST_TRUE(secondary_thread != NULL);
 
 
@@ -212,7 +212,7 @@ static bool test_complex_process(void) {
     const size_t NUM_THREADS = sizeof(threads) / sizeof(threads[0]);
 
     for (size_t i = 0; i < NUM_THREADS; i++) {
-        thread_t *thr = proc_new_thread(proc, fake_entry, NULL);
+        thread_t *thr = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
         TEST_TRUE(thr != NULL);
         threads[i] = thr;
     }
