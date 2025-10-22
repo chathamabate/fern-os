@@ -178,7 +178,8 @@ void delete_process(process_t *proc) {
     al_free(proc->al, proc);
 }
 
-fernos_error_t proc_exec(process_t *proc, user_app_t *ua, const void *args_block, size_t args_block_size) {
+fernos_error_t proc_exec(process_t *proc, user_app_t *ua, 
+        const void *abs_args_block, size_t abs_args_block_size) {
     fernos_error_t err;
 
     if (!ua) {
@@ -187,19 +188,16 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua, const void *args_block
 
     // First confirm args block is seemingly valid.
 
-    if (args_block_size > 0 && !args_block) {
+    if (abs_args_block_size > 0 && !abs_args_block) {
         return FOS_E_BAD_ARGS;
     }
 
-    if (args_block_size > FOS_APP_ARGS_AREA_SIZE) {
+    if (abs_args_block_size > FOS_APP_ARGS_AREA_SIZE) {
         return FOS_E_INVALID_RANGE;
     }
     
-    // Next check that the user app is seemingly valid.
-
-    if (ua->entry < (void *)FOS_APP_AREA_START || (void *)FOS_APP_AREA_END <= ua->entry) {
-        return FOS_E_INVALID_RANGE; // Entry point must be within the app area!
-    }
+    // The entry point of the given app MUST be inside one of the given ranges!
+    bool entry_valid = false;
 
     // Ok, let's first confirm that `ua` is loadable!
     for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
@@ -220,8 +218,19 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua, const void *args_block
             if (start < (void *)FOS_APP_AREA_START || (void *)FOS_APP_AREA_END < end) {
                 return FOS_E_INVALID_RANGE;
             }
+
+            if (start <= ua->entry && ua->entry < end) {
+                entry_valid = true;
+            }
         }
     }
+    
+    if (!entry_valid) {
+        return FOS_E_INVALID_RANGE;
+    }
+
+    // NOTE: We don't explicitly check if ranges overlap above. This will be handled automatically
+    // when we write to the new page directory below.
 
     // Looks like our args block and user app are both somewhat loadable!!
 
@@ -236,47 +245,39 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua, const void *args_block
 
     // First, let's deal with the args block. 
     
-    if (args_block) { // Remember, args_block is allowed to be NULL!
+    if (abs_args_block) { // Remember, abs_args_block is allowed to be NULL!
                       // If no args block is given, we don't need to do much!
 
         // First let's reserve the area necessary in the page directory for the args block!
-        size_t args_block_alloc_size = args_block_size;
-        if (!IS_ALIGNED(args_block_alloc_size, M_4K)) {
-            args_block_alloc_size = ALIGN(args_block_alloc_size + M_4K, M_4K);
+        size_t abs_args_block_alloc_size = abs_args_block_size;
+        if (!IS_ALIGNED(abs_args_block_alloc_size, M_4K)) {
+            abs_args_block_alloc_size = ALIGN(abs_args_block_alloc_size + M_4K, M_4K);
         }
 
         const void *true_e;
         err = pd_alloc_pages(new_pd, true, (void *)FOS_APP_ARGS_AREA_START, 
-                (void *)(FOS_APP_ARGS_AREA_START + args_block_alloc_size), &true_e);
+                (void *)(FOS_APP_ARGS_AREA_START + abs_args_block_alloc_size), &true_e);
 
         if (err != FOS_E_SUCCESS) {
             delete_page_directory(new_pd);
             return err;
         }
 
-        // The given args block is relative so, we need to next create an absolute version
-        // of it's "index tbl".
+        // Ok, now we copy the args block into the app args area!  (This is why the args block must 
+        // be absolute when given)
 
-        uint32_t * const index_tbl = (uint32_t *)args_block;
-        uint32_t *abs_args = NULL; // We will not be modifying the given args block,
-                                   // we will instead fill out a new buffer with the absolute
-                                   // offsets!
-
-        size_t num_args = 0;
-        while (index_tbl[num_args]) { 
-            num_args++;
-        }
-
-        abs_args = al_malloc(proc->al, sizeof(uint32_t) * num_args);
-        if (!abs_args) {
+        err = mem_cpy_to_user(new_pd, (void *)FOS_APP_ARGS_AREA_START, abs_args_block, 
+                abs_args_block_size, NULL);
+        if (err != FOS_E_SUCCESS) {
             delete_page_directory(new_pd);
-            return FOS_E_NO_MEM;
+            return err;
         }
+    }
 
-        for (size_t i = 0; i < num_args; i++) {
-            abs_args[i] = index_tbl[i] + FOS_APP_ARGS_AREA_START;
-        }
+    // Now we can move onto loading app sections!
 
+    for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
+        // Ok, we also need some mem_set stuff here???
     }
 
     return FOS_E_NOT_IMPLEMENTED;

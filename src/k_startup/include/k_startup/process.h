@@ -214,8 +214,13 @@ void delete_process(process_t *proc);
  *
  * NOTE: VERY IMPORTANT: This call DOES NOT modify the zombie children and living children
  * lists!!! This reposibility is defered to the caller!!! 
+ *
+ * NOTE: ALSO VERY IMPORTANT: The given args block is loaded DIRECTLY into the new page directory.
+ * It is the caller's responsibility to make sure `abs_args_block` is absolute from 
+ * FOS_APP_ARGS_AREA_START!
  */
-fernos_error_t proc_exec(process_t *proc, user_app_t *ua, const void *args_block, size_t args_block_size);
+fernos_error_t proc_exec(process_t *proc, user_app_t *ua, 
+        const void *abs_args_block, size_t abs_args_block_size);
 
 /**
  * Create a thread within a process with the given entry point and argument!

@@ -62,3 +62,14 @@ fernos_error_t mem_cpy_from_user(void *dest, phys_addr_t user_pd, const void *us
  */
 fernos_error_t mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void *src, 
         uint32_t bytes, uint32_t *copied);
+
+/**
+ * Efficiently set the contents of an area within a different userspace.
+ *
+ * Returns an error if the user dest buffer is not entirely mapped.
+ * Returns an error if args are bad.
+ *
+ * On Success, the entire area has been set.
+ * On Error, an undefined amount of the area may have been set.
+ */
+fernos_error_t mem_set_to_user(phys_addr_t user_pd, void *user_dest, uint8_t val, uint32_t bytes);
