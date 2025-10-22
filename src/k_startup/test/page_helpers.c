@@ -570,10 +570,88 @@ static bool test_mem_set_user(void) {
         TEST_TRUE(c.start <= c.end);
         const size_t bytes = (uintptr_t)c.end - (uintptr_t)c.start;
 
-        TEST_SUCCESS(mem_set_to_user(upd, c.start, c.val, bytes));
+        uint32_t bytes_set;
+        TEST_SUCCESS(mem_set_to_user(upd, c.start, c.val, bytes, &bytes_set));
 
         set_page_directory(upd);
         TEST_TRUE(mem_chk(c.start, c.val, bytes));
+        set_page_directory(kpd);
+
+        TEST_EQUAL_UINT(bytes, bytes_set);
+    }
+
+    delete_page_directory(upd);
+
+    TEST_SUCCEED();
+}
+
+static bool test_bad_mem_set(void) {
+    typedef struct {
+        // The start and end of our mem_set.
+        void *start;
+        const void *end;
+
+        // Where we expect the mem_set'ing to stop.
+        const void *real_end;
+        uint8_t val;
+    } case_t;
+
+    const case_t CASES[] = {
+        {
+            (void *)(MEM_TEST_AREA_END),
+            (const void *)(MEM_TEST_AREA_END + 10),
+
+            (const void *)(MEM_TEST_AREA_END),
+            0xAA
+        },
+        {
+            (void *)(MEM_TEST_AREA_END - 10),
+            (const void *)(MEM_TEST_AREA_END + 10),
+
+            (const void *)(MEM_TEST_AREA_END),
+            0xAB
+        },
+        {
+            (void *)(MEM_TEST_AREA_END - M_4K),
+            (const void *)(MEM_TEST_AREA_END + M_4K),
+
+            (const void *)(MEM_TEST_AREA_END),
+            0xAC
+        },
+        {
+            (void *)(MEM_TEST_AREA_END - M_4K - 10),
+            (const void *)(MEM_TEST_AREA_END + M_4K),
+
+            (const void *)(MEM_TEST_AREA_END),
+            0xAD
+        }
+    };
+    const size_t NUM_CASES = sizeof(CASES) / sizeof(CASES[0]);
+
+    phys_addr_t kpd = get_page_directory();
+
+    phys_addr_t upd = copy_page_directory(kpd);
+    TEST_TRUE(upd != NULL_PHYS_ADDR);
+
+    const void *true_e;
+    TEST_SUCCESS(pd_alloc_pages(upd, true, (void *)MEM_TEST_AREA_START, (const void *)MEM_TEST_AREA_END,
+                &true_e));
+
+    for (size_t i = 0; i < NUM_CASES; i++) {
+        case_t c = CASES[i];
+
+        TEST_TRUE(c.start <= c.end);
+        TEST_TRUE(c.start <= c.real_end);
+
+        const size_t bytes_to_set = (uint32_t)c.end - (uint32_t)c.start;
+        const size_t exp_bytes_set = (uint32_t)c.real_end - (uint32_t)c.start;
+
+        uint32_t bytes_set;
+        TEST_FAILURE(mem_set_to_user(upd, c.start, c.val, bytes_to_set, &bytes_set));
+        TEST_EQUAL_UINT(exp_bytes_set, bytes_set);
+
+        set_page_directory(upd);
+        TEST_TRUE(mem_chk(c.start, c.val, bytes_set));
         set_page_directory(kpd);
     }
 
@@ -591,6 +669,7 @@ bool test_page_helpers(void) {
     RUN_TEST(test_mem_cpy_user);
     RUN_TEST(test_bad_mem_cpy);
     RUN_TEST(test_mem_set_user);
+    RUN_TEST(test_bad_mem_set);
 
     return END_SUITE();
 }

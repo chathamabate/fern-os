@@ -307,7 +307,7 @@ fernos_error_t proc_exec(process_t *proc, user_app_t *ua,
 
         if (err == FOS_E_SUCCESS && bytes_to_set > 0) {
             err = mem_set_to_user(new_pd, 
-                    (uint8_t *)(uaa->load_position) + uaa->given_size, 0, bytes_to_set);
+                    (uint8_t *)(uaa->load_position) + uaa->given_size, 0, bytes_to_set, NULL);
         }
     }
 

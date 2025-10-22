@@ -70,6 +70,10 @@ fernos_error_t mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void 
  * Returns an error if args are bad.
  *
  * On Success, the entire area has been set.
- * On Error, an undefined amount of the area may have been set.
+ * On Error, some or none of the area was set.
+ *
+ * If `set` is given, the number of bytes set will be written to `*set`. On success, this will
+ * always be `bytes`.
  */
-fernos_error_t mem_set_to_user(phys_addr_t user_pd, void *user_dest, uint8_t val, uint32_t bytes);
+fernos_error_t mem_set_to_user(phys_addr_t user_pd, void *user_dest, uint8_t val, uint32_t bytes,
+        uint32_t *set);
