@@ -3,6 +3,7 @@
 
 #include "k_startup/page.h"
 #include "k_sys/page.h"
+#include "s_bridge/app.h"
 
 /*
  * Helper functions to use when paging is enabled.
@@ -77,3 +78,32 @@ fernos_error_t mem_cpy_to_user(phys_addr_t user_pd, void *user_dest, const void 
  */
 fernos_error_t mem_set_to_user(phys_addr_t user_pd, void *user_dest, uint8_t val, uint32_t bytes,
         uint32_t *set);
+
+/**
+ * Create a fresh user application memory space!
+ * This uses a copy of the initial user page directory as a starting point. This way the user app
+ * gets a fresh copy of the s_* data/bss and u_* data/bss.
+ *
+ * FOS_E_BAD_ARGS if `ua` is NULL or doesn't have at least one loadable area.
+ * FOS_E_BAD_ARGS if `abs_ab_len` is greater than the size of the apps argument area.
+ * FOS_E_ALIGN_ERROR if any of the loadable areas has a load_position which is NOT 4K aligned.
+ * (Note, the size of each area need not be 4K aligned)
+ * FOS_E_INVALID_RANGE if any of the loadable areas overlap OR if the entry point is not inside
+ * a loaded area OR if any of the loadable areas are outside the FOS APP area.
+ *
+ * Other error may be returned.
+ *
+ * On success, FOS_E_SUCCESS is returned, the physical address of the new page directory is written
+ * to `*out`.
+ *
+ * NOTE: `*out` is only written to on success.
+ *
+ * NOTE: VERY IMPORTANT: `abs_ab` is a pointer to an ABSOLUTE args block with offset
+ * FOS_APP_ARGS_AREA_START. This is assumed and not checked. (Also, if `abs_ab_len` is 0, `abs_ab`
+ * can be NULL)
+ *
+ * NOTE: This DOES NOT allocate any thread stacks!! When creating a new process with this memory
+ * space, it is your responsibility to allocate a stack!
+ */
+fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t abs_ab_len,
+        phys_addr_t *out);

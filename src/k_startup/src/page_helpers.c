@@ -2,6 +2,7 @@
 #include "k_startup/page_helpers.h"
 
 #include "s_util/str.h"
+#include "s_util/constraints.h"
 
 void page_copy(phys_addr_t dest, phys_addr_t src) {
     phys_addr_t old0 = assign_free_page(0, dest);
@@ -263,4 +264,152 @@ fernos_error_t mem_set_to_user(phys_addr_t user_pd, void *user_dest, uint8_t val
     }
 
     return err;
+}
+
+fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t abs_ab_len,
+        phys_addr_t *out) {
+    fernos_error_t err;
+
+    if (!ua || !out) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    // First confirm args block is seemingly valid.
+
+    if (abs_ab_len > 0 && !abs_ab) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (abs_ab_len > FOS_APP_ARGS_AREA_SIZE) {
+        return FOS_E_BAD_ARGS;
+    }
+    
+    // The entry point of the given app MUST be inside one of the given ranges!
+    bool entry_valid = false;
+
+    // Ok, let's first confirm that `ua` is loadable!
+    for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
+        if (ua->areas[i].occupied) {
+            if (ua->areas[i].area_size == 0) {
+                return FOS_E_INVALID_RANGE; // We'll say all loadable regions must have
+                                            // non-zero size!
+            }
+
+            const void *start = ua->areas[i].load_position;
+            const void *end = (uint8_t *)start + ua->areas[i].area_size;
+
+            if (!IS_ALIGNED(start, M_4K)) {
+                return FOS_E_ALIGN_ERROR;
+            }
+
+            if (end < start) { // Wrap case! 
+                return FOS_E_INVALID_RANGE;
+            }
+
+            // NOTE: The end of the loadable area CAN be the end of the app area!
+            if (start < (void *)FOS_APP_AREA_START || (void *)FOS_APP_AREA_END < end) {
+                return FOS_E_INVALID_RANGE;
+            }
+
+            if (start <= ua->entry && ua->entry < end) {
+                entry_valid = true;
+            }
+
+            // Also, just as a sanity check, let's confirm that the given size is <= the area size.
+            if (ua->areas[i].given_size > ua->areas[i].area_size) {
+                return FOS_E_INVALID_RANGE;
+            }
+        }
+    }
+    
+    if (!entry_valid) {
+        return FOS_E_INVALID_RANGE;
+    }
+
+    // NOTE: We don't explicitly check if ranges overlap above. This will be handled automatically
+    // when we write to the new page directory below.
+
+    // Looks like our args block and user app are both somewhat loadable!!
+
+    // First off, we need to setup the page directory for our new application.
+    // If we fail at any point, we can just easily delete the page directory and return.
+    
+    phys_addr_t new_pd = pop_initial_user_pd_copy();
+    if (new_pd == NULL_PHYS_ADDR) {
+        return FOS_E_NO_MEM;
+    }
+
+    // First, let's deal with the args block. 
+    
+    err = FOS_E_SUCCESS;
+
+    if (abs_ab) { // Remember, abs_ab is allowed to be NULL!
+                      // If no args block is given, we don't need to do much!
+
+        // First let's reserve the area necessary in the page directory for the args block!
+        size_t abs_ab_alloc_size = abs_ab_len;
+        if (!IS_ALIGNED(abs_ab_alloc_size, M_4K)) {
+            abs_ab_alloc_size = ALIGN(abs_ab_alloc_size + M_4K, M_4K);
+        }
+
+        const void *true_e;
+        err = pd_alloc_pages(new_pd, true, (void *)FOS_APP_ARGS_AREA_START, 
+                (void *)(FOS_APP_ARGS_AREA_START + abs_ab_alloc_size), &true_e);
+
+
+        // Ok, now we copy the args block into the app args area!  (This is why the args block must 
+        // be absolute when given)
+
+        if (err == FOS_E_SUCCESS) {
+            err = mem_cpy_to_user(new_pd, (void *)FOS_APP_ARGS_AREA_START, abs_ab, 
+                    abs_ab_len, NULL);
+        }
+    }
+
+    // Now we can move onto loading app sections!
+
+    for (size_t i = 0; err == FOS_E_SUCCESS && i < FOS_MAX_APP_AREAS; i++) {
+        const user_app_area_entry_t *uaa = ua->areas + i;
+
+        if (!(uaa->occupied)) {
+            continue;;
+        }
+
+        // We know from above that at this point, all occupied areas must have a non zero
+        // area size! (This doesn't really change that much, but whatever!)
+        //
+        // We also know that each load position in 4K Aligned!
+        // We'll round up sizes to 4K which shouldn't cause any problems since load positions
+        // are 4K aligned!
+
+        size_t area_size = uaa->area_size;
+        if (!IS_ALIGNED(area_size, M_4K)) {
+            area_size = ALIGN(area_size, M_4K) + M_4K;
+        }
+        
+        const void *true_e;
+        err = pd_alloc_pages(new_pd, true, uaa->load_position, 
+                (uint8_t *)(uaa->load_position) + area_size, &true_e);
+
+        if (err == FOS_E_SUCCESS && uaa->given_size > 0) {
+            err = mem_cpy_to_user(new_pd, uaa->load_position, uaa->given, uaa->given_size, NULL);
+        }
+
+        const size_t bytes_to_set = uaa->area_size - uaa->given_size;
+
+        if (err == FOS_E_SUCCESS && bytes_to_set > 0) {
+            err = mem_set_to_user(new_pd, 
+                    (uint8_t *)(uaa->load_position) + uaa->given_size, 0, bytes_to_set, NULL);
+        }
+    }
+
+    if (err != FOS_E_SUCCESS) {
+        delete_page_directory(new_pd);
+
+        return err;
+    }
+
+    *out = new_pd;
+    
+    return FOS_E_SUCCESS;
 }
