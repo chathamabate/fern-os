@@ -251,6 +251,7 @@ fernos_error_t mem_set_to_user(phys_addr_t user_pd, void *user_dest, uint8_t val
 
         assign_free_page(0, old);
 
+        iter += amt_to_set;
         bytes_left -= amt_to_set;
     }
 

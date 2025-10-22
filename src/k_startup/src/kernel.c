@@ -33,6 +33,7 @@
 #include "s_mem/test/simple_heap.h"
 #include "s_bridge/test/app.h"
 #include "s_bridge/app.h"
+#include "k_startup/test/page_helpers.h"
 
 #include <stdint.h>
 
@@ -176,6 +177,7 @@ void start_kernel(void) {
 
     try_setup_step(init_vga_char_display(), "Failed to init VGA terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
+
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     try_setup_step(init_kb(), "Failed to init keyboard");
 

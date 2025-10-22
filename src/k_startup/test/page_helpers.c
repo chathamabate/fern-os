@@ -327,28 +327,28 @@ static bool test_copy_page_directory(void) {
 /**
  * NOTE: This test copies the current page directory!
  */
-#define MEM_CPY_AREA_SIZE  (4 * M_4K)
-#define MEM_CPY_AREA_START ((uint8_t *)FOS_FREE_AREA_START)
-#define MEM_CPY_AREA_END   (MEM_CPY_AREA_START + MEM_CPY_AREA_SIZE)
+#define MEM_TEST_AREA_SIZE  (4 * M_4K)
+#define MEM_TEST_AREA_START ((uint8_t *)FOS_FREE_AREA_START)
+#define MEM_TEST_AREA_END   (MEM_TEST_AREA_START + MEM_TEST_AREA_SIZE)
 static bool test_mem_cpy_user(void) {
     const void *true_e;
 
     phys_addr_t kpd = get_page_directory();
     TEST_EQUAL_HEX(FOS_E_SUCCESS, 
-            pd_alloc_pages(kpd, true, MEM_CPY_AREA_START, MEM_CPY_AREA_END, &true_e));
+            pd_alloc_pages(kpd, true, MEM_TEST_AREA_START, MEM_TEST_AREA_END, &true_e));
 
     phys_addr_t upd = copy_page_directory(kpd);
     TEST_TRUE(upd != NULL_PHYS_ADDR);
 
     // Kernel pages will have lower case abc's.
-    for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
-        MEM_CPY_AREA_START[i] = 'a' + (i % 26);
+    for (uint32_t i = 0; i < MEM_TEST_AREA_SIZE; i++) {
+        MEM_TEST_AREA_START[i] = 'a' + (i % 26);
     }
 
     // User pages will have upper case abc's.
     set_page_directory(upd);
-    for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
-        MEM_CPY_AREA_START[i] = 'A' + (i % 26);
+    for (uint32_t i = 0; i < MEM_TEST_AREA_SIZE; i++) {
+        MEM_TEST_AREA_START[i] = 'A' + (i % 26);
     }
 
     set_page_directory(kpd);
@@ -388,12 +388,12 @@ static bool test_mem_cpy_user(void) {
         (case_t) {
             .ui = 100,
             .ki = 50,
-            .bytes = MEM_CPY_AREA_SIZE - 100
+            .bytes = MEM_TEST_AREA_SIZE - 100
         },
         (case_t) {
             .ui = 0,
             .ki = 0,
-            .bytes = MEM_CPY_AREA_SIZE
+            .bytes = MEM_TEST_AREA_SIZE
         }
     };
     const uint32_t NUM_CASES = sizeof(CASES) / sizeof(case_t);
@@ -405,41 +405,41 @@ static bool test_mem_cpy_user(void) {
         
         uint32_t copied;
 
-        TEST_EQUAL_HEX(FOS_E_SUCCESS, mem_cpy_to_user(upd, MEM_CPY_AREA_START + c.ui, 
-                    MEM_CPY_AREA_START + c.ki, c.bytes, &copied));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, mem_cpy_to_user(upd, MEM_TEST_AREA_START + c.ui, 
+                    MEM_TEST_AREA_START + c.ki, c.bytes, &copied));
         TEST_EQUAL_UINT(c.bytes, copied);
 
         // Ok, so was the copy successful. (We look over the whole area btw!)
         set_page_directory(upd);
-        for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
+        for (uint32_t i = 0; i < MEM_TEST_AREA_SIZE; i++) {
             if (c.ui <= i && i < c.ui + c.bytes) {
                 uint32_t ki = c.ki + (i - c.ui);
-                TEST_EQUAL_UINT('a' + (ki % 26), MEM_CPY_AREA_START[i]);
-                MEM_CPY_AREA_START[i] = 'A' + (i % 26);
+                TEST_EQUAL_UINT('a' + (ki % 26), MEM_TEST_AREA_START[i]);
+                MEM_TEST_AREA_START[i] = 'A' + (i % 26);
             } else {
-                TEST_EQUAL_UINT('A' + (i % 26), MEM_CPY_AREA_START[i]);
+                TEST_EQUAL_UINT('A' + (i % 26), MEM_TEST_AREA_START[i]);
             }
         }
 
         // Now we copy in the from user direciton!
 
         set_page_directory(kpd);
-        TEST_EQUAL_HEX(FOS_E_SUCCESS, mem_cpy_from_user(MEM_CPY_AREA_START + c.ki, 
-                    upd, MEM_CPY_AREA_START + c.ui, c.bytes, &copied));
+        TEST_EQUAL_HEX(FOS_E_SUCCESS, mem_cpy_from_user(MEM_TEST_AREA_START + c.ki, 
+                    upd, MEM_TEST_AREA_START + c.ui, c.bytes, &copied));
         TEST_EQUAL_UINT(c.bytes, copied);
 
-        for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
+        for (uint32_t i = 0; i < MEM_TEST_AREA_SIZE; i++) {
             if (c.ki <= i && i < c.ki + c.bytes) {
                 uint32_t ui = c.ui + (i - c.ki);
-                TEST_EQUAL_UINT('A' + (ui % 26), MEM_CPY_AREA_START[i]);
-                MEM_CPY_AREA_START[i] = 'a' + (i % 26);
+                TEST_EQUAL_UINT('A' + (ui % 26), MEM_TEST_AREA_START[i]);
+                MEM_TEST_AREA_START[i] = 'a' + (i % 26);
             } else {
-                TEST_EQUAL_UINT('a' + (i % 26), MEM_CPY_AREA_START[i]);
+                TEST_EQUAL_UINT('a' + (i % 26), MEM_TEST_AREA_START[i]);
             }
         }
     }
 
-    pd_free_pages(kpd, MEM_CPY_AREA_START, MEM_CPY_AREA_END);
+    pd_free_pages(kpd, MEM_TEST_AREA_START, MEM_TEST_AREA_END);
     delete_page_directory(upd);
 
     TEST_SUCCEED();
@@ -456,48 +456,122 @@ static bool test_bad_mem_cpy(void) {
 
     phys_addr_t kpd = get_page_directory();
     TEST_EQUAL_HEX(FOS_E_SUCCESS, 
-            pd_alloc_pages(kpd, true, MEM_CPY_AREA_START, MEM_CPY_AREA_END, &true_e));
+            pd_alloc_pages(kpd, true, MEM_TEST_AREA_START, MEM_TEST_AREA_END, &true_e));
 
     phys_addr_t upd = copy_page_directory(kpd);
     TEST_TRUE(upd != NULL_PHYS_ADDR);
 
-    for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
-        MEM_CPY_AREA_START[i] = 0xAA;
+    for (uint32_t i = 0; i < MEM_TEST_AREA_SIZE; i++) {
+        MEM_TEST_AREA_START[i] = 0xAA;
     }
 
     set_page_directory(upd);
-    for (uint32_t i = 0; i < MEM_CPY_AREA_SIZE; i++) {
-        MEM_CPY_AREA_START[i] = 0xBB;
+    for (uint32_t i = 0; i < MEM_TEST_AREA_SIZE; i++) {
+        MEM_TEST_AREA_START[i] = 0xBB;
     }
     set_page_directory(kpd);
 
-    err = mem_cpy_to_user(upd, MEM_CPY_AREA_END - M_4K, 
-            MEM_CPY_AREA_START, 2 * M_4K, &copied);
+    err = mem_cpy_to_user(upd, MEM_TEST_AREA_END - M_4K, 
+            MEM_TEST_AREA_START, 2 * M_4K, &copied);
 
     TEST_TRUE(err != FOS_E_SUCCESS);
     TEST_EQUAL_HEX(M_4K, copied);
 
     set_page_directory(upd);
-    for (uint32_t i = MEM_CPY_AREA_SIZE - M_4K; i < MEM_CPY_AREA_SIZE; i++) {
+    for (uint32_t i = MEM_TEST_AREA_SIZE - M_4K; i < MEM_TEST_AREA_SIZE; i++) {
         // CHeck isn't really as rigorous, but whatevs.
-        TEST_EQUAL_HEX(0xAA, MEM_CPY_AREA_START[i]);
-        MEM_CPY_AREA_START[i] = 0xBB;
+        TEST_EQUAL_HEX(0xAA, MEM_TEST_AREA_START[i]);
+        MEM_TEST_AREA_START[i] = 0xBB;
     }
     set_page_directory(kpd);
 
     // Now in the from direction.
-    err = mem_cpy_from_user(MEM_CPY_AREA_START, upd, 
-            MEM_CPY_AREA_END - M_4K, 2*M_4K, &copied);
+    err = mem_cpy_from_user(MEM_TEST_AREA_START, upd, 
+            MEM_TEST_AREA_END - M_4K, 2*M_4K, &copied);
     TEST_TRUE(err != FOS_E_SUCCESS);
     TEST_EQUAL_HEX(M_4K, copied);
 
     for (uint32_t i = 0; i < M_4K; i++) {
         // CHeck isn't really as rigorous, but whatevs.
-        TEST_EQUAL_HEX(0xBB, MEM_CPY_AREA_START[i]);
-        MEM_CPY_AREA_START[i] = 0xAA;
+        TEST_EQUAL_HEX(0xBB, MEM_TEST_AREA_START[i]);
+        MEM_TEST_AREA_START[i] = 0xAA;
     }
 
-    pd_free_pages(kpd, MEM_CPY_AREA_START, MEM_CPY_AREA_END);
+    delete_page_directory(upd);
+    pd_free_pages(kpd, MEM_TEST_AREA_START, MEM_TEST_AREA_END);
+
+    TEST_SUCCEED();
+}
+
+static bool test_mem_set_user(void) {
+    typedef struct {
+        void *start;
+        const void *end;
+        uint8_t val;
+    } case_t;
+
+    const case_t CASES[] = {
+        {
+            (void *)(MEM_TEST_AREA_START),
+            (void *)(MEM_TEST_AREA_START + M_4K),
+            0xAB
+        },
+        {
+            (void *)(MEM_TEST_AREA_START + 13),
+            (void *)(MEM_TEST_AREA_START + M_4K),
+            0xAC
+        },
+        {
+            (void *)(MEM_TEST_AREA_START + 13),
+            (void *)(MEM_TEST_AREA_START + M_4K + 15),
+            0xAD
+        },
+        {
+            (void *)(MEM_TEST_AREA_START + 13),
+            (void *)(MEM_TEST_AREA_START + (2*M_4K) + 15),
+            0xAD
+        },
+        {
+            (void *)(MEM_TEST_AREA_START),
+            (void *)(MEM_TEST_AREA_START + (2*M_4K)),
+            0xAD
+        },
+        {
+            (void *)(MEM_TEST_AREA_START + 24),
+            (void *)(MEM_TEST_AREA_START + (2*M_4K)),
+            0xAD
+        }
+    };
+    const size_t NUM_CASES = sizeof(CASES) / sizeof(CASES[0]);
+
+    const void *true_e;
+
+    // Like the mem_cpy tests above, this test will switch between memory spaces to confirm
+    // mem_set's work as expected. This type of test only works when the kernel stack is shared
+    // between the two spaces.
+
+    phys_addr_t kpd = get_page_directory();
+
+    phys_addr_t upd = copy_page_directory(kpd);
+    TEST_TRUE(upd != NULL_PHYS_ADDR);
+
+    TEST_SUCCESS(pd_alloc_pages(upd, true, (void *)MEM_TEST_AREA_START, (const void *)MEM_TEST_AREA_END,
+                &true_e));
+
+
+    for (size_t i = 0; i < NUM_CASES; i++) {
+        case_t c = CASES[i];
+
+        TEST_TRUE(c.start <= c.end);
+        const size_t bytes = (uintptr_t)c.end - (uintptr_t)c.start;
+
+        TEST_SUCCESS(mem_set_to_user(upd, c.start, c.val, bytes));
+
+        set_page_directory(upd);
+        TEST_TRUE(mem_chk(c.start, c.val, bytes));
+        set_page_directory(kpd);
+    }
+
     delete_page_directory(upd);
 
     TEST_SUCCEED();
@@ -511,6 +585,7 @@ bool test_page_helpers(void) {
     RUN_TEST(test_copy_page_directory);
     RUN_TEST(test_mem_cpy_user);
     RUN_TEST(test_bad_mem_cpy);
+    RUN_TEST(test_mem_set_user);
 
     return END_SUITE();
 }
