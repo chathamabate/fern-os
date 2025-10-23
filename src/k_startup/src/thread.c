@@ -33,10 +33,9 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry,
 
     // NOTE: we used to allocate stack pages here... NOT ANYMORE!
 
-    thr->state = THREAD_STATE_DETATCHED;
+    init_ring_element(&(thr->super));
 
-    thr->next_thread = NULL;
-    thr->prev_thread = NULL;
+    thr->state = THREAD_STATE_DETATCHED;
 
     thr->tid = tid;
     thr->stack_base = NULL;
@@ -78,9 +77,8 @@ thread_t *new_thread_copy(thread_t *thr, process_t *new_proc) {
         return NULL;
     }
 
+    init_ring_element(&(thr->super));
     copy->state = THREAD_STATE_DETATCHED;
-    copy->next_thread = NULL;
-    copy->prev_thread = NULL;
     copy->tid = thr->tid;
     copy->stack_base = thr->stack_base;
 
@@ -96,10 +94,22 @@ thread_t *new_thread_copy(thread_t *thr, process_t *new_proc) {
     return copy;
 }
 
+void thread_detach(thread_t *thr) {
+    if (thr->state == THREAD_STATE_WAITING) {
+        wq_remove(thr->wq, thr);
+        thr->state = THREAD_STATE_DETATCHED;
+    } else if (thr->state == THREAD_STATE_SCHEDULED) {
+        ring_element_detach((ring_element_t *)thr);
+        thr->state = THREAD_STATE_DETATCHED;
+    }
+}
+
 void delete_thread(thread_t *thr) {
     if (!thr) {
         return;
     }
+
+    thread_detach(thr);
 
     al_free(thr->proc->al, thr);
 }

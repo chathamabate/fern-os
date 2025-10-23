@@ -7,6 +7,7 @@
 #include "s_util/constraints.h"
 #include "s_util/str.h"
 
+#include "k_startup/handle.h"
 #include "s_util/misc.h"
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
@@ -76,20 +77,20 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     return proc;
 }
 
-process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
+fernos_error_t new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid, process_t **out) {
     fernos_error_t err;
 
-    if (!proc || !thr) {
-        return NULL;
+    if (!proc || !thr || !out) {
+        return FOS_E_BAD_ARGS;
     }
 
     if (thr->proc != proc) {
-        return NULL;
+        return FOS_E_BAD_ARGS;
     }
 
     phys_addr_t new_pd = copy_page_directory(proc->pd);
     if (new_pd == NULL_PHYS_ADDR) {
-        return NULL;
+        return FOS_E_NO_MEM;
     }
 
     // Deciding not to use an iterator here because that technically mutates `proc`.
@@ -108,7 +109,7 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
 
     if (!child) {
         delete_page_directory(new_pd);
-        return NULL;
+        return FOS_E_NO_MEM;
     }
 
     // From this point on, `child` owns `new_pd`.
@@ -123,23 +124,53 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid) {
         delete_process(child);
         delete_thread(child_main_thr);
 
-        return NULL;
+        return FOS_E_NO_MEM;
     }
 
     idtb_set(child->thread_table, child_main_thr->tid, child_main_thr);
     child->main_thread = child_main_thr;
 
-    // Remember, actual handle copying will happen one layer up.
-    // This copy is shallow and simple.
+    // From this point on, `child` owns `child_main_thread`.
+    // Deleting `child` will delete everything created so far in this function
+    // safely!
+
     child->in_handle = proc->in_handle;
     child->out_handle = proc->out_handle;
 
-    return child;
+    // Ok, now actual handle copying will happen here too!
+
+    for (id_t hid = 0; hid < FOS_MAX_HANDLES_PER_PROC; hid++) {
+        handle_state_t *hs = idtb_get(proc->handle_table, hid);
+        if (hs) {
+            handle_state_t *hs_copy;
+
+            err = idtb_request_id(child->handle_table, hid);
+
+            if (err == FOS_E_SUCCESS) {
+                err = copy_handle_state(hs, child, &hs_copy);
+            }
+
+            if (err == FOS_E_SUCCESS) {
+                // This will never fail.
+                idtb_set(child->handle_table, hid, hs_copy);
+            }
+
+            if (err != FOS_E_SUCCESS) {
+                delete_process(child);
+                return err; // This could be FOS_E_ABORT_SYSTEM,
+                            // or some other non catastrophic error!
+            }
+        }
+    }
+
+    *out = child;
+
+    return FOS_E_SUCCESS;
 }
 
-void delete_process(process_t *proc) {
+fernos_error_t delete_process(process_t *proc) {
     if (!proc) {
-        return;
+        return FOS_E_SUCCESS; // allowed to delete NULL.
     }
 
     delete_page_directory(proc->pd);
@@ -147,13 +178,12 @@ void delete_process(process_t *proc) {
     delete_list(proc->children);
     delete_list(proc->zombie_children);
 
-    // Dangerously delete all threads.
     const thread_id_t NULL_TID = idtb_null_id(proc->thread_table);
     idtb_reset_iterator(proc->thread_table);
     for (thread_id_t tid = idtb_get_iter(proc->thread_table);
             tid != NULL_TID; tid = idtb_next(proc->thread_table)) {
         thread_t *thr = idtb_get(proc->thread_table, tid);
-        delete_thread(thr);
+        delete_thread(thr); // detaches thread if needed.
     }
 
     delete_id_table(proc->thread_table);
@@ -172,10 +202,26 @@ void delete_process(process_t *proc) {
     // Now delete the map as a whole.
     delete_map(proc->futexes);
 
+    // Delete each handle state individually.
+    const handle_t NULL_HID = idtb_null_id(proc->handle_table);
+    idtb_reset_iterator(proc->handle_table);
+    for (handle_t hid = idtb_get_iter(proc->handle_table);
+            hid != NULL_HID; hid = idtb_next(proc->handle_table)) {
+        handle_state_t *hs = idtb_get(proc->handle_table, hid);
+        fernos_error_t err = delete_handle_state(hs);
+        if (err != FOS_E_SUCCESS) {
+            return err; // Catastrophic (it's ok to exit early from the destructor
+                        // given the system is about to lock up)
+        }
+    }
+
+    // Delete table as a whole!
     delete_id_table(proc->handle_table);
 
     // Finally free entire process structure!
     al_free(proc->al, proc);
+
+    return FOS_E_SUCCESS;
 }
 
 /**

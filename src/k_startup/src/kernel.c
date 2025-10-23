@@ -34,6 +34,7 @@
 #include "s_bridge/test/app.h"
 #include "s_bridge/app.h"
 #include "k_startup/test/page_helpers.h"
+#include "s_data/test/ring.h"
 
 #include <stdint.h>
 

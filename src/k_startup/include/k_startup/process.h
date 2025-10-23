@@ -170,34 +170,29 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  * NOTE: futexes and join queue are NOT copied! And The given process `proc` is not edited in
  * ANY WAY! It is your responsibility to register this new process as a child in the old.
  *
- * VERY IMPORTANT: Handle states in the Handle table ARE NOT COPIED! This is because copying a
- * handle state can result in a catastrophic error. So, it's the kernel's responsibility to copy over
- * handles one layer up. (This will copy over the defualt in/out indeces though, but this is trivial)
+ * Handle states are all copied over.
  *
- * Returns NULL if there are insufficient resources or if the arguments are bad.
+ * Returns FOS_E_ABORT_SYSTEM if some catastrophic error occurs.
  *
  * Uses the same allocator as the given process.
  */
-process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid);
+fernos_error_t new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid, process_t **out);
 
 /**
- * Simple and Dangerous destructor!
+ * Process destructor!
  *
  * This frees all memory used by proc! (Including the full page directory)
  *
- * This does NOT remove threads from wait queues or schedules!!!!!!!
+ * This DOES detach all owned threads from schedules and wait queues.
+ * This DOES delete handle states!
  *
- * VERY IMPORTANT: This DOES NOT delete handle states.
- * This must be dealt with one layer above this one!
- *
- * Before you delete a process, ALWAYS detach all threads!
- * This call DOES NOT check if threads are detatched or not before deleting.
- * Running this function with threads still referenced by the kernel will result in 
- * undefided behavior later on!!
+ * Any non-success error returned from this function is seen as catastrophic!
  */
-void delete_process(process_t *proc);
+fernos_error_t delete_process(process_t *proc);
 
 /**
+ * TODO: REDESIGN THIS LATER!
+ *
  * Reset a process! (Useful for the Exec system call!)
  *
  * This sets a process to a starting state with NO threads!
@@ -224,7 +219,7 @@ void delete_process(process_t *proc);
  * LASTLY... Handle states are NOT deleted, just REMOVED!! It is the caller's responsibility to 
  * delete the non default IO handle states.
  */
-fernos_error_t proc_reset(process_t *proc, phys_addr_t new_pd);
+//fernos_error_t proc_reset(process_t *proc, phys_addr_t new_pd);
 
 /**
  * Create a thread within a process with the given entry point and argument!

@@ -5,6 +5,7 @@
 #include "k_startup/fwd_defs.h"
 #include "s_mem/allocator.h"
 #include "s_data/wait_queue.h"
+#include "s_data/ring.h"
 #include "s_data/destructable.h"
 #include "s_bridge/ctx.h"
 #include <stdbool.h>
@@ -33,18 +34,14 @@ typedef uint32_t thread_state_t;
 
 struct _thread_t {
     /**
+     * A thread will also be a ring element. (The ring being a schedule)
+     */
+    ring_element_t super;
+
+    /**
      * The state of this thread.
      */
     thread_state_t state;
-
-    /**
-     * These are used for scheduling only.
-     *
-     * We expect when threads are scheduled, that they belong to a cyclic
-     * doubly linked list. (i.e. these two pointers should never be NULL when scheduled)
-     */
-    thread_t *next_thread;
-    thread_t *prev_thread;
 
     /**
      * The process local id of this thread.
@@ -126,12 +123,18 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry,
 thread_t *new_thread_copy(thread_t *thr, process_t *new_proc);
 
 /**
- * This call is very simple/dangerous.
+ * If a thread is scheduled, the thread is descheduled.
+ * If a thread is waiting, the thread is removed from its wait queue.
+ * If the thread is already detached, do nothing.
+ * If the thread is in an exited state, do nothing.
+ */
+void thread_detach(thread_t *thr);
+
+/**
+ * Delete a thread.
  *
- * Given any thread structure, it just frees it, nothing is done to the page directory.
- * Additionally, no checks are done on the thread's state.
+ * NOTE: Before deleting, the thread is detached from its wait queue or schedule!
  *
- * If you want this to be removed from some wait queue or schedule, you must do this yourself
- * before calling this function!
+ * NOTHING is done to the process's page directory!
  */
 void delete_thread(thread_t *thr);
