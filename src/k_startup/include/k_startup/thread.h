@@ -65,7 +65,7 @@ struct _thread_t {
 
     /**
      * When a thread is in the waiting state, this field is populated.
-     * Otherwise, this field is NULL.
+     * Otherwise, this field is NULL.  
      */
     wait_queue_t *wq;
 

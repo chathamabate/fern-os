@@ -198,32 +198,33 @@ process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid);
 void delete_process(process_t *proc);
 
 /**
- * Have a process execute a user application.
- * This overwirtes the process's current state.
+ * Reset a process! (Useful for the Exec system call!)
  *
- * `proc` retains its process ID, but its page directory is deleted and replaced
- * with a fresh page directory.
+ * This sets a process to a starting state with NO threads!
  *
- * All loadable areas MUST have a 4K aligned load position, or else this fails.
- * The size of each area need not be 4K aligned. 
+ * `pid` is preserved.
+ * `pd` is switched with `new_pd`. (then deleted)
+ * `parent` is preserved.
+ * `children` is cleared.
+ * `zombie_children` is cleared.
+ * All threads in `thread_table` are deleted, and `thread_table` is cleared.
+ * `join_queue` is cleared. (Should already be empty tho)
+ * `main_thread` is set to NULL.
+ * `sig_vec` and `sig_allow` are both set to empty.
+ * `signal_queue` is cleared. (Should already be empty tho)
+ * All handles states except for `in_handle` and `out_handle` are removed from
+ * `handle_table`.
  *
- * `proc`'s parent process remains the same.
- * All threads are deleted, a new main thread is created to kick off the given app.
- * The `proc`'s signal vectors are cleared. (Including the allow vector)
- * All futexes are deleted.
- * Default IO handles are preserved, but all other handles are deleted!
- *
- * In case of error, the process remains in its original state.
- *
- * NOTE: VERY IMPORTANT: This call DOES NOT modify the zombie children and living children
- * lists!!! This reposibility is defered to the caller!!! 
- *
- * NOTE: ALSO VERY IMPORTANT: The given args block is loaded DIRECTLY into the new page directory.
- * It is the caller's responsibility to make sure `abs_args_block` is absolute from 
- * FOS_APP_ARGS_AREA_START!
+ * NOTE: I am trying my best to stick to the design of these functions never modifying 
+ * anything potentially one layer up. (Maybe one day I'll change this design, but whatever)
+ * SO... processes in `children` and `zombie_children` are not deleted in this function, it is
+ * the caller's responsibility to do something with them before this function is called!
+ * AND... All threads are deleted, but they are NOT detatched!!! It is the caller's responsibility
+ * to detatch all threads before calling this function!
+ * LASTLY... Handle states are NOT deleted, just REMOVED!! It is the caller's responsibility to 
+ * delete the non default IO handle states.
  */
-fernos_error_t proc_exec(process_t *proc, user_app_t *ua, 
-        const void *abs_args_block, size_t abs_args_block_size);
+fernos_error_t proc_reset(process_t *proc, phys_addr_t new_pd);
 
 /**
  * Create a thread within a process with the given entry point and argument!

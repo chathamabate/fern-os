@@ -178,11 +178,6 @@ void delete_process(process_t *proc) {
     al_free(proc->al, proc);
 }
 
-fernos_error_t proc_exec(process_t *proc, user_app_t *ua, 
-        const void *abs_args_block, size_t abs_args_block_size) {
-    return FOS_E_NOT_IMPLEMENTED;
-}
-
 /**
  * Allocate a new thread, and its initial stack pages.
  */

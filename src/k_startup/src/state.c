@@ -197,7 +197,7 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
 
 static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid);
 
-fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
+KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     if (!(ks->curr_thread)) {
         return FOS_E_STATE_MISMATCH;
     }
@@ -378,7 +378,7 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
+KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
     if (!(ks->curr_thread)) {
         return FOS_E_STATE_MISMATCH;
     }
@@ -386,7 +386,7 @@ fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t status) {
     return ks_exit_proc_p(ks, ks->curr_thread->proc, status);
 }
 
-fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, 
+KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, 
         proc_id_t *u_rcpid, proc_exit_status_t *u_rces) {
     fernos_error_t err;
 
@@ -491,7 +491,7 @@ static user_app_t *ua_copy_from_user(user_app_t *u_ua) {
 
 }
 
-fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_args_block,
+KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_args_block,
         size_t u_args_block_size) {
     fernos_error_t err;
 
@@ -503,7 +503,12 @@ fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_args_
     process_t *proc = thr->proc;
     phys_addr_t pd = proc->pd;
 
-    // First off, we must copy over
+    // Things that need to be done:
+    // 1) Copy entire user app and args block from userspace into kernel space.
+    // 2) Create a new page directroy for the user app and args block.
+    // 3) Somehow reset the calling process to this new state?
+    //      Based on how I have organized handles.. and everything else, we must do this all
+    //      within the calling process!
 }
 
 static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid) {
@@ -572,7 +577,7 @@ static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t 
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
+KS_SYSCALL fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
@@ -611,7 +616,7 @@ fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t sid) {
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
+KS_SYSCALL fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
     if (!(ks->curr_thread)) {
         return FOS_E_STATE_MISMATCH; 
     }
@@ -631,7 +636,7 @@ fernos_error_t ks_allow_signal(kernel_state_t *ks, sig_vector_t sv) {
     DUAL_RET(thr, old, FOS_E_SUCCESS);
 }
 
-fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid) {
+KS_SYSCALL fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_sid) {
     fernos_error_t err;
     
     if (!(ks->curr_thread)) {
@@ -692,7 +697,7 @@ fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, sig_id_t *u_s
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv) {
+KS_SYSCALL fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv) {
     if (!(ks->curr_thread)) {
         return FOS_E_STATE_MISMATCH;
     }
@@ -702,7 +707,7 @@ fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv) {
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_request_mem(kernel_state_t *ks, void *s, const void *e, const void **u_true_e) {
+KS_SYSCALL fernos_error_t ks_request_mem(kernel_state_t *ks, void *s, const void *e, const void **u_true_e) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
@@ -736,7 +741,7 @@ fernos_error_t ks_request_mem(kernel_state_t *ks, void *s, const void *e, const 
     DUAL_RET(thr, err, FOS_E_SUCCESS);
 }
 
-fernos_error_t ks_return_mem(kernel_state_t *ks, void *s, const void *e) {
+KS_SYSCALL fernos_error_t ks_return_mem(kernel_state_t *ks, void *s, const void *e) {
     if (!(ks->curr_thread)) {
         return FOS_E_STATE_MISMATCH;
     }
@@ -758,7 +763,7 @@ fernos_error_t ks_return_mem(kernel_state_t *ks, void *s, const void *e) {
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
+KS_SYSCALL fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
@@ -782,7 +787,7 @@ fernos_error_t ks_sleep_thread(kernel_state_t *ks, uint32_t ticks) {
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 
+KS_SYSCALL fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid, 
         thread_entry_t entry, void *arg) {
     if (!(ks->curr_thread)) {
         return FOS_E_STATE_MISMATCH;
@@ -819,7 +824,7 @@ fernos_error_t ks_spawn_local_thread(kernel_state_t *ks, thread_id_t *u_tid,
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
-fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
+KS_SYSCALL fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     if (!(ks->curr_thread)) {
         return FOS_E_STATE_MISMATCH;
     }
@@ -891,7 +896,7 @@ fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val) {
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
+KS_SYSCALL fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
         thread_join_ret_t *u_join_ret) {
     fernos_error_t err;
 
@@ -955,7 +960,7 @@ fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv,
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex) {
+KS_SYSCALL fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
@@ -969,7 +974,7 @@ fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex) {
     DUAL_RET(thr, err, FOS_E_SUCCESS);
 }
 
-fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
+KS_SYSCALL fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
@@ -1009,7 +1014,7 @@ fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex) {
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
-fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val) {
+KS_SYSCALL fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
@@ -1050,7 +1055,7 @@ fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_v
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
+KS_SYSCALL fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all) {
     fernos_error_t err;
 
     if (!(ks->curr_thread)) {
