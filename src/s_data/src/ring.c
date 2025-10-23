@@ -26,11 +26,11 @@ void ring_element_detach(ring_element_t *re) {
             re->prev->next = re->next;
         }
 
+        re->r->len--;
+
         re->r = NULL;
         re->next = NULL;
         re->prev = NULL;
-        
-        re->r->len--;
     }
 }
 
