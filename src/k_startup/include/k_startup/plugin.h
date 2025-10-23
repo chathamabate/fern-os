@@ -121,8 +121,10 @@ KS_SYSCALL static inline fernos_error_t plg_cmd(plugin_t *plg, plugin_cmd_id_t c
         return plg->impl->plg_cmd(plg, cmd_id, arg0, arg1, arg2, arg3);
     }
 
-    if (plg->ks->curr_thread) {
-        DUAL_RET(plg->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
+    thread_t *thr = (thread_t *)(plg->ks->schedule.head);
+
+    if (thr) {
+        DUAL_RET(thr, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
     } else {
         return FOS_E_STATE_MISMATCH;
     }

@@ -10,6 +10,7 @@
 #include "s_bridge/ctx.h"
 #include "s_data/map.h"
 #include "s_bridge/app.h"
+#include "s_data/ring.h"
 
 #include "s_block_device/file_sys.h"
 
@@ -41,18 +42,16 @@
  * The structures within the kenrel are inherently cyclic. For example a process needs
  * knowledge of threads, and threads need knowledge of processes.
  *
- * However, I still tried to implement behaviors in a non-cyclic way.
- * 
- * Functions written in thread.c should only ever modify fields within a thread structure.
- * Even though a thread has a wait queue pointer, no function in thread.c should modify the
- * external wait queue.
+ * Originally, I had some unidirectional design where functions in `thread.c` could never modify
+ * anything outside `thread.c`. Functions in `process.c` could modify stuff from `process.c`
+ * and `thread.c`. However, trying to make this all consistent was confusing and lead to
+ * lots of error prone code.
  *
- * Similarly, functions in process.c can modify the state of owned threads, but never modify 
- * any higher up state. For example, the schedule.
- *
- * Kernel State -- Can Modify -- > Processes -- Can Modify -- > Threads
- *
- * NOT THE OTHER DIRECTION!
+ * Now, threads and process are given hooks for doing the modifications they need in certain
+ * situations. For example, a function in `thread.c` should never access kernel state schedule
+ * directly. However, threads now inherit from `ring_element`, which give them the ability 
+ * to remove themselves from any "ring/schedule" without knowledge of where said schedule lives.
+ * The same concept applies to the thread `wq` field, and a process's handle states!
  *
  * Addition (9/1/2025) NOTE that many of these functions are designed specifically to correspond
  * to system calls. Others may simply be helpers which are used within the system call 
@@ -81,13 +80,9 @@ struct _kernel_state_t {
     allocator_t * const al;
 
     /**
-     * The currently executing thread.
-     *
-     * NOTE: The schedule forms a cyclic doubly linked list.
-     *
-     * During a context switch curr_thread is set to curr_thread->next.
+     * The schedule!
      */
-    thread_t *curr_thread;
+    ring_t schedule;
 
     /**
      * Every process will have a globally unique ID!
@@ -149,27 +144,6 @@ fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *p
  * Does nothing if there is no current thread.
  */
 void ks_save_ctx(kernel_state_t *ks, user_ctx_t *ctx);
-
-/**
- * Takes a thread and adds it to the schedule!
- *
- * We expect the given thread to be in a detatched state.
- * (However, this is not checked, so be careful!)
- *
- * Undefined behavoir will occur if the same thread appears twice
- * in the schedule! So make sure this never happens!
- *
- * NOTE: this only modifies the current thread field iff there is no current thread!
- */
-void ks_schedule_thread(kernel_state_t *ks, thread_t *thr);
-
-/**
- * Remove a scheduled thread from the schedule!
- *
- * Like above, we don't actually check if the given thread is scheduled
- * or not, we just assume it is! (SO BE CAREFUL)
- */
-void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr);
 
 /**
  * Attempts to expand the stack of the current thread.

@@ -194,7 +194,7 @@ static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk
             mem_set(&(woken_thread->wait_ctx), 0, sizeof(woken_thread->wait_ctx));
             woken_thread->ctx.eax = FOS_E_STATE_MISMATCH; 
 
-            ks_schedule_thread(plg_fs->super.ks, woken_thread);
+            thread_schedule(woken_thread, &(plg_fs->super.ks->schedule));
         }
 
         if (err != FOS_E_EMPTY) {
@@ -215,7 +215,7 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
 
     plugin_fs_t *plg_fs = (plugin_fs_t *)plg;
 
-    thread_t *thr = plg->ks->curr_thread;
+    thread_t *thr = (thread_t *)(plg->ks->schedule.head);
     process_t *proc = thr->proc;
     proc_id_t pid = proc->pid;
 
@@ -626,7 +626,7 @@ static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t 
     plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
     plugin_fs_t *plg_fs = fs_hs->plg_fs;
 
-    thread_t *thr = hs->ks->curr_thread;
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
 
     if (!u_src || len == 0) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
@@ -720,7 +720,7 @@ static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t 
 
             woken_thr->ctx.eax = FOS_E_SUCCESS;
 
-            ks_schedule_thread(plg_fs->super.ks, woken_thr);
+            thread_schedule(woken_thr, &(plg_fs->super.ks->schedule));
         }
     }
 
@@ -744,7 +744,7 @@ static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, si
     plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
     plugin_fs_t *plg_fs = fs_hs->plg_fs;
 
-    thread_t *thr = hs->ks->curr_thread;
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
 
     if (!u_dst || len == 0) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
@@ -806,7 +806,7 @@ static fernos_error_t fs_hs_wait(handle_state_t *hs) {
     plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
     plugin_fs_t *plg_fs = fs_hs->plg_fs;
 
-    thread_t *thr = hs->ks->curr_thread;
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
 
     fs_node_info_t info;
     err = fs_get_node_info(plg_fs->fs, fs_hs->nk, &info);
@@ -836,7 +836,7 @@ static fernos_error_t fs_hs_wait(handle_state_t *hs) {
         err = bwq_enqueue(bwq, thr);
         DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
 
-        ks_deschedule_thread(hs->ks, thr);
+        thread_detach(thr);
 
         thr->wq = (wait_queue_t *)bwq;
         thr->wait_ctx[0] = (uint32_t)fs_hs;
@@ -859,7 +859,7 @@ static fernos_error_t fs_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_
     plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
     plugin_fs_t *plg_fs = fs_hs->plg_fs;
 
-    thread_t *thr = hs->ks->curr_thread;
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
 
     switch (cmd) {
 

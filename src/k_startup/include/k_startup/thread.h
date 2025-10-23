@@ -125,10 +125,17 @@ thread_t *new_thread_copy(thread_t *thr, process_t *new_proc);
 /**
  * If a thread is scheduled, the thread is descheduled.
  * If a thread is waiting, the thread is removed from its wait queue.
+ * (It's wait queue is set to NULL, and context set to 0... SO BE CAREFUL)
  * If the thread is already detached, do nothing.
  * If the thread is in an exited state, do nothing.
  */
 void thread_detach(thread_t *thr);
+
+/**
+ * Add a thread to schedule `r`. 
+ * If `thr` is not detached, `thread_detach` will be called before `thr` is added to `r`.
+ */
+void thread_schedule(thread_t *thr, ring_t *r);
 
 /**
  * Delete a thread.

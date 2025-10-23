@@ -97,11 +97,24 @@ thread_t *new_thread_copy(thread_t *thr, process_t *new_proc) {
 void thread_detach(thread_t *thr) {
     if (thr->state == THREAD_STATE_WAITING) {
         wq_remove(thr->wq, thr);
+        thr->wq = NULL;
+        mem_set(thr->wait_ctx, 0, sizeof(thr->wait_ctx));
+
         thr->state = THREAD_STATE_DETATCHED;
     } else if (thr->state == THREAD_STATE_SCHEDULED) {
         ring_element_detach((ring_element_t *)thr);
         thr->state = THREAD_STATE_DETATCHED;
     }
+}
+
+void thread_schedule(thread_t *thr, ring_t *r) {
+    if (thr->state != THREAD_STATE_DETATCHED) {
+        thread_detach(thr);
+    }
+
+    ring_element_attach((ring_element_t *)thr, r);
+
+    thr->state = THREAD_STATE_SCHEDULED;
 }
 
 void delete_thread(thread_t *thr) {

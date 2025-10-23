@@ -111,7 +111,7 @@ static void init_kernel_state(void) {
     }
 
     // Finally, schedule our first thread!
-    ks_schedule_thread(kernel, thr);
+    thread_schedule(thr, &(kernel->schedule));
 }
 
 static void init_kernel_plugins(void) {
@@ -189,5 +189,6 @@ void start_kernel(void) {
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
 
-    return_to_ctx(&(kernel->curr_thread->ctx));
+    thread_t *first_thread = (thread_t *)(kernel->schedule.head);
+    return_to_ctx(&(first_thread->ctx));
 }

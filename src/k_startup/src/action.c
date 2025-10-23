@@ -60,8 +60,9 @@ void _return_to_halt_context(void) {
  * If there is no current thread, enter the halt context.
  */
 static void return_to_curr_thread(void) {
-    if (kernel->curr_thread) {
-        return_to_ctx(&(kernel->curr_thread->ctx));
+    thread_t *thr = (thread_t *)(kernel->schedule.head);
+    if (thr) {
+        return_to_ctx(&(thr->ctx));
     }
 
     // If we make it here, we have no thread to schedule :,(
@@ -126,6 +127,8 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         uint32_t arg2, uint32_t arg3) {
     ks_save_ctx(kernel, ctx);
     fernos_error_t err = FOS_E_SUCCESS;
+
+    thread_t *thr = (thread_t *)(kernel->schedule.head);
 
     switch (id) {
     case SCID_PROC_FORK:
@@ -229,11 +232,11 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
             handle_scid_extract(id, &h, &h_cmd);
 
-            id_table_t *handle_table = kernel->curr_thread->proc->handle_table;
+            id_table_t *handle_table = thr->proc->handle_table;
             handle_state_t *hs = idtb_get(handle_table, h);
 
             if (!hs) {
-                kernel->curr_thread->ctx.eax = FOS_E_INVALID_INDEX;
+                thr->ctx.eax = FOS_E_INVALID_INDEX;
                 err = FOS_E_SUCCESS;
             } else { // handle found!
                 switch (h_cmd) {
@@ -267,13 +270,13 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
             plugin_t *plg = kernel->plugins[plg_id];
 
             if (!plg) {
-                kernel->curr_thread->ctx.eax = FOS_E_INVALID_INDEX;
+                thr->ctx.eax = FOS_E_INVALID_INDEX;
                 err = FOS_E_SUCCESS;
             } else {
                 err = plg_cmd(plg, plg_cmd_id, arg0, arg1, arg2, arg3);
             }
         } else {
-            kernel->curr_thread->ctx.eax = FOS_E_BAD_ARGS;
+            thr->ctx.eax = FOS_E_BAD_ARGS;
             err = FOS_E_SUCCESS;
         }
 

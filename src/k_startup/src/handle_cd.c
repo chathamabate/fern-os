@@ -67,7 +67,7 @@ static fernos_error_t hs_cd_write(handle_state_t *hs, const void *u_src, size_t 
     fernos_error_t err;
     handle_cd_state_t *hs_cd = (handle_cd_state_t *)hs;
 
-    thread_t *thr = hs->ks->curr_thread;
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
 
     if (!u_src || len == 0) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
@@ -121,7 +121,7 @@ static fernos_error_t hs_cd_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_
     (void)arg2;
     (void)arg3;
 
-    thread_t *thr = hs->ks->curr_thread;
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
 
     switch (cmd) {
 
