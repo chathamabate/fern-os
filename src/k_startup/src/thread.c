@@ -77,7 +77,7 @@ thread_t *new_thread_copy(thread_t *thr, process_t *new_proc) {
         return NULL;
     }
 
-    init_ring_element(&(thr->super));
+    init_ring_element(&(copy->super));
     copy->state = THREAD_STATE_DETATCHED;
     copy->tid = thr->tid;
     copy->stack_base = thr->stack_base;
