@@ -5,7 +5,6 @@
 #include "k_sys/page.h"
 #include "s_mem/allocator.h"
 #include "s_util/constraints.h"
-#include "s_util/str.h"
 
 #include "k_startup/handle.h"
 #include "s_util/misc.h"
@@ -118,15 +117,36 @@ fernos_error_t new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid, 
     // Now we must copy the given thread, add it to the thread table, and set it as the main thread!
 
     err = idtb_request_id(child->thread_table, thr->tid);
-    thread_t *child_main_thr = new_thread_copy(thr, child);
+    thread_t *child_main_thr = NULL;
+
+    if (err == FOS_E_SUCCESS) {
+        // Place NULL in temporarily!
+        //
+        // This is a little confusing, but because we may end up calling the `delete_process` 
+        // function below, we must make sure our child process is always able to be deleted 
+        // correctly.
+        //
+        // Deleting a process will go through the thread table and delete all threads.
+        // We reserved an ID in the thread table, but don't have a thread to place in it yet.
+        // By setting to NULL here, we make sure the process destructor will succeed.
+        // (Deleting NULL always succeeds!)
+        idtb_set(child->thread_table, thr->tid, NULL);
+
+        child_main_thr = new_thread_copy(thr, child);
+    }
 
     if (err != FOS_E_SUCCESS || !child_main_thr) {
-        delete_process(child);
         delete_thread(child_main_thr);
+
+        // The implications of a destructor returning an error are actually kinda annoying here.
+        if (delete_process(child) != FOS_E_SUCCESS) {
+            return FOS_E_ABORT_SYSTEM;
+        }
 
         return FOS_E_NO_MEM;
     }
 
+    // Here we successfully created a new main thread with a reserved thread ID!
     idtb_set(child->thread_table, child_main_thr->tid, child_main_thr);
     child->main_thread = child_main_thr;
 
@@ -145,21 +165,28 @@ fernos_error_t new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid, 
             handle_state_t *hs_copy;
 
             err = idtb_request_id(child->handle_table, hid);
-
             if (err == FOS_E_SUCCESS) {
+                // Same idea as what I said above about the thread table!
+                idtb_set(child->handle_table, hid, NULL);
                 err = copy_handle_state(hs, child, &hs_copy);
             }
 
-            if (err == FOS_E_SUCCESS) {
-                // This will never fail.
-                idtb_set(child->handle_table, hid, hs_copy);
+            if (err != FOS_E_SUCCESS) {
+                if (err == FOS_E_ABORT_SYSTEM) {
+                    // In case of catastrophic error, don't worry about clean up.
+                    return FOS_E_ABORT_SYSTEM;
+                }
+
+                // In case of other error, attempt cleanup.
+                if (delete_process(child) != FOS_E_SUCCESS) {
+                    return FOS_E_ABORT_SYSTEM;
+                }
+
+                return err;
             }
 
-            if (err != FOS_E_SUCCESS) {
-                delete_process(child);
-                return err; // This could be FOS_E_ABORT_SYSTEM,
-                            // or some other non catastrophic error!
-            }
+            // Success case! Place in table!
+            idtb_set(child->handle_table, hid, hs_copy);
         }
     }
 
@@ -184,6 +211,8 @@ fernos_error_t delete_process(process_t *proc) {
             tid != NULL_TID; tid = idtb_next(proc->thread_table)) {
         thread_t *thr = idtb_get(proc->thread_table, tid);
         delete_thread(thr); // detaches thread if needed.
+                            // We don't need to explicitly delete the stack of each thread because
+                            // the page directory as a whole will be deleted in one go above!
     }
 
     delete_id_table(proc->thread_table);
