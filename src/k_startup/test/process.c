@@ -132,8 +132,9 @@ static bool test_fork_process(void) {
     thread_t *secondary_thread = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
     TEST_TRUE(secondary_thread != NULL);
 
-
-    process_t *child_proc = new_process_fork(proc, secondary_thread, 1);
+    process_t *child_proc;
+    fernos_error_t err = new_process_fork(proc, secondary_thread, 1, &child_proc);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_TRUE(child_proc != NULL);
 
     TEST_EQUAL_HEX(1, child_proc->pid);
@@ -241,6 +242,8 @@ static bool test_complex_process(void) {
     TEST_SUCCEED();
 }
 
+// TODO: Test out handle copying! (Maybe make some mock handle type 
+// specifically for testing)
 
 bool test_process(void) {
     BEGIN_SUITE("Process");

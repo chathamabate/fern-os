@@ -301,6 +301,7 @@ void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack) {
         pd_free_pages(proc->pd, tstack_start, tstack_end);
     }
 
+    // detaches.
     delete_thread(thr);
 
     // Return the thread id so it can be used by later threads!

@@ -238,12 +238,7 @@ thread_t *proc_new_thread(process_t *proc, uintptr_t entry, uint32_t arg0, uint3
 /**
  * Given a process and one of its threads, delete the thread entirely from the process!
  *
- * This call DOES NOT check the thread's state whatsoever, that's your responsibility.
- * Because a thread can potentially be in a wait queue which is external to this process,
- * this DOES NOT remove the given thread from its wait queue (if it is waiting)
- *
- * (Same goes for scheduled threads)
- * It is your responsibility to detatch the given thread before calling this function!
+ * This DOES detach the thread if necessary before deletion!
  *
  * If you'd like the thread's stack pages to be returned, set `return_stack` to true.
  */
@@ -272,3 +267,7 @@ basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex);
  * Make sure all waiting threads are dealt with before calling this function.
  */
 void proc_deregister_futex(process_t *proc, futex_t *u_futex);
+
+// Should there be a register handle function???
+// Ehhh, using the handle table directly isn't so hard???
+// And maybe a handle deregister function too???
