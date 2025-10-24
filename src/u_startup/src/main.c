@@ -26,17 +26,12 @@ proc_exit_status_t user_main(void) {
 
     sc_set_out_handle(cd);
 
-    test_syscall();
-
-    /*
-
     err = setup_default_simple_heap(USER_MMP);
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
 
     test_syscall_fs();
-    */
 
     return PROC_ES_SUCCESS;
 }
