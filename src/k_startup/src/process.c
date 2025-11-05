@@ -253,6 +253,37 @@ fernos_error_t delete_process(process_t *proc) {
     return FOS_E_SUCCESS;
 }
 
+fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, uint32_t arg0,
+        uint32_t arg1, uint32_t arg2) {
+    if (new_pd == NULL_PHYS_ADDR || !entry) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    // Let's try the thread alloc first!
+
+    thread_t *main_thr = proc->main_thread;
+    if (!main_thr) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    // Might need to redo this tbh.
+
+    for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC; tid++) {
+        thread_t *thr = (thread_t *)idtb_get(proc->thread_table, tid);
+        if (thr && thr != proc->main_thread) {
+            delete_thread(thr); // This will deschedule/unwait as necessary!
+
+            // Delete thr's stack 
+
+            idtb_push_id(proc->thread_table, tid);
+        }
+    }
+
+
+
+    return FOS_E_SUCCESS;
+}
+
 /**
  * Allocate a new thread, and its initial stack pages.
  */

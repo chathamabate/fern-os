@@ -191,35 +191,37 @@ fernos_error_t new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid, 
 fernos_error_t delete_process(process_t *proc);
 
 /**
- * TODO: REDESIGN THIS LATER!
+ * Overwrite a process to begin other different execution.
  *
- * Reset a process! (Useful for the Exec system call!)
+ * FOS_E_BAD_ARGS if `new_pd` or `entry` are NULL. (Given process is unmodified in this case)
+ * FOS_E_STATE_MISMATCH if there is no main thread on the given process!
  *
- * This sets a process to a starting state with NO threads!
- *
+ * `new_pd` is a page directory which points to a new memory space to be used by this process.
+ * It should have NO user thread stacks allocated!
+ * The first thing this function will do, is attempt to allocate a stack for the main thread
+ * within `new_pd`. If this fails, FOS_E_NO_MEM is returned. The given process remains in its
+ * original state.
+ * 
+ *  If allocation succeeds, the following actions are taken:
  * `pid` is preserved.
- * `pd` is switched with `new_pd`. (then deleted)
+ * `pd` is switched with `new_pd`. (then `pd` is deleted)
  * `parent` is preserved.
- * `children` is cleared.
- * `zombie_children` is cleared.
- * All threads in `thread_table` are deleted, and `thread_table` is cleared.
+ * `children` is preserved.
+ * `zombie_children` is preserved.
+ *  All threads in the thread table are deleted, except for `main_thread`. (This thread becomes
+ *  the first thread of this new execution context)
  * `join_queue` is cleared. (Should already be empty tho)
- * `main_thread` is set to NULL.
  * `sig_vec` and `sig_allow` are both set to empty.
  * `signal_queue` is cleared. (Should already be empty tho)
+ * `futexes` is cleared.
  * All handles states except for `in_handle` and `out_handle` are removed from
  * `handle_table`.
  *
- * NOTE: I am trying my best to stick to the design of these functions never modifying 
- * anything potentially one layer up. (Maybe one day I'll change this design, but whatever)
- * SO... processes in `children` and `zombie_children` are not deleted in this function, it is
- * the caller's responsibility to do something with them before this function is called!
- * AND... All threads are deleted, but they are NOT detatched!!! It is the caller's responsibility
- * to detatch all threads before calling this function!
- * LASTLY... Handle states are NOT deleted, just REMOVED!! It is the caller's responsibility to 
- * delete the non default IO handle states.
+ * FOS_E_ABORT_SYSTEM if there is an error deleting one of the non-default handles.
+ * All other of the above actions should always succeed.
  */
-//fernos_error_t proc_reset(process_t *proc, phys_addr_t new_pd);
+fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, uint32_t arg0,
+        uint32_t arg1, uint32_t arg2);
 
 /**
  * Create a thread within a process with the given entry point and argument!
