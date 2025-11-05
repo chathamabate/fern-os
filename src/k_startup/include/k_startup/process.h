@@ -216,6 +216,8 @@ fernos_error_t delete_process(process_t *proc);
  *
  * FOS_E_ABORT_SYSTEM if there is an error deleting one of the non-default handles.
  * All other of the above actions should always succeed.
+ *
+ * NOTE: On success, just the `main_thr` will exist. And it will be in a detached state!
  */
 fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, uint32_t arg0,
         uint32_t arg1, uint32_t arg2);

@@ -22,6 +22,23 @@ static uint32_t fm_key_hash(const void *k) {
     return (((uint32_t)futex + 1373) * 7) + 2;
 }
 
+/**
+ * Private helper for clearing the futex map. This deletes all futex wait queues
+ * (WITHOUT CHECKING THEIR STATE). Then it clears the futex map.
+ */
+static void proc_clear_fm_map(process_t *proc) {
+    // Delete all wait queues!
+    basic_wait_queue_t **fwq; // Pretty confusing, but yes this should be a **.
+    mp_reset_iter(proc->futexes);
+    for (fernos_error_t err = mp_get_iter(proc->futexes, NULL, (void **)&fwq);
+                err == FOS_E_SUCCESS; err = mp_next_iter(proc->futexes, NULL, (void **)&fwq)) {
+        delete_wait_queue((wait_queue_t *)*fwq); 
+    }
+
+    // Finally clear the ol' map.
+    mp_clear(proc->futexes);
+}
+
 process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent) {
     process_t *proc = al_malloc(al, sizeof(process_t));
     list_t *children = new_linked_list(al, sizeof(process_t *));
@@ -220,13 +237,8 @@ fernos_error_t delete_process(process_t *proc) {
     delete_wait_queue((wait_queue_t *)proc->join_queue);
     delete_wait_queue((wait_queue_t *)proc->signal_queue);
 
-    // Now we need to delete every wait queue (If there are any)
-    basic_wait_queue_t **fwq; // Pretty confusing, but yes this should be a **.
-    mp_reset_iter(proc->futexes);
-    for (fernos_error_t err = mp_get_iter(proc->futexes, NULL, (void **)&fwq);
-                err == FOS_E_SUCCESS; err = mp_next_iter(proc->futexes, NULL, (void **)&fwq)) {
-        delete_wait_queue((wait_queue_t *)*fwq); 
-    }
+    // Delete all wait queues from the process futex map!
+    proc_clear_fm_map(proc);
 
     // Now delete the map as a whole.
     delete_map(proc->futexes);
@@ -295,22 +307,22 @@ fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, u
     proc->sig_vec = empty_sig_vector(); 
     proc->sig_allow = empty_sig_vector();
 
-    // We must delete all futex's and clear the futexes map!
-    mp_reset_iter(proc->futexes);
+    // Delete all futexes and empty the map. (Futex's should really be moved to a 
+    // plugin imo.
+    proc_clear_fm_map(proc);
 
-    // Now we need to delete every wait queue (If there are any)
-    basic_wait_queue_t **fwq; // Pretty confusing, but yes this should be a **.
-    mp_reset_iter(proc->futexes);
-    for (fernos_error_t err = mp_get_iter(proc->futexes, NULL, (void **)&fwq);
-                err == FOS_E_SUCCESS; err = mp_next_iter(proc->futexes, NULL, (void **)&fwq)) {
-        delete_wait_queue((wait_queue_t *)*fwq); 
+    // Now, delete all non-default handles, check for errors of course.
+    for (handle_t h = 0; h < FOS_MAX_HANDLES_PER_PROC; h++) {
+        handle_state_t *hs = idtb_get(proc->handle_table, h);
+        if (hs && h != proc->in_handle && h != proc->out_handle) {
+            err = delete_handle_state(hs);
+            if (err != FOS_E_SUCCESS) {
+                return FOS_E_ABORT_SYSTEM;
+            }
+
+            idtb_push_id(proc->handle_table, h);
+        }
     }
-
-    // Finally, what else?? 
-    // Clear the map too??
-    // If we could clear the map, that would be nice tbh!!
-
-    // We need to be able to clear a map!
 
     return FOS_E_SUCCESS;
 }
