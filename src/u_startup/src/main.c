@@ -11,6 +11,8 @@
 #include "s_mem/simple_heap.h"
 #include "u_startup/test/syscall.h"
 #include "s_data/test/map.h"
+#include "u_concur/test/mutex.h"
+#include "u_startup/test/syscall_fut.h"
 
 #include <stdarg.h>
 
@@ -34,6 +36,8 @@ proc_exit_status_t user_main(void) {
     }
     */
 
+    test_mutex();
+    test_syscall_fut();
     test_syscall();
 
     return PROC_ES_SUCCESS;

@@ -11,34 +11,6 @@
 #include "k_startup/page.h"
 #include "k_startup/page_helpers.h"
 
-static bool fm_key_eq(const void *k0, const void *k1) {
-    return *(const futex_t **)k0 == *(const futex_t **)k1;
-}
-
-static uint32_t fm_key_hash(const void *k) {
-    const futex_t *futex = *(const futex_t **)k;
-
-    // Kinda just a random hash function here.
-    return (((uint32_t)futex + 1373) * 7) + 2;
-}
-
-/**
- * Private helper for clearing the futex map. This deletes all futex wait queues
- * (WITHOUT CHECKING THEIR STATE). Then it clears the futex map.
- */
-static void proc_clear_fm_map(process_t *proc) {
-    // Delete all wait queues!
-    basic_wait_queue_t **fwq; // Pretty confusing, but yes this should be a **.
-    mp_reset_iter(proc->futexes);
-    for (fernos_error_t err = mp_get_iter(proc->futexes, NULL, (void **)&fwq);
-                err == FOS_E_SUCCESS; err = mp_next_iter(proc->futexes, NULL, (void **)&fwq)) {
-        delete_wait_queue((wait_queue_t *)*fwq); 
-    }
-
-    // Finally clear the ol' map.
-    mp_clear(proc->futexes);
-}
-
 process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t *parent) {
     process_t *proc = al_malloc(al, sizeof(process_t));
     list_t *children = new_linked_list(al, sizeof(process_t *));
@@ -46,19 +18,16 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     id_table_t *thread_table = new_id_table(al, FOS_MAX_THREADS_PER_PROC);
     vector_wait_queue_t *join_queue = new_vector_wait_queue(al);
     vector_wait_queue_t *signal_queue = new_vector_wait_queue(al);
-    map_t *futexes = new_chained_hash_map(al, sizeof(futex_t *), sizeof(basic_wait_queue_t *), 
-            3, fm_key_eq, fm_key_hash);
     id_table_t *handle_table = new_id_table(al, FOS_MAX_HANDLES_PER_PROC);
 
     if (!proc || !children || !zchildren || !thread_table || !join_queue || 
-            !signal_queue || !futexes || !handle_table) {
+            !signal_queue || !handle_table) {
         al_free(al, proc);
         delete_list(children);
         delete_list(zchildren);
         delete_id_table(thread_table);
         delete_wait_queue((wait_queue_t *)signal_queue);
         delete_wait_queue((wait_queue_t *)join_queue);
-        delete_map(futexes);
         delete_id_table(handle_table);
 
         return NULL;
@@ -83,7 +52,6 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     proc->sig_allow = empty_sig_vector();
     proc->signal_queue = signal_queue;
 
-    proc->futexes = futexes;
     proc->handle_table = handle_table;
 
     const handle_t NULL_HANDLE = idtb_null_id(handle_table);
@@ -237,12 +205,6 @@ fernos_error_t delete_process(process_t *proc) {
     delete_wait_queue((wait_queue_t *)proc->join_queue);
     delete_wait_queue((wait_queue_t *)proc->signal_queue);
 
-    // Delete all wait queues from the process futex map!
-    proc_clear_fm_map(proc);
-
-    // Now delete the map as a whole.
-    delete_map(proc->futexes);
-
     // Delete each handle state individually.
     const handle_t NULL_HID = idtb_null_id(proc->handle_table);
     idtb_reset_iterator(proc->handle_table);
@@ -307,9 +269,10 @@ fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, u
     proc->sig_vec = empty_sig_vector(); 
     proc->sig_allow = empty_sig_vector();
 
+    // ************************ TODO COME BACK HERE **************************
     // Delete all futexes and empty the map. (Futex's should really be moved to a 
     // plugin imo.
-    proc_clear_fm_map(proc);
+    // proc_clear_fm_map(proc);
 
     // Now, delete all non-default handles, check for errors of course.
     for (handle_t h = 0; h < FOS_MAX_HANDLES_PER_PROC; h++) {
@@ -382,69 +345,3 @@ void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack) {
     idtb_push_id(proc->thread_table, tid);
 }
 
-fernos_error_t proc_register_futex(process_t *proc, futex_t *u_futex) {
-    fernos_error_t err;
-
-    if (!proc || !u_futex) {
-        return FOS_E_BAD_ARGS;
-    }
-
-    // Is it already mapped?
-
-    if (mp_get(proc->futexes, &u_futex)) {
-        return FOS_E_ALREADY_ALLOCATED;
-    }
-
-    // Test out that we have access to the futex.
-
-    futex_t test;
-    err = mem_cpy_from_user(&test, proc->pd, u_futex, sizeof(futex_t), NULL);
-    if (err != FOS_E_SUCCESS) {
-        return err;
-    }
-
-    // Create the wait queue.
-
-    basic_wait_queue_t *bwq = new_basic_wait_queue(proc->al);
-    if (!bwq) {
-        return FOS_E_NO_MEM;
-    }
-
-    err = mp_put(proc->futexes, &u_futex, &bwq);
-    if (err != FOS_E_SUCCESS) {
-        delete_wait_queue((wait_queue_t *)bwq);
-        return err;
-    }
-    
-    return FOS_E_SUCCESS;
-}
-
-basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex) {
-    if (!proc || !u_futex) {
-        return NULL;
-    }
-
-    basic_wait_queue_t **bwq = mp_get(proc->futexes, &u_futex);
-
-    if (!bwq) {
-        return NULL;
-    }
-
-    return *bwq;
-}
-
-void proc_deregister_futex(process_t *proc, futex_t *u_futex) {
-    if (!proc || !u_futex) {
-        return;
-    }
-
-    basic_wait_queue_t **bwq = mp_get(proc->futexes, &u_futex);
-
-    if (!bwq) {
-        return;
-    }
-
-    mp_remove(proc->futexes, &u_futex);
-
-    delete_wait_queue((wait_queue_t *)*bwq);
-}

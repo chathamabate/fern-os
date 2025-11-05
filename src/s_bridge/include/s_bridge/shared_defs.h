@@ -161,12 +161,6 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 #define SCID_THREAD_SPAWN (0x102U)
 #define SCID_THREAD_JOIN  (0x103U)
 
-/* Futex Syscalls (Consider making futex's a plugin) */
-#define SCID_FUTEX_REGISTER   (0x200U)
-#define SCID_FUTEX_DEREGISTER (0x201U)
-#define SCID_FUTEX_WAIT       (0x202U)
-#define SCID_FUTEX_WAKE       (0x203U)
-
 /* Default IO Syscalls (See Handle Syscalls) */
 #define SCID_SET_IN_HANDLE  (0x300U)
 #define SCID_IN_READ        (0x301U)

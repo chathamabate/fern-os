@@ -402,46 +402,6 @@ KS_SYSCALL fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t
         thread_join_ret_t *u_join_ret);
 
 /**
- * Regsiter a futex in the current process.
- *
- * user error if futex is null or already in use, Or if there are insufficient resources.
- *
- * Remember, u_futex is a pointer into userspace!
- */
-KS_SYSCALL fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex);
-
-/**
- * Deregister a futex of the current process.
- *
- * Doesn't return a user error.
- *
- * If threads are currently waiting on this futex, they are rescheduled with return value
- * FOS_E_STATE_MISMATCH.
- *
- * Returns an error if there is some issue with the deregister.
- */
-KS_SYSCALL fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex);
-
-/**
- * Confirm the given value of the futex = exp_val. If not, returns user success immediately.
- * If the value is equal, the current thread is descheduled.
- *
- * The descheduled thread will only be woken up with a call to wake, Or if the futex is destroyed.
- * If the futex is destroyed, all waiting threads are rescheduled with user return value of
- * FOS_E_STATE_MISMATCH.
- *
- * Returns user error if arguements are invalid.
- */
-KS_SYSCALL fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val);
-
-/**
- * Wake up one or all threads waiting on a futex.
- *
- * Returns user error if arguements are invalid.
- */
-KS_SYSCALL fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all);
-
-/**
  * Set the default input handle of the calling process. If the given input handle is invalid,
  * this will set the defualt Input handle to the NULL_HANDLE.
  *

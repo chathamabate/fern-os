@@ -81,19 +81,19 @@ fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retv
 }
 
 fernos_error_t sc_futex_register(futex_t *futex) {
-    return (fernos_error_t)trigger_syscall(SCID_FUTEX_REGISTER, (uint32_t)futex, 0, 0, 0);
+    return sc_plg_cmd(PLG_FUTEX_ID, PLG_FUT_PCID_REGISTER, (uint32_t)futex, 0, 0, 0);
 }
 
 void sc_futex_deregister(futex_t *futex) {
-    (void)trigger_syscall(SCID_FUTEX_DEREGISTER, (uint32_t)futex, 0, 0, 0);
+    (void)sc_plg_cmd(PLG_FUTEX_ID, PLG_FUT_PCID_DEREGISTER, (uint32_t)futex, 0, 0, 0);
 }
 
 fernos_error_t sc_futex_wait(futex_t *futex, futex_t exp_val) {
-    return (fernos_error_t)trigger_syscall(SCID_FUTEX_WAIT, (uint32_t)futex, exp_val, 0, 0);
+    return sc_plg_cmd(PLG_FUTEX_ID, PLG_FUT_PCID_WAIT, (uint32_t)futex, exp_val, 0, 0);
 }
 
 fernos_error_t sc_futex_wake(futex_t *futex, bool all) {
-    return (fernos_error_t)trigger_syscall(SCID_FUTEX_WAKE, (uint32_t)futex, all, 0, 0);
+    return sc_plg_cmd(PLG_FUTEX_ID, PLG_FUT_PCID_WAKE, (uint32_t)futex, (uint32_t)all, 0, 0);
 }
 
 void sc_set_in_handle(handle_t in) {

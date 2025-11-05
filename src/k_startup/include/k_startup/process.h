@@ -113,14 +113,6 @@ struct _process_t {
     vector_wait_queue_t *signal_queue;
     
     /**
-     * Originally conditions were stored here, however, upon learning more about synchronization
-     * mechanisms, now, futexes are stored here in the process structure.
-     *
-     * This is a map from userspace addresses (futex_t *)'s -> (basic_wait_queue *)'s
-     */
-    map_t *futexes;
-
-    /**
      * This ID table will always have a maximum capcity <= 256. This way ID's can always fit
      * in 8 bits. (i.e. the size of a handle_t)
      *
@@ -244,31 +236,3 @@ thread_t *proc_new_thread(process_t *proc, uintptr_t entry, uint32_t arg0, uint3
  * If you'd like the thread's stack pages to be returned, set `return_stack` to true.
  */
 void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack);
-
-/**
- * Register a futex with the process.
- *
- * Returns an error in the case of bad arguments or insufficient resources.
- */
-fernos_error_t proc_register_futex(process_t *proc, futex_t *u_futex);
-
-/**
- * Get a futexes corresponding wait queue. 
- *
- * Returns NULL if it cannot be found.
- */
-basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex);
-
-/**
- * Deregister a futex from a process.
- *
- * This deletes its wait queue. And removes it from the futex map.
- *
- * NOTE: This does NO cleanup of threads within the wait queue.
- * Make sure all waiting threads are dealt with before calling this function.
- */
-void proc_deregister_futex(process_t *proc, futex_t *u_futex);
-
-// Should there be a register handle function???
-// Ehhh, using the handle table directly isn't so hard???
-// And maybe a handle deregister function too???

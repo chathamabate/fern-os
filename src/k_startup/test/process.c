@@ -154,44 +154,6 @@ static bool test_fork_process(void) {
 }
 
 /**
- * Test out making invlaid futexes.
- */
-static bool test_simple_futex(void) {
-    fernos_error_t err;
-
-    phys_addr_t pd = new_page_directory();
-    TEST_TRUE(pd != NULL_PHYS_ADDR);
-
-    const void *true_e;
-    err = pd_alloc_pages(pd, true, (void *)M_4K, (const void *)(M_4K + M_4K), &true_e);
-    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
-
-    futex_t *u_futex0 = (futex_t *)M_4K;
-    futex_t *u_futex1 = (futex_t *)M_4K - 1;
-
-    process_t *proc = new_da_process(0, pd, NULL);
-    TEST_TRUE(proc != NULL);
-
-    err = proc_register_futex(proc, u_futex0);
-    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
-
-    err = proc_register_futex(proc, u_futex1);
-    TEST_TRUE(err != FOS_E_SUCCESS);
-
-    err = proc_register_futex(proc, u_futex0);
-    TEST_TRUE(err != FOS_E_SUCCESS);
-
-    proc_deregister_futex(proc, u_futex0);
-
-    err = proc_register_futex(proc, u_futex0);
-    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
-
-    TEST_SUCCESS(delete_process(proc));
-
-    TEST_SUCCEED();
-}
-
-/**
  * This test is going to populate the process structures in a way that the kernel is intended to.
  */
 static bool test_complex_process(void) {
@@ -204,9 +166,6 @@ static bool test_complex_process(void) {
     err = pd_alloc_pages(pd, true, (void *)M_4K, (const void *)(M_4K + M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    futex_t *u_futex0 = (futex_t *)M_4K;
-    futex_t *u_futex1 = (futex_t *)M_4K + 1;
-
     process_t *proc = new_da_process(0, pd, NULL);
     TEST_TRUE(proc != NULL);
 
@@ -217,26 +176,6 @@ static bool test_complex_process(void) {
         thread_t *thr = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
         TEST_TRUE(thr != NULL);
         threads[i] = thr;
-    }
-
-    // Ok, now maybe make a new futex??
-    
-    err = proc_register_futex(proc, u_futex0);
-    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
-
-    err = proc_register_futex(proc, u_futex1);
-    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
-
-    basic_wait_queue_t *wq = proc_get_futex_wq(proc, u_futex1);
-    TEST_TRUE(wq != NULL);
-
-    for (size_t i = 0; i < NUM_THREADS; i += 2) {
-        thread_t *thr = threads[i];
-
-        err = bwq_enqueue(wq, thr);
-
-        thr->state = THREAD_STATE_WAITING;
-        thr->wq = (wait_queue_t *)wq;
     }
 
     TEST_SUCCESS(delete_process(proc));
@@ -364,7 +303,6 @@ bool test_process(void) {
     RUN_TEST(test_new_thread);
     RUN_TEST(test_many_threads);
     RUN_TEST(test_fork_process);
-    RUN_TEST(test_simple_futex);
     RUN_TEST(test_complex_process);
     RUN_TEST(test_fork_with_handles);
     return END_SUITE();

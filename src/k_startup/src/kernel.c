@@ -23,6 +23,7 @@
 #include "s_block_device/fat32.h"
 #include "s_block_device/fat32_file_sys.h"
 #include "s_block_device/file_sys.h"
+#include "k_startup/plugin_fut.h"
 #include "k_startup/plugin_fs.h"
 #include "k_startup/plugin_kb.h"
 #include "k_startup/plugin_vga_cd.h"
@@ -112,6 +113,12 @@ static void init_kernel_state(void) {
 
 static void init_kernel_plugins(void) {
     fernos_error_t err;
+
+    plugin_t *plg_fut = new_plugin_fut(kernel);
+    if (!plg_fut) {
+        setup_fatal("Failed to create Futex plugin");
+    }
+    try_setup_step(ks_set_plugin(kernel, PLG_FUTEX_ID, plg_fut), "Failed to set Futex plugin");
 
     block_device_t *bd = new_da_cached_block_device(
         get_ata_block_device(),

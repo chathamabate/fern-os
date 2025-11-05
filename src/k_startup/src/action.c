@@ -188,22 +188,6 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_join_local_thread(kernel, arg0, (thread_join_ret_t *)arg1);
         break;
 
-    case SCID_FUTEX_REGISTER:
-        err = ks_register_futex(kernel, (futex_t *)arg0);
-        break;
-
-    case SCID_FUTEX_DEREGISTER:
-        err = ks_deregister_futex(kernel, (futex_t *)arg0);
-        break;
-
-    case SCID_FUTEX_WAIT:
-        err = ks_wait_futex(kernel, (futex_t *)arg0, arg1);
-        break;
-
-    case SCID_FUTEX_WAKE:
-        err = ks_wake_futex(kernel, (futex_t *)arg0, (bool)arg1);
-        break;
-
     case SCID_SET_IN_HANDLE:
         err = ks_set_in_handle(kernel, (handle_t)arg0);
         break;

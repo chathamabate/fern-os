@@ -9,6 +9,7 @@ _SRCS 		?= kernel.c \
 			   state.c \
 			   handle_cd.c \
 			   plugin.c \
+			   plugin_fut.c \
 			   plugin_fs.c \
 			   plugin_kb.c \
 			   plugin_vga_cd.c \

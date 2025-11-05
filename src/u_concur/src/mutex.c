@@ -1,6 +1,7 @@
 
 #include "u_concur/mutex.h"
 #include "u_startup/syscall.h"
+#include "u_startup/syscall_fut.h"
 
 fernos_error_t init_mutex(mutex_t *mut) {
     if (!mut) {
@@ -9,11 +10,11 @@ fernos_error_t init_mutex(mutex_t *mut) {
 
     *mut = MUT_UNLOCKED;
 
-    return sc_futex_register(mut);
+    return sc_fut_register(mut);
 }
 
 void cleanup_mutex(mutex_t *mut) {
-    sc_futex_deregister(mut);
+    sc_fut_deregister(mut);
 }
 
 fernos_error_t mut_lock(mutex_t *mut) {
@@ -27,7 +28,7 @@ fernos_error_t mut_lock(mutex_t *mut) {
 
         // We only wait if the mutex was successfully set to contended!
         // (Remember, the comparison will safely happen inside the kernel)
-        err = sc_futex_wait(mut, MUT_LOCKED_CONTENDED);
+        err = sc_fut_wait(mut, MUT_LOCKED_CONTENDED);
         if (err != FOS_E_SUCCESS) {
             return err; // fast fail if something went wrong with waiting on the lock.
         }
@@ -49,7 +50,7 @@ fernos_error_t mut_unlock(mutex_t *mut) {
     if (__sync_val_compare_and_swap(mut, MUT_LOCKED_CONTENDED, MUT_UNLOCKED) == 
             MUT_LOCKED_CONTENDED) {
 
-        err = sc_futex_wake(mut, true);
+        err = sc_fut_wake(mut, true);
         return err;
     }
 
