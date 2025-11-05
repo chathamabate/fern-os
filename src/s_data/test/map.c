@@ -146,6 +146,43 @@ static bool test_map_simple_remove(void) {
     TEST_SUCCEED();
 }
 
+static bool test_map_clear(void) {
+    map_t *mp = gen_map(sizeof(uint32_t), sizeof(uint32_t));
+    TEST_TRUE(mp != NULL);
+
+    mp_clear(mp);
+
+    TEST_EQUAL_UINT(0, mp_len(mp));
+
+    for (uint32_t i = 0; i < 20; i++) {
+        uint32_t v = i * 2;
+        TEST_SUCCESS(mp_put(mp, &i, &v));
+    }
+
+    mp_clear(mp);
+    TEST_EQUAL_UINT(0, mp_len(mp));
+
+    for (uint32_t i = 0; i < 20; i++) {
+        TEST_TRUE(mp_get(mp, &i) == NULL);
+    }
+
+    // Make sure adding after clearing works fine!
+    for (uint32_t i = 0; i < 20; i++) {
+        uint32_t v = i * 2;
+        TEST_SUCCESS(mp_put(mp, &i, &v));
+    }
+
+    for (uint32_t i = 0; i < 20; i++) {
+        uint32_t *v = mp_get(mp, &i);
+        TEST_TRUE(v != NULL);
+        TEST_EQUAL_UINT(i * 2, *v);
+    }
+    
+    delete_map(mp);
+    TEST_SUCCEED();
+}
+
+
 static bool test_map_simple_iter(void) {
     map_t *mp = gen_map(sizeof(uint16_t), sizeof(uint64_t));
     TEST_TRUE(mp != NULL);
@@ -320,6 +357,7 @@ bool test_map(const char *name, map_t *(*gen)(size_t ks, size_t vs)) {
     RUN_TEST(test_map_simple_put_and_get);
     RUN_TEST(test_map_simple_overwrite);
     RUN_TEST(test_map_simple_remove);
+    RUN_TEST(test_map_clear);
     RUN_TEST(test_map_simple_iter);
     RUN_TEST(test_map_complex0);
     RUN_TEST(test_map_complex1);

@@ -116,7 +116,7 @@ struct _process_t {
      * Originally conditions were stored here, however, upon learning more about synchronization
      * mechanisms, now, futexes are stored here in the process structure.
      *
-     * This is a map from userspace addresses (futex_t *)'s -> basic_wait_queue's
+     * This is a map from userspace addresses (futex_t *)'s -> (basic_wait_queue *)'s
      */
     map_t *futexes;
 
@@ -197,12 +197,9 @@ fernos_error_t delete_process(process_t *proc);
  * FOS_E_STATE_MISMATCH if there is no main thread on the given process!
  *
  * `new_pd` is a page directory which points to a new memory space to be used by this process.
- * It should have NO user thread stacks allocated!
- * The first thing this function will do, is attempt to allocate a stack for the main thread
- * within `new_pd`. If this fails, FOS_E_NO_MEM is returned. The given process remains in its
- * original state.
+ * It should have NO user thread stacks allocated! Remember, we never explicitly allocate
+ * the user stacks, we rely on the PF handler to do that!
  * 
- *  If allocation succeeds, the following actions are taken:
  * `pid` is preserved.
  * `pd` is switched with `new_pd`. (then `pd` is deleted)
  * `parent` is preserved.

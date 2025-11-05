@@ -90,6 +90,7 @@ struct _thread_t {
     void *exit_ret_val;
 };
 
+
 /**
  * Create a new thread!
  *
@@ -108,6 +109,15 @@ struct _thread_t {
  */
 thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry, 
         uint32_t arg0, uint32_t arg1, uint32_t arg2);
+
+/**
+ * Given a thread, detach it, then set its context to the given entry point.
+ * `stack_base` of the given thread will be left unchanged. However, %esp will be set back
+ * to the end of the stack area corresponding to `thr->tid`.
+ *
+ * This call never fails.
+ */
+void thread_reset(thread_t *thr, uintptr_t entry, uint32_t arg0, uint32_t arg1, uint32_t arg2);
 
 /**
  * Copy a given thread.

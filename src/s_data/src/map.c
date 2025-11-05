@@ -12,6 +12,7 @@ static void delete_chained_hash_map(map_t *mp);
 static fernos_error_t chm_get_kvp(map_t *mp, const void *key, const void **key_out, void **val_out);
 static fernos_error_t chm_put(map_t *mp, const void *key, const void *value);
 static bool chm_remove(map_t *mp, const void *key);
+static void chm_clear(map_t *mp);
 static size_t chm_len(map_t *mp);
 static void chm_reset_iter(map_t *mp);
 static fernos_error_t chm_get_iter(map_t *mp, const void **key, void **value);
@@ -23,6 +24,7 @@ const map_impl_t CHM_IMPL = {
     .mp_get_kvp = chm_get_kvp,
     .mp_put = chm_put,
     .mp_remove = chm_remove,
+    .mp_clear = chm_clear,
     .mp_len = chm_len,
     .mp_reset_iter = chm_reset_iter,
     .mp_get_iter = chm_get_iter,
@@ -71,19 +73,9 @@ map_t *new_chained_hash_map(allocator_t *al, size_t key_size, size_t val_size, u
 }
 
 static void delete_chained_hash_map(map_t *mp) {
+    mp_clear(mp);
+
     chained_hash_map_t *chm = (chained_hash_map_t *)mp;
-
-    for (size_t i = 0; i < chm->cap; i++) {
-        chm_node_header_t *iter = chm->table[i];
-
-        while (iter) {
-            chm_node_header_t *next = iter->next;
-
-            al_free(chm->al, iter);
-
-            iter = next;
-        }
-    }
 
     al_free(chm->al, chm->table);
     al_free(chm->al, chm);
@@ -272,6 +264,27 @@ static bool chm_remove(map_t *mp, const void *key) {
     chm->len--;
 
     return true;
+}
+
+static void chm_clear(map_t *mp) {
+    chained_hash_map_t *chm = (chained_hash_map_t *)mp;
+
+    for (size_t i = 0; i < chm->cap; i++) {
+        chm_node_header_t *iter = chm->table[i];
+
+        while (iter) {
+            chm_node_header_t *next = iter->next;
+
+            al_free(chm->al, iter);
+
+            iter = next;
+        }
+
+        chm->table[i] = NULL;
+    }
+
+    chm->len = 0;
+    chm->iter = NULL;
 }
 
 static size_t chm_len(map_t *mp) {

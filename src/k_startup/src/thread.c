@@ -9,6 +9,44 @@
 #include "u_startup/main.h"
 #include "s_util/str.h"
 
+/**
+ * private version of `thread_reset`, this just requires `thr` to have a parent process
+ * and tid, that's it!
+ *
+ * Dangerous because it does NO detaching!
+ */
+static void thread_reset_context(thread_t *thr, uintptr_t entry, uint32_t arg0, 
+        uint32_t arg1, uint32_t arg2) {
+    uint8_t *tstack_end = (uint8_t *)FOS_THREAD_STACK_END(thr->tid);
+    process_t *proc = thr->proc;
+
+    thr->ctx = (user_ctx_t) {
+        .ds = USER_DATA_SELECTOR,
+        .cr3 = proc->pd,
+
+        .eax = entry,
+        .ebx = arg0,
+        .ecx = arg1,
+        .edx = arg2,
+
+        .eip = (uint32_t)thread_entry_routine,
+        .cs = USER_CODE_SELECTOR,
+        .eflags = read_eflags() | (1 << 9),
+
+        .esp = (uint32_t)tstack_end,
+        .ss = USER_DATA_SELECTOR
+    };
+}
+
+void thread_reset(thread_t *thr, uintptr_t entry, uint32_t arg0, 
+        uint32_t arg1, uint32_t arg2) {
+    if (thr->state != THREAD_STATE_DETATCHED) {
+        thread_detach(thr);
+    }
+
+    thread_reset_context(thr, entry, arg0, arg1, arg2);
+}
+
 thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry, 
         uint32_t arg0, uint32_t arg1, uint32_t arg2) {
     if (tid >= FOS_MAX_THREADS_PER_PROC) {
@@ -43,22 +81,7 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry,
     mem_set(thr->wait_ctx, 0, sizeof(thr->wait_ctx));
     thr->exit_ret_val = NULL;
 
-    thr->ctx = (user_ctx_t) {
-        .ds = USER_DATA_SELECTOR,
-        .cr3 = proc->pd,
-
-        .eax = entry,
-        .ebx = arg0,
-        .ecx = arg1,
-        .edx = arg2,
-
-        .eip = (uint32_t)thread_entry_routine,
-        .cs = USER_CODE_SELECTOR,
-        .eflags = read_eflags() | (1 << 9),
-
-        .esp = (uint32_t)tstack_end,
-        .ss = USER_DATA_SELECTOR
-    };
+    thread_reset_context(thr, entry, arg0, arg1, arg2);
 
     return thr;
 }

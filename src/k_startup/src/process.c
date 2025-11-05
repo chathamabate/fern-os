@@ -261,38 +261,56 @@ fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, u
         return FOS_E_BAD_ARGS;
     }
 
-    // Let's try the thread alloc first!
-
     thread_t *main_thr = proc->main_thread;
     if (!main_thr) {
         return FOS_E_STATE_MISMATCH;
     }
 
-    thread_id_t main_tid = main_thr->tid;
+    // Now we start doing irreversible changes on `proc`!
 
-    const void *true_e; // I should really make this arg optional ugh!
-    err = pd_alloc_pages(new_pd, true, (void *)(FOS_THREAD_STACK_END(main_tid) - M_4K), 
-            (void *)FOS_THREAD_STACK_END(main_tid), &true_e);
-    if (err != FOS_E_SUCCESS) {
-        return FOS_E_NO_MEM; // This is a recoverable error for the given process as it
-                             // is left unmodified.
-    }
-    
+    // First let's replace `proc->pd`.
+    delete_page_directory(proc->pd);
+    proc->pd = new_pd; // New pd should have no thread stacks allocated!
 
-    // Might need to redo this tbh.
+    // Now delete all non-main threads!
 
     for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC; tid++) {
         thread_t *thr = (thread_t *)idtb_get(proc->thread_table, tid);
-        if (thr && thr != proc->main_thread) {
+        if (thr && thr != main_thr) {
             delete_thread(thr); // This will deschedule/unwait as necessary!
 
-            // Delete thr's stack 
+            // No need to delete `thr`'s stack.
+            // This was already done by just deleting the whole page directory!
 
             idtb_push_id(proc->thread_table, tid);
         }
     }
 
+    // This will detach main thread too!
+    thread_reset(main_thr, entry, arg0, arg1, arg2);
 
+    // One point though, we are in a new page directory now, so we must manually reset stack_base.
+    main_thr->stack_base = (void *)FOS_THREAD_STACK_END(main_thr->tid);
+
+    proc->sig_vec = empty_sig_vector(); 
+    proc->sig_allow = empty_sig_vector();
+
+    // We must delete all futex's and clear the futexes map!
+    mp_reset_iter(proc->futexes);
+
+    // Now we need to delete every wait queue (If there are any)
+    basic_wait_queue_t **fwq; // Pretty confusing, but yes this should be a **.
+    mp_reset_iter(proc->futexes);
+    for (fernos_error_t err = mp_get_iter(proc->futexes, NULL, (void **)&fwq);
+                err == FOS_E_SUCCESS; err = mp_next_iter(proc->futexes, NULL, (void **)&fwq)) {
+        delete_wait_queue((wait_queue_t *)*fwq); 
+    }
+
+    // Finally, what else?? 
+    // Clear the map too??
+    // If we could clear the map, that would be nice tbh!!
+
+    // We need to be able to clear a map!
 
     return FOS_E_SUCCESS;
 }
