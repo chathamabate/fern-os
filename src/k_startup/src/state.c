@@ -443,6 +443,13 @@ KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const vo
         size_t u_args_block_size) {
     fernos_error_t err;
 
+    if (!(ks->schedule.head)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = (thread_t *)(ks->schedule.head);
+    process_t *proc = thr->proc;
+
     // Things that need to be done:
     // 1) Copy entire user app and args block from userspace into kernel space.
     // 2) Create a new page directroy for the user app and args block.
