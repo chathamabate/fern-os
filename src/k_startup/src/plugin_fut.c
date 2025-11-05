@@ -1,5 +1,7 @@
 
 #include "k_startup/plugin_fut.h"
+#include "k_startup/process.h"
+#include "k_startup/page_helpers.h"
 
 static bool fm_key_eq(const void *k0, const void *k1) {
     return *(const futex_t **)k0 == *(const futex_t **)k1;
@@ -68,20 +70,118 @@ plugin_t *new_plugin_fut(kernel_state_t *ks) {
 
 static fernos_error_t plg_fut_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1,
         uint32_t arg2, uint32_t arg3) {
+    fernos_error_t err;
+
     plugin_fut_t *plg_fut = (plugin_fut_t *)plg;
     kernel_state_t *ks = plg->ks;
 
     thread_t *curr_thr = (thread_t *)(ks->schedule.head);
+    process_t *proc = curr_thr->proc;
+
+    map_t *fut_map = plg_fut->fut_maps[proc->pid];
+    if (!fut_map) {
+        return FOS_E_STATE_MISMATCH;
+    }
 
 
     switch (cmd) {
 
+    /*
+     * Register a futex with the futex plugin.
+     *
+     * A futex is a number, which is mapped to a wait queue in this plugin.
+     *
+     * Threads will be able to wait while the futex holds a specific value.
+     *
+     * Returns an error if there are insufficient resources, if futex is NULL,
+     * or if the futex is already in use!
+     */
     case PLG_FUT_PCID_REGISTER: {
+        futex_t *u_fut = (futex_t *)arg0;
 
+        if (!u_fut) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS); 
+        }
+
+        if (mp_get(fut_map, &u_fut)) {
+            DUAL_RET(curr_thr, FOS_E_ALREADY_ALLOCATED, FOS_E_SUCCESS);
+        }
+
+        // Do we have access to this futex?
+        futex_t test;
+        err = mem_cpy_from_user(&test, proc->pd, u_fut, sizeof(futex_t), NULL);
+        if (err != FOS_E_SUCCESS) {
+            DUAL_RET(curr_thr, FOS_E_INVALID_INDEX, FOS_E_SUCCESS);
+        }
+
+        basic_wait_queue_t *bwq = new_basic_wait_queue(proc->al);
+        if (!bwq) {
+            DUAL_RET(curr_thr, FOS_E_NO_MEM, FOS_E_SUCCESS);
+        }
+
+        err = mp_put(fut_map, &u_fut, &bwq);
+        if (err != FOS_E_SUCCESS) {
+            delete_wait_queue((wait_queue_t *)bwq);
+            DUAL_RET(curr_thr, FOS_E_NO_MEM, FOS_E_SUCCESS);
+        }
+
+        DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
+    /*
+     * Deregister a futex of the current process.
+     *
+     * Doesn't return a user error.
+     *
+     * If threads are currently waiting on this futex, they are rescheduled with return value
+     * FOS_E_STATE_MISMATCH.
+     *
+     * Returns an error if there is some issue with the deregister.
+     */
 	case PLG_FUT_PCID_DEREGISTER: {
-		
+        futex_t *u_fut = (futex_t *)arg0;
+
+        if (!u_fut) {
+            return FOS_E_SUCCESS;
+        }
+
+        basic_wait_queue_t **_bwq = mp_get(fut_map, &u_fut);
+        if (!_bwq) {
+            return FOS_E_SUCCESS; // Unmapped futex doesn't do anything.
+        }
+
+        basic_wait_queue_t *bwq = *_bwq;
+        if (!bwq) {
+            return FOS_E_STATE_MISMATCH; // something very wrong if this is the case.
+        }
+
+        // Now we are going to wake up all threads which may have been waiting on this futex!
+        err = bwq_notify_all(bwq);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        thread_t *woken_thread;
+        while ((err = bwq_pop(bwq, (void **)&woken_thread)) == FOS_E_SUCCESS) {
+            woken_thread->wq = NULL;
+            woken_thread->ctx.eax = FOS_E_STATE_MISMATCH;
+            woken_thread->state = THREAD_STATE_DETATCHED;
+
+            thread_schedule(woken_thread, &(ks->schedule));
+        }
+
+        // Some sort of error with the popping.
+        if (err != FOS_E_EMPTY) {
+            return err;
+        }
+
+        // At this point the wait queue should be totally empty,
+        // let's delete it and remove it from the map!
+
+        delete_wait_queue((wait_queue_t *)bwq);
+        mp_remove(fut_map, &u_fut);
+
+        return FOS_E_SUCCESS;
 	}
 
 	case PLG_FUT_PCID_WAIT: {
