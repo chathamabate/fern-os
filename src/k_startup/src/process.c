@@ -255,6 +255,8 @@ fernos_error_t delete_process(process_t *proc) {
 
 fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, uint32_t arg0,
         uint32_t arg1, uint32_t arg2) {
+    fernos_error_t err;
+
     if (new_pd == NULL_PHYS_ADDR || !entry) {
         return FOS_E_BAD_ARGS;
     }
@@ -265,6 +267,17 @@ fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, u
     if (!main_thr) {
         return FOS_E_STATE_MISMATCH;
     }
+
+    thread_id_t main_tid = main_thr->tid;
+
+    const void *true_e; // I should really make this arg optional ugh!
+    err = pd_alloc_pages(new_pd, true, (void *)(FOS_THREAD_STACK_END(main_tid) - M_4K), 
+            (void *)FOS_THREAD_STACK_END(main_tid), &true_e);
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_NO_MEM; // This is a recoverable error for the given process as it
+                             // is left unmodified.
+    }
+    
 
     // Might need to redo this tbh.
 
@@ -284,36 +297,6 @@ fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, u
     return FOS_E_SUCCESS;
 }
 
-/**
- * Allocate a new thread, and its initial stack pages.
- */
-static thread_t *proc_new_thread_with_stack(process_t *proc,
-        thread_id_t tid, uintptr_t entry, uint32_t arg0, uint32_t arg1, uint32_t arg2) {
-    thread_t *new_thr = new_thread(proc, tid, entry, arg0, arg1, arg2);
-    if (!new_thr) {
-        return NULL;
-    }
-
-    const void *true_e;
-    
-    const void *tstack_end = (void *)FOS_THREAD_STACK_END(tid);
-    void *tstack_start = (void *)((uint8_t *)tstack_end - M_4K);
-
-    new_thr->stack_base = (void *)tstack_end;
-
-    fernos_error_t err = pd_alloc_pages(proc->pd, true, tstack_start, tstack_end, &true_e);
-
-    if (err != FOS_E_SUCCESS && err != FOS_E_ALREADY_ALLOCATED) {
-        delete_thread(new_thr);
-        return NULL;
-    }
-
-    // Only set the new stack base one the allocation succeeds. 
-    new_thr->stack_base = tstack_start;
-
-    return new_thr;
-}
-
 thread_t *proc_new_thread(process_t *proc, uintptr_t entry, uint32_t arg0, uint32_t arg1,
         uint32_t arg2) {
     if (!proc || !entry) {
@@ -327,7 +310,8 @@ thread_t *proc_new_thread(process_t *proc, uintptr_t entry, uint32_t arg0, uint3
         return NULL;
     }
 
-    thread_t *new_thr = proc_new_thread_with_stack(proc, tid, entry, arg0, arg1, arg2);
+    // No more stack allocation here! Only ever by the page fault handler!
+    thread_t *new_thr = new_thread(proc, tid, entry, arg0, arg1, arg2);
     if (!new_thr) {
         idtb_push_id(proc->thread_table, tid);
         return NULL;

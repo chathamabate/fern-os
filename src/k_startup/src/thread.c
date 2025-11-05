@@ -22,8 +22,6 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry,
 
     allocator_t *al = proc->al;
 
-    // Many, many things to think about here tbh....
-
     thread_t *thr = al_malloc(al, sizeof(thread_t));
     if (!thr) {
         return NULL;
@@ -38,7 +36,7 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry,
     thr->state = THREAD_STATE_DETATCHED;
 
     thr->tid = tid;
-    thr->stack_base = NULL;
+    thr->stack_base = tstack_end; // New change here! hopefully this works!
 
     *(process_t **)&(thr->proc) = proc;
     thr->wq = NULL;
