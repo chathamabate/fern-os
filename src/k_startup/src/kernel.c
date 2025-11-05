@@ -31,7 +31,6 @@
 #include "k_startup/vga_cd.h"
 
 #include "s_bridge/test/app.h"
-#include "s_data/test/map.h"
 
 #include <stdint.h>
 

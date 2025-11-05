@@ -278,6 +278,18 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
     *cmd_id = (uint16_t)plg_scid;
 }
 
+/*
+ * ***** Futex Plugin *****
+ */
+
+#define PLG_FUTEX_ID (0U)
+
+#define PLG_FUT_PCID_REGISTER   (0x0U)
+#define PLG_FUT_PCID_DEREGISTER (0x1U)
+#define PLG_FUT_PCID_WAIT       (0x2U)
+#define PLG_FUT_PCID_WAKE       (0x3U)
+
+#define PLG_FUTEX_NUM_CMDS (PLG_FUT_PCID_WAKE + 1)
 
 /*
  * ***** File System Plugin *****
