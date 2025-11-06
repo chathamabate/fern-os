@@ -155,6 +155,21 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
     return FOS_E_SUCCESS;
 }
 
+/**
+ * Helper function.
+ *
+ * This gives all living and zombie children to the root process.
+ * If zombie children are adopted by the root process, a signal will be sent.
+ *
+ * NOTE: What if `proc` is the root process?
+ * In this case, if `proc` has any living/zombie children, FOS_E_NOT_PERMITTED is returned
+ * Otherwise, this function doesn't need to do anything and FOS_E_SUCCESS is returned.
+ *
+ * If `root_signaled` is given, it will be set to true iff a signal was sent to the root,
+ * otherwise false.
+ */
+static fernos_error_t ks_abandon_children(kernel_state_t *ks, process_t *proc, bool *root_signaled);
+
 static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc, 
         proc_exit_status_t status);
 
@@ -244,6 +259,66 @@ KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
+static fernos_error_t ks_abandon_children(kernel_state_t *ks, process_t *proc, bool *root_signaled) {
+    if (!proc) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (proc == ks->root_proc) {
+        if (l_get_len(proc->children) > 0 || l_get_len(proc->zombie_children) > 0) {
+            return FOS_E_NOT_PERMITTED;
+        }
+
+        // If we have no children to abandon, it is OK for this call to succeed on the root
+        // process.
+        return FOS_E_SUCCESS;
+    }
+
+    // Ok, now begin the adoption process for a non-root process.
+
+    fernos_error_t err;
+
+    // If we have zombie children, we will need to signal the root process at the end!
+    bool signal_root = l_get_len(proc->zombie_children) > 0;
+
+    // Give all living children to the root process.
+    l_reset_iter(proc->children);
+    for (process_t **iter = l_get_iter(proc->children); 
+            iter; iter = l_next_iter(proc->children)) {
+        (*iter)->parent = ks->root_proc;
+    }
+
+    err = l_push_back_all(ks->root_proc->children, proc->children);
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
+    }
+
+    // Give all zombie children to the root process!
+    l_reset_iter(proc->zombie_children);
+    for (process_t **iter = l_get_iter(proc->zombie_children); 
+            iter; iter = l_next_iter(proc->zombie_children)) {
+        (*iter)->parent = ks->root_proc;
+    }
+
+    err = l_push_back_all(ks->root_proc->zombie_children, proc->zombie_children);
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
+    }
+
+    if (signal_root) {
+        err = ks_signal_p(ks, ks->root_proc, FSIG_CHLD);
+        if (err != FOS_E_SUCCESS) {
+            return FOS_E_UNKNWON_ERROR;
+        }
+    }
+
+    if (root_signaled) {
+        *root_signaled = signal_root;
+    }
+
+    return FOS_E_SUCCESS;
+}
+
 static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc, 
         proc_exit_status_t status) {
     fernos_error_t err;
@@ -264,32 +339,12 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
         thread_detach(worker);
     }
 
-    // If we have zombie children, we will need to signal the root process!
-    bool signal_root = l_get_len(proc->zombie_children) > 0;
-
-    // Next, we add all living and zombie children to the root process.
-    // (Also setting their parents to the root process!)
-
-    l_reset_iter(proc->children);
-    for (process_t **iter = l_get_iter(proc->children); 
-            iter; iter = l_next_iter(proc->children)) {
-        (*iter)->parent = ks->root_proc;
-    }
-
-    err = l_push_back_all(ks->root_proc->children, proc->children);
+    // This gives all zombie and living children of `proc` to the root process!
+    bool root_signaled;
+    err = ks_abandon_children(ks, proc, &root_signaled);
     if (err != FOS_E_SUCCESS) {
-        return err;
-    }
-
-    l_reset_iter(proc->zombie_children);
-    for (process_t **iter = l_get_iter(proc->zombie_children); 
-            iter; iter = l_next_iter(proc->zombie_children)) {
-        (*iter)->parent = ks->root_proc;
-    }
-
-    err = l_push_back_all(ks->root_proc->zombie_children, proc->zombie_children);
-    if (err != FOS_E_SUCCESS) {
-        return err;
+        return err; // we know `proc` is not the root process here, so a non-success code 
+                    // is catastrophic!
     }
 
     // Now remove our process from the parent's children list, and move it to the parent's
@@ -310,13 +365,13 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
         return err;
     }
 
-    err = ks_signal_p(ks, proc->parent, FSIG_CHLD);
-    if (err != FOS_E_SUCCESS) {
-        return err;
-    }
+    // Ok, now, our process has exited, and has been added to the parent's zombie children list.
+    // We should only signal the parent iff it hasn't already been signaled by ks_abandon above.
 
-    if (signal_root) {
-        err = ks_signal_p(ks, ks->root_proc, FSIG_CHLD);
+    const bool parent_already_signaled = proc->parent == ks->root_proc && root_signaled;
+
+    if (!parent_already_signaled) {
+        err = ks_signal_p(ks, proc->parent, FSIG_CHLD);
         if (err != FOS_E_SUCCESS) {
             return err;
         }
@@ -436,11 +491,11 @@ KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
  * Helper which copies
  */
 static user_app_t *ua_copy_from_user(user_app_t *u_ua) {
-
+    
 }
 
-KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_args_block,
-        size_t u_args_block_size) {
+KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_abs_ab,
+        size_t u_abs_ab_len) {
     fernos_error_t err;
 
     if (!(ks->schedule.head)) {
@@ -454,6 +509,7 @@ KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const vo
     // 1) Copy entire user app and args block from userspace into kernel space.
     // 2) Create a new page directroy for the user app and args block.
     // 3) Somehow reset the calling process to this new state?
+    // 4) I think before reset we move children and zombie to the root?
     //      Based on how I have organized handles.. and everything else, we must do this all
     //      within the calling process! 
 }

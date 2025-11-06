@@ -210,8 +210,7 @@ KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid);
 /** 
  * Exit the current process. (Becoming a zombie process)
  *
- * FSIG_CHLD is sent to the parent process. If this is the root process, FOS_E_ABORT_SYSTEM is 
- * returned.
+ * FSIG_CHLD is sent to the parent process. If this is the root process, the kernel is shutdown!
  *
  * All living children of this process are now orphans, they are adopted by the root process.
  * All zombie children of this process are now zombie orphas, also adopted by the root process.
@@ -249,17 +248,26 @@ KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_
  * Execute a user application in the current process.
  *
  * This call overwrites the calling process by loading a binary dynamically!
- * 
- * On success, this call does NOT return to the user process, it enters the given app's main function
- * providing the given args as parameters.
- * In this case, the child processes, signal vectors, zombie processes, and default IO handles
- * are all preserved from the calling process.
- * All futexes, non-default handles, and threads of the original process are destroyed.
  *
- * On failure, an error is returned to user space, the calling process remains in its original state.
+ * NOTE: `u_abs_ab` must be a pointer to an ABSOLUTE args block! That is all pointers within
+ * the block must assume the block begins at FOS_APP_ARGS_AREA_START.
+ * SEE: `args_block_make_absolute`.
+ *
+ * On success, this call does NOT return to the user process, it enters the given app's main function
+ * providing the given args as parameters. 
+ * In this case, all child and zombie processes of the calling process are adopted by the root 
+ * process. 
+ * All non-default handles are deleted.
+ * All threads except the main thread are deleted. (The main thread is reset to the entry point
+ * of given user app)
+ * 
+ * A failure to create the new page director for the given application, the given process remains
+ * ENTIRELY in tact and an error is returned to userspace.
+ *
+ * Errors at other points in this function may halt the system.
  */
-KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_args_block,
-        size_t u_args_block_size);
+KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_abs_ab,
+        size_t u_abs_ab_len);
 
 /** 
  * Send a signal to a process with pid `pid`.

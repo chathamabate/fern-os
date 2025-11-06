@@ -194,9 +194,6 @@ void start_kernel(void) {
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
 
-    test_process();
-    lock_up();
-
     thread_t *first_thread = (thread_t *)(kernel->schedule.head);
     return_to_ctx(&(first_thread->ctx));
 }
