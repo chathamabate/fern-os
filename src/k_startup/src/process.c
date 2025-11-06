@@ -269,10 +269,7 @@ fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, u
     proc->sig_vec = empty_sig_vector(); 
     proc->sig_allow = empty_sig_vector();
 
-    // ************************ TODO COME BACK HERE **************************
-    // Delete all futexes and empty the map. (Futex's should really be moved to a 
-    // plugin imo.
-    // proc_clear_fm_map(proc);
+    // Lucky for us, futexes are no longer stored inside the process structure!
 
     // Now, delete all non-default handles, check for errors of course.
     for (handle_t h = 0; h < FOS_MAX_HANDLES_PER_PROC; h++) {

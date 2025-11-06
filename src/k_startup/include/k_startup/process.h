@@ -159,7 +159,7 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  * The new child process will always be single threaded! With the copied thread becoming the new
  * main thread.
  *
- * NOTE: futexes and join queue are NOT copied! And The given process `proc` is not edited in
+ * join queue is NOT copied! And The given process `proc` is not edited in
  * ANY WAY! It is your responsibility to register this new process as a child in the old.
  *
  * Handle states are all copied over.
@@ -202,9 +202,8 @@ fernos_error_t delete_process(process_t *proc);
  * `join_queue` is cleared. (Should already be empty tho)
  * `sig_vec` and `sig_allow` are both set to empty.
  * `signal_queue` is cleared. (Should already be empty tho)
- * `futexes` is cleared.
  * All handles states except for `in_handle` and `out_handle` are removed from
- * `handle_table`.
+ * `handle_table`. (and deleted)
  *
  * FOS_E_ABORT_SYSTEM if there is an error deleting one of the non-default handles.
  * All other of the above actions should always succeed.

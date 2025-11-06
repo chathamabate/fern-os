@@ -297,6 +297,76 @@ static bool test_fork_with_handles(void) {
     TEST_SUCCEED();
 }
 
+static bool test_proc_exec(void) {
+    phys_addr_t pd = pop_initial_user_pd_copy();
+    process_t *mock_parent = (process_t *)0x1;
+
+    process_t *proc = new_da_process(0, pd, mock_parent);
+    TEST_TRUE(proc != NULL);
+
+    // Let's give this process some handles and threads.
+
+    // Main thread should be preserved!
+    thread_t *mt = proc_new_thread(proc, (uint32_t)fake_entry, 0, 0, 0);
+    TEST_TRUE(mt != NULL);
+
+    // This thread will be deleted!
+    TEST_TRUE(proc_new_thread(proc, (uint32_t)fake_entry, 0, 0, 0) != NULL);
+
+    // Finally, some handles too?
+
+    const handle_t NULL_HANDLE = idtb_null_id(proc->handle_table);
+    handle_t handles[3];
+    const size_t handles_len = sizeof(handles) / sizeof(handles[0]);
+
+    for (size_t i = 0; i < handles_len; i++) {
+        handle_t h = idtb_pop_id(proc->handle_table);
+        TEST_TRUE(h != NULL_HANDLE);
+
+        handle_state_t *hs = new_da_mock_handle_state(proc, h, true, true);
+        TEST_TRUE(hs != NULL);
+
+        idtb_set(proc->handle_table, h, hs);
+
+        handles[i] = h;
+    }
+
+    proc->in_handle = NULL_HANDLE;
+    proc->out_handle = handles[0]; // Only 0 should be preserved!
+
+    // Make a new page directory!
+    phys_addr_t new_pd = pop_initial_user_pd_copy();
+    TEST_SUCCESS(proc_exec(proc, new_pd, (uint32_t)fake_entry, 0, 0, 0));
+
+    // Confirm page directories were switched.
+    TEST_EQUAL_HEX(new_pd, proc->pd);
+    
+    // Confirm main thread persisted.
+    TEST_EQUAL_HEX(mt, proc->main_thread);
+
+    // Confirm only the main thread still exists!
+    for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC; tid++) {
+        if (tid == mt->tid) {
+            TEST_EQUAL_HEX(mt, idtb_get(proc->thread_table, tid));
+        } else {
+            TEST_EQUAL_HEX(NULL, idtb_get(proc->thread_table, tid));
+        }
+    }
+
+    // Now confirm just the out handle exists!
+    for (handle_t h = 0; h < FOS_MAX_HANDLES_PER_PROC; h++) {
+        if (h == proc->out_handle) {
+            TEST_TRUE(idtb_get(proc->handle_table, h) != NULL);
+        } else {
+            TEST_EQUAL_HEX(NULL, idtb_get(proc->handle_table, h));
+        }
+    }
+
+    delete_process(proc);
+
+    TEST_SUCCEED();
+}
+
 bool test_process(void) {
     BEGIN_SUITE("Process");
     RUN_TEST(test_new_and_delete);
@@ -305,5 +375,6 @@ bool test_process(void) {
     RUN_TEST(test_fork_process);
     RUN_TEST(test_complex_process);
     RUN_TEST(test_fork_with_handles);
+    RUN_TEST(test_proc_exec);
     return END_SUITE();
 }
