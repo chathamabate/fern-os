@@ -164,11 +164,8 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
  * NOTE: What if `proc` is the root process?
  * In this case, if `proc` has any living/zombie children, FOS_E_NOT_PERMITTED is returned
  * Otherwise, this function doesn't need to do anything and FOS_E_SUCCESS is returned.
- *
- * If `root_signaled` is given, it will be set to true iff a signal was sent to the root,
- * otherwise false.
  */
-static fernos_error_t ks_abandon_children(kernel_state_t *ks, process_t *proc, bool *root_signaled);
+static fernos_error_t ks_abandon_children(kernel_state_t *ks, process_t *proc);
 
 static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc, 
         proc_exit_status_t status);
@@ -259,7 +256,7 @@ KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
-static fernos_error_t ks_abandon_children(kernel_state_t *ks, process_t *proc, bool *root_signaled) {
+static fernos_error_t ks_abandon_children(kernel_state_t *ks, process_t *proc) {
     if (!proc) {
         return FOS_E_BAD_ARGS;
     }
@@ -312,10 +309,6 @@ static fernos_error_t ks_abandon_children(kernel_state_t *ks, process_t *proc, b
         }
     }
 
-    if (root_signaled) {
-        *root_signaled = signal_root;
-    }
-
     return FOS_E_SUCCESS;
 }
 
@@ -340,8 +333,7 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
     }
 
     // This gives all zombie and living children of `proc` to the root process!
-    bool root_signaled;
-    err = ks_abandon_children(ks, proc, &root_signaled);
+    err = ks_abandon_children(ks, proc);
     if (err != FOS_E_SUCCESS) {
         return err; // we know `proc` is not the root process here, so a non-success code 
                     // is catastrophic!
@@ -365,16 +357,30 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
         return err;
     }
 
-    // Ok, now, our process has exited, and has been added to the parent's zombie children list.
-    // We should only signal the parent iff it hasn't already been signaled by ks_abandon above.
-
-    const bool parent_already_signaled = proc->parent == ks->root_proc && root_signaled;
-
-    if (!parent_already_signaled) {
-        err = ks_signal_p(ks, proc->parent, FSIG_CHLD);
-        if (err != FOS_E_SUCCESS) {
-            return err;
-        }
+    // NOTE: By the way this has been designed, the root process may get MULTIPLE FSIG_CHLD
+    // signals on a signle exit.
+    //
+    // Example 1:
+    // root -> proc0 -> proc1 (zombie)
+    //
+    // Here if proc0 exits, root will get an FSIG_CHLD for `proc0` AND for when `proc1` is adopted.
+    //
+    // Example 2:
+    //
+    // root -> proc0 -> proc1 -> proc2 (zombie)
+    //
+    // Assume proc1 exits and proc0 doesn't allow signals. 
+    // First `proc2` is adopted by `root` (sending a FSIG_CHLD)
+    // Then `proc1` is added to `proc0`'s zombie children, `proc0` then forcefully exits,
+    // sending even more FSIG_CHLD's to the root.
+    //
+    // Moral of the story, gauranteeing the root only receives a single FSIG_CHLD during a process
+    // exit is kinda hard to do well. 
+    // For this reason, users of FernOS should understand that receiving an FSIG_CHLD does not
+    // gaurantee there is anyone to reap! 
+    err = ks_signal_p(ks, proc->parent, FSIG_CHLD);
+    if (err != FOS_E_SUCCESS) {
+        return err;
     }
 
     // This call does not return to any user thread!
@@ -434,16 +440,21 @@ KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
         // We are reaping a specific process!
         rproc = idtb_get(ks->proc_table, cpid);
 
-        if (rproc && rproc->parent == proc && rproc->exited == true) {
-            bool removed = l_pop_ele(proc->zombie_children, &rproc, l_ptr_cmp, false);
+        if (rproc && rproc->parent == proc) {
+            user_err = FOS_E_EMPTY; // We found an expected child process!
 
-            if (!removed) {
-                // Something is very wrong if the described process is not in the zombie list.
-                return FOS_E_STATE_MISMATCH;
+            // but is it reapable?
+            if (rproc->exited == true) {
+                bool removed = l_pop_ele(proc->zombie_children, &rproc, l_ptr_cmp, false);
+
+                if (!removed) {
+                    // Something is very wrong if the described process is not in the zombie list.
+                    return FOS_E_STATE_MISMATCH;
+                }
+
+                user_err = FOS_E_SUCCESS;
             }
-
-            user_err = FOS_E_SUCCESS;
-        } 
+        }
     }
 
     proc_id_t rcpid = FOS_MAX_PROCS;

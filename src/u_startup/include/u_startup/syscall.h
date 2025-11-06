@@ -32,7 +32,7 @@ int32_t trigger_syscall(uint32_t id, uint32_t arg0, uint32_t arg1, uint32_t arg2
  *
  * Only the calling thread is copied over into the child process.
  * Multithreading state is not copied (i.e. Futexes and the join queue)
- * Signal vector is not copied. The created process starts with no received signals.
+ * Signal vector is not copied. The created process starts with no received or allowed signals!
  * Deep copies of each file handle are made for the child process!
  *
  * On error, an error is returned just in the calling process.
@@ -55,10 +55,10 @@ fernos_error_t sc_proc_fork(proc_id_t *cpid);
  *
  * All living children of this process are now orphans, they are adopted by the root process.
  * All zombie children of this process are now zombie orphas, also adopted by the root process.
- * All open file handles will remain open until this process is reaped.
+ * All open handles will remain open until this process is reaped.
  *
  * NOTE: if zombie orphans are added to the root process, the root process will also get a
- * FSIG_CHLD.
+ * FSIG_CHLD. 
  *
  * This function is automatically called when returning from a proceess's main thread.
  */
@@ -72,6 +72,8 @@ void sc_proc_exit(proc_exit_status_t status);
  * 
  * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
  * process, FOS_E_STATE_MISMATCH is returned to the user.
+ * If `cpid` DOES correspond to a child of this process, but is yet to exit, FOS_E_EMPTY is
+ * returned to the user.
  *
  * When attempting to reap any zombie process, if there are no zombie children to reap,
  * FOS_E_EMPTY is returned to the user.
@@ -83,6 +85,11 @@ void sc_proc_exit(proc_exit_status_t status);
  * If `rces` is given, the exit status of the reaped child is written to *rces.
  *
  * On error, FOS_MAX_PROCS is written to *rcpid, and PROC_ES_UNSET is written to *rces.
+ *
+ * NOTE: VERY IMPORTANT: It is intended that the user uses this call in combination with a 
+ * wait_signal on FSIG_CHLD. However, based on how the kernel works internally, just because
+ * the FSIG_CHLD signal bit is set DOES NOT mean there is anyone to reap.
+ * In fact, this call `ks_reap_proc` knows NOTHING of the FSIG_CHLD bit.
  */
 fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t *rces);
 
@@ -95,7 +102,7 @@ fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t
  * providing the given args as parameters.
  * In this case, the child processes, signal vectors, zombie processes, and default IO handles
  * are all preserved from the calling process.
- * All futexes, non-default handles, and threads of the original process are destroyed.
+ * non-default handles, and threads of the original process are destroyed.
  *
  * On failure, an error is returned, the calling process remains in its original state.
  */
@@ -147,6 +154,8 @@ fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid);
  *
  * For example, when reaping child processes. All processes may be reapped, but there still
  * may be a lingering FSIG_CHLD bit set in the signal vector.
+ *
+ * NOTE: 11/6/25: Unsure if the example above really holds water. 
  */
 void sc_signal_clear(sig_vector_t sv);
 

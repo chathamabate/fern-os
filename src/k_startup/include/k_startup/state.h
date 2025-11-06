@@ -230,6 +230,8 @@ KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t st
  * 
  * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
  * process, FOS_E_STATE_MISMATCH is returned to the user.
+ * If `cpid` DOES correspond to a child of this process, but is yet to exit, FOS_E_EMPTY is
+ * returned to the user.
  *
  * When attempting to reap any zombie process, if there are no zombie children to reap,
  * FOS_E_EMPTY is returned to the user.
@@ -240,6 +242,11 @@ KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t st
  * If `u_rces` is given, the exit status of the reaped child is written to *u_rces.
  *
  * On error, FOS_MAX_PROCS is written to *u_rcpid, and PROC_ES_UNSET is written to *u_rces.
+ *
+ * NOTE: VERY IMPORTANT: It is intended that the user uses this call in combination with a 
+ * wait_signal on FSIG_CHLD. However, based on how the kernel works internally, just because
+ * the FSIG_CHLD signal bit is set DOES NOT mean there is anyone to reap.
+ * In fact, this call `ks_reap_proc` knows NOTHING of the FSIG_CHLD bit.
  */
 KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, 
         proc_exit_status_t *u_rces);

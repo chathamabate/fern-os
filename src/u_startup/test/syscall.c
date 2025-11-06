@@ -36,7 +36,11 @@ static fernos_error_t reap_single(proc_id_t *rcpid, proc_exit_status_t *rces) {
         err = sc_proc_reap(FOS_MAX_PROCS, rcpid, rces);
         if (err == FOS_E_SUCCESS) {
             // We clear just in case we were able to reap without waiting on the signal!
+            // If we didn't clear, the FSIG_CHLD bit may still be set after returning from this
+            // function. Although, in reality, I don't think that would be such a problem.
             sc_signal_clear(1 << FSIG_CHLD);
+
+            return FOS_E_SUCCESS;
         }
 
         if (err != FOS_E_EMPTY) {
@@ -433,6 +437,28 @@ static bool test_complex_fork2(void) {
     TEST_SUCCEED();
 }
 
+static bool test_premature_reap(void) {
+    // Child signal is already allowed here in the root.
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) { // child.
+        while (1); // The child will just loop forever.
+    }
+
+    // Let's try reaping before the child has exited!
+
+    TEST_EQUAL_HEX(FOS_E_EMPTY, sc_proc_reap(cpid, NULL, NULL));
+
+    // Now, let's forcefully exit the child!
+
+    TEST_SUCCESS(sc_signal(cpid, 2));
+    TEST_SUCCESS(reap_single(NULL, NULL));
+
+    TEST_SUCCEED();
+}
+
 /* 
  * Free Memory Tests 
  * 
@@ -796,6 +822,7 @@ bool test_syscall(void) {
     RUN_TEST(test_complex_fork0);
     RUN_TEST(test_complex_fork1);
     RUN_TEST(test_complex_fork2);
+    RUN_TEST(test_premature_reap);
 
     // Memory tests
 
