@@ -498,13 +498,6 @@ KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     DUAL_RET(thr, user_err, FOS_E_SUCCESS);
 }
 
-/**
- * Helper which copies
- */
-static user_app_t *ua_copy_from_user(user_app_t *u_ua) {
-    
-}
-
 KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_abs_ab,
         size_t u_abs_ab_len) {
     fernos_error_t err;

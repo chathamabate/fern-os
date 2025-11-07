@@ -413,3 +413,67 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
     
     return FOS_E_SUCCESS;
 }
+
+user_app_t *ua_copy_from_user(allocator_t *al, phys_addr_t pd, user_app_t *u_ua) {
+    fernos_error_t err;
+
+    if (!al || pd == NULL_PHYS_ADDR || !u_ua) {
+        return NULL;
+    }
+
+    user_app_t *ua = al_malloc(al, sizeof(user_app_t)); 
+    if (!ua) {
+        return NULL;
+    }
+
+    err = mem_cpy_from_user(&ua, pd, u_ua, sizeof(user_app_t), NULL);
+    if (err != FOS_E_SUCCESS) {
+        al_free(al, ua);
+        return NULL;
+    }
+
+    ua->al = al; // Essential we overwrite the userspace allocator!
+
+    // Ok, now to do a deep copy of all the given regions!
+
+    err = FOS_E_SUCCESS;
+
+    size_t i; 
+
+    for (i = 0; i < FOS_MAX_APP_AREAS && err == FOS_E_SUCCESS; ) {
+        if (ua->areas[i].occupied && ua->areas[i].given_size > 0) { // A copy is required!
+            void *given_copy = al_malloc(al, ua->areas[i].given_size);
+
+            if (given_copy) { 
+                const void *u_given = ua->areas[i].given;
+
+                ua->areas[i].given = given_copy;
+
+                // We incrememnt `i` once `ua->areas` holds a buffer allocated here in this space.
+                // This will make deletion easier in an error case.
+                i++;
+
+                err = mem_cpy_from_user(given_copy, pd, u_given, ua->areas[i].given_size, NULL); 
+            } else { // Failed to malloc
+                err = FOS_E_NO_MEM;
+            }
+        } else {
+            i++;
+        }
+    }
+
+    if (err != FOS_E_SUCCESS) { // error case, we only delete given buffers we know
+                                // are here in this space.
+        for (size_t j = 0; j < i; j++) {
+            if (ua->areas[j].occupied && ua->areas[j].given_size > 0) {
+                al_free(al, (void *)(ua->areas[j].given));
+            }
+        }
+
+        al_free(al, ua);
+
+        return NULL;
+    }
+    
+    return ua;
+}

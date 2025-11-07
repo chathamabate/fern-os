@@ -107,3 +107,13 @@ fernos_error_t mem_set_to_user(phys_addr_t user_pd, void *user_dest, uint8_t val
  */
 fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t abs_ab_len,
         phys_addr_t *out);
+
+/**
+ * Copy a user app which lives in a different memory space into this memory space.
+ *
+ * This is a deep copy into a NEW user app object here in this space.
+ * `al` is used to allocate the new user app object.
+ *
+ * Returns NULL on error.
+ */
+user_app_t *ua_copy_from_user(allocator_t *al, phys_addr_t pd, user_app_t *u_ua);
