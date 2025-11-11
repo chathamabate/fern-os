@@ -509,13 +509,87 @@ KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const vo
     thread_t *thr = (thread_t *)(ks->schedule.head);
     process_t *proc = thr->proc;
 
-    // Things that need to be done:
-    // 1) Copy entire user app and args block from userspace into kernel space.
-    // 2) Create a new page directroy for the user app and args block.
-    // 3) Somehow reset the calling process to this new state?
-    // 4) I think before reset we move children and zombie to the root?
-    //      Based on how I have organized handles.. and everything else, we must do this all
-    //      within the calling process! 
+    // Quick args check.
+    if (!u_ua) {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    if (u_abs_ab_len > 0 && !u_abs_ab) {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    // 1) Attempt to copy user app from userspace here into kernel space.
+
+    user_app_t *ua = ua_copy_from_user(ks->al, proc->pd, u_ua);
+    if (!ua) {
+        DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+    }
+
+    // Save for later.
+    const uint32_t entry = (uint32_t)(ua->entry);
+
+    // 2) Copy in abs args block.
+
+    void *abs_ab = NULL;
+    uint32_t num_args = 0;
+
+    if (u_abs_ab_len > 0) {
+        err = FOS_E_SUCCESS;
+        abs_ab = al_malloc(ks->al, u_abs_ab_len);
+
+        if (abs_ab) {
+            err = mem_cpy_from_user(abs_ab, proc->pd, u_abs_ab, u_abs_ab_len, NULL);
+        }
+
+        // Copy error!
+        if (!abs_ab || err != FOS_E_SUCCESS) {
+            al_free(ks->al, abs_ab);
+            delete_user_app(ua);
+
+            DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+        }
+
+        // Success, let's count the number of arguments actually in the 
+        // args block.
+
+        const size_t max_num_args = u_abs_ab_len / sizeof(uint32_t);
+        uint32_t *abs_ab_prefix = (uint32_t *)abs_ab;
+
+        // Loop until we hit the end of the args block OR we hit a 0.
+        for (; num_args < max_num_args && abs_ab_prefix[num_args]; num_args++);
+    }
+
+    // 3) Create new page directory from abs args block and user app object.
+
+    phys_addr_t new_pd;
+    err = new_user_app_pd(ua, abs_ab, u_abs_ab_len, &new_pd);
+
+    // Regardless of success or error, we can delete the user app and args block now.
+    al_free(ks->al, abs_ab);
+    delete_user_app(ua);
+
+    if (err != FOS_E_SUCCESS) {
+        DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+    }
+
+    // THE POINT OF NO RETURN.
+    // Errors after this point will crash the system. (may change this later)
+
+    // 4) Tell all plugins that a reset is about to occur.
+
+    // 5) Give all children to the root process.
+    PROP_ERR(ks_abandon_children(ks, proc));
+
+    // 6) Exec and schedule!
+    PROP_ERR(proc_exec(proc, new_pd, entry, (uint32_t)FOS_APP_AREA_START, num_args, 0));
+
+    (void)thr; // `proc` has been reset, thus the calling thread may not even exist anymore!
+
+    // At this point, we just schedule the main thread of `proc` and call it a day!
+
+    thread_schedule(proc->main_thread, &(ks->schedule));
+
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t ks_signal_p(kernel_state_t *ks, process_t *proc, sig_id_t sid) {
