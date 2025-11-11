@@ -9,6 +9,8 @@
 #include "s_util/err.h"
 #include "s_util/constraints.h"
 #include "s_util/str.h"
+#include "s_mem/allocator.h"
+#include "s_mem/simple_heap.h"
 #include <stdint.h>
 
 static bool pretest(void);
@@ -323,6 +325,13 @@ static bool test_copy_page_directory(void) {
 
     TEST_SUCCEED();
 }
+
+/*
+ * NOTE: VERY IMPORTANT: in some of the below tests I switch into a copied memory space for
+ * convenience. I have learned this is extra dicey. Calling any of the paging functions from the
+ * copied memory space will likely cause undefined behavior. Those calls rely on the kernel 
+ * free pages which are mapped correctly in the original kernel page directory.
+ */
 
 /**
  * NOTE: This test copies the current page directory!
@@ -781,6 +790,111 @@ static bool test_new_user_app_pd(void) {
     TEST_SUCCEED();
 }
 
+static bool test_ua_copy_from_user(void) {
+    enable_loss_check();
+
+    const user_app_t auto_ua = {
+        .al = NULL,
+        .areas = {
+            (const user_app_area_entry_t) {
+                .occupied = true,
+                .load_position = (void *)0x10,
+
+                .area_size = 0x10,
+                .writeable = true,
+
+                .given = "Hello",
+                .given_size = 6
+            },
+            (const user_app_area_entry_t) {
+                .occupied = true,
+                .load_position = (void *)0x20,
+
+                .area_size = 0x10,
+                .writeable = true,
+
+                .given = "Goodbye",
+                .given_size = 8
+            },
+            (const user_app_area_entry_t) { .occupied = false },
+
+            (const user_app_area_entry_t) {
+                .occupied = true,
+                .load_position = (void *)0x30,
+
+                .area_size = 0x20,
+                .writeable = false,
+
+                .given = NULL,
+                .given_size = 0
+            },
+        }
+    };
+
+    // All tests above assume no heap, this test requires some sort of allocator
+    // though to give to `ua_copy_from_user`. We'll setup a heap real quick to achieve this!
+
+    // First confirm we have no allocator set up. (Not the most rigorous check, but whatever)
+    TEST_EQUAL_HEX(NULL, get_default_allocator());
+
+    const simple_heap_attrs_t small_shal_attrs = { // attributes for a small heap.
+        .start = (void *)FOS_FREE_AREA_START,
+        .end =   (void *)(FOS_FREE_AREA_START + (M_4K)),
+        .mmp = (mem_manage_pair_t) {
+            .request_mem = alloc_pages,
+            .return_mem = free_pages
+        },
+
+        .small_fl_cutoff = 0x100,
+        .small_fl_search_amt = 0x10,
+        .large_fl_search_amt = 0x10
+    };
+
+    phys_addr_t kpd = get_kernel_pd();
+
+    phys_addr_t upd = copy_page_directory(kpd);
+    TEST_TRUE(upd != NULL_PHYS_ADDR);
+
+    allocator_t *al = new_simple_heap_allocator(small_shal_attrs);
+    TEST_TRUE(al != NULL);
+
+    // auto_ua will should exist in upd too! 
+    user_app_t *ua = ua_copy_from_user(al, upd, &auto_ua);
+    TEST_TRUE(ua != NULL);
+
+    // Pretty hand wavey equality check. Really just make sure the given buffers were copied 
+    // correctly!
+    TEST_EQUAL_HEX(auto_ua.entry, ua->entry);
+    for (size_t i = 0; i < FOS_MAX_APP_AREAS; i++) {
+        TEST_EQUAL_HEX(auto_ua.areas[i].occupied, ua->areas[i].occupied);  
+        if (auto_ua.areas[i].occupied) {
+            TEST_EQUAL_HEX(auto_ua.areas[i].load_position, ua->areas[i].load_position);
+            TEST_EQUAL_HEX(auto_ua.areas[i].given_size, ua->areas[i].given_size);
+            if (auto_ua.areas[i].given_size > 0) {
+                TEST_TRUE(mem_cmp(auto_ua.areas[i].given, ua->areas[i].given, auto_ua.areas[i].given_size));
+            }
+        }
+    }
+
+    delete_user_app(ua);
+
+    // Test what happens durring memory exhaustion.
+    do {
+        size_t num_ubs = al_num_user_blocks(al);
+        ua = ua_copy_from_user(al, upd, &auto_ua);
+
+        if (!ua) {
+            TEST_EQUAL_HEX(num_ubs, al_num_user_blocks(al));
+        }
+    } while (ua);
+
+    delete_allocator(al);
+
+    delete_page_directory(upd);
+
+    TEST_SUCCEED();
+}
+
 bool test_page_helpers(void) {
     BEGIN_SUITE("Page Helpers");
 
@@ -792,6 +906,7 @@ bool test_page_helpers(void) {
     RUN_TEST(test_mem_set_user);
     RUN_TEST(test_bad_mem_set);
     RUN_TEST(test_new_user_app_pd);
+    RUN_TEST(test_ua_copy_from_user);
 
     return END_SUITE();
 }

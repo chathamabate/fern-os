@@ -123,6 +123,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
     size_t first_fb_size = (size_t)(shal->brk_ptr) - (size_t)(shal->heap_start) 
         - (2 * sizeof(mem_block_border_t));
 
+
     // This if statement should really never execute.
     // This would error out in the case that our simple heap allocator structure is so large
     // that it takes up the entire first page.

@@ -248,11 +248,10 @@ void pd_free_pages(phys_addr_t pd, void *s, const void *e);
 void delete_page_directory(phys_addr_t pd);
 
 static inline fernos_error_t alloc_pages(void *s, const void *e, const void **true_e) {
-    // NOTE: this is only accesibly in kernel mode, so always allocate as supervisor only.
-    return pd_alloc_pages(get_page_directory(), false, s, e, true_e); 
+    return pd_alloc_pages(get_kernel_pd(), false, s, e, true_e); 
 }
 
 static inline void free_pages(void *s, const void *e) {
-    pd_free_pages(get_page_directory(), s, e);
+    pd_free_pages(get_kernel_pd(), s, e);
 }
 

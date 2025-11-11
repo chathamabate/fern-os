@@ -414,7 +414,7 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
     return FOS_E_SUCCESS;
 }
 
-user_app_t *ua_copy_from_user(allocator_t *al, phys_addr_t pd, user_app_t *u_ua) {
+user_app_t *ua_copy_from_user(allocator_t *al, phys_addr_t pd, const user_app_t *u_ua) {
     fernos_error_t err;
 
     if (!al || pd == NULL_PHYS_ADDR || !u_ua) {
@@ -426,7 +426,7 @@ user_app_t *ua_copy_from_user(allocator_t *al, phys_addr_t pd, user_app_t *u_ua)
         return NULL;
     }
 
-    err = mem_cpy_from_user(&ua, pd, u_ua, sizeof(user_app_t), NULL);
+    err = mem_cpy_from_user(ua, pd, u_ua, sizeof(user_app_t), NULL);
     if (err != FOS_E_SUCCESS) {
         al_free(al, ua);
         return NULL;
@@ -445,6 +445,7 @@ user_app_t *ua_copy_from_user(allocator_t *al, phys_addr_t pd, user_app_t *u_ua)
             void *given_copy = al_malloc(al, ua->areas[i].given_size);
 
             if (given_copy) { 
+                const size_t u_given_size = ua->areas[i].given_size;
                 const void *u_given = ua->areas[i].given;
 
                 ua->areas[i].given = given_copy;
@@ -453,7 +454,7 @@ user_app_t *ua_copy_from_user(allocator_t *al, phys_addr_t pd, user_app_t *u_ua)
                 // This will make deletion easier in an error case.
                 i++;
 
-                err = mem_cpy_from_user(given_copy, pd, u_given, ua->areas[i].given_size, NULL); 
+                err = mem_cpy_from_user(given_copy, pd, u_given, u_given_size, NULL); 
             } else { // Failed to malloc
                 err = FOS_E_NO_MEM;
             }

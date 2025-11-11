@@ -116,4 +116,4 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
  *
  * Returns NULL on error.
  */
-user_app_t *ua_copy_from_user(allocator_t *al, phys_addr_t pd, user_app_t *u_ua);
+user_app_t *ua_copy_from_user(allocator_t *al, phys_addr_t pd, const user_app_t *u_ua);
