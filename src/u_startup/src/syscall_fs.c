@@ -6,6 +6,9 @@
 #include "s_util/str.h"
 #include "s_util/misc.h"
 #include "s_util/elf.h"
+#include "s_util/constraints.h"
+
+#include <stdarg.h>
 
 fernos_error_t sc_fs_set_wd(const char *path) {
     return sc_plg_cmd(PLG_FILE_SYS_ID, PLG_FS_PCID_SET_WD, (uint32_t)path, str_len(path), 0, 0);
@@ -180,4 +183,108 @@ fernos_error_t sc_fs_parse_elf32(allocator_t *al, const char *path, user_app_t *
     sc_handle_close(fh);
 
     return err;
+}
+
+fernos_error_t sc_fs_parse_da_elf32(const char *path, user_app_t **ua) {
+    if (get_default_allocator() == NULL) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    return sc_fs_parse_elf32(get_default_allocator(), path, ua);
+}
+
+fernos_error_t sc_fs_exec_da_elf32(const char * const * args, size_t num_args) {
+    if (!args || num_args == 0) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (get_default_allocator() == NULL) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    fernos_error_t err;
+
+    // 1) let's get the user app loaded.
+    user_app_t *ua;
+    err = sc_fs_parse_da_elf32(args[0], &ua);
+    if (err != FOS_E_SUCCESS) {
+        return err;
+    }
+
+    // 2) Next, let's get the args block created.
+    const void *args_block;
+    size_t args_block_len;
+
+    err = new_da_args_block(args + 1, num_args - 1, &args_block, &args_block_len);
+    if (err != FOS_E_SUCCESS) {
+        delete_user_app(ua);
+        return err;
+    }
+
+    // Make absolute!
+    args_block_make_absolute((void *)args_block, FOS_APP_ARGS_AREA_START);
+
+    // Finally, attempt to execute!
+    err = sc_proc_exec(ua, args_block, args_block_len);
+
+    if (err != FOS_E_SUCCESS) {
+        da_free((void *)args_block); // works when args_block is NULL.
+        delete_user_app(ua);
+
+        return err;
+    } 
+
+    // This should never run, on SUCCESS `sc_proc_exec` should never return.
+    return FOS_E_ABORT_SYSTEM;
+}
+
+fernos_error_t _sc_fs_exec_da_elf32_va(const char *prog, ...) {
+    if (!prog) {
+        return FOS_E_BAD_ARGS;
+    }
+    
+    size_t num_args = 1;
+
+    va_list va_args;
+    va_start(va_args, prog);
+    
+    // First things first, count all non-null args after prog.
+    while (true) {
+        const char *arg = va_arg(va_args, const char *);
+        if (!arg) {
+            break;
+        }
+        num_args++;
+    }
+
+    va_end(va_args);
+
+    // Now place all arg pointers in a dynamic array.
+    // (We kinda know that on 32-bit x86, the const char *'s are already in perfect order on the
+    // stack, but whatever, we'll do it the "right" way)
+
+    const char **args = da_malloc(sizeof(const char *) * num_args);
+    if (!args) {
+        return FOS_E_NO_MEM;
+    }
+
+    args[0] = prog;
+
+    va_start(va_args, prog);
+    for (size_t i = 1; i < num_args; i++) {
+        args[i] = va_arg(va_args, const char *);
+    }
+    va_end(va_args);
+
+    fernos_error_t err;
+
+    err = sc_fs_exec_da_elf32(args, num_args);
+
+    if (err != FOS_E_SUCCESS) {
+        da_free(args);
+        return err;
+    }
+
+    // Should never make it here!
+    return FOS_E_ABORT_SYSTEM;
 }

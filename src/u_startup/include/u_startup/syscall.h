@@ -100,9 +100,14 @@ fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t
  * 
  * On success, this call does NOT return, it enters the given app's main function
  * providing the given args as parameters.
- * In this case, the child processes, signal vectors, zombie processes, and default IO handles
- * are all preserved from the calling process.
- * non-default handles, and threads of the original process are destroyed.
+ * In this case, all child/zombie processes are adopted by the root process.
+ * Signal vectors are clears.
+ *
+ * The only thing really preserved are the default IO handles!
+ *
+ * NOTE: When this new application is entered, it uses a new memory space which has NO HEAP setup.
+ *
+ * NOTE: `args_block` is expected to be absolute from FOS_APP_ARGS_AREA_START.
  *
  * On failure, an error is returned, the calling process remains in its original state.
  */
