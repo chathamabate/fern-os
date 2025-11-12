@@ -32,6 +32,7 @@ typedef struct _plugin_impl_t {
     fernos_error_t (*plg_tick)(plugin_t *plg);
     fernos_error_t (*plg_cmd)(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
     fernos_error_t (*plg_on_fork_proc)(plugin_t *plg, proc_id_t cpid);
+    fernos_error_t (*plg_on_reset_proc)(plugin_t *plg, proc_id_t pid);
     fernos_error_t (*plg_on_reap_proc)(plugin_t *plg, proc_id_t rpid);
 } plugin_impl_t;
 
@@ -147,6 +148,26 @@ static inline fernos_error_t plg_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
  * Execute `plg_on_fork` on an array of plugins. 
  */
 fernos_error_t plgs_on_fork_proc(plugin_t **plgs, size_t plgs_len, proc_id_t cpid);
+
+/**
+ * When `proc_exec` is called, a process is completely overwritten (except for its default IO handles).
+ * All of its children/zombie process are adopted by the root process.
+ * All it's threads are deleted or reset. And its memory space is replaced.
+ *
+ * BEFORE ANY of these things happen though, this handler will be called with the `pid` of the
+ * process which is about to be reset.
+ */
+static inline fernos_error_t plg_on_reset_proc(plugin_t *plg, proc_id_t pid) {
+    if (plg->impl->plg_on_reset_proc) {
+        return plg->impl->plg_on_reset_proc(plg, pid);
+    }
+    return FOS_E_SUCCESS;
+}
+
+/**
+ * Execute `plg_on_reset_proc` on an array of plugins.
+ */
+fernos_error_t plgs_on_reset_proc(plugin_t **plgs, size_t plgs_len, proc_id_t pid);
 
 /**
  * When a process is reaped by the kernel state current thread, this will be called

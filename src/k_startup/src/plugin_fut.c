@@ -17,6 +17,7 @@ static uint32_t fm_key_hash(const void *k) {
 static fernos_error_t plg_fut_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1,
         uint32_t arg2, uint32_t arg3);
 static fernos_error_t plg_fut_on_fork_proc(plugin_t *plg, proc_id_t cpid);
+static fernos_error_t plg_fut_on_reset_proc(plugin_t *plg, proc_id_t pid);
 static fernos_error_t plg_fut_on_reap_proc(plugin_t *plg, proc_id_t rpid);
 
 static const plugin_impl_t PLUGIN_FUT_IMPL = {
@@ -25,6 +26,7 @@ static const plugin_impl_t PLUGIN_FUT_IMPL = {
     .plg_cmd = plg_fut_cmd,
     .plg_tick = NULL,
     .plg_on_fork_proc = plg_fut_on_fork_proc,
+    .plg_on_reset_proc = plg_fut_on_reset_proc,
     .plg_on_reap_proc =plg_fut_on_reap_proc 
 };
 
@@ -319,6 +321,69 @@ static fernos_error_t plg_fut_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
     return FOS_E_SUCCESS;
 }
 
+static fernos_error_t plg_fut_on_reset_proc(plugin_t *plg, proc_id_t pid) {
+    plugin_fut_t *plg_fut = (plugin_fut_t *)plg;
+
+    map_t *fut_map = plg_fut->fut_maps[pid];
+
+    if (!fut_map) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    // We need to remove all threads from each basic wait queue within the map.
+    // Each removed thread will be left in a detached state. 
+    // Each basic wait queue is then deleted.
+    //
+    // At the very end, the full futex map is emptied of all bwq references!
+
+    fernos_error_t err;
+
+    mp_reset_iter(fut_map);
+    basic_wait_queue_t **_bwq;
+    for (err = mp_get_iter(fut_map, NULL, (void **)&_bwq); err == FOS_E_SUCCESS;
+            err = mp_next_iter(fut_map, NULL, (void **)&_bwq)) {
+
+        basic_wait_queue_t *bwq = *_bwq;
+        if (!bwq) {
+            return FOS_E_STATE_MISMATCH; // should never happen.
+        }
+
+        err = bwq_notify_all(bwq);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        thread_t *woken_thr;
+        while ((err = bwq_pop(bwq, (void **)&woken_thr)) == FOS_E_SUCCESS) {
+            woken_thr->wq = NULL;
+            woken_thr->ctx.eax = FOS_E_STATE_MISMATCH;
+            woken_thr->state = THREAD_STATE_DETATCHED;
+
+            // Unlike in other areas of this plugin, `woken_thr` will NOT be scheduled, it'll remain
+            // detatched until it is either deleted or overwritten by the kernel during exec.
+        }
+
+        if (err != FOS_E_EMPTY) {
+            return err;
+        }
+
+        // Since basic wait queue is now empty, we can delete it safely!
+
+        delete_wait_queue((wait_queue_t *)bwq);
+    }
+
+    if (err != FOS_E_EMPTY) {
+        return err;
+    }
+
+    // Finally remove all entries from the futex map!
+    // After this, `fut_map` has safely been entirely emptied! It is fresh and ready for the
+    // new application.
+    mp_clear(fut_map);
+
+    return FOS_E_SUCCESS;
+}
+
 static fernos_error_t plg_fut_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
     plugin_fut_t *plg_fut = (plugin_fut_t *)plg;
 
@@ -333,12 +398,18 @@ static fernos_error_t plg_fut_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
     // are detached. So, if a process is being reaped, none of its threads will be in the wait
     // queues we are about to delete!
 
+    fernos_error_t err;
+
     mp_reset_iter(fut_map);
     
     basic_wait_queue_t **bwq;
-    for (fernos_error_t err = mp_get_iter(fut_map, NULL, (void **)&bwq); err != FOS_E_EMPTY;
+    for (err = mp_get_iter(fut_map, NULL, (void **)&bwq); err == FOS_E_SUCCESS;
             err = mp_next_iter(fut_map, NULL, (void **)&bwq)) {
         delete_wait_queue((wait_queue_t *)*bwq);
+    }
+
+    if (err != FOS_E_EMPTY) {
+        return err;
     }
 
     // Finally, delete the map itself!

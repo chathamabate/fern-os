@@ -15,6 +15,7 @@ static const plugin_impl_t PLUGIN_VGA_CD_IMPL = {
     .plg_cmd = vga_cd_plg_cmd,
     .plg_tick = NULL,
     .plg_on_fork_proc = NULL,
+    .plg_on_reset_proc = NULL,
     .plg_on_reap_proc = NULL,
 };
 

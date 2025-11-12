@@ -576,6 +576,7 @@ KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const vo
     // Errors after this point will crash the system. (may change this later)
 
     // 4) Tell all plugins that a reset is about to occur.
+    PROP_ERR(plgs_on_reset_proc(ks->plugins, FOS_MAX_PLUGINS, proc->pid));
 
     // 5) Give all children to the root process.
     PROP_ERR(ks_abandon_children(ks, proc));
@@ -583,7 +584,7 @@ KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const vo
     // 6) Exec and schedule!
     PROP_ERR(proc_exec(proc, new_pd, entry, (uint32_t)FOS_APP_ARGS_AREA_START, num_args, 0));
 
-    (void)thr; // `proc` has been reset, thus the calling thread may not even exist anymore!
+    thr = NULL; // `proc` has been reset, thus the calling thread may not even exist anymore!
 
     // At this point, we just schedule the main thread of `proc` and call it a day!
 

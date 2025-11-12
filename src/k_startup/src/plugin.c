@@ -35,6 +35,23 @@ fernos_error_t plgs_on_fork_proc(plugin_t **plgs, size_t plgs_len, proc_id_t cpi
     return FOS_E_SUCCESS;
 }
 
+fernos_error_t plgs_on_reset_proc(plugin_t **plgs, size_t plgs_len, proc_id_t pid) {
+    fernos_error_t err;
+    for (size_t i = 0; i < plgs_len; i++) {
+        plugin_t *plg = plgs[i];
+
+        if (plg) {
+            err = plg_on_reset_proc(plg, pid);
+
+            if (err != FOS_E_SUCCESS) {
+                return err;
+            }
+        }
+    }
+
+    return FOS_E_SUCCESS;
+}
+
 fernos_error_t plgs_on_reap_proc(plugin_t **plgs, size_t plgs_len, proc_id_t rpid) {
     fernos_error_t err;
     for (size_t i = 0; i < plgs_len; i++) {
