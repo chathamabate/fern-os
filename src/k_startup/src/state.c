@@ -581,7 +581,7 @@ KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const vo
     PROP_ERR(ks_abandon_children(ks, proc));
 
     // 6) Exec and schedule!
-    PROP_ERR(proc_exec(proc, new_pd, entry, (uint32_t)FOS_APP_AREA_START, num_args, 0));
+    PROP_ERR(proc_exec(proc, new_pd, entry, (uint32_t)FOS_APP_ARGS_AREA_START, num_args, 0));
 
     (void)thr; // `proc` has been reset, thus the calling thread may not even exist anymore!
 

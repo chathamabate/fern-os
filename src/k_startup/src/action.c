@@ -144,7 +144,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         break;
 
     case SCID_PROC_EXEC:
-        err = ks_exec(kernel, (user_app_t *)arg0, (const void *)arg1, (size_t)arg1);
+        err = ks_exec(kernel, (user_app_t *)arg0, (const void *)arg1, (size_t)arg2);
         break;
 
     case SCID_SIGNAL:
