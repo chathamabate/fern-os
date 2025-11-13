@@ -180,32 +180,39 @@ bin: $(ELF_FILE)
 # have MORE than 8 characters before the extension. Otherwise, FernOS will not be able to locate
 # said files. (Files/directories created from within FernOS will always be given long filenames
 # and thus can have any name length)
+#
+# EDIT: (11/12/25) mtools will also give a file a LFN if the files name has mixed case!
+# For example, naming an app "Test" instead of "test" will result in an LFN!
+#
+# Also, note that orignally, we were going to construct the "core apps" here in this repo.
+# This would likely overcrowd this repo. I plan to make another repo (maybe called "fern-os-iso"
+# which will build and package core apps into a single ISO.
+# The disk work here is only for testing purposes!
 
-TOY_DISK := $(BUILD_DIR)/hdd.img
-CORE_APPS_GUEST := ::/core_apps
-CORE_APPS_HOST  := $(BUILD_DIR)/core_apps
+TEST_DISK := $(BUILD_DIR)/hdd.img
+TEST_APPS_GUEST := ::/test_apps
+TEST_APPS_HOST  := $(BUILD_DIR)/test_apps
 
-.PHONY: core_apps disk
+.PHONY: test_apps disk
 
-$(CORE_APPS_HOST):
+$(TEST_APPS_HOST):
 	mkdir -p $@
 
-# Maybe later this will include some sort of external repo iteration!
-core_apps: $(ELF_SYMS) $(OS_DEFS_LD) hdrs.install | $(CORE_APPS_HOST)
-	$(MY_MAKE) -C $(SRC_DIR)/dummy_app \
-		BUILD_DIR=$(BUILD_DIR)/dummy_app \
-		HOST_CORE_APPS_DIR=$(CORE_APPS_HOST) \
+test_apps: $(ELF_SYMS) $(OS_DEFS_LD) hdrs.install | $(TEST_APPS_HOST)
+	$(MY_MAKE) -C $(SRC_DIR)/test_app \
+		BUILD_DIR=$(BUILD_DIR)/test_app \
+		HOST_APPS_DIR=$(TEST_APPS_HOST) \
 		INSTALL_DIR=$(INSTALL_DIR) \
 		ELF_SYMS=$(ELF_SYMS) \
 		bin clangd
 
-$(TOY_DISK): core_apps | $(BUILD_DIR)
+$(TEST_DISK): test_apps | $(BUILD_DIR)
 	qemu-img create -f raw $@ 256M
 	mkfs.fat -F 32 -s 2 $@
-	mcopy -i $@ $(CORE_APPS_HOST) $(CORE_APPS_GUEST)
+	mcopy -i $@ $(TEST_APPS_HOST) $(TEST_APPS_GUEST)
 	$(call DONE_MSG,Disk Built)
 
-disk: $(TOY_DISK)
+disk: $(TEST_DISK)
 
 ####################################################################################################
 
@@ -215,13 +222,13 @@ disk: $(TOY_DISK)
 
 all: bin disk
 
-# NOTE: This depends on the TOY_DISK existing.
+# NOTE: This depends on the TEST_DISK existing.
 # Order only deps are annoying, so it's not listed here.
 qemu.bin: $(ELF_FILE)
 	qemu-system-x86_64 \
 		-m 4G \
 		-kernel $(ELF_FILE) \
-		-drive file=$(TOY_DISK),format=raw,index=0,media=disk \
+		-drive file=$(TEST_DISK),format=raw,index=0,media=disk \
 		-display sdl \
 		-full-screen \
 		-monitor stdio

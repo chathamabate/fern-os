@@ -36,7 +36,7 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    err = sc_fs_exec_da_elf32_va("/core_apps/dummy_app", "hello", "world");
+    err = sc_fs_exec_da_elf32_va("/core_apps/dummy_app", "hello", "world", "What is going on");
 
     if (err != FOS_E_SUCCESS) {
         sc_out_write_s("Exec Failure\n");
