@@ -220,12 +220,9 @@ static bool test_big_adoption(void) {
     TEST_SUCCEED();
 }
 
-static void *test_thread_read_worker(void *arg) {
+static void *test_thread_wait_worker(void *arg) {
     handle_t h = *(handle_t *)arg;
-
-    char c;
-    sc_handle_read_full(h, &c, sizeof(c)); // Read forever.
-
+    sc_handle_wait(h);
     return NULL;
 }
 
@@ -235,12 +232,16 @@ static void *test_thread_futex_worker(void *arg) {
     return NULL;
 }
 
-static void *test_thread_do_nothing_worker(void *arg) {
-    if (arg) {
-        return arg; // Just exit!
+static void *test_thread_exec_worker(void *arg) {
+    switch ((uintptr_t)arg) {
+    case 0: // Return right away.
+        return NULL;
+    case 1: // Run forever.
+        while (1);
+    default: // Exec the test application.
+        TEST_SUCCESS(sc_fs_exec_da_elf32_va(TEST_APP));
+        return NULL; // Should never make it here.
     }
-
-    while (1); // DO NOTHING!
 }
 
 static bool test_mutli_threaded(void) {
@@ -260,12 +261,44 @@ static bool test_mutli_threaded(void) {
         const size_t num_futs = sizeof(futs) / sizeof(futs[0]);
 
         for (size_t i = 0; i < num_futs; i++) {
-
+            TEST_SUCCESS(sc_fut_register(futs + i));
         }
-          
-        // What happens when two threads wait on the same handle??
+
+        // Two threads waiting on each futex.
+        for (size_t i = 0; i < num_futs * 2; i++) {
+            TEST_SUCCESS(sc_thread_spawn(NULL, test_thread_futex_worker, futs + (i % num_futs)));
+        }
+
+        handle_t h;
+        TEST_SUCCESS(sc_fs_open(data_pipe_path, &h));
+
+        // 3 threads just waiting on a handle. (Multiple threads ARE allowed to wait on the 
+        // same file handle) On exec, the handle being waited on should be cleaned up!
+        for (size_t i = 0; i < 3; i++) {
+            TEST_SUCCESS(sc_thread_spawn(NULL, test_thread_wait_worker, &h));
+        }
+
+        // 2 threads to return right away.
+        for (size_t i = 0; i < 2; i++) {
+            TEST_SUCCESS(sc_thread_spawn(NULL, test_thread_exec_worker, (void *)0));
+        }
+
+        // 2 threads to run forever.
+        for (size_t i = 0; i < 2; i++) {
+            TEST_SUCCESS(sc_thread_spawn(NULL, test_thread_exec_worker, (void *)1));
+        }
+
+        // This will call exec from a NON MAIN THREAD!
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_thread_exec_worker, (void *)2));
+
+        while (1);
     }
 
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+
+    proc_exit_status_t es;
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &es));
+    TEST_EQUAL_UINT(100, es);
 
     TEST_SUCCESS(sc_fs_remove(data_pipe_path));
 
@@ -279,5 +312,6 @@ bool test_syscall_exec(void) {
     RUN_TEST(test_exit_status);
     RUN_TEST(test_adoption);
     RUN_TEST(test_big_adoption);
+    RUN_TEST(test_mutli_threaded);
     return END_SUITE();
 }
