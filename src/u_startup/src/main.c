@@ -39,6 +39,5 @@ proc_exit_status_t user_main(void) {
 
     test_syscall_exec();
 
-
     return PROC_ES_SUCCESS;
 }
