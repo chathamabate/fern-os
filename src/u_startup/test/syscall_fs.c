@@ -185,6 +185,94 @@ static bool test_multithread_rw(void) {
     TEST_SUCCEED();
 }
 
+static void *test_multithread_wait_same_handle_worker(void *arg) {
+    handle_t h = *(handle_t *)arg;
+
+    TEST_SUCCESS(sc_handle_wait(h));
+
+    return NULL;
+}
+
+static bool test_multithread_wait_same_handle(void) {
+    // Multiple threads ARE allowed to wait on the same handle at the same time.
+    // (However, it's really not advised)
+    // Reading at the same time could cause a system shutdown.
+
+    thread_id_t workers[5];
+    const size_t num_workers = sizeof(workers) / sizeof(workers[0]);
+
+    TEST_SUCCESS(sc_fs_touch("./a.txt"));
+
+    handle_t read_h;
+    TEST_SUCCESS(sc_fs_open("./a.txt", &read_h));
+
+
+    for (size_t i = 0; i < num_workers; i++) {
+        TEST_SUCCESS(sc_thread_spawn(workers + i, test_multithread_wait_same_handle_worker, &read_h));
+    }
+
+    handle_t write_h;
+    TEST_SUCCESS(sc_fs_open("./a.txt", &write_h));
+    TEST_SUCCESS(sc_handle_write_full(write_h, "a", 1));
+
+    for (size_t i = 0; i < num_workers; i++) {
+        TEST_SUCCESS(sc_thread_join(1 << workers[i], NULL, NULL));
+    }
+
+    sc_handle_close(write_h);
+    sc_handle_close(read_h);
+    TEST_SUCCESS(sc_fs_remove("./a.txt"));
+
+    TEST_SUCCEED();
+}
+
+static void *test_multithread_multihandle_worker(void *arg) {
+    handle_t h = *(handle_t *)arg;
+
+    char msg[6];
+    TEST_SUCCESS(sc_handle_read_full(h, msg, sizeof(msg)));
+    TEST_TRUE(str_eq("hello", msg));
+
+    return NULL;
+}
+
+static bool test_multithread_multihandle(void) {
+    // Multiple threads should all be able to read from the same file at the same time GIVEN
+    // they are using different handles.
+
+    thread_id_t workers[10];
+    handle_t read_handles[sizeof(workers) / sizeof(workers[0])];
+    const size_t num_workers = sizeof(workers) / sizeof(workers[0]);
+
+    TEST_SUCCESS(sc_fs_touch("./a.txt"));
+
+    for (size_t i = 0; i < num_workers; i++) {
+        TEST_SUCCESS(sc_fs_open("./a.txt", read_handles + i));
+        TEST_SUCCESS(sc_thread_spawn(workers + i, test_multithread_multihandle_worker, read_handles + i));
+    }
+
+    // We want at least 2 of the workers to be waiting before we write.
+    sc_thread_sleep(1);
+
+    handle_t write_handle;
+    TEST_SUCCESS(sc_fs_open("./a.txt", &write_handle));
+    TEST_SUCCESS(sc_handle_write_full(write_handle, "hello", 6));
+
+    for (size_t i = 0; i < num_workers; i++) {
+        TEST_SUCCESS(sc_thread_join(1 << workers[i], NULL, NULL));
+    }
+
+    sc_handle_close(write_handle);
+
+    for (size_t i = 0; i < num_workers; i++) {
+        sc_handle_close(read_handles[i]);
+    }
+
+    TEST_SUCCESS(sc_fs_remove("./a.txt"));
+
+    TEST_SUCCEED();
+}
+
 static bool test_multiprocess_rw(void) {
     fernos_error_t err;
 
@@ -971,6 +1059,8 @@ bool test_syscall_fs(void) {
     BEGIN_SUITE("FS Syscalls");
     RUN_TEST(test_simple_rw);
     RUN_TEST(test_multithread_rw);
+    RUN_TEST(test_multithread_wait_same_handle);
+    RUN_TEST(test_multithread_multihandle);
     RUN_TEST(test_multiprocess_rw);
     RUN_TEST(test_multithread_and_process_rw);
     RUN_TEST(test_early_close);

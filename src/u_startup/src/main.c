@@ -37,7 +37,7 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    test_syscall_exec();
+    test_syscall_fs();
 
     return PROC_ES_SUCCESS;
 }

@@ -715,6 +715,8 @@ static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t 
             plugin_fs_handle_state_t * const woken_handle_state = (plugin_fs_handle_state_t *)(woken_thr->wait_ctx[0]);
             mem_set(woken_thr->wait_ctx, 0, sizeof(woken_thr->wait_ctx));
 
+            // This could cause system shutdown if the user is writing and reading to 
+            // the same handle with multiple threads.
             if (woken_handle_state->pos != old_len) {
                 return FOS_E_STATE_MISMATCH; // Sanity check.
             }
