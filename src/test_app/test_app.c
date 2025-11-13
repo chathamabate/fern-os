@@ -18,5 +18,11 @@ proc_exit_status_t app_main(const char * const *args, size_t num_args) {
         return 100; // Here we confirm proc exit status works as expected.
     }
 
-    return PROC_ES_SUCCESS;
+    switch (args[0][0]) {
+    case 'a': // Run forever.
+        while (1);
+
+    default:
+        return PROC_ES_SUCCESS;
+    }
 }

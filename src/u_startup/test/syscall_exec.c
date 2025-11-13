@@ -61,8 +61,81 @@ static bool test_exit_status(void) {
     TEST_SUCCEED();
 }
 
+static bool test_adoption(void) {
+    // After running exec, all child processes should be adopted by the root process!
+
+    // We will use a file to communicate with grandchildren!
+    const char *data_pipe_path = "data_pipe";
+    TEST_SUCCESS(sc_fs_touch(data_pipe_path));
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) {
+        sc_signal_allow(1 << FSIG_CHLD);
+
+        proc_id_t gcpid;
+
+        // First grand child will immediately exit.
+        TEST_SUCCESS(sc_proc_fork(&gcpid));
+        if (gcpid == FOS_MAX_PROCS) {
+            sc_proc_exit(PROC_ES_SUCCESS);
+        }
+
+        // Here we wait to confirm it is a zombie.
+        TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+
+        // Second grand child waits for a single character across the data pipe!
+        // Then exits!
+        TEST_SUCCESS(sc_proc_fork(&gcpid));
+        if (gcpid == FOS_MAX_PROCS) {
+            handle_t gc_dp;
+            TEST_SUCCESS(sc_fs_open(data_pipe_path, &gc_dp));
+
+            char c;
+            TEST_SUCCESS(sc_handle_read_full(gc_dp, &c, sizeof(c)));
+
+            sc_handle_close(gc_dp);
+
+            sc_proc_exit(PROC_ES_SUCCESS);
+        }
+
+        // With arg "a", the test application never exits.
+        // When this call executes, exactly one zombie process and one child process should
+        // be adopted by the root process!
+        TEST_SUCCESS(sc_fs_exec_da_elf32_va(TEST_APP, "a"));
+    }
+    
+    // Ok, back in the root. 
+    
+    // First let's reap the only zombie.
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+    TEST_SUCCESS(sc_proc_reap(FOS_MAX_PROCS, NULL, NULL));
+
+    // Next, let's send a character over the data pipe.
+
+    handle_t dp;
+    TEST_SUCCESS(sc_fs_open(data_pipe_path, &dp));
+    TEST_SUCCESS(sc_handle_write_full(dp, "a", 1));
+    sc_handle_close(dp);
+
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+    TEST_SUCCESS(sc_proc_reap(FOS_MAX_PROCS, NULL, NULL));
+
+    // Finally, Let's signal our original child!
+    TEST_SUCCESS(sc_signal(cpid, 1));
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL)); // Wait for forced exit.
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, NULL));
+
+    // Finally, delete the data pipe, and call it a day.
+    TEST_SUCCESS(sc_fs_remove(data_pipe_path));
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_exec(void) {
     BEGIN_SUITE("Syscall Exec");
     RUN_TEST(test_exit_status);
+    RUN_TEST(test_adoption);
     return END_SUITE();
 }
