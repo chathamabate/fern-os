@@ -19,6 +19,7 @@ _ASMS		?= main.s syscall.s
 _TEST_SRCS 	?= syscall.c \
 			   syscall_fut.c \
 			   syscall_fs.c \
+			   syscall_exec.c \
 			   syscall_cd.c \
 			   syscall_default_io.c \
 			   syscall_kb.c

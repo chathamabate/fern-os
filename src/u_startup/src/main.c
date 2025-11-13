@@ -16,6 +16,7 @@
 
 #include "s_util/constraints.h"
 #include <stdarg.h>
+#include "u_startup/test/syscall_exec.h"
 
 proc_exit_status_t user_main(void) {
     // User code here! 
@@ -30,18 +31,14 @@ proc_exit_status_t user_main(void) {
 
     sc_set_out_handle(cd);
 
-    // Setup heap.
+    // Setup heap. Maybe the heap should also be thread safe?
     err = setup_default_simple_heap(USER_MMP);
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
 
-    err = sc_fs_exec_da_elf32_va("/core_apps/dummy_app", "hello", "world", "What is going on");
+    test_syscall_exec();
 
-    if (err != FOS_E_SUCCESS) {
-        sc_out_write_s("Exec Failure\n");
-        return PROC_ES_FAILURE;
-    }
 
     return PROC_ES_SUCCESS;
 }
