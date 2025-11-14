@@ -305,7 +305,58 @@ static bool test_mutli_threaded(void) {
     TEST_SUCCEED();
 }
 
-// Default IO? Multi threading? Then what??
+static bool test_default_io(void) {
+    TEST_SUCCESS(sc_fs_touch("h2c"));
+    TEST_SUCCESS(sc_fs_touch("c2h"));
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) {
+        handle_t d_in;
+        TEST_SUCCESS(sc_fs_open("h2c", &d_in));
+        sc_set_in_handle(d_in);
+
+        handle_t d_out;
+        TEST_SUCCESS(sc_fs_open("c2h", &d_out));
+        sc_set_out_handle(d_out);
+
+        // IO in a loop forever!
+        TEST_SUCCESS(sc_fs_exec_da_elf32_va(TEST_APP, "b"));
+
+        while (1); // should never make it here.
+    }
+
+    handle_t h2c;
+    TEST_SUCCESS(sc_fs_open("h2c", &h2c));
+
+    handle_t c2h;
+    TEST_SUCCESS(sc_fs_open("c2h", &c2h));
+
+    char buf[100];
+
+    TEST_SUCCESS(sc_handle_write_full(h2c, "abc", 3));
+    TEST_SUCCESS(sc_handle_read_full(c2h, buf, 3));
+    TEST_TRUE(mem_cmp("bcd", buf, 3));
+
+    TEST_SUCCESS(sc_handle_write_full(h2c, "aaabbb", 6));
+    TEST_SUCCESS(sc_handle_read_full(c2h, buf, 6));
+    TEST_TRUE(mem_cmp("bbbccc", buf, 6));
+
+    sc_handle_close(c2h);
+    sc_handle_close(h2c);
+
+    TEST_SUCCESS(sc_signal(cpid, 1));
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+
+    proc_exit_status_t es;
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &es));
+    TEST_EQUAL_HEX(PROC_ES_SIGNAL, es);
+
+    TEST_SUCCESS(sc_fs_remove("c2h"));
+    TEST_SUCCESS(sc_fs_remove("h2c"));
+    TEST_SUCCEED();
+}
 
 bool test_syscall_exec(void) {
     BEGIN_SUITE("Syscall Exec");
@@ -313,5 +364,6 @@ bool test_syscall_exec(void) {
     RUN_TEST(test_adoption);
     RUN_TEST(test_big_adoption);
     RUN_TEST(test_mutli_threaded);
+    RUN_TEST(test_default_io);
     return END_SUITE();
 }
