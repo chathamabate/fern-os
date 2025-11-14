@@ -49,6 +49,17 @@ proc_exit_status_t app_main(const char * const *args, size_t num_args) {
             }
         }
 
+    case 'c': { // Loop over all args/charcters and produce some checksum.
+        proc_exit_status_t status = 0;
+        for (size_t i = 1; i < num_args; i++) {
+            for (size_t j = 0; args[i][j] != '\0'; j++) {
+                status += (uint8_t)(args[i][j]);
+            }
+        }
+        return status;
+    }
+
+
     default:
         return PROC_ES_SUCCESS;
     }

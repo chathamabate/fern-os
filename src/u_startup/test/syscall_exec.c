@@ -28,17 +28,22 @@ static bool posttest(void);
 #define SYSCALL_EXEC_TEST_DIR "/" _SYSCALL_EXEC_TEST_DIR
 
 sig_vector_t old_sv;
+size_t num_al_blocks;
 
 static bool pretest(void) {
     TEST_SUCCESS(sc_fs_mkdir(SYSCALL_EXEC_TEST_DIR)); 
     TEST_SUCCESS(sc_fs_set_wd(SYSCALL_EXEC_TEST_DIR));
     
     old_sv = sc_signal_allow(1 << FSIG_CHLD);
+    num_al_blocks = al_num_user_blocks(get_default_allocator());
 
     TEST_SUCCEED();
 }
 
 static bool posttest(void) {
+    size_t post_al_blocks = al_num_user_blocks(get_default_allocator());
+    TEST_EQUAL_UINT(num_al_blocks, post_al_blocks);
+
     sc_signal_allow(old_sv);
 
     TEST_SUCCESS(sc_fs_set_wd("/"));
@@ -358,6 +363,53 @@ static bool test_default_io(void) {
     TEST_SUCCEED();
 }
 
+static bool test_big_args(void) {
+    const char *args[100];
+    const size_t num_args = sizeof(args) / sizeof(args[0]);
+
+    proc_exit_status_t exp_es = 0;
+
+    args[0] = TEST_APP;
+    args[1] = "c";
+
+    for (size_t i = 2; i < num_args; i++) {
+        args[i] = i % 2 == 0 ? "hello" : "world";     
+        for (size_t j = 0; args[i][j]; j++) { // redundant computation, but whatever.
+            exp_es += (uint8_t)(args[i][j]);
+        }
+    }
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+    if (cpid == FOS_MAX_PROCS) {
+        TEST_SUCCESS(sc_fs_exec_da_elf32(args, num_args));
+    }
+
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+
+    proc_exit_status_t act_es;
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &act_es));
+    TEST_EQUAL_UINT(exp_es, act_es);
+
+    TEST_SUCCEED();
+}
+
+static bool test_too_big_args(void) {
+    const size_t num_args = 5000;
+    const char **args = da_malloc(sizeof(const char *) * 5000);  
+    TEST_TRUE(args != NULL);
+
+    args[0] = TEST_APP;
+    for (size_t i = 1; i < num_args; i++) {
+        args[i] = "HereIsSomBigArgWooooooh!";
+    }
+
+    TEST_FAILURE(sc_fs_exec_da_elf32(args, num_args));
+    da_free((void *)args);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_exec(void) {
     BEGIN_SUITE("Syscall Exec");
     RUN_TEST(test_exit_status);
@@ -365,5 +417,7 @@ bool test_syscall_exec(void) {
     RUN_TEST(test_big_adoption);
     RUN_TEST(test_mutli_threaded);
     RUN_TEST(test_default_io);
+    RUN_TEST(test_big_args);
+    RUN_TEST(test_too_big_args);
     return END_SUITE();
 }

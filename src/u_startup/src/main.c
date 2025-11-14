@@ -28,7 +28,6 @@ proc_exit_status_t user_main(void) {
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
-
     sc_set_out_handle(cd);
 
     // Setup heap. Maybe the heap should also be thread safe?
@@ -37,7 +36,7 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    test_syscall_exec();
+    // User code here!
 
     return PROC_ES_SUCCESS;
 }
