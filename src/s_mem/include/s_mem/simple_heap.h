@@ -69,3 +69,13 @@ typedef struct _simple_heap_attrs_t {
  * The simple_heap_allocator will request memory as needed.
  */
 allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs);
+
+/**
+ * This attempts to setup a simple heap which spans the entire free area.
+ *
+ * `mmp` is how exactly the allocator will allocate pages within the free area.
+ * From userspace, these should be system calls.
+ *
+ * On success, FOS_E_SUCCESS is returned, and the default allocator is set.
+ */
+fernos_error_t setup_default_simple_heap(mem_manage_pair_t mmp);

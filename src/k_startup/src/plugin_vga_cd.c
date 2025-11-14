@@ -3,7 +3,6 @@
 #include "k_startup/plugin_vga_cd.h"
 #include "k_startup/plugin.h"
 #include "k_startup/handle.h"
-#include "k_startup/page_helpers.h"
 #include "s_bridge/shared_defs.h"
 #include "k_startup/handle_cd.h"
 #include "k_startup/vga_cd.h"
@@ -16,6 +15,7 @@ static const plugin_impl_t PLUGIN_VGA_CD_IMPL = {
     .plg_cmd = vga_cd_plg_cmd,
     .plg_tick = NULL,
     .plg_on_fork_proc = NULL,
+    .plg_on_reset_proc = NULL,
     .plg_on_reap_proc = NULL,
 };
 
@@ -40,7 +40,7 @@ static fernos_error_t vga_cd_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint
     (void)arg2;
     (void)arg3;
 
-    thread_t *thr = plg->ks->curr_thread;
+    thread_t *thr = (thread_t *)(plg->ks->schedule.head);
     process_t *proc = thr->proc;
 
     if (cmd_id == PLG_VGA_CD_PCID_OPEN) {

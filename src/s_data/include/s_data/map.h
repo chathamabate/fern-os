@@ -18,6 +18,7 @@ struct _map_impl_t {
     fernos_error_t (*mp_put)(map_t *mp, const void *key, const void *value);
 
     bool (*mp_remove)(map_t *mp, const void *key);
+    void (*mp_clear)(map_t *mp);
 
     size_t (*mp_len)(map_t *mp);
 
@@ -113,6 +114,16 @@ static inline fernos_error_t mp_put(map_t *mp, const void *key, const void *valu
  */
 static inline bool mp_remove(map_t *mp, const void *key) {
     return mp->impl->mp_remove(mp, key);
+}
+
+/**
+ * Effieicently remove ALL kvps from the map.
+ *
+ * NOTE: this doesn't do anything to the values inside the kvps! Make sure to call necessary 
+ * destructors on all kvps before calling this function!
+ */
+static inline void mp_clear(map_t *mp) {
+    mp->impl->mp_clear(mp);
 }
 
 /**

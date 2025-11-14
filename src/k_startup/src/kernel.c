@@ -23,12 +23,17 @@
 #include "s_block_device/fat32.h"
 #include "s_block_device/fat32_file_sys.h"
 #include "s_block_device/file_sys.h"
+#include "k_startup/plugin_fut.h"
 #include "k_startup/plugin_fs.h"
 #include "k_startup/plugin_kb.h"
 #include "k_startup/plugin_vga_cd.h"
 
 #include "s_util/char_display.h"
 #include "k_startup/vga_cd.h"
+
+#include "s_bridge/test/app.h"
+
+#include "k_startup/test/page_helpers.h"
 
 #include <stdint.h>
 
@@ -85,7 +90,7 @@ static void init_kernel_state(void) {
         setup_fatal("Failed to pop root pid");
     }
 
-    phys_addr_t user_pd = pop_initial_user_info();
+    phys_addr_t user_pd = pop_initial_user_pd_copy();
     if (user_pd == NULL_PHYS_ADDR) {
         setup_fatal("Failed to get user PD");
     }
@@ -98,22 +103,24 @@ static void init_kernel_state(void) {
     kernel->root_proc = proc;
     idtb_set(kernel->proc_table, pid, proc);
 
-    // The first thread spawned will not get a void * arg, nor will it return one.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
     thread_t *thr = proc_new_thread(kernel->root_proc, 
-            (thread_entry_t)user_main, NULL);
+            (uintptr_t)user_main, 0, 0, 0);
     if (!thr) {
         setup_fatal("Failed to allocate first thread");
     }
-#pragma GCC diagnostic pop
 
     // Finally, schedule our first thread!
-    ks_schedule_thread(kernel, thr);
+    thread_schedule(thr, &(kernel->schedule));
 }
 
 static void init_kernel_plugins(void) {
     fernos_error_t err;
+
+    plugin_t *plg_fut = new_plugin_fut(kernel);
+    if (!plg_fut) {
+        setup_fatal("Failed to create Futex plugin");
+    }
+    try_setup_step(ks_set_plugin(kernel, PLG_FUTEX_ID, plg_fut), "Failed to set Futex plugin");
 
     block_device_t *bd = new_da_cached_block_device(
         get_ata_block_device(),
@@ -172,6 +179,7 @@ void start_kernel(void) {
 
     try_setup_step(init_vga_char_display(), "Failed to init VGA terminal");
     try_setup_step(init_paging(), "Failed to setup paging");
+
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     try_setup_step(init_kb(), "Failed to init keyboard");
 
@@ -186,5 +194,6 @@ void start_kernel(void) {
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
 
-    return_to_ctx(&(kernel->curr_thread->ctx));
+    thread_t *first_thread = (thread_t *)(kernel->schedule.head);
+    return_to_ctx(&(first_thread->ctx));
 }

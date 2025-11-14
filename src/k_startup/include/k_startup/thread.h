@@ -5,6 +5,7 @@
 #include "k_startup/fwd_defs.h"
 #include "s_mem/allocator.h"
 #include "s_data/wait_queue.h"
+#include "s_data/ring.h"
 #include "s_data/destructable.h"
 #include "s_bridge/ctx.h"
 #include <stdbool.h>
@@ -33,18 +34,14 @@ typedef uint32_t thread_state_t;
 
 struct _thread_t {
     /**
+     * A thread will also be a ring element. (The ring being a schedule)
+     */
+    ring_element_t super;
+
+    /**
      * The state of this thread.
      */
     thread_state_t state;
-
-    /**
-     * These are used for scheduling only.
-     *
-     * We expect when threads are scheduled, that they belong to a cyclic
-     * doubly linked list. (i.e. these two pointers should never be NULL when scheduled)
-     */
-    thread_t *next_thread;
-    thread_t *prev_thread;
 
     /**
      * The process local id of this thread.
@@ -65,7 +62,7 @@ struct _thread_t {
 
     /**
      * When a thread is in the waiting state, this field is populated.
-     * Otherwise, this field is NULL.
+     * Otherwise, this field is NULL.  
      */
     wait_queue_t *wq;
 
@@ -93,20 +90,34 @@ struct _thread_t {
     void *exit_ret_val;
 };
 
+
 /**
  * Create a new thread!
  *
  * Returns NULL if we have insufficient memory to create the thread. Or if arguments are invalid.
  *
- * This DOES NOT allocate into the owning process's page directory, that is your responsibility.
- * This will set %esp in the created thread to the correct position given its TID.
+ * This DOES NOT allocate into the owning process's page directory.
+ * It set the %esp and stack_base to the very end of the stack area associated with `tid`.
+ *
+ * We'd expect that when this thread starts executing, a page fault occurs immediately, which
+ * would allocate the very first stack page!
  *
  * Also, this function does not edit the parent process in any way. It it your responsibility
  * to actually place the created thread into the process's thread table!
  *
  * Lastly, threads assume the same allocator has the parent process.
  */
-thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, void *arg);
+thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry, 
+        uint32_t arg0, uint32_t arg1, uint32_t arg2);
+
+/**
+ * Given a thread, detach it, then set its context to the given entry point.
+ * `stack_base` of the given thread will be left unchanged. However, %esp will be set back
+ * to the end of the stack area corresponding to `thr->tid`.
+ *
+ * This call never fails.
+ */
+void thread_reset(thread_t *thr, uintptr_t entry, uint32_t arg0, uint32_t arg1, uint32_t arg2);
 
 /**
  * Copy a given thread.
@@ -125,12 +136,25 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, thread_entry_t entry, voi
 thread_t *new_thread_copy(thread_t *thr, process_t *new_proc);
 
 /**
- * This call is very simple/dangerous.
+ * If a thread is scheduled, the thread is descheduled.
+ * If a thread is waiting, the thread is removed from its wait queue.
+ * (It's wait queue is set to NULL, and context set to 0... SO BE CAREFUL)
+ * If the thread is already detached, do nothing.
+ * If the thread is in an exited state, do nothing.
+ */
+void thread_detach(thread_t *thr);
+
+/**
+ * Add a thread to schedule `r`. 
+ * If `thr` is not detached, `thread_detach` will be called before `thr` is added to `r`.
+ */
+void thread_schedule(thread_t *thr, ring_t *r);
+
+/**
+ * Delete a thread.
  *
- * Given any thread structure, it just frees it, nothing is done to the page directory.
- * Additionally, no checks are done on the thread's state.
+ * NOTE: Before deleting, the thread is detached from its wait queue or schedule!
  *
- * If you want this to be removed from some wait queue or schedule, you must do this yourself
- * before calling this function!
+ * NOTHING is done to the process's page directory!
  */
 void delete_thread(thread_t *thr);

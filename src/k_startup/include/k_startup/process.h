@@ -7,6 +7,7 @@
 #include "s_data/wait_queue.h"
 #include "s_data/map.h"
 #include "s_block_device/file_sys.h"
+#include "s_bridge/app.h"
 
 #include <stdbool.h>
 
@@ -112,14 +113,6 @@ struct _process_t {
     vector_wait_queue_t *signal_queue;
     
     /**
-     * Originally conditions were stored here, however, upon learning more about synchronization
-     * mechanisms, now, futexes are stored here in the process structure.
-     *
-     * This is a map from userspace addresses (futex_t *)'s -> basic_wait_queue's
-     */
-    map_t *futexes;
-
-    /**
      * This ID table will always have a maximum capcity <= 256. This way ID's can always fit
      * in 8 bits. (i.e. the size of a handle_t)
      *
@@ -166,35 +159,59 @@ static inline process_t *new_da_process(proc_id_t pid, phys_addr_t pd, process_t
  * The new child process will always be single threaded! With the copied thread becoming the new
  * main thread.
  *
- * NOTE: futexes and join queue are NOT copied! And The given process `proc` is not edited in
+ * join queue is NOT copied! And The given process `proc` is not edited in
  * ANY WAY! It is your responsibility to register this new process as a child in the old.
  *
- * VERY IMPORTANT: Handle states in the Handle table ARE NOT COPIED! This is because copying a
- * handle state can result in a catastrophic error. So, it's the kernel's responsibility to copy over
- * handles one layer up. (This will copy over the defualt in/out indeces though, but this is trivial)
+ * Handle states are all copied over.
  *
- * Returns NULL if there are insufficient resources or if the arguments are bad.
+ * Returns FOS_E_ABORT_SYSTEM if some catastrophic error occurs.
  *
  * Uses the same allocator as the given process.
  */
-process_t *new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid);
+fernos_error_t new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid, process_t **out);
 
 /**
- * Simple and Dangerous destructor!
+ * Process destructor!
  *
  * This frees all memory used by proc! (Including the full page directory)
  *
- * This does NOT remove threads from wait queues or schedules!!!!!!!
+ * This DOES detach all owned threads from schedules and wait queues.
+ * This DOES delete handle states!
  *
- * VERY IMPORTANT: This DOES NOT delete handle states.
- * This must be dealt with one layer above this one!
- *
- * Before you delete a process, ALWAYS detach all threads!
- * This call DOES NOT check if threads are detatched or not before deleting.
- * Running this function with threads still referenced by the kernel will result in 
- * undefided behavior later on!!
+ * Any non-success error returned from this function is seen as catastrophic!
  */
-void delete_process(process_t *proc);
+fernos_error_t delete_process(process_t *proc);
+
+/**
+ * Overwrite a process to begin other different execution.
+ *
+ * FOS_E_BAD_ARGS if `new_pd` or `entry` are NULL. (Given process is unmodified in this case)
+ * FOS_E_STATE_MISMATCH if there is no main thread on the given process!
+ *
+ * `new_pd` is a page directory which points to a new memory space to be used by this process.
+ * It should have NO user thread stacks allocated! Remember, we never explicitly allocate
+ * the user stacks, we rely on the PF handler to do that!
+ * 
+ * `pid` is preserved.
+ * `pd` is switched with `new_pd`. (then `pd` is deleted)
+ * `parent` is preserved.
+ * `children` is preserved.
+ * `zombie_children` is preserved.
+ *  All threads in the thread table are deleted, except for `main_thread`. (This thread becomes
+ *  the first thread of this new execution context)
+ * `join_queue` is cleared. (Should already be empty tho)
+ * `sig_vec` and `sig_allow` are both set to empty.
+ * `signal_queue` is cleared. (Should already be empty tho)
+ * All handles states except for `in_handle` and `out_handle` are removed from
+ * `handle_table`. (and deleted)
+ *
+ * FOS_E_ABORT_SYSTEM if there is an error deleting one of the non-default handles.
+ * All other of the above actions should always succeed.
+ *
+ * NOTE: On success, just the `main_thr` will exist. And it will be in a detached state!
+ */
+fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, uint32_t arg0,
+        uint32_t arg1, uint32_t arg2);
 
 /**
  * Create a thread within a process with the given entry point and argument!
@@ -202,49 +219,19 @@ void delete_process(process_t *proc);
  *
  * If this process doesn't have a main thread yet, the created thread will be set as main.
  *
- * (Remember, entry and arg should both be userspace pointers!)
- *
  * On Success, the a pointer to the created thread is returned.
  * On error, NULL is returned.
  *
  * NOTE: This uses the same allocator which was used for `proc`.
  */
-thread_t *proc_new_thread(process_t *proc, thread_entry_t entry, void *arg);
+thread_t *proc_new_thread(process_t *proc, uintptr_t entry, uint32_t arg0, uint32_t arg1,
+        uint32_t arg2);
 
 /**
  * Given a process and one of its threads, delete the thread entirely from the process!
  *
- * This call DOES NOT check the thread's state whatsoever, that's your responsibility.
- * Because a thread can potentially be in a wait queue which is external to this process,
- * this DOES NOT remove the given thread from its wait queue (if it is waiting)
- *
- * (Same goes for scheduled threads)
- * It is your responsibility to detatch the given thread before calling this function!
+ * This DOES detach the thread if necessary before deletion!
  *
  * If you'd like the thread's stack pages to be returned, set `return_stack` to true.
  */
 void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack);
-
-/**
- * Register a futex with the process.
- *
- * Returns an error in the case of bad arguments or insufficient resources.
- */
-fernos_error_t proc_register_futex(process_t *proc, futex_t *u_futex);
-
-/**
- * Get a futexes corresponding wait queue. 
- *
- * Returns NULL if it cannot be found.
- */
-basic_wait_queue_t *proc_get_futex_wq(process_t *proc, futex_t *u_futex);
-
-/**
- * Deregister a futex from a process.
- *
- * This deletes its wait queue. And removes it from the futex map.
- *
- * NOTE: This does NO cleanup of threads within the wait queue.
- * Make sure all waiting threads are dealt with before calling this function.
- */
-void proc_deregister_futex(process_t *proc, futex_t *u_futex);

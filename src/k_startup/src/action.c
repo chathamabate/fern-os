@@ -60,8 +60,9 @@ void _return_to_halt_context(void) {
  * If there is no current thread, enter the halt context.
  */
 static void return_to_curr_thread(void) {
-    if (kernel->curr_thread) {
-        return_to_ctx(&(kernel->curr_thread->ctx));
+    thread_t *thr = (thread_t *)(kernel->schedule.head);
+    if (thr) {
+        return_to_ctx(&(thr->ctx));
     }
 
     // If we make it here, we have no thread to schedule :,(
@@ -127,6 +128,8 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     ks_save_ctx(kernel, ctx);
     fernos_error_t err = FOS_E_SUCCESS;
 
+    thread_t *thr = (thread_t *)(kernel->schedule.head);
+
     switch (id) {
     case SCID_PROC_FORK:
         err = ks_fork_proc(kernel, (proc_id_t *)arg0);
@@ -138,6 +141,10 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     case SCID_PROC_REAP:
         err = ks_reap_proc(kernel, (proc_id_t)arg0, (proc_id_t *)arg1, (proc_exit_status_t *)arg2);
+        break;
+
+    case SCID_PROC_EXEC:
+        err = ks_exec(kernel, (user_app_t *)arg0, (const void *)arg1, (size_t)arg2);
         break;
 
     case SCID_SIGNAL:
@@ -156,6 +163,14 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_signal_clear(kernel, (sig_vector_t)arg0);
         break;
 
+    case SCID_MEM_REQUEST:
+        err = ks_request_mem(kernel, (void *)arg0, (const void *)arg1, (const void **)arg2);
+        break;
+
+    case SCID_MEM_RETURN:
+        err = ks_return_mem(kernel, (void *)arg0, (const void *)arg1);
+        break;
+
     case SCID_THREAD_EXIT:
         err = ks_exit_thread(kernel, (void *)arg0);
         break;
@@ -171,22 +186,6 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     case SCID_THREAD_JOIN:
         err = ks_join_local_thread(kernel, arg0, (thread_join_ret_t *)arg1);
-        break;
-
-    case SCID_FUTEX_REGISTER:
-        err = ks_register_futex(kernel, (futex_t *)arg0);
-        break;
-
-    case SCID_FUTEX_DEREGISTER:
-        err = ks_deregister_futex(kernel, (futex_t *)arg0);
-        break;
-
-    case SCID_FUTEX_WAIT:
-        err = ks_wait_futex(kernel, (futex_t *)arg0, arg1);
-        break;
-
-    case SCID_FUTEX_WAKE:
-        err = ks_wake_futex(kernel, (futex_t *)arg0, (bool)arg1);
         break;
 
     case SCID_SET_IN_HANDLE:
@@ -217,11 +216,11 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
             handle_scid_extract(id, &h, &h_cmd);
 
-            id_table_t *handle_table = kernel->curr_thread->proc->handle_table;
+            id_table_t *handle_table = thr->proc->handle_table;
             handle_state_t *hs = idtb_get(handle_table, h);
 
             if (!hs) {
-                kernel->curr_thread->ctx.eax = FOS_E_INVALID_INDEX;
+                thr->ctx.eax = FOS_E_INVALID_INDEX;
                 err = FOS_E_SUCCESS;
             } else { // handle found!
                 switch (h_cmd) {
@@ -255,13 +254,13 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
             plugin_t *plg = kernel->plugins[plg_id];
 
             if (!plg) {
-                kernel->curr_thread->ctx.eax = FOS_E_INVALID_INDEX;
+                thr->ctx.eax = FOS_E_INVALID_INDEX;
                 err = FOS_E_SUCCESS;
             } else {
                 err = plg_cmd(plg, plg_cmd_id, arg0, arg1, arg2, arg3);
             }
         } else {
-            kernel->curr_thread->ctx.eax = FOS_E_BAD_ARGS;
+            thr->ctx.eax = FOS_E_BAD_ARGS;
             err = FOS_E_SUCCESS;
         }
 

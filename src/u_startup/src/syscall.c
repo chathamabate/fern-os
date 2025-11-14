@@ -1,7 +1,6 @@
 
 #include "u_startup/syscall.h"
 #include "s_bridge/shared_defs.h"
-#include "s_bridge/ctx.h"
 #include "s_util/str.h"
 
 fernos_error_t sc_proc_fork(proc_id_t *cpid) {
@@ -17,6 +16,11 @@ fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t
             (uint32_t)rces, 0);
 }
 
+fernos_error_t sc_proc_exec(user_app_t *ua, const void *args_block, size_t args_block_size) {
+    return (fernos_error_t)trigger_syscall(SCID_PROC_EXEC, (uint32_t)ua, (uint32_t)args_block, 
+            (uint32_t)args_block_size, 0);
+}
+
 fernos_error_t sc_signal(proc_id_t pid, sig_id_t sid) {
     return (fernos_error_t)trigger_syscall(SCID_SIGNAL, (uint32_t)pid, (uint32_t)sid, 0, 0);
 }
@@ -30,8 +34,21 @@ fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid) {
 }
 
 void sc_signal_clear(sig_vector_t sv) {
-    trigger_syscall(SCID_SIGNAL_CLEAR, (uint32_t)sv, 0, 0, 0);
+    (void)trigger_syscall(SCID_SIGNAL_CLEAR, (uint32_t)sv, 0, 0, 0);
 }
+
+fernos_error_t sc_mem_request(void *s, const void *e, const void **true_e) {
+    return (fernos_error_t)trigger_syscall(SCID_MEM_REQUEST, (uint32_t)s, (uint32_t)e, (uint32_t)true_e, 0);
+}
+
+void sc_mem_return(void *s, const void *e) {
+    (void)trigger_syscall(SCID_MEM_RETURN, (uint32_t)s, (uint32_t)e, 0, 0);
+}
+
+const mem_manage_pair_t USER_MMP = {
+    .request_mem = sc_mem_request,
+    .return_mem = sc_mem_return
+};
 
 void sc_thread_exit(void *retval) {
     (void)trigger_syscall(SCID_THREAD_EXIT, (uint32_t)retval, 0, 0, 0);
@@ -63,28 +80,12 @@ fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retv
     return err;
 }
 
-fernos_error_t sc_futex_register(futex_t *futex) {
-    return (fernos_error_t)trigger_syscall(SCID_FUTEX_REGISTER, (uint32_t)futex, 0, 0, 0);
-}
-
-void sc_futex_deregister(futex_t *futex) {
-    (void)trigger_syscall(SCID_FUTEX_DEREGISTER, (uint32_t)futex, 0, 0, 0);
-}
-
-fernos_error_t sc_futex_wait(futex_t *futex, futex_t exp_val) {
-    return (fernos_error_t)trigger_syscall(SCID_FUTEX_WAIT, (uint32_t)futex, exp_val, 0, 0);
-}
-
-fernos_error_t sc_futex_wake(futex_t *futex, bool all) {
-    return (fernos_error_t)trigger_syscall(SCID_FUTEX_WAKE, (uint32_t)futex, all, 0, 0);
-}
-
 void sc_set_in_handle(handle_t in) {
     (void)trigger_syscall(SCID_SET_IN_HANDLE, (uint32_t)in, 0, 0, 0);
 }
 
-fernos_error_t sc_in_read(void *u_dest, size_t len, size_t *u_readden) {
-    return (fernos_error_t)trigger_syscall(SCID_IN_READ, (uint32_t)u_dest, (uint32_t)len, (uint32_t)u_readden, 0);
+fernos_error_t sc_in_read(void *dest, size_t len, size_t *readden) {
+    return (fernos_error_t)trigger_syscall(SCID_IN_READ, (uint32_t)dest, (uint32_t)len, (uint32_t)readden, 0);
 }
 
 fernos_error_t sc_in_wait(void) {
@@ -95,8 +96,8 @@ void sc_set_out_handle(handle_t out) {
     (void)trigger_syscall(SCID_SET_OUT_HANDLE, (uint32_t)out, 0, 0, 0);
 }
 
-fernos_error_t sc_out_write(const void *u_src, size_t len, size_t *u_written) {
-    return (fernos_error_t)trigger_syscall(SCID_OUT_WRITE, (uint32_t)u_src, (uint32_t)len, (uint32_t)u_written, 0);
+fernos_error_t sc_out_write(const void *src, size_t len, size_t *written) {
+    return (fernos_error_t)trigger_syscall(SCID_OUT_WRITE, (uint32_t)src, (uint32_t)len, (uint32_t)written, 0);
 }
 
 fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
@@ -193,6 +194,17 @@ fernos_error_t sc_out_write_fmt_s(const char *fmt, ...) {
     va_end(va);
 
     return sc_out_write_s(buf);
+}
+
+void sc_out_write_fmt_s_lf(const char *fmt, ...) {
+    char buf[SC_HANDLE_WRITE_FMT_S_BUFFER_SIZE];
+
+    va_list va; 
+    va_start(va, fmt);
+    str_vfmt(buf, fmt, va);
+    va_end(va);
+
+    (void)sc_out_write_s(buf);
 }
 
 fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {

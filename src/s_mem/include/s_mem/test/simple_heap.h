@@ -6,4 +6,4 @@
 /**
  * Run simple heap tests which a memory manager pair.
  */
-void test_shal(mem_manage_pair_t mmp);
+void test_shal(mem_manage_pair_t mmp, void (*logf)(const char *fmt, ...));

@@ -142,7 +142,7 @@ KS_SYSCALL static inline fernos_error_t hs_write(handle_state_t *hs, const void 
     if (hs->impl->hs_write) {
         return hs->impl->hs_write(hs, u_src, len, u_written);
     }
-    DUAL_RET(hs->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
+    DUAL_RET((thread_t *)(hs->ks->schedule.head), FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }
 
 /**
@@ -163,7 +163,7 @@ KS_SYSCALL static inline fernos_error_t hs_read(handle_state_t *hs, void *u_dst,
     if (hs->impl->hs_read) {
         return hs->impl->hs_read(hs, u_dst, len, u_readden);
     }
-    DUAL_RET(hs->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
+    DUAL_RET((thread_t *)(hs->ks->schedule.head), FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }
 
 /**
@@ -176,7 +176,7 @@ KS_SYSCALL static inline fernos_error_t hs_wait(handle_state_t *hs) {
     if (hs->impl->hs_wait) {
         return hs->impl->hs_wait(hs);
     }
-    DUAL_RET(hs->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
+    DUAL_RET((thread_t *)(hs->ks->schedule.head), FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }
 
 /**
@@ -186,27 +186,5 @@ KS_SYSCALL static inline fernos_error_t hs_cmd(handle_state_t *hs, handle_cmd_id
     if (hs->impl->hs_cmd) {
         return hs->impl->hs_cmd(hs, cmd, arg0, arg1, arg2, arg3);
     }
-    DUAL_RET(hs->ks->curr_thread, FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
+    DUAL_RET((thread_t *)(hs->ks->schedule.head), FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }
-
-/*
- * Some helpers.
- */
-
-/**
- * This is a helper function which calls `delete` on every handle within a handle table,
- * AND returns all handle id's to the table.
- *
- * After this call, `handle_table` will hold no handles.
- *
- * Returns FOS_E_ABORT_SYSTEM if there is ever a problem deleting any of the handles.
- */
-fernos_error_t clear_handle_table(id_table_t *handle_table);
-
-/**
- * Attempt to copy over handles from a parent process to a newly forked child.
- *
- * On error, all handles which were created will be deleted before returning.
- * (Except when FOS_E_ABORT_SYSTEM is returned)
- */
-fernos_error_t copy_handle_table(process_t *parent, process_t *child);

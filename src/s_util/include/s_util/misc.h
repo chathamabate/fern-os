@@ -14,6 +14,9 @@
 #define M_1G   (0x40000000U)
 #define M_2G   (0x80000000U)
 
+#define _STRINGIFY(x) #x
+#define STRINGIFY(x) _STRINGIFY(x)
+
 /**
  * Converts a number n to a 64-bit constant with n 1 lsbs
  */

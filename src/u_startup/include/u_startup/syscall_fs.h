@@ -6,6 +6,7 @@
 
 #include "s_util/err.h"
 #include "s_bridge/shared_defs.h"
+#include "s_bridge/app.h"
 
 #include "s_block_device/file_sys.h"
 
@@ -104,4 +105,44 @@ fernos_error_t sc_fs_seek(handle_t h, size_t pos);
  */
 fernos_error_t sc_fs_flush(handle_t h);
 
+/**
+ * Given a path to an ELF file, parse its contents into a new user app structure.
+ *
+ * On success, a pointer to the allocated user app is written to `*ua`.
+ *
+ * User app sections are gauranteed to appear in the order of corresponding program headers within
+ * the elf file. (i.e. the first loadable program segment in the ELF file will be the first user
+ * app section)
+ *
+ * NOTE: this is not a standalone system call, it's more a helper. I am putting it here since it
+ * takes advantage of the behaviors specific to file handles. A simpler parse function could be
+ * generic, but require the full elf file be loaded in to memory first. This would be mid.
+ */
+fernos_error_t sc_fs_parse_elf32(allocator_t *al, const char *path, user_app_t **ua);
+
+/**
+ * Default allocator wrapper around `sc_fs_parse_elf32`.
+ */
+fernos_error_t sc_fs_parse_da_elf32(const char *path, user_app_t **ua);
+
+/**
+ * Wrapper around `sc_fs_parse_da_elf32` and `sc_proc_exec`.
+ *
+ * `num_args` must be greater than 1.
+ *
+ * `args[0]` is the path to the executable which will be run.
+ * `args[1...]` will be the arguments passed to the executable at run time.
+ */
+fernos_error_t sc_fs_exec_da_elf32(const char * const * args, size_t num_args);
+
+/**
+ * Vararg wrapper around `sc_fs_exec_da_elf32`.
+ *
+ * This always expects the last param to be NULL!
+ *
+ * An error is returned if `prog` is NULL.
+ */
+fernos_error_t _sc_fs_exec_da_elf32_va(const char *prog, ...);
+
+#define sc_fs_exec_da_elf32_va(...) _sc_fs_exec_da_elf32_va(__VA_ARGS__, NULL)
 

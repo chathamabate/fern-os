@@ -4,6 +4,11 @@
 #include "u_startup/syscall.h"
 #include "s_bridge/shared_defs.h"
 #include "s_util/str.h"
+#include "s_util/misc.h"
+#include "s_util/elf.h"
+#include "s_util/constraints.h"
+
+#include <stdarg.h>
 
 fernos_error_t sc_fs_set_wd(const char *path) {
     return sc_plg_cmd(PLG_FILE_SYS_ID, PLG_FS_PCID_SET_WD, (uint32_t)path, str_len(path), 0, 0);
@@ -43,4 +48,243 @@ fernos_error_t sc_fs_seek(handle_t h, size_t pos) {
 
 fernos_error_t sc_fs_flush(handle_t h) {
     return sc_handle_cmd(h, PLG_FS_PCID_FLUSH, 0, 0, 0, 0);
+}
+
+/**
+ * This expects that `user_app` points to an ampty user app structure.
+ * (One where the allocator is set, but all area entries are unoccupied)
+ */
+static fernos_error_t sc_fs_parse_elf32_helper(handle_t fh, size_t file_len, user_app_t *user_app) {
+    if (!user_app) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (file_len < sizeof(elf32_header_t)) {
+        return FOS_E_EMPTY;
+    }
+
+    elf32_header_t elf32_header;
+    PROP_ERR(sc_handle_read_full(fh, &elf32_header, sizeof(elf32_header_t)));
+
+    // Must be 32-bit little-endian targeting x86 with an entry point!
+    if (elf32_header.header_magic != ELF_HEADER_MAGIC || 
+            elf32_header.cls != 1 || elf32_header.endian != 1 ||
+            elf32_header.machine != 0x03 || 
+            elf32_header.this_header_size != sizeof(elf32_header_t) ||
+            elf32_header.program_header_size != sizeof(elf32_program_header_t) ||
+            elf32_header.section_header_size != sizeof(elf32_section_header_t)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    const size_t num_pg_headers = elf32_header.num_program_headers;
+    if (file_len < elf32_header.program_header_table + (num_pg_headers * sizeof(elf32_program_header_t))) {
+        return FOS_E_EMPTY; // File doesn't contain expected program header table.
+    }
+
+    // Set entry point!
+    user_app->entry = elf32_header.entry;
+    // All area entries will start as unoccupied.
+
+    fernos_error_t err;
+
+    size_t area_ind = 0;
+    for (size_t i = 0; i < num_pg_headers; i++) {
+        elf32_program_header_t pg_header; // we'll read one program header at a time.
+        
+        PROP_ERR(sc_fs_seek(fh, elf32_header.program_header_table + (i * sizeof(elf32_program_header_t))));
+        PROP_ERR(sc_handle_read_full(fh, &pg_header, sizeof(elf32_program_header_t)));
+
+        // We only care about loadable segments for now!
+        if (pg_header.type == ELF32_SEG_TYPE_LOADABLE) {
+            if (area_ind >= FOS_MAX_APP_AREAS) {
+                return FOS_E_NO_SPACE;
+            }
+
+            // Ok, now we gotta actually read the given data from the file 
+            // (if there is any such data)
+            
+            void *given = NULL;
+            if (pg_header.size_in_file > 0) {
+                if (file_len < pg_header.offset + pg_header.size_in_file) {
+                    return FOS_E_EMPTY; // This elf file doesn't hold the program segment
+                                        // it says it does!
+                }
+
+                PROP_ERR(sc_fs_seek(fh, pg_header.offset));
+                given = al_malloc(user_app->al, pg_header.size_in_file); 
+                if (!given) {
+                    return FOS_E_NO_MEM;
+                }
+
+                err = sc_handle_read_full(fh, given, pg_header.size_in_file);
+                if (err != FOS_E_SUCCESS) {
+                    al_free(user_app->al, given);
+                    return err;
+                }
+            }
+
+            // Place everything in the user_app structure (Regardless of whether there is given
+            // data or not)
+
+            user_app_area_entry_t *area_entry = user_app->areas + (area_ind++);
+
+            area_entry->occupied = true;
+            area_entry->given = given;
+            area_entry->given_size = pg_header.size_in_file;
+            area_entry->area_size = pg_header.size_in_mem;
+            area_entry->load_position = pg_header.vaddr;
+            area_entry->writeable = (pg_header.flags & ELF32_SEG_FLAG_WRITEABLE) == ELF32_SEG_FLAG_WRITEABLE;
+        }
+    }
+
+    return FOS_E_SUCCESS;
+}
+
+fernos_error_t sc_fs_parse_elf32(allocator_t *al, const char *path, user_app_t **ua) {
+    fernos_error_t err;
+
+    if (!al || !path || !ua) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    fs_node_info_t info;
+    sc_fs_get_info(path, &info);
+    
+    if (info.is_dir) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    user_app_t *user_app = new_user_app(al);
+    if (!user_app) {
+        return FOS_E_NO_MEM;
+    }
+
+    const size_t file_len = info.len;
+
+    handle_t fh; 
+
+    err = sc_fs_open(path, &fh);
+    if (err != FOS_E_SUCCESS) {
+        delete_user_app(user_app);
+        return err;
+    }
+
+    // fh needs closing after this point always!
+
+    err = sc_fs_parse_elf32_helper(fh, file_len, user_app);
+
+    if (err == FOS_E_SUCCESS) {
+        *ua = user_app;
+    } else {
+        delete_user_app(user_app);
+        *ua = NULL;
+    }
+
+    sc_handle_close(fh);
+
+    return err;
+}
+
+fernos_error_t sc_fs_parse_da_elf32(const char *path, user_app_t **ua) {
+    if (get_default_allocator() == NULL) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    return sc_fs_parse_elf32(get_default_allocator(), path, ua);
+}
+
+fernos_error_t sc_fs_exec_da_elf32(const char * const * args, size_t num_args) {
+    if (!args || num_args == 0) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (get_default_allocator() == NULL) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    fernos_error_t err;
+
+    // 1) let's get the user app loaded.
+    user_app_t *ua;
+    err = sc_fs_parse_da_elf32(args[0], &ua);
+    if (err != FOS_E_SUCCESS) {
+        return err;
+    }
+
+    // 2) Next, let's get the args block created.
+    const void *args_block;
+    size_t args_block_len;
+
+    err = new_da_args_block(args + 1, num_args - 1, &args_block, &args_block_len);
+    if (err != FOS_E_SUCCESS) {
+        delete_user_app(ua);
+        return err;
+    }
+
+    // Make absolute!
+    args_block_make_absolute((void *)args_block, FOS_APP_ARGS_AREA_START);
+
+    // Finally, attempt to execute!
+    err = sc_proc_exec(ua, args_block, args_block_len);
+
+    if (err != FOS_E_SUCCESS) {
+        da_free((void *)args_block); // works when args_block is NULL.
+        delete_user_app(ua);
+
+        return err;
+    } 
+
+    // This should never run, on SUCCESS `sc_proc_exec` should never return.
+    return FOS_E_ABORT_SYSTEM;
+}
+
+fernos_error_t _sc_fs_exec_da_elf32_va(const char *prog, ...) {
+    if (!prog) {
+        return FOS_E_BAD_ARGS;
+    }
+    
+    size_t num_args = 1;
+
+    va_list va_args;
+    va_start(va_args, prog);
+    
+    // First things first, count all non-null args after prog.
+    while (true) {
+        const char *arg = va_arg(va_args, const char *);
+        if (!arg) {
+            break;
+        }
+        num_args++;
+    }
+
+    va_end(va_args);
+
+    // Now place all arg pointers in a dynamic array.
+    // (We kinda know that on 32-bit x86, the const char *'s are already in perfect order on the
+    // stack, but whatever, we'll do it the "right" way)
+
+    const char **args = da_malloc(sizeof(const char *) * num_args);
+    if (!args) {
+        return FOS_E_NO_MEM;
+    }
+
+    args[0] = prog;
+
+    va_start(va_args, prog);
+    for (size_t i = 1; i < num_args; i++) {
+        args[i] = va_arg(va_args, const char *);
+    }
+    va_end(va_args);
+
+    fernos_error_t err;
+
+    err = sc_fs_exec_da_elf32(args, num_args);
+
+    if (err != FOS_E_SUCCESS) {
+        da_free(args);
+        return err;
+    }
+
+    // Should never make it here!
+    return FOS_E_ABORT_SYSTEM;
 }

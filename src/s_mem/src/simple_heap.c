@@ -1,12 +1,12 @@
 
 
 #include "s_mem/simple_heap.h"
-#include "k_startup/vga_cd.h"
 #include "s_mem/allocator.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
 #include "s_util/str.h"
 #include "s_util/ansi.h"
+#include "s_util/constraints.h"
 #include <stdarg.h>
 
 static void *shal_malloc(allocator_t *al, size_t bytes);
@@ -122,6 +122,7 @@ allocator_t *new_simple_heap_allocator(simple_heap_attrs_t attrs) {
 
     size_t first_fb_size = (size_t)(shal->brk_ptr) - (size_t)(shal->heap_start) 
         - (2 * sizeof(mem_block_border_t));
+
 
     // This if statement should really never execute.
     // This would error out in the case that our simple heap allocator structure is so large
@@ -430,7 +431,7 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
     // After doing an initial search of both lists, are we still yet to find a large enough free 
     // block? If so, check if we can request more memory.
     if (!fb && !(shal->exhausted)) {
-        size_t mem_needed = bytes;
+        size_t mem_needed = bytes + (2 * sizeof(mem_block_border_t)); 
         if (!IS_ALIGNED(mem_needed, M_4K)) {
             mem_needed = ALIGN(mem_needed + M_4K, M_4K);
         }
@@ -450,7 +451,7 @@ static void *shal_malloc(allocator_t *al, size_t bytes) {
                 // If not large enough, just add it back to the free list.
                 shal_add_fb(shal, new_fb);
             }
-        }
+        } 
     }
 
     // Have we still not found a match? Let's exhaust our small free list.
@@ -656,4 +657,27 @@ static void delete_simple_heap_allocator(allocator_t *al) {
 
     // Remember, we only return up to the break pointer.
     shal->attrs.mmp.return_mem(shal->attrs.start, shal->brk_ptr);
+}
+
+fernos_error_t setup_default_simple_heap(mem_manage_pair_t mmp) {
+    allocator_t *al = new_simple_heap_allocator(
+        (simple_heap_attrs_t) {
+            .start = (void *)FOS_FREE_AREA_START,
+            .end = (const void *)(FOS_FREE_AREA_END),
+
+            .mmp = mmp,
+
+            .small_fl_cutoff = 0x100,
+            .small_fl_search_amt = 0x20,
+            .large_fl_search_amt = 0x200
+        }
+    );
+
+    if (!al) {
+        return FOS_E_UNKNWON_ERROR;
+    }
+
+    set_default_allocator(al);
+
+    return FOS_E_SUCCESS;
 }

@@ -68,7 +68,7 @@ static fernos_error_t kb_hs_read(handle_state_t *hs, void *u_dest, size_t len, s
     plugin_kb_t *plg_kb = plg_kb_hs->plg_kb;
 
     kernel_state_t *ks = plg_kb_hs->super.ks;
-    thread_t *thr = ks->curr_thread;
+    thread_t *thr = (thread_t *)(ks->schedule.head);
     process_t *proc = thr->proc;
 
     if (!u_dest) {
@@ -147,7 +147,7 @@ static fernos_error_t kb_hs_wait(handle_state_t *hs) {
     plugin_kb_t *plg_kb = plg_kb_hs->plg_kb;
 
     kernel_state_t *ks = plg_kb_hs->super.ks;
-    thread_t *thr = ks->curr_thread;
+    thread_t *thr = (thread_t *)(ks->schedule.head);
 
     if (plg_kb_hs->pos == plg_kb->sc_buf_pos) { // Time to wait!
         basic_wait_queue_t *bwq = plg_kb->bwq;      
@@ -155,7 +155,7 @@ static fernos_error_t kb_hs_wait(handle_state_t *hs) {
         err = bwq_enqueue(bwq, thr);
         DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
 
-        ks_deschedule_thread(ks, thr);
+        thread_detach(thr);
 
         thr->wq = (wait_queue_t *)bwq;
         thr->wait_ctx[0] = (uint32_t)plg_kb_hs;
@@ -180,7 +180,7 @@ static fernos_error_t kb_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_
     plugin_kb_t *plg_kb = plg_kb_hs->plg_kb;
 
     kernel_state_t *ks = plg_kb_hs->super.ks;
-    thread_t *thr = ks->curr_thread;
+    thread_t *thr = (thread_t *)(ks->schedule.head);
     
     switch (cmd) {
 
@@ -216,6 +216,7 @@ static const plugin_impl_t PLUGIN_KB_IMPL = {
     .plg_cmd = plg_kb_cmd,
     .plg_tick = NULL,
     .plg_on_fork_proc = NULL,
+    .plg_on_reset_proc = NULL,
     .plg_on_reap_proc = NULL,
 };
 
@@ -288,7 +289,10 @@ static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kc
 
         while ((err = bwq_pop(bwq, (void **)&woken_thr)) == FOS_E_SUCCESS) {
             plugin_kb_handle_state_t *hs_kb = (plugin_kb_handle_state_t *)(woken_thr->wait_ctx[0]);
+
             mem_set(woken_thr->wait_ctx, 0, sizeof(woken_thr->wait_ctx));
+            woken_thr->wq = NULL;
+            woken_thr->state = THREAD_STATE_DETATCHED;
 
             if (hs_kb->pos != old_pos) {
                 return FOS_E_STATE_MISMATCH; // sanity check for the boys back home.
@@ -298,7 +302,7 @@ static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kc
             
             woken_thr->ctx.eax = FOS_E_SUCCESS;
 
-            ks_schedule_thread(plg->ks, woken_thr);
+            thread_schedule(woken_thr, &(plg->ks->schedule));
         }
 
         if (err != FOS_E_EMPTY) {
@@ -322,7 +326,7 @@ static fernos_error_t plg_kb_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
     plugin_kb_t *plg_kb = (plugin_kb_t *)plg;
     kernel_state_t *ks = plg->ks;
 
-    thread_t *thr = ks->curr_thread;
+    thread_t *thr = (thread_t *)(ks->schedule.head);
     process_t *proc = thr->proc;
 
     (void)arg1;

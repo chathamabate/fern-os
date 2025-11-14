@@ -9,6 +9,8 @@
 #include "s_util/constraints.h"
 #include "s_bridge/ctx.h"
 #include "s_data/map.h"
+#include "s_bridge/app.h"
+#include "s_data/ring.h"
 
 #include "s_block_device/file_sys.h"
 
@@ -40,18 +42,16 @@
  * The structures within the kenrel are inherently cyclic. For example a process needs
  * knowledge of threads, and threads need knowledge of processes.
  *
- * However, I still tried to implement behaviors in a non-cyclic way.
- * 
- * Functions written in thread.c should only ever modify fields within a thread structure.
- * Even though a thread has a wait queue pointer, no function in thread.c should modify the
- * external wait queue.
+ * Originally, I had some unidirectional design where functions in `thread.c` could never modify
+ * anything outside `thread.c`. Functions in `process.c` could modify stuff from `process.c`
+ * and `thread.c`. However, trying to make this all consistent was confusing and lead to
+ * lots of error prone code.
  *
- * Similarly, functions in process.c can modify the state of owned threads, but never modify 
- * any higher up state. For example, the schedule.
- *
- * Kernel State -- Can Modify -- > Processes -- Can Modify -- > Threads
- *
- * NOT THE OTHER DIRECTION!
+ * Now, threads and process are given hooks for doing the modifications they need in certain
+ * situations. For example, a function in `thread.c` should never access kernel state schedule
+ * directly. However, threads now inherit from `ring_element`, which give them the ability 
+ * to remove themselves from any "ring/schedule" without knowledge of where said schedule lives.
+ * The same concept applies to the thread `wq` field, and a process's handle states!
  *
  * Addition (9/1/2025) NOTE that many of these functions are designed specifically to correspond
  * to system calls. Others may simply be helpers which are used within the system call 
@@ -80,13 +80,9 @@ struct _kernel_state_t {
     allocator_t * const al;
 
     /**
-     * The currently executing thread.
-     *
-     * NOTE: The schedule forms a cyclic doubly linked list.
-     *
-     * During a context switch curr_thread is set to curr_thread->next.
+     * The schedule!
      */
-    thread_t *curr_thread;
+    ring_t schedule;
 
     /**
      * Every process will have a globally unique ID!
@@ -148,27 +144,6 @@ fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *p
  * Does nothing if there is no current thread.
  */
 void ks_save_ctx(kernel_state_t *ks, user_ctx_t *ctx);
-
-/**
- * Takes a thread and adds it to the schedule!
- *
- * We expect the given thread to be in a detatched state.
- * (However, this is not checked, so be careful!)
- *
- * Undefined behavoir will occur if the same thread appears twice
- * in the schedule! So make sure this never happens!
- *
- * NOTE: this only modifies the current thread field iff there is no current thread!
- */
-void ks_schedule_thread(kernel_state_t *ks, thread_t *thr);
-
-/**
- * Remove a scheduled thread from the schedule!
- *
- * Like above, we don't actually check if the given thread is scheduled
- * or not, we just assume it is! (SO BE CAREFUL)
- */
-void ks_deschedule_thread(kernel_state_t *ks, thread_t *thr);
 
 /**
  * Attempts to expand the stack of the current thread.
@@ -235,8 +210,7 @@ KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid);
 /** 
  * Exit the current process. (Becoming a zombie process)
  *
- * FSIG_CHLD is sent to the parent process. If this is the root process, FOS_E_ABORT_SYSTEM is 
- * returned.
+ * FSIG_CHLD is sent to the parent process. If this is the root process, the kernel is shutdown!
  *
  * All living children of this process are now orphans, they are adopted by the root process.
  * All zombie children of this process are now zombie orphas, also adopted by the root process.
@@ -256,6 +230,8 @@ KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t st
  * 
  * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
  * process, FOS_E_STATE_MISMATCH is returned to the user.
+ * If `cpid` DOES correspond to a child of this process, but is yet to exit, FOS_E_EMPTY is
+ * returned to the user.
  *
  * When attempting to reap any zombie process, if there are no zombie children to reap,
  * FOS_E_EMPTY is returned to the user.
@@ -266,9 +242,39 @@ KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t st
  * If `u_rces` is given, the exit status of the reaped child is written to *u_rces.
  *
  * On error, FOS_MAX_PROCS is written to *u_rcpid, and PROC_ES_UNSET is written to *u_rces.
+ *
+ * NOTE: VERY IMPORTANT: It is intended that the user uses this call in combination with a 
+ * wait_signal on FSIG_CHLD. However, based on how the kernel works internally, just because
+ * the FSIG_CHLD signal bit is set DOES NOT mean there is anyone to reap.
+ * In fact, this call `ks_reap_proc` knows NOTHING of the FSIG_CHLD bit.
  */
 KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_id_t *u_rcpid, 
         proc_exit_status_t *u_rces);
+
+/**
+ * Execute a user application in the current process.
+ *
+ * This call overwrites the calling process by loading a binary dynamically!
+ *
+ * NOTE: `u_abs_ab` must be a pointer to an ABSOLUTE args block! That is all pointers within
+ * the block must assume the block begins at FOS_APP_ARGS_AREA_START.
+ * SEE: `args_block_make_absolute`.
+ *
+ * On success, this call does NOT return to the user process, it enters the given app's main function
+ * providing the given args as parameters. 
+ * In this case, all child and zombie processes of the calling process are adopted by the root 
+ * process. 
+ * All non-default handles are deleted.
+ * All threads except the main thread are deleted. (The main thread is reset to the entry point
+ * of given user app)
+ * 
+ * A failure to create the new page director for the given application, the given process remains
+ * ENTIRELY in tact and an error is returned to userspace.
+ *
+ * Errors at other points in this function may halt the system.
+ */
+KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const void *u_abs_ab,
+        size_t u_abs_ab_len);
 
 /** 
  * Send a signal to a process with pid `pid`.
@@ -320,6 +326,34 @@ KS_SYSCALL fernos_error_t ks_wait_signal(kernel_state_t *ks, sig_vector_t sv, si
  * may be a lingering FSIG_CHLD bit set in the signal vector.
  */
 KS_SYSCALL fernos_error_t ks_signal_clear(kernel_state_t *ks, sig_vector_t sv);
+
+/**
+ * Request memory in a process's free area.
+ *
+ * FOS_E_BAD_ARGS if `u_true_e` is NULL.
+ * FOS_E_ALIGN_ERROR if `s` or `e` aren't 4K aligned.
+ * FOS_E_INVALID_RANGE if `e` < `s` OR if `s` or `e` are outside the free area.
+ *
+ * In the above three cases, this call does nothing.
+ *
+ * Otherwise, memory will be attempted to be allocated.
+ *
+ * FOS_E_SUCCESS is returned if the entire allocation succeeds.
+ * If we run out of memory, FOS_E_NO_MEM is returned.
+ * If we run into an already page, FOS_E_ALREADY_ALLOCATED is returned.
+ * In all of these cases, the end of the last allocated page is written to `*u_true_e`
+ */
+KS_SYSCALL fernos_error_t ks_request_mem(kernel_state_t *ks, void *s, const void *e, const void **u_true_e);
+
+/**
+ * Returns memory in the proccess's free area.
+ *
+ * Does nothing if `s` or `e` aren't 4K aligned, `e` < `s`, or `s` or `e` are outside
+ * the process free area.
+ *
+ * Returns nothing to the user thread.
+ */
+KS_SYSCALL fernos_error_t ks_return_mem(kernel_state_t *ks, void *s, const void *e);
 
 /**
  * Take the current thread, deschedule it, and add it it to the sleep wait queue.
@@ -381,46 +415,6 @@ KS_SYSCALL fernos_error_t ks_exit_thread(kernel_state_t *ks, void *ret_val);
  */
 KS_SYSCALL fernos_error_t ks_join_local_thread(kernel_state_t *ks, join_vector_t jv, 
         thread_join_ret_t *u_join_ret);
-
-/**
- * Regsiter a futex in the current process.
- *
- * user error if futex is null or already in use, Or if there are insufficient resources.
- *
- * Remember, u_futex is a pointer into userspace!
- */
-KS_SYSCALL fernos_error_t ks_register_futex(kernel_state_t *ks, futex_t *u_futex);
-
-/**
- * Deregister a futex of the current process.
- *
- * Doesn't return a user error.
- *
- * If threads are currently waiting on this futex, they are rescheduled with return value
- * FOS_E_STATE_MISMATCH.
- *
- * Returns an error if there is some issue with the deregister.
- */
-KS_SYSCALL fernos_error_t ks_deregister_futex(kernel_state_t *ks, futex_t *u_futex);
-
-/**
- * Confirm the given value of the futex = exp_val. If not, returns user success immediately.
- * If the value is equal, the current thread is descheduled.
- *
- * The descheduled thread will only be woken up with a call to wake, Or if the futex is destroyed.
- * If the futex is destroyed, all waiting threads are rescheduled with user return value of
- * FOS_E_STATE_MISMATCH.
- *
- * Returns user error if arguements are invalid.
- */
-KS_SYSCALL fernos_error_t ks_wait_futex(kernel_state_t *ks, futex_t *u_futex, futex_t exp_val);
-
-/**
- * Wake up one or all threads waiting on a futex.
- *
- * Returns user error if arguements are invalid.
- */
-KS_SYSCALL fernos_error_t ks_wake_futex(kernel_state_t *ks, futex_t *u_futex, bool all);
 
 /**
  * Set the default input handle of the calling process. If the given input handle is invalid,

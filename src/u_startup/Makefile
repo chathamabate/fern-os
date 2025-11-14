@@ -6,6 +6,7 @@ MOD_NAME 	?= u_startup
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
 _SRCS 		?= main.c \
 			   syscall.c \
+			   syscall_fut.c \
 			   syscall_cd.c \
 			   syscall_fs.c \
 			   syscall_vga_cd.c \
@@ -16,7 +17,9 @@ _ASMS		?= main.s syscall.s
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= syscall.c \
+			   syscall_fut.c \
 			   syscall_fs.c \
+			   syscall_exec.c \
 			   syscall_cd.c \
 			   syscall_default_io.c \
 			   syscall_kb.c

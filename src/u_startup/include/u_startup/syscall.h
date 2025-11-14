@@ -6,6 +6,8 @@
 
 #include "s_util/err.h"
 #include "s_bridge/shared_defs.h"
+#include "s_bridge/app.h"
+#include "s_mem/allocator.h"
 
 /**
  * Trigger a system call from user space.
@@ -30,7 +32,7 @@ int32_t trigger_syscall(uint32_t id, uint32_t arg0, uint32_t arg1, uint32_t arg2
  *
  * Only the calling thread is copied over into the child process.
  * Multithreading state is not copied (i.e. Futexes and the join queue)
- * Signal vector is not copied. The created process starts with no received signals.
+ * Signal vector is not copied. The created process starts with no received or allowed signals!
  * Deep copies of each file handle are made for the child process!
  *
  * On error, an error is returned just in the calling process.
@@ -53,10 +55,10 @@ fernos_error_t sc_proc_fork(proc_id_t *cpid);
  *
  * All living children of this process are now orphans, they are adopted by the root process.
  * All zombie children of this process are now zombie orphas, also adopted by the root process.
- * All open file handles will remain open until this process is reaped.
+ * All open handles will remain open until this process is reaped.
  *
  * NOTE: if zombie orphans are added to the root process, the root process will also get a
- * FSIG_CHLD.
+ * FSIG_CHLD. 
  *
  * This function is automatically called when returning from a proceess's main thread.
  */
@@ -70,6 +72,8 @@ void sc_proc_exit(proc_exit_status_t status);
  * 
  * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
  * process, FOS_E_STATE_MISMATCH is returned to the user.
+ * If `cpid` DOES correspond to a child of this process, but is yet to exit, FOS_E_EMPTY is
+ * returned to the user.
  *
  * When attempting to reap any zombie process, if there are no zombie children to reap,
  * FOS_E_EMPTY is returned to the user.
@@ -81,8 +85,33 @@ void sc_proc_exit(proc_exit_status_t status);
  * If `rces` is given, the exit status of the reaped child is written to *rces.
  *
  * On error, FOS_MAX_PROCS is written to *rcpid, and PROC_ES_UNSET is written to *rces.
+ *
+ * NOTE: VERY IMPORTANT: It is intended that the user uses this call in combination with a 
+ * wait_signal on FSIG_CHLD. However, based on how the kernel works internally, just because
+ * the FSIG_CHLD signal bit is set DOES NOT mean there is anyone to reap.
+ * In fact, this call `ks_reap_proc` knows NOTHING of the FSIG_CHLD bit.
  */
 fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t *rces);
+
+/**
+ * Execute a user application. 
+ *
+ * This call overwrites the calling process by loading a binary dynamically!
+ * 
+ * On success, this call does NOT return, it enters the given app's main function
+ * providing the given args as parameters.
+ * In this case, all child/zombie processes are adopted by the root process.
+ * Signal vectors are clears.
+ *
+ * The only thing really preserved are the default IO handles!
+ *
+ * NOTE: When this new application is entered, it uses a new memory space which has NO HEAP setup.
+ *
+ * NOTE: `args_block` is expected to be absolute from FOS_APP_ARGS_AREA_START.
+ *
+ * On failure, an error is returned, the calling process remains in its original state.
+ */
+fernos_error_t sc_proc_exec(user_app_t *ua, const void *args_block, size_t args_block_size);
 
 /**
  * Send a signal to a process with pid `pid`.
@@ -130,8 +159,43 @@ fernos_error_t sc_signal_wait(sig_vector_t sv, sig_id_t *sid);
  *
  * For example, when reaping child processes. All processes may be reapped, but there still
  * may be a lingering FSIG_CHLD bit set in the signal vector.
+ *
+ * NOTE: 11/6/25: Unsure if the example above really holds water. 
  */
 void sc_signal_clear(sig_vector_t sv);
+
+/**
+ * Request memory in this process's free area.
+ *
+ * FOS_E_BAD_ARGS if `true_e` is NULL.
+ * FOS_E_ALIGN_ERROR if `s` or `e` aren't 4K aligned.
+ * FOS_E_INVALID_RANGE if `e` < `s` OR if `s` or `e` are outside the free area.
+ *
+ * In the above three cases, this call does nothing.
+ *
+ * Otherwise, memory will be attempted to be allocated.
+ *
+ * FOS_E_SUCCESS is returned if the entire allocation succeeds.
+ * If we run out of memory, FOS_E_NO_MEM is returned.
+ * If we run into an already page, FOS_E_ALREADY_ALLOCATED is returned.
+ * In all of these cases, the end of the last allocated page is written to `*true_e`
+ */
+fernos_error_t sc_mem_request(void *s, const void *e, const void **true_e);
+
+/**
+ * Returns memory in this proccess's free area.
+ *
+ * Does nothing if `s` or `e` aren't 4K aligned, `e` < `s`, or `s` or `e` are outside
+ * the process free area.
+ */
+void sc_mem_return(void *s, const void *e);
+
+/**
+ * This is a memory managenment pair which holds the above two
+ * system calls. When creating a heap allocator in userspace, you'll likely
+ * want to use this pair.
+ */
+extern const mem_manage_pair_t USER_MMP;
 
 /**
  * Exit the current thread.
@@ -185,49 +249,6 @@ fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void
  */
 fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retval);
 
-/**
- * Register a futex with the kernel.
- *
- * A futex is a number, which is mapped to a wait queue in the kernel.
- *
- * Threads will be able to wait while the futex holds a specific value.
- *
- * Returns an error if there are insufficient resources, if futex is NULL,
- * or if the futex is already in use!
- */
-fernos_error_t sc_futex_register(futex_t *futex);
-
-/**
- * Remove all references to a futex from the kernel.
- *
- * If the given futex exists, it's wait queue will be deleted.
- *
- * All threads waiting on the futex will wake up with FOS_E_STATE_MISMATCH returned.
- */
-void sc_futex_deregister(futex_t *futex);
-
-/**
- * This function will check if the futex's value = exp_val from within the kernel.
- *
- * If the values match as expected, the calling thread will be put to sleep.
- * If the values don't match, this call will return immediately with FOS_E_SUCCESS.
- *
- * When a thread is put to sleep it can only be rescheduled by an `sc_futex_wake` call.
- * This will also return FOS_E_SUCCESS.
- *
- * This call returns FOS_E_STATE_MISMATCH if the futex is deregistered mid wait!
- *
- * This call return other errors if something goes wrong or if the given futex doesn't exist!
- */
-fernos_error_t sc_futex_wait(futex_t *futex, futex_t exp_val);
-
-/**
- * Wake up one or all threads waiting on a futex. This does not modify the futex value at all.
- *
- * Returns an error if the given futex doesn't exist.
- */
-fernos_error_t sc_futex_wake(futex_t *futex, bool all);
-
 /*
  * Now for handle and plugin system calls!
  *
@@ -246,7 +267,7 @@ void sc_set_in_handle(handle_t in);
  *
  * If the default input handle is not currently initialized this returns FOS_E_EMPTY.
  */
-fernos_error_t sc_in_read(void *u_dest, size_t len, size_t *u_readden);
+fernos_error_t sc_in_read(void *dest, size_t len, size_t *readden);
 
 /**
  * Wait on default input handle.
@@ -267,7 +288,7 @@ void sc_set_out_handle(handle_t out);
  * If the default output handle is not currently initialized this behaves as if all bytes were
  * successfully written.
  */
-fernos_error_t sc_out_write(const void *u_src, size_t len, size_t *u_written);
+fernos_error_t sc_out_write(const void *src, size_t len, size_t *written);
 
 /**
  * Execute a handle specific command.
@@ -356,6 +377,14 @@ fernos_error_t sc_handle_write_fmt_s(handle_t h, const char *fmt, ...);
  * Same as `sc_handle_write_fmt_s`, but with the default out handle.
  */
 fernos_error_t sc_out_write_fmt_s(const char *fmt, ...);
+
+/**
+ * Same as `sc_out_write_fmt_s` but with a void return type.
+ *
+ * This is useful for data structur dump debug functions which require a logging
+ * function with a void return type.
+ */
+void sc_out_write_fmt_s_lf(const char *fmt, ...);
 
 /**
  * When using a handle which may read a partial amount on success,

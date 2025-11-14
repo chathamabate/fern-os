@@ -61,10 +61,6 @@ extern uint8_t _static_area_end[];
  * A shared entry points to a non-identity page which is referenced by many page tables.
  * These functions offer little support for shared entries. It is the job the kernel to manage
  * such pages correctly.
- *
- * NOTE: In my pt_entry helpers below, I take a writeable bool. Since I am always running in 
- * supervisor role, this option is pointless. However, I will leave it in to remind the user
- * that certain pages shouldn't be written to.
  */
 
 #define IDENTITY_ENTRY (0)
@@ -137,15 +133,14 @@ fernos_error_t init_paging(void);
 phys_addr_t get_kernel_pd(void);
 
 /**
- * When paging is initialized, a memory space is set up to be used by the very first user process.
- * To switch into this space, you just need the page directory physical address.
+ * When paging is initialized, a memory space is set up as a template for all user processes.
  *
- * NOTE: This function is only meant to be used once. An error will be returned if you try to
- * call this function two times.
+ * The page directory of this memory space is always private. However, using this function,
+ * a copy can be returned. Returns NULL_PHYS_ADDR if the copy fails.
  *
- * NOTE: The first user page directory has no space allocated for user threads!
+ * NOTE: The copy has NO pages allocated in the user stack area.
  */
-phys_addr_t pop_initial_user_info(void);
+phys_addr_t pop_initial_user_pd_copy(void);
 
 /**
  * The number of free kernel pages exposed. MUST BE A POWER OF 2.
@@ -219,10 +214,15 @@ phys_addr_t new_page_directory(void);
  * Add pages (and page table if necessary) to a page directory.
  * The pages will always be marked as writeable. 
  *
+ * FOS_E_ALIGN_ERROR if `pd`, `s`, or `e` aren't 4K aligned.
+ * FOS_E_BAD_ARGS if `true_e` is NULL.
+ * FOS_E_INVALID_RANGE if `e` < `s`.
+ *
+ * Otherwise, pages are attempted to be allocated.
+ * If all pages are allocated, FOS_E_SUCCESS is returned.
  * If we run out of memory, FOS_E_NO_MEM is returned.
  * If we run into an already page, FOS_E_ALREADY_ALLOCATED is returned.
- *
- * Use true_e to determine how many pages were actually allocated in case of error.
+ * In these three cases, the true end of the allocated section is written to `*true_e`.
  */
 fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e, const void **true_e);
 
@@ -248,11 +248,10 @@ void pd_free_pages(phys_addr_t pd, void *s, const void *e);
 void delete_page_directory(phys_addr_t pd);
 
 static inline fernos_error_t alloc_pages(void *s, const void *e, const void **true_e) {
-    // NOTE: this is only accesibly in kernel mode, so always allocate as supervisor only.
-    return pd_alloc_pages(get_page_directory(), false, s, e, true_e); 
+    return pd_alloc_pages(get_kernel_pd(), false, s, e, true_e); 
 }
 
 static inline void free_pages(void *s, const void *e) {
-    pd_free_pages(get_page_directory(), s, e);
+    pd_free_pages(get_kernel_pd(), s, e);
 }
 

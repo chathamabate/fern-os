@@ -3,6 +3,7 @@
 #include "u_startup/syscall_fs.h"
 #include "s_util/constraints.h"
 #include "s_util/str.h"
+#include "s_util/elf.h"
 #include <stdarg.h>
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
@@ -31,9 +32,12 @@ static bool posttest(void);
 #define _TEMP_TEST_DIR_PATH "syscall_fs_test"
 #define TEMP_TEST_DIR_PATH "/" _TEMP_TEST_DIR_PATH 
 
-sig_vector_t old_sv;
+static sig_vector_t old_sv;
+static size_t old_user_al;
 
 static bool pretest(void) {
+    old_user_al = al_num_user_blocks(get_default_allocator());
+
     fernos_error_t err;
 
     // Since we will be working with child processes, we will allow the 
@@ -62,6 +66,9 @@ static bool posttest(void) {
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     sc_signal_allow(old_sv);
+
+    size_t new_user_al = al_num_user_blocks(get_default_allocator());
+    TEST_EQUAL_UINT(old_user_al, new_user_al);
 
     TEST_SUCCEED();
 }
@@ -175,6 +182,94 @@ static bool test_multithread_rw(void) {
     err = sc_fs_remove("./b.txt");
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     
+    TEST_SUCCEED();
+}
+
+static void *test_multithread_wait_same_handle_worker(void *arg) {
+    handle_t h = *(handle_t *)arg;
+
+    TEST_SUCCESS(sc_handle_wait(h));
+
+    return NULL;
+}
+
+static bool test_multithread_wait_same_handle(void) {
+    // Multiple threads ARE allowed to wait on the same handle at the same time.
+    // (However, it's really not advised)
+    // Reading at the same time could cause a system shutdown.
+
+    thread_id_t workers[5];
+    const size_t num_workers = sizeof(workers) / sizeof(workers[0]);
+
+    TEST_SUCCESS(sc_fs_touch("./a.txt"));
+
+    handle_t read_h;
+    TEST_SUCCESS(sc_fs_open("./a.txt", &read_h));
+
+
+    for (size_t i = 0; i < num_workers; i++) {
+        TEST_SUCCESS(sc_thread_spawn(workers + i, test_multithread_wait_same_handle_worker, &read_h));
+    }
+
+    handle_t write_h;
+    TEST_SUCCESS(sc_fs_open("./a.txt", &write_h));
+    TEST_SUCCESS(sc_handle_write_full(write_h, "a", 1));
+
+    for (size_t i = 0; i < num_workers; i++) {
+        TEST_SUCCESS(sc_thread_join(1 << workers[i], NULL, NULL));
+    }
+
+    sc_handle_close(write_h);
+    sc_handle_close(read_h);
+    TEST_SUCCESS(sc_fs_remove("./a.txt"));
+
+    TEST_SUCCEED();
+}
+
+static void *test_multithread_multihandle_worker(void *arg) {
+    handle_t h = *(handle_t *)arg;
+
+    char msg[6];
+    TEST_SUCCESS(sc_handle_read_full(h, msg, sizeof(msg)));
+    TEST_TRUE(str_eq("hello", msg));
+
+    return NULL;
+}
+
+static bool test_multithread_multihandle(void) {
+    // Multiple threads should all be able to read from the same file at the same time GIVEN
+    // they are using different handles.
+
+    thread_id_t workers[10];
+    handle_t read_handles[sizeof(workers) / sizeof(workers[0])];
+    const size_t num_workers = sizeof(workers) / sizeof(workers[0]);
+
+    TEST_SUCCESS(sc_fs_touch("./a.txt"));
+
+    for (size_t i = 0; i < num_workers; i++) {
+        TEST_SUCCESS(sc_fs_open("./a.txt", read_handles + i));
+        TEST_SUCCESS(sc_thread_spawn(workers + i, test_multithread_multihandle_worker, read_handles + i));
+    }
+
+    // We want at least 2 of the workers to be waiting before we write.
+    sc_thread_sleep(1);
+
+    handle_t write_handle;
+    TEST_SUCCESS(sc_fs_open("./a.txt", &write_handle));
+    TEST_SUCCESS(sc_handle_write_full(write_handle, "hello", 6));
+
+    for (size_t i = 0; i < num_workers; i++) {
+        TEST_SUCCESS(sc_thread_join(1 << workers[i], NULL, NULL));
+    }
+
+    sc_handle_close(write_handle);
+
+    for (size_t i = 0; i < num_workers; i++) {
+        sc_handle_close(read_handles[i]);
+    }
+
+    TEST_SUCCESS(sc_fs_remove("./a.txt"));
+
     TEST_SUCCEED();
 }
 
@@ -759,10 +854,213 @@ static bool test_bad_fs_calls(void) {
     TEST_SUCCEED();
 }
 
+/*
+ * ELF parser testing. Consider moving this to another file?
+ */
+
+#define TEST_ELF_FILENAME "test.elf"
+
+/**
+ * Helper for `test_elf32_parsing`.
+ */
+static bool test_bad_elf32_file(const void *bad_elf_data, size_t elf_len) {
+    TEST_SUCCESS(sc_fs_touch(TEST_ELF_FILENAME));
+
+    handle_t fh;
+
+    // Write out test elf data.
+    TEST_SUCCESS(sc_fs_open(TEST_ELF_FILENAME, &fh));
+    TEST_SUCCESS(sc_handle_write_full(fh, bad_elf_data, elf_len));
+    sc_handle_close(fh);
+
+    // Now try to parse, this should fail!
+
+    user_app_t *ua;
+    TEST_FAILURE(sc_fs_parse_elf32(get_default_allocator(), TEST_ELF_FILENAME, &ua));
+
+    TEST_SUCCESS(sc_fs_remove(TEST_ELF_FILENAME));
+
+    TEST_SUCCEED();
+}
+
+static bool test_elf32_parsing(void) {
+    // Ok, for this test I am going to setup a "real" elf file in memory.
+    // I will confirm that this parses successfully.
+    //
+    // Afterwards, I will screw around with the elf file and confirm failures!
+
+    void * const dummy_entry = (void *)0x555U;
+    const size_t num_pg_headers = 5; 
+    const size_t bin_area_offset = sizeof(elf32_header_t) +
+        (num_pg_headers * sizeof(elf32_program_header_t));
+    const size_t bin_area_size = 0x1000U;
+    const size_t elf_size = bin_area_offset + bin_area_size;
+
+    uint8_t *elf_data = da_malloc(
+        elf_size
+    );
+
+    TEST_TRUE(elf_data != NULL);
+
+    elf32_header_t * const elf_header = (elf32_header_t *)elf_data;
+    
+    *elf_header = (elf32_header_t) {
+        .header_magic = ELF_HEADER_MAGIC,
+        .cls = 1, .endian = 1, .version0 = 1, .os_abi = 0xFF,
+        .os_abi_version = 0, .pad0 = { 0 }, .obj_type = 0, 
+        .machine = 0x03,
+        .version1 = 1,
+        .entry = dummy_entry, 
+        .program_header_table = sizeof(elf32_header_t),
+        .section_header_table = elf_size, // Not being used
+        .flags = 0,
+        .this_header_size = sizeof(elf32_header_t),
+        .program_header_size = sizeof(elf32_program_header_t),
+        .num_program_headers = num_pg_headers,
+        .section_header_size = sizeof(elf32_section_header_t),
+        .num_section_headers = 0,
+        .section_names_header_index = 0,
+    };
+
+    elf32_program_header_t *pg_headers = (elf32_program_header_t *)((elf32_header_t *)elf_data + 1);
+    
+    // Maybe 3 program non-null program headers?
+
+    uint8_t * const seg0_area = (uint8_t *)elf_data + bin_area_offset;
+    const size_t seg0_size_in_file = 0x100U;
+
+    mem_set(seg0_area, 0xAB, seg0_size_in_file);
+
+    pg_headers[0] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_LOADABLE,
+        .offset = (uintptr_t)seg0_area - (uintptr_t)elf_data,
+        .vaddr = (void *)0x2000U,
+        .paddr = 0,
+        .size_in_file = seg0_size_in_file, 
+        .size_in_mem =  0x1000U,
+        .flags = ELF32_SEG_FLAG_READABLE | ELF32_SEG_FLAG_WRITEABLE,
+        .align = 2
+    };
+
+    pg_headers[1] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_DYNAMIC, // Should be ignored by the parser.
+    };
+
+    uint8_t * const seg2_area = (uint8_t *)elf_data + bin_area_offset + 0x200U;
+    const size_t seg2_size_in_file = 0x200U;
+
+    mem_set(seg2_area, 0xCD, seg2_size_in_file);
+
+    pg_headers[2] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_LOADABLE,
+        .offset = (uintptr_t)seg2_area - (uintptr_t)elf_data,
+        .vaddr = (void *)0x1000U,
+        .paddr = 0,
+        .size_in_file = seg2_size_in_file, 
+        .size_in_mem =  0x200U,
+        .flags = ELF32_SEG_FLAG_READABLE | ELF32_SEG_FLAG_EXECUTABLE,
+        .align = 2
+    };
+
+    pg_headers[3] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_LOADABLE,
+        .offset = 0,
+        .vaddr = (void *)0x3000U,
+        .paddr = 0,
+        .size_in_file = 0,  // No file component!
+        .size_in_mem =  0x200U,
+        .flags = ELF32_SEG_FLAG_READABLE | ELF32_SEG_FLAG_WRITEABLE,
+        .align = 2
+    };
+
+    // Unused entries.
+    pg_headers[4] = (elf32_program_header_t) {
+        .type = ELF32_SEG_TYPE_NULL
+    };
+
+    // Ok, now let's write out the ELF Files, and confirm it parses!
+    
+    TEST_SUCCESS(sc_fs_touch(TEST_ELF_FILENAME));
+
+    handle_t fh;
+    TEST_SUCCESS(sc_fs_open(TEST_ELF_FILENAME, &fh));
+    TEST_SUCCESS(sc_handle_write_full(fh, elf_data, elf_size));
+    sc_handle_close(fh);
+
+    user_app_t *ua;
+    TEST_SUCCESS(sc_fs_parse_elf32(get_default_allocator(), TEST_ELF_FILENAME, &ua));
+    TEST_TRUE(ua != NULL);
+
+    // Remove the test file since we don't need it anymore!
+    TEST_SUCCESS(sc_fs_remove(TEST_ELF_FILENAME));
+
+    // Let's confirm our user app looks right!
+    TEST_EQUAL_HEX(dummy_entry, ua->entry);
+
+    const size_t loaded_hdr_inds[] = {
+        0, 2, 3 // The headers which should've been loaded into
+                            // the resulting user app.
+    };
+    const size_t num_loaded_hdr_inds = sizeof(loaded_hdr_inds) / sizeof(loaded_hdr_inds[0]);
+
+    for (size_t i = 0; i < num_loaded_hdr_inds; i++) {
+        const size_t hdr_ind = loaded_hdr_inds[i];
+        TEST_TRUE(ua->areas[i].occupied);
+        if (pg_headers[hdr_ind].flags & ELF32_SEG_FLAG_WRITEABLE) {
+            TEST_TRUE(ua->areas[i].writeable);
+        }
+        TEST_EQUAL_HEX(pg_headers[hdr_ind].vaddr, ua->areas[i].load_position);
+        TEST_EQUAL_HEX(pg_headers[hdr_ind].size_in_file, ua->areas[i].given_size);
+        TEST_EQUAL_HEX(pg_headers[hdr_ind].size_in_mem, ua->areas[i].area_size);
+
+        if (pg_headers[hdr_ind].size_in_file > 0) {
+            TEST_TRUE(ua->areas[i].given != NULL);
+        }
+    }
+
+    TEST_TRUE(mem_cmp(ua->areas[0].given, seg0_area, seg0_size_in_file));
+    TEST_TRUE(mem_cmp(ua->areas[1].given, seg2_area, seg2_size_in_file));
+
+    // Confirm unoccupied areas!
+    for (size_t i = num_loaded_hdr_inds; i < FOS_MAX_APP_AREAS; i++) {
+        TEST_FALSE(ua->areas[i].occupied);
+    }
+
+    delete_user_app(ua);
+
+    // Ok, finally, now onto failure cases!
+
+    // Lengths too short.
+    TEST_TRUE(test_bad_elf32_file(elf_data, 1));
+    TEST_TRUE(test_bad_elf32_file(elf_data, sizeof(elf32_header_t)));
+    TEST_TRUE(test_bad_elf32_file(elf_data, sizeof(elf32_header_t) 
+                + ((num_pg_headers - 1) * sizeof(elf32_program_header_t))));
+    TEST_TRUE(test_bad_elf32_file(elf_data, sizeof(elf32_header_t) 
+                + (num_pg_headers * sizeof(elf32_program_header_t))));
+
+    // Bad magic value
+    elf_header->header_magic++;
+    TEST_TRUE(test_bad_elf32_file(elf_data, elf_size));
+    elf_header->header_magic--;
+
+    // Too many program headers!
+    elf_header->num_program_headers = 10000;
+    TEST_TRUE(test_bad_elf32_file(elf_data, elf_size));
+    elf_header->num_program_headers = num_pg_headers;
+
+    // Alright, I could always add more cases, but I think we get the point.
+
+    da_free(elf_data);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_fs(void) {
     BEGIN_SUITE("FS Syscalls");
     RUN_TEST(test_simple_rw);
     RUN_TEST(test_multithread_rw);
+    RUN_TEST(test_multithread_wait_same_handle);
+    RUN_TEST(test_multithread_multihandle);
     RUN_TEST(test_multiprocess_rw);
     RUN_TEST(test_multithread_and_process_rw);
     RUN_TEST(test_early_close);
@@ -771,5 +1069,6 @@ bool test_syscall_fs(void) {
     RUN_TEST(test_dir_functions);
     RUN_TEST(test_big_file);
     RUN_TEST(test_bad_fs_calls);
+    RUN_TEST(test_elf32_parsing);
     return END_SUITE();
 }

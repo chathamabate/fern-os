@@ -2,6 +2,7 @@
 #pragma once
 
 #include "s_data/id_table.h"
+#include "s_mem/allocator.h"
 
 /*
  * This header includes type definitions which are significant in both user and kernel space.
@@ -142,6 +143,7 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 #define SCID_PROC_FORK (0x80U)
 #define SCID_PROC_EXIT (0x81U)
 #define SCID_PROC_REAP (0x82U)
+#define SCID_PROC_EXEC (0x83U)
 
 /* Signal Syscalls (process adjacent) */
 #define SCID_SIGNAL       (0x90U)
@@ -149,17 +151,15 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 #define SCID_SIGNAL_WAIT  (0x92U)
 #define SCID_SIGNAL_CLEAR (0x93U)
 
+/* Process Memory Management */
+#define SCID_MEM_REQUEST  (0xA0U)
+#define SCID_MEM_RETURN   (0xA1U)
+
 /* Thread Syscalls */
 #define SCID_THREAD_EXIT  (0x100U)
 #define SCID_THREAD_SLEEP (0x101U)
 #define SCID_THREAD_SPAWN (0x102U)
 #define SCID_THREAD_JOIN  (0x103U)
-
-/* Futex Syscalls */
-#define SCID_FUTEX_REGISTER   (0x200U)
-#define SCID_FUTEX_DEREGISTER (0x201U)
-#define SCID_FUTEX_WAIT       (0x202U)
-#define SCID_FUTEX_WAKE       (0x203U)
 
 /* Default IO Syscalls (See Handle Syscalls) */
 #define SCID_SET_IN_HANDLE  (0x300U)
@@ -272,6 +272,18 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
     *cmd_id = (uint16_t)plg_scid;
 }
 
+/*
+ * ***** Futex Plugin *****
+ */
+
+#define PLG_FUTEX_ID (0U)
+
+#define PLG_FUT_PCID_REGISTER   (0x0U)
+#define PLG_FUT_PCID_DEREGISTER (0x1U)
+#define PLG_FUT_PCID_WAIT       (0x2U)
+#define PLG_FUT_PCID_WAKE       (0x3U)
+
+#define PLG_FUTEX_NUM_CMDS (PLG_FUT_PCID_WAKE + 1)
 
 /*
  * ***** File System Plugin *****
