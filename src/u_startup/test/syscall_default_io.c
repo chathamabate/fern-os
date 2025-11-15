@@ -25,11 +25,11 @@ static handle_t in;
 static handle_t out;
 
 static bool pretest(void) {
-    TEST_SUCCESS(sc_fs_touch("input"));
-    TEST_SUCCESS(sc_fs_touch("output"));
+    TEST_SUCCESS(sc_fs_touch("/input"));
+    TEST_SUCCESS(sc_fs_touch("/output"));
 
-    TEST_SUCCESS(sc_fs_open("input", &in));
-    TEST_SUCCESS(sc_fs_open("output", &out));
+    TEST_SUCCESS(sc_fs_open("/input", &in));
+    TEST_SUCCESS(sc_fs_open("/output", &out));
 
     sc_set_in_handle(in);
     sc_set_out_handle(out);
@@ -41,8 +41,8 @@ static bool posttest(void) {
     sc_handle_close(out);
     sc_handle_close(in);
 
-    TEST_SUCCESS(sc_fs_remove("output"));
-    TEST_SUCCESS(sc_fs_remove("input"));
+    TEST_SUCCESS(sc_fs_remove("/output"));
+    TEST_SUCCESS(sc_fs_remove("/input"));
 
     TEST_SUCCEED();
 }
@@ -52,6 +52,8 @@ static bool test_null_io_handles(void) {
 
     sc_set_in_handle(FOS_MAX_HANDLES_PER_PROC + 100);
 
+    TEST_EQUAL_UINT(FOS_MAX_HANDLES_PER_PROC, sc_get_in_handle());
+
     char buf[5];
     err = sc_in_read(buf, sizeof(buf), NULL);
     TEST_EQUAL_HEX(FOS_E_EMPTY, err);
@@ -60,6 +62,7 @@ static bool test_null_io_handles(void) {
     TEST_EQUAL_HEX(FOS_E_EMPTY, err);
 
     sc_set_out_handle(FOS_MAX_HANDLES_PER_PROC);
+    TEST_EQUAL_UINT(FOS_MAX_HANDLES_PER_PROC, sc_get_out_handle());
 
     size_t written;
     err = sc_out_write("hello", 5, &written);
@@ -71,6 +74,9 @@ static bool test_null_io_handles(void) {
 
 static bool test_valid_io_handles(void) {
     char buf[128];
+
+    TEST_EQUAL_HEX(in, sc_get_in_handle());
+    TEST_EQUAL_HEX(out, sc_get_out_handle());
 
     const char *msg = "hello";
     const size_t msg_len = str_len(msg);

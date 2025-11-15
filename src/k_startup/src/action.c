@@ -253,7 +253,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
                     break;
 
                 case HCID_IS_CD:
-                    thr->ctx.eax = (uint32_t)(hs->is_cd);
+                    thr->ctx.eax = (uint32_t)(hs->is_cd) ? FOS_E_SUCCESS : FOS_E_UNKNWON_ERROR;
                     err = FOS_E_SUCCESS;
                     break;
 

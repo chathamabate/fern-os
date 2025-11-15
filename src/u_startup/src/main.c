@@ -17,6 +17,8 @@
 #include "s_util/constraints.h"
 #include <stdarg.h>
 #include "u_startup/test/syscall_exec.h"
+#include "u_startup/test/syscall_default_io.h"
+#include "u_startup/test/syscall_cd.h"
 
 proc_exit_status_t user_main(void) {
     // User code here! 
@@ -36,7 +38,9 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    // User code here!
+    if (test_syscall_cd_dimmensions() != FOS_E_SUCCESS) {
+        sc_out_write_s("AHHH\n");
+    }
 
     return PROC_ES_SUCCESS;
 }

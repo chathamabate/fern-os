@@ -11,6 +11,10 @@ fernos_error_t test_syscall_cd_dimmensions(void) {
 
     PROP_ERR(sc_vga_cd_open(&cd));
 
+    if (!sc_handle_is_cd(cd)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
     size_t rows, cols;
     sc_cd_get_dimmensions(cd, &rows, &cols);
 
