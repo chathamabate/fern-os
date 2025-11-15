@@ -45,14 +45,20 @@ struct _handle_state_t {
      * The handle which maps to this state in `proc`.
      */
     const handle_t handle;
+
+    /**
+     * Whether or not this is a character display handle.
+     */
+    const bool is_cd;
 };
 
 static inline void init_base_handle(handle_state_t *hs, const handle_state_impl_t *impl, kernel_state_t *ks,
-        process_t *proc, handle_t handle) {
+        process_t *proc, handle_t handle, bool is_cd) {
     *(const handle_state_impl_t **)&(hs->impl) = impl;
     *(kernel_state_t **)&(hs->ks) = ks;
     *(process_t **)&(hs->proc) = proc;
     *(handle_t *)&(hs->handle) = handle;
+    *(bool *)&(hs->is_cd) = is_cd;
 }
 
 /**

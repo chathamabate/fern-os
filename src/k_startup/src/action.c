@@ -192,6 +192,12 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_set_in_handle(kernel, (handle_t)arg0);
         break;
 
+    case SCID_GET_IN_HANDLE: // Probs easiest to just do inline here.
+        thr->ctx.eax = idtb_get(thr->proc->handle_table, thr->proc->in_handle) 
+            ? thr->proc->in_handle : FOS_MAX_HANDLES_PER_PROC;
+        err = FOS_E_SUCCESS;
+        break;
+
     case SCID_IN_READ:
         err = ks_in_read(kernel, (void *)arg0, (size_t)arg1, (size_t *)arg2);
         break;
@@ -202,6 +208,12 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     case SCID_SET_OUT_HANDLE:
         err = ks_set_out_handle(kernel, (handle_t)arg0);
+        break;
+
+    case SCID_GET_OUT_HANDLE: // Probs easiest to just do inline here.
+        thr->ctx.eax = idtb_get(thr->proc->handle_table, thr->proc->out_handle) 
+            ? thr->proc->out_handle : FOS_MAX_HANDLES_PER_PROC;
+        err = FOS_E_SUCCESS;
         break;
 
     case SCID_OUT_WRITE:
@@ -238,6 +250,11 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
                 case HCID_WAIT:
                     err = hs_wait(hs);
+                    break;
+
+                case HCID_IS_CD:
+                    thr->ctx.eax = (uint32_t)(hs->is_cd);
+                    err = FOS_E_SUCCESS;
                     break;
 
                 default: // Otherwise, default to custom command!

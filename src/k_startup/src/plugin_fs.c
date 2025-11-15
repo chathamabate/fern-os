@@ -482,7 +482,7 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
         }
 
         if (err == FOS_E_SUCCESS) {
-            init_base_handle((handle_state_t *)hs, &FS_HS_IMPL, plg_fs->super.ks, proc, h);
+            init_base_handle((handle_state_t *)hs, &FS_HS_IMPL, plg_fs->super.ks, proc, h, false);
             *(plugin_fs_t **)&(hs->plg_fs) = plg_fs;
             hs->pos = 0;
             *(fs_node_key_t *)&(hs->nk) = kernel_nk;
@@ -578,7 +578,7 @@ static fernos_error_t copy_fs_handle_state(handle_state_t *hs, process_t *proc, 
     }
     (*nk_entry)->references++;
 
-    init_base_handle((handle_state_t *)fs_hs_copy, hs->impl, hs->ks, proc, hs->handle);
+    init_base_handle((handle_state_t *)fs_hs_copy, hs->impl, hs->ks, proc, hs->handle, false);
     *(plugin_fs_t **)&(fs_hs_copy->plg_fs) = plg_fs;
     fs_hs_copy->pos = fs_hs->pos;
     *(fs_node_key_t *)&(fs_hs_copy->nk) = fs_hs->nk;

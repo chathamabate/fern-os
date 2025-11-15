@@ -22,7 +22,7 @@ static const handle_state_impl_t HS_CD_IMPL = {
     .hs_write = hs_cd_write,
     .hs_read = NULL,
     .hs_wait = NULL,
-    .hs_cmd = hs_cd_cmd 
+    .hs_cmd = hs_cd_cmd, 
 };
 
 handle_state_t *new_handle_cd_state(kernel_state_t *ks, process_t *proc, handle_t h, char_display_t *cd) {
@@ -31,7 +31,7 @@ handle_state_t *new_handle_cd_state(kernel_state_t *ks, process_t *proc, handle_
         return NULL;
     }
 
-    init_base_handle((handle_state_t *)hs_cd, &HS_CD_IMPL, ks, proc, h);
+    init_base_handle((handle_state_t *)hs_cd, &HS_CD_IMPL, ks, proc, h, true);
 
     *(char_display_t **)&(hs_cd->cd) = cd;
 

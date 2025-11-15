@@ -263,6 +263,13 @@ fernos_error_t sc_thread_join(join_vector_t jv, thread_id_t *joined, void **retv
 void sc_set_in_handle(handle_t in);
 
 /**
+ * Get the default input handle.
+ *
+ * If this handle is not initialized, FOS_MAX_HANDLES_PER_PROC is returned.
+ */
+handle_t sc_get_in_handle(void);
+
+/**
  * Read from default input handle.
  *
  * If the default input handle is not currently initialized this returns FOS_E_EMPTY.
@@ -281,6 +288,13 @@ fernos_error_t sc_in_wait(void);
  * this will set the defualt output handle to the NULL_HANDLE.
  */
 void sc_set_out_handle(handle_t out);
+
+/**
+ * Get the default output handle.
+ *
+ * If this handle is not initialized, FOS_MAX_HANDLES_PER_PROC is returned.
+ */
+handle_t sc_get_out_handle(void);
 
 /**
  * Write to default output handle.
@@ -331,6 +345,11 @@ fernos_error_t sc_handle_read(handle_t h, void *dest, size_t len, size_t *readde
  * (Other errors may be returned)
  */
 fernos_error_t sc_handle_wait(handle_t h);
+
+/**
+ * Is this a character display handle?
+ */
+bool sc_handle_is_cd(handle_t h);
 
 /**
  * Execute some plugin specific command.

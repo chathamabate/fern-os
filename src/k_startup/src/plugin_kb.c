@@ -36,7 +36,7 @@ static fernos_error_t copy_kb_handle_state(handle_state_t *hs, process_t *proc, 
         return FOS_E_NO_MEM;
     }
 
-    init_base_handle((handle_state_t *)plg_hs_copy, &KB_HS_IMPL, hs->ks, proc, hs->handle);
+    init_base_handle((handle_state_t *)plg_hs_copy, &KB_HS_IMPL, hs->ks, proc, hs->handle, false);
     *(plugin_kb_t **)&(plg_hs_copy->plg_kb) = plg_hs->plg_kb;
     plg_hs_copy->pos = plg_hs->pos;
 
@@ -376,7 +376,7 @@ static fernos_error_t plg_kb_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
 
         // Success!
 
-        init_base_handle((handle_state_t *)hs_kb, &KB_HS_IMPL, ks, proc, h);
+        init_base_handle((handle_state_t *)hs_kb, &KB_HS_IMPL, ks, proc, h, false);
         *(plugin_kb_t **)&(hs_kb->plg_kb) = plg_kb;
         hs_kb->pos = plg_kb->sc_buf_pos;
 

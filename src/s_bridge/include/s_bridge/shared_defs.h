@@ -163,10 +163,12 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 
 /* Default IO Syscalls (See Handle Syscalls) */
 #define SCID_SET_IN_HANDLE  (0x300U)
-#define SCID_IN_READ        (0x301U)
-#define SCID_IN_WAIT        (0x302U)
-#define SCID_SET_OUT_HANDLE (0x303U)
-#define SCID_OUT_WRITE      (0x304U) 
+#define SCID_GET_IN_HANDLE  (0x301U)
+#define SCID_IN_READ        (0x302U)
+#define SCID_IN_WAIT        (0x303U)
+#define SCID_SET_OUT_HANDLE (0x304U)
+#define SCID_GET_OUT_HANDLE (0x305U)
+#define SCID_OUT_WRITE      (0x306U) 
 
 /*
  * Handle Syscalls
@@ -200,8 +202,9 @@ static inline bool scid_is_handle_cmd(syscall_id_t scid) {
 #define HCID_WRITE (0x1U)
 #define HCID_READ  (0x2U)
 #define HCID_WAIT  (0x3U)
+#define HCID_IS_CD (0x4U)
 
-#define NUM_DEFAULT_HCIDS (HCID_WAIT + 1)
+#define NUM_DEFAULT_HCIDS (HCID_IS_CD + 1)
 
 // All other handle commands are custom/implementation specific!
 

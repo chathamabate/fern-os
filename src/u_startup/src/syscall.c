@@ -84,6 +84,10 @@ void sc_set_in_handle(handle_t in) {
     (void)trigger_syscall(SCID_SET_IN_HANDLE, (uint32_t)in, 0, 0, 0);
 }
 
+handle_t sc_get_in_handle(void) {
+    return (handle_t)trigger_syscall(SCID_GET_IN_HANDLE, 0, 0, 0, 0);
+}
+
 fernos_error_t sc_in_read(void *dest, size_t len, size_t *readden) {
     return (fernos_error_t)trigger_syscall(SCID_IN_READ, (uint32_t)dest, (uint32_t)len, (uint32_t)readden, 0);
 }
@@ -94,6 +98,10 @@ fernos_error_t sc_in_wait(void) {
 
 void sc_set_out_handle(handle_t out) {
     (void)trigger_syscall(SCID_SET_OUT_HANDLE, (uint32_t)out, 0, 0, 0);
+}
+
+handle_t sc_get_out_handle(void) {
+    return (handle_t)trigger_syscall(SCID_GET_OUT_HANDLE, 0, 0, 0, 0);
 }
 
 fernos_error_t sc_out_write(const void *src, size_t len, size_t *written) {
@@ -118,6 +126,10 @@ fernos_error_t sc_handle_read(handle_t h, void *dest, size_t len, size_t *readde
 
 fernos_error_t sc_handle_wait(handle_t h) {
     return sc_handle_cmd(h, HCID_WAIT, 0, 0, 0, 0);
+}
+
+bool sc_handle_is_cd(handle_t h) {
+    return sc_handle_cmd(h, HCID_IS_CD, 0, 0, 0, 0) == FOS_E_SUCCESS;
 }
 
 fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
