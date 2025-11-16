@@ -38,15 +38,12 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    test_syscall_default_io(cd);
+    sc_fs_exec_da_elf32_va("/test_apps/Test", "A");
 
-    // Try using relative pointers while in the ROOT?
-    // Rarely works?? I wish the fat32 tools didn't suck so bad!
-    // Maybe we could change some of the behavior??
-    //err = sc_fs_touch("/test_apps/a");
-    if (err != FOS_E_SUCCESS) {
-        return PROC_ES_FAILURE;
-    }
-
+    // Should we start working on the ISO???
+    // Yeah, that'd be cool I guess...
+    // Different apps and stuff??
+    // Apps do specific things??
+    
     return PROC_ES_SUCCESS;
 }
