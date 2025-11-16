@@ -34,6 +34,7 @@
 #include "s_bridge/test/app.h"
 
 #include "k_startup/test/page_helpers.h"
+#include "s_block_device/test/file_sys_helpers.h"
 
 #include <stdint.h>
 

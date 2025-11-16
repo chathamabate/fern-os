@@ -148,6 +148,7 @@ static bool test_separate_path(void) {
         const char *exp_basename;
     } success_cases[] = {
         {"a", "./", "a"},
+        {"./a", "./", "a"}, 
         {"/a", "/", "a"},
         {"/a/b/c", "/a/b/", "c"},
         {"./a/.././b", "./a/.././", "b"},

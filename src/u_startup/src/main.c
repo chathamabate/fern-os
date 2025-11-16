@@ -38,8 +38,14 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    if (test_syscall_cd_dimmensions() != FOS_E_SUCCESS) {
-        sc_out_write_s("AHHH\n");
+    test_syscall_default_io(cd);
+
+    // Try using relative pointers while in the ROOT?
+    // Rarely works?? I wish the fat32 tools didn't suck so bad!
+    // Maybe we could change some of the behavior??
+    //err = sc_fs_touch("/test_apps/a");
+    if (err != FOS_E_SUCCESS) {
+        return PROC_ES_FAILURE;
     }
 
     return PROC_ES_SUCCESS;

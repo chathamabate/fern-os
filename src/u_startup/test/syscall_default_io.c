@@ -25,11 +25,11 @@ static handle_t in;
 static handle_t out;
 
 static bool pretest(void) {
-    TEST_SUCCESS(sc_fs_touch("/input"));
-    TEST_SUCCESS(sc_fs_touch("/output"));
+    TEST_SUCCESS(sc_fs_touch("input"));
+    TEST_SUCCESS(sc_fs_touch("output"));
 
-    TEST_SUCCESS(sc_fs_open("/input", &in));
-    TEST_SUCCESS(sc_fs_open("/output", &out));
+    TEST_SUCCESS(sc_fs_open("input", &in));
+    TEST_SUCCESS(sc_fs_open("output", &out));
 
     sc_set_in_handle(in);
     sc_set_out_handle(out);
@@ -41,8 +41,8 @@ static bool posttest(void) {
     sc_handle_close(out);
     sc_handle_close(in);
 
-    TEST_SUCCESS(sc_fs_remove("/output"));
-    TEST_SUCCESS(sc_fs_remove("/input"));
+    TEST_SUCCESS(sc_fs_remove("output"));
+    TEST_SUCCESS(sc_fs_remove("input"));
 
     TEST_SUCCEED();
 }
