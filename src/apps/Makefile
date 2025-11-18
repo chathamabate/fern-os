@@ -27,6 +27,8 @@ _APPS := Test
 
 ####################################################################################################
 
+MY_MAKE := @make --no-print-directory
+
 GIT_TOP   := $(shell git rev-parse --show-toplevel)
 SRC_DIR   := $(GIT_TOP)/src
 APPS_DIR  := $(SRC_DIR)/apps
@@ -39,15 +41,36 @@ C_COMPILER := i686-elf-gcc
 $(BUILD_DIR) $(OUT_DIR):
 	mkdir -p $@
 
-APP_PHONY_TARS := $(addprefix app.,$(_APPS))
-.PHONY: apps $(APP_PHONY_TARS)
+.PHONY: apps $(_APPS)
 
-$(APP_PHONY_TARS): app.%: | $(BUILD_DIR) $(OUT_DIR)
-	make -C $(APPS_DIR)/$* \
-		BUILD_DIR=$(BUILD_DIR)/$* \
+$(_APPS): | $(BUILD_DIR) $(OUT_DIR)
+	$(MY_MAKE) -C $(APPS_DIR)/$@ \
+		BUILD_DIR=$(BUILD_DIR)/$@ \
 		OUT_DIR=$(OUT_DIR) \
 		INSTALL_DIR=$(INSTALL_DIR) \
 		ELF_SYMS=$(ELF_SYMS) \
 		bin
 
-apps: $(APP_PHONY_TARS)
+apps: $(_APPS)
+
+# Clangd stuff.
+
+CLANGD_TARS := $(addprefix clangd.,$(_APPS))
+.PHONY: clangd $(CLANGD_TARS)
+
+$(CLANGD_TARS): clangd.%:
+	$(MY_MAKE) -C $(APPS_DIR)/$* \
+		INSTALL_DIR=$(INSTALL_DIR) \
+		clangd
+
+clangd: $(CLANGD_TARS)
+
+CLANGD_CLEAN_TARS := $(addprefix clean.clangd.,$(_APPS))
+.PHONY: clean.clangd $(CLANGD_CLEAN_TARS)
+
+$(CLANGD_CLEAN_TARS): clean.clangd.%:
+	$(MY_MAKE) -C $(APPS_DIR)/$* \
+		clean.clangd
+
+clean.clangd: $(CLANGD_CLEAN_TARS)
+

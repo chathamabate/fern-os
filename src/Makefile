@@ -196,7 +196,7 @@ APPS_BUILD := $(BUILD_DIR)/apps
 .PHONY: apps $(APPS_BUILD)
 
 $(APPS_BUILD): $(ELF_SYMS) $(OS_DEFS_LD) hdrs.install
-	make -C $(APPS_DIR) \
+	$(MY_MAKE) -C $(APPS_DIR) \
 		BUILD_DIR=$(APPS_BUILD) \
 		INSTALL_DIR=$(INSTALL_DIR) \
 		ELF_SYMS=$(ELF_SYMS) \
@@ -204,11 +204,19 @@ $(APPS_BUILD): $(ELF_SYMS) $(OS_DEFS_LD) hdrs.install
 
 apps: $(APPS_BUILD)
 
-TEST_APPS_GUEST := ::/test_apps
-TEST_APPS_HOST  := $(BUILD_DIR)/test_apps
+.PHONY: apps.clangd apps.clean.clangd
 
-.PHONY: apps disk
+# NOTE: this will not install headers.
+apps.clangd:
+	$(MY_MAKE) -C $(APPS_DIR) \
+		INSTALL_DIR=$(INSTALL_DIR) \
+		clangd
 
+apps.clean.clangd:
+	$(MY_MAKE) -C $(APPS_DIR) \
+		clean.clangd
+
+.PHONY: disk
 $(DISK): $(APPS_BUILD) | $(BUILD_DIR)
 	qemu-img create -f raw $@ 256M
 	mkfs.fat -F 32 -s 2 $@

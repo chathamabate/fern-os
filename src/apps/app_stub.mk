@@ -73,7 +73,7 @@ $(APP): $(OBJS) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(APP_LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
 	    -lgcc -Wl,--just-symbols=$(ELF_SYMS) $^
 
-.PHONY: bin clean
+.PHONY: bin
 
 bin: $(APP)
 
