@@ -9,10 +9,10 @@
 #include "s_mem/simple_heap.h"
 
 #include "s_util/constraints.h"
+#include "s_util/ps2_scancodes.h"
 #include <stdarg.h>
 
 proc_exit_status_t user_main(void) {
-
     fernos_error_t err;
 
     sc_signal_allow(1 << FSIG_CHLD);
