@@ -74,8 +74,8 @@ $(APP): $(OBJS) | $(BUILD_DIR)
 	    -lgcc -Wl,--just-symbols=$(ELF_SYMS) $^
 
 .PHONY: bin
-
 bin: $(APP)
+	@echo > /dev/null
 
 # Expects 
 # $(1): Clangd File

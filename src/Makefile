@@ -95,14 +95,44 @@ $(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
 
 # Install Headers
 
+INCLUDE_DIRS := $(addprefix $(INCLUDE_DIR)/,$(MODS))
+$(INCLUDE_DIRS): $(INCLUDE_DIR)/%: | $(INCLUDE_DIR)
+	$(MY_MAKE) -C $(SRC_DIR)/$* hdrs.install test_hdrs.install 
+
+ALL_INCLUDES := $(INCLUDE_DIRS) $(OS_DEFS_H) $(OS_DEFS_S)
+
+# NOTE: This target is "shallow" because it doesn't check for modifications at all.
+# If the include directories exist, it does NOTHING!
+.PHONY: hdrs.install.shallow
+hdrs.install.shallow: $(ALL_INCLUDES)
+	$(call DONE_MSG,Headers Installed [shallow])
+
+# These targets are NOT "shallow" since they always defer to the module makefile which DOES
+# check for modification!
 HDRS_INSTALL_TARS := $(addprefix hdrs.install.,$(MODS))
+$(HDRS_INSTALL_TARS): hdrs.install.%:
+	$(MY_MAKE) -C $(SRC_DIR)/$* hdrs.install test_hdrs.install 
 
 .PHONY: hdrs.install $(HDRS_INSTALL_TARS)
 hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
 	$(call DONE_MSG,Headers Installed)
 
-$(HDRS_INSTALL_TARS): hdrs.install.%:
-	$(MY_MAKE) -C $(SRC_DIR)/$* hdrs.install test_hdrs.install 
+# Install Libraries
+
+# NOTE: The LIBS and TEST_LIBS targets are Shallow since they ONLY CHECK FOR EXISTENCE!!!
+LIBS := $(patsubst %,$(INSTALL_DIR)/lib%.a,$(MODS))
+$(LIBS): $(INSTALL_DIR)/lib%.a: | $(ALL_INCLUDES)
+	$(MY_MAKE) -C $(SRC_DIR)/$* lib.install
+
+TEST_LIBS := $(patsubst %,$(INSTALL_DIR)/lib%_test.a,$(MODS))
+$(TEST_LIBS): $(INSTALL_DIR)/lib%_test.a: | $(INSTALL_DIR) $(ALL_INCLUDES)
+	$(MY_MAKE) -C $(SRC_DIR)/$* test_lib.install
+
+ALL_LIBS := $(LIBS) $(TEST_LIBS)
+
+.PHONY: lib.install.shallow
+lib.install.shallow: $(ALL_LIBS)
+	$(call DONE_MSG,Libraries Installed [shallow])
 
 # Install Libs (For now we'll just always build the test and normal libs)
 
@@ -153,20 +183,80 @@ $(BUILD_DIR):
 
 LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod)_test -l$(mod))
 
-# Kinda frustrating that this always runs! (But I guess it's not a huge deal)
-$(ELF_FILE): lib.install $(OS_DEFS_LD) | $(BUILD_DIR)
+# Remember this will not attempt to rebuild libs if they already exist!
+$(ELF_FILE): $(ALL_LIBS) $(OS_DEFS_LD) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
 		-Wl,--start-group $(LIB_FLAGS) -lgcc -Wl,--end-group
-	$(call DONE_MSG, Kernel ELF Built)
 
-# The symbols file is useful for compiling user application binaries.
-# (This also always runs)
+.PHONY: elf.shallow elf.shallow.dummy
+elf.shallow.dummy: $(ELF_FILE)
+	@echo > /dev/null
+elf.shallow: $(ELF_FILE)
+	$(call DONE_MSG,Kernel ELF Built [shallow])
+
+.PHONY: elf
+elf: lib.install $(OS_DEFS_LD)
+	$(MY_MAKE) -C $(SRC_DIR) elf.shallow.dummy
+	$(call DONE_MSG,Kernel ELF Built)
+
+####################################################################################################
+
+# User Apps
+
+# NOTE: ADD APPLICATION NAMES HERE!
+APPS := Test
+
+APPS_DIR  := $(SRC_DIR)/apps
+
+APPS_BUILD := $(BUILD_DIR)/apps
+APPS_OUT := $(BUILD_DIR)/apps/out
+
+# The symbols file is useful for compiling user application binaries.  (Depends on SHALLOW kernel rules)
 $(ELF_SYMS): $(ELF_FILE) | $(BUILD_DIR)
-	i686-elf-objcopy --extract-symbol $< $@
+	i686-elf-objcopy --extract-symbol $(ELF_FILE) $@
 
-.PHONY: bin qemu.bin
+$(APPS_BUILD) $(APPS_OUT):
+	mkdir -p $@
 
-bin: $(ELF_FILE)
+APP_BUILDS := $(addprefix $(APPS_BUILD)/,$(APPS))
+
+$(APP_BUILDS): $(APPS_BUILD)/%: $(ELF_SYMS) | $(APPS_BUILD) $(APPS_OUT)
+	$(MY_MAKE) -C $(APPS_DIR)/$* \
+		BUILD_DIR=$@ \
+		OUT_DIR=$(APPS_OUT) \
+		INSTALL_DIR=$(INSTALL_DIR) \
+		ELF_SYMS=$(ELF_SYMS) \
+		bin
+
+# NOTE: VERY IMPORTANT!
+# Apps specific makefile are always invoked! However, they depend on the shallow kernel rules!
+
+.PHONY: apps $(APP_BUILDS)
+apps: $(APP_BUILDS)
+	$(call DONE_MSG,Apps Built)
+
+# Potentially move this out of here?
+
+APPS_CLANGD_TARS := $(addprefix apps.clangd.,$(APPS))
+.PHONY: apps.clangd $(APPS_CLANGD_TARS)
+
+$(APPS_CLANGD_TARS): apps.clangd.%: 
+	$(MY_MAKE) -C $(APPS_DIR)/$* \
+		INSTALL_DIR=$(INSTALL_DIR) \
+		clangd
+
+apps.clangd: $(APPS_CLANGD_TARS)
+	$(call DONE_MSG,App Clangd Installed)
+
+APPS_CLEAN_CLANGD_TARS := $(addprefix apps.clean.clangd.,$(APPS))
+.PHONY: apps.clean.clangd $(APPS_CLEAN_CLANGD_TARS)
+
+$(APPS_CLEAN_CLANGD_TARS): apps.clean.clangd.%:
+	$(MY_MAKE) -C $(APPS_DIR)/$* \
+		clean.clangd
+
+apps.clean.clangd: $(APPS_CLEAN_CLANGD_TARS)
+	$(call DONE_MSG,App Clangd Cleaned)
 
 ####################################################################################################
 
@@ -183,38 +273,9 @@ bin: $(ELF_FILE)
 #
 # EDIT: (11/12/25) mtools will also give a file a LFN if the files name has mixed case!
 # For example, naming an app "Test" instead of "test" will result in an LFN!
-#
-# Also, note that orignally, we were going to construct the "core apps" here in this repo.
-# This would likely overcrowd this repo. I plan to make another repo (maybe called "fern-os-iso"
-# which will build and package core apps into a single ISO.
-# The disk work here is only for testing purposes!
 
 DISK := $(BUILD_DIR)/hdd.img
-APPS_DIR  := $(SRC_DIR)/apps
-APPS_BUILD := $(BUILD_DIR)/apps
 
-.PHONY: apps $(APPS_BUILD)
-
-$(APPS_BUILD): $(ELF_SYMS) $(OS_DEFS_LD) hdrs.install
-	$(MY_MAKE) -C $(APPS_DIR) \
-		BUILD_DIR=$(APPS_BUILD) \
-		INSTALL_DIR=$(INSTALL_DIR) \
-		ELF_SYMS=$(ELF_SYMS) \
-		apps
-
-apps: $(APPS_BUILD)
-
-.PHONY: apps.clangd apps.clean.clangd
-
-# NOTE: this will not install headers.
-apps.clangd:
-	$(MY_MAKE) -C $(APPS_DIR) \
-		INSTALL_DIR=$(INSTALL_DIR) \
-		clangd
-
-apps.clean.clangd:
-	$(MY_MAKE) -C $(APPS_DIR) \
-		clean.clangd
 
 .PHONY: disk
 $(DISK): $(APPS_BUILD) | $(BUILD_DIR)
