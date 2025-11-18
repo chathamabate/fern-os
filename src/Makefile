@@ -189,30 +189,33 @@ bin: $(ELF_FILE)
 # which will build and package core apps into a single ISO.
 # The disk work here is only for testing purposes!
 
-TEST_DISK := $(BUILD_DIR)/hdd.img
+DISK := $(BUILD_DIR)/hdd.img
+APPS_DIR  := $(SRC_DIR)/apps
+APPS_BUILD := $(BUILD_DIR)/apps
+
+.PHONY: apps $(APPS_BUILD)
+
+$(APPS_BUILD): $(ELF_SYMS) $(OS_DEFS_LD) hdrs.install
+	make -C $(APPS_DIR) \
+		BUILD_DIR=$(APPS_BUILD) \
+		INSTALL_DIR=$(INSTALL_DIR) \
+		ELF_SYMS=$(ELF_SYMS) \
+		apps
+
+apps: $(APPS_BUILD)
+
 TEST_APPS_GUEST := ::/test_apps
 TEST_APPS_HOST  := $(BUILD_DIR)/test_apps
 
-.PHONY: test_apps disk
+.PHONY: apps disk
 
-$(TEST_APPS_HOST):
-	mkdir -p $@
-
-test_apps: $(ELF_SYMS) $(OS_DEFS_LD) hdrs.install | $(TEST_APPS_HOST)
-	$(MY_MAKE) -C $(SRC_DIR)/test_app \
-		BUILD_DIR=$(BUILD_DIR)/test_app \
-		HOST_APPS_DIR=$(TEST_APPS_HOST) \
-		INSTALL_DIR=$(INSTALL_DIR) \
-		ELF_SYMS=$(ELF_SYMS) \
-		bin clangd
-
-$(TEST_DISK): test_apps | $(BUILD_DIR)
+$(DISK): $(APPS_BUILD) | $(BUILD_DIR)
 	qemu-img create -f raw $@ 256M
 	mkfs.fat -F 32 -s 2 $@
-	mcopy -i $@ $(TEST_APPS_HOST) $(TEST_APPS_GUEST)
+	mcopy -i $@ $(APPS_BUILD)/out ::/Bin
 	$(call DONE_MSG,Disk Built)
 
-disk: $(TEST_DISK)
+disk: $(DISK)
 
 ####################################################################################################
 
@@ -222,13 +225,13 @@ disk: $(TEST_DISK)
 
 all: bin disk
 
-# NOTE: This depends on the TEST_DISK existing.
+# NOTE: This depends on the DISK existing.
 # Order only deps are annoying, so it's not listed here.
 qemu.bin: $(ELF_FILE)
 	qemu-system-x86_64 \
 		-m 4G \
 		-kernel $(ELF_FILE) \
-		-drive file=$(TEST_DISK),format=raw,index=0,media=disk \
+		-drive file=$(DISK),format=raw,index=0,media=disk \
 		-display sdl \
 		-full-screen \
 		-monitor stdio
