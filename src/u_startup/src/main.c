@@ -38,7 +38,7 @@ proc_exit_status_t user_main(void) {
         return PROC_ES_FAILURE;
     }
 
-    sc_fs_exec_da_elf32_va("/test_apps/Test", "A");
+    test_syscall_exec();
 
     // Should we start working on the ISO???
     // Yeah, that'd be cool I guess...

@@ -22,7 +22,7 @@ static bool posttest(void);
 
 #include "s_util/test.h"
 
-#define TEST_APP "/test_apps/Test"
+#define TEST_APP "/Bin/Test"
 
 #define _SYSCALL_EXEC_TEST_DIR "syscall_exec_test_dir"
 #define SYSCALL_EXEC_TEST_DIR "/" _SYSCALL_EXEC_TEST_DIR
