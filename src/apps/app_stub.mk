@@ -65,7 +65,7 @@ OBJS := $(patsubst %.c, $(BUILD_DIR)/%.o,$(_SRCS))
 
 CFLAGS := -m32 -std=gnu99 -ffreestanding -Wall -Wextra -Wpedantic 
 $(OBJS): $(BUILD_DIR)/%.o: $(APP_DIR)/%.c $(ELF_SYMS) | $(BUILD_DIR)
-	$(C_COMPILER) -c $(CFLAGS) -I$(INCLUDE_DIR) -o $@ $<
+	$(C_COMPILER) -c $(CFLAGS) -I$(INCLUDE_DIR) -I$(APP_DIR) -o $@ $<
 
 # NOTE: in the below recipe we give -L$(INSTALL_DIR) so we have access to os_defs.ld
 # This recipe DOES NOT use any FernOS libraries directly! (The point of the symbols file)
@@ -88,7 +88,7 @@ endef
 
 CLANGD := $(APP_DIR)/.clangd
 $(CLANGD):
-	$(call CLANGD_HELPER,$@,$(CFLAGS) -I$(INCLUDE_DIR))
+	$(call CLANGD_HELPER,$@,$(CFLAGS) -I$(INCLUDE_DIR) -I$(APP_DIR))
 
 .PHONY: clangd clean.clangd
 

@@ -206,7 +206,8 @@ elf: lib.install $(OS_DEFS_LD)
 # User Apps
 
 # NOTE: ADD APPLICATION NAMES HERE!
-APPS := Test
+APPS := Test \
+		Shell
 
 APPS_DIR  := $(SRC_DIR)/apps
 
