@@ -167,6 +167,7 @@ $(TEST_CLANGD):
 
 CLANGDS := $(INC_CLANGD) $(SRC_CLANGD) $(TEST_CLANGD)
 clangd: $(CLANGDS) 
+	@echo > /dev/null
 
 # clean targets
 

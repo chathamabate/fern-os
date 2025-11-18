@@ -157,6 +157,7 @@ $(CLANGD_TARS): clangd.%:
 	$(MY_MAKE) -C $(SRC_DIR)/$* clangd
 
 clangd: $(CLANGD_TARS)
+	$(call DONE_MSG,Clangd Installed)
 
 CLANGD_CLEAN_TARS := $(addprefix clean.clangd.,$(MODS))
 .PHONY: clean.clangd $(CLANGD_CLEAN_TARS)
@@ -165,6 +166,7 @@ $(CLANGD_CLEAN_TARS): clean.clangd.%:
 	$(MY_MAKE) -C $(SRC_DIR)/$* clean.clangd
 
 clean.clangd: $(CLANGD_CLEAN_TARS)
+	$(call DONE_MSG,Clang Cleaned)
 
 ####################################################################################################
 
@@ -229,10 +231,19 @@ $(APP_BUILDS): $(APPS_BUILD)/%: $(ELF_SYMS) | $(APPS_BUILD) $(APPS_OUT)
 		bin
 
 # NOTE: VERY IMPORTANT!
-# Apps specific makefile are always invoked! However, they depend on the shallow kernel rules!
+# Apps specific makefile are always invoked! However, the shallow/unshallow rules below determine
+# whether or not the kernel is rebuilt first!
 
-.PHONY: apps $(APP_BUILDS)
-apps: $(APP_BUILDS)
+.PHONY: apps.shallow apps.shallow.dummy $(APP_BUILDS)
+apps.shallow.dummy: $(APP_BUILDS)
+	@echo > /dev/null
+
+apps.shallow: $(APP_BUILDS)
+	$(call DONE_MSG,Apps Built [shallow kernel])
+
+.PHONY: apps
+apps: elf
+	$(MY_MAKE) -C $(SRC_DIR) apps.shallow.dummy
 	$(call DONE_MSG,Apps Built)
 
 # Potentially move this out of here?
@@ -276,27 +287,26 @@ apps.clean.clangd: $(APPS_CLEAN_CLANGD_TARS)
 
 DISK := $(BUILD_DIR)/hdd.img
 
-
-.PHONY: disk
-$(DISK): $(APPS_BUILD) | $(BUILD_DIR)
+$(DISK): $(APP_BUILDS) | $(BUILD_DIR)
 	qemu-img create -f raw $@ 256M
 	mkfs.fat -F 32 -s 2 $@
-	mcopy -i $@ $(APPS_BUILD)/out ::/Bin
-	$(call DONE_MSG,Disk Built)
+	mcopy -i $@ $(APPS_OUT) ::/Bin
 
-disk: $(DISK)
+.PHONY: disk disk.shallow 
+disk.shallow: $(DISK)
+	$(call DONE_MSG,Disk Built [shallow kernel])
+
+disk: elf
+	$(MY_MAKE) -C $(SRC_DIR) $(DISK)
+	$(call DONE_MSG,Disk Built)
 
 ####################################################################################################
 
 # Bringing it all together
 
-.PHONY: all
+.PHONY: run run.shallow
 
-all: bin disk
-
-# NOTE: This depends on the DISK existing.
-# Order only deps are annoying, so it's not listed here.
-qemu.bin: $(ELF_FILE)
+run.shallow: disk.shallow
 	qemu-system-x86_64 \
 		-m 4G \
 		-kernel $(ELF_FILE) \
@@ -304,8 +314,15 @@ qemu.bin: $(ELF_FILE)
 		-display sdl \
 		-full-screen \
 		-monitor stdio
-		
-# Clean
+
+run: disk
+	qemu-system-x86_64 \
+		-m 4G \
+		-kernel $(ELF_FILE) \
+		-drive file=$(DISK),format=raw,index=0,media=disk \
+		-display sdl \
+		-full-screen \
+		-monitor stdio
 
 .PHONY: clean
 
