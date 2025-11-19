@@ -17,7 +17,7 @@
 /**
  * Will make this more dynamic in the future.
  */
-#define PROMPT ANSI_BRIGHT_GREEN_FG " > " ANSI_RESET
+#define PROMPT ANSI_BRIGHT_GREEN_FG "> " ANSI_RESET
 
 static void single_prompt(void);
 static void run_cmd(const char *cmd);
@@ -61,18 +61,32 @@ static void single_prompt(void) {
             break;
 
         case SCS1_ENTER:
-            cmd_buf[cmd_pos] = '\0';
-            run_cmd(cmd_buf);
-            return;
+            if (scs1_is_make(code)) {
+                cmd_buf[cmd_pos] = '\0';
+                sc_out_write_s("\n");
+                run_cmd(cmd_buf);
+                return;
+            }
+            break;
+
+        case SCS1_BACKSPACE:
+            if (scs1_is_make(code) && cmd_pos > 0) {
+                sc_out_write_s("\b \b"); 
+                cmd_buf[--cmd_pos] = '\0';
+            }
+            break;
 
         default: {
             char c = lshift_pressed || rshift_pressed 
                 ? scs1_to_ascii_uc(make_code) : scs1_to_ascii_lc(make_code);
 
-            if (c) {
+            if (scs1_is_make(code) && c) {
                 cmd_buf[cmd_pos++] = c;
+                sc_out_write_full(&c, sizeof(c));
+
                 if (cmd_pos == CMD_BUF_LEN) {
                     cmd_buf[CMD_BUF_LEN] = '\0';
+                    sc_out_write_s("\n");
                     run_cmd(cmd_buf);
                     return;
                 }
@@ -84,6 +98,10 @@ static void single_prompt(void) {
 }
 
 static void run_cmd(const char *cmd) {
+    if (cmd[0] == '\0') {
+        return; // Do nothing for an empty command!
+    }
+
     sc_out_write_s(cmd);
     sc_out_write_s("\n");
 }

@@ -187,8 +187,8 @@ LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod)_test -l$(mod))
 
 # Remember this will not attempt to rebuild libs if they already exist!
 $(ELF_FILE): $(ALL_LIBS) $(OS_DEFS_LD) | $(BUILD_DIR)
-	$(C_COMPILER) -Wl,--no-gc-sections -T $(LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
-		-Wl,--start-group $(LIB_FLAGS) -lgcc -Wl,--end-group
+	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -nostdlib -O2 -L$(INSTALL_DIR) \
+		-Wl,--start-group -lgcc -Wl,--whole-archive $(LIB_FLAGS) -Wl,--end-group 
 
 .PHONY: elf.shallow elf.shallow.dummy
 elf.shallow.dummy: $(ELF_FILE)
