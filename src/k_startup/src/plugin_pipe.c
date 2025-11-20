@@ -14,10 +14,12 @@ static pipe_t *new_pipe(allocator_t *al, size_t sig_cap) {
 
     pipe_t *p = al_malloc(al, sizeof(pipe_t));
     uint8_t *buf = al_malloc(al, cap);
-    basic_wait_queue_t *wq = new_basic_wait_queue(al);
+    basic_wait_queue_t *r_wq = new_basic_wait_queue(al);
+    basic_wait_queue_t *w_wq = new_basic_wait_queue(al);
 
-    if (!p || !buf || !wq) {
-        delete_wait_queue((wait_queue_t *)wq);
+    if (!p || !buf || !r_wq || !w_wq) {
+        delete_wait_queue((wait_queue_t *)w_wq);
+        delete_wait_queue((wait_queue_t *)r_wq);
         al_free(al, buf);
         al_free(al, p);
 
@@ -30,7 +32,8 @@ static pipe_t *new_pipe(allocator_t *al, size_t sig_cap) {
     p->j = 0;
     *(size_t *)&(p->cap) = cap;
     *(uint8_t **)&(p->buf) = buf;
-    *(basic_wait_queue_t **)&(p->wq) = wq;
+    *(basic_wait_queue_t **)&(p->read_wq) = r_wq;
+    *(basic_wait_queue_t **)&(p->write_wq) = w_wq;
 
     return p;
 }
@@ -45,7 +48,8 @@ static void delete_pipe(pipe_t *p) {
     }
 
     al_free(p->al, p->buf);
-    delete_wait_queue((wait_queue_t *)(p->wq));
+    delete_wait_queue((wait_queue_t *)(p->read_wq));
+    delete_wait_queue((wait_queue_t *)(p->write_wq));
     al_free(p->al, p);
 }
 
@@ -103,22 +107,10 @@ static fernos_error_t delete_pipe_handle_state(handle_state_t *hs) {
     if ((--(pipe->ref_count)) == 0) { 
         // Time to destruct the pipe!
 
-        // We must wake up all waiting threads with FOS_E_STATE_MISMATCH
-        PROP_ERR(bwq_notify_all(pipe->wq)); // fatal error if this fails.
-        
-        thread_t *woken_thread;
-        while ((err = bwq_pop(pipe->wq, (void **)&woken_thread)) == FOS_E_SUCCESS) {
-            woken_thread->wq = NULL;
-            woken_thread->state = THREAD_STATE_DETATCHED;
-            mem_set(woken_thread->wait_ctx, 0, sizeof(woken_thread->wait_ctx));
-            woken_thread->ctx.eax = (uint32_t)FOS_E_STATE_MISMATCH;
-
-            thread_schedule(woken_thread, &(pipe_hs->super.ks->schedule)); 
-        }
-
-        if (err != FOS_E_EMPTY) {
-            return err;
-        }
+        PROP_ERR(bwq_wake_all_threads(pipe->read_wq, 
+                    &(pipe_hs->super.ks->schedule), FOS_E_STATE_MISMATCH));
+        PROP_ERR(bwq_wake_all_threads(pipe->write_wq, 
+                    &(pipe_hs->super.ks->schedule), FOS_E_STATE_MISMATCH));
 
         delete_pipe(pipe);
     }
@@ -126,8 +118,24 @@ static fernos_error_t delete_pipe_handle_state(handle_state_t *hs) {
     return FOS_E_SUCCESS;
 }
 
-
 static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
+    /*
+     * Somewhat unique situation here.
+     *
+     * Write ONLY succeeds if some or all of the given data has been written.
+     * The default write though WILL NOT overwrite data in the pipe. This means that if the
+     * pipe is currently full, the calling thread will block until space frees up in the pipe.
+     * (i.e. there's a read)
+     *
+     * The difficult part is how do we know who is just "waiting"? and who actually has a valid wait
+     * ctx?
+     */
+
+    pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
+    thread_t *thr = (thread_t *)(pipe_hs->super.ks->schedule.head);
+    // If what now, this should block then!!
+    // We can have non-blocking and overwrite somewhere else maybe?
+    // Yeah, that could be cool I guess.
     return FOS_E_NOT_IMPLEMENTED;
 }
 

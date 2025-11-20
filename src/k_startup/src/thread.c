@@ -148,3 +148,28 @@ void delete_thread(thread_t *thr) {
     al_free(thr->proc->al, thr);
 }
 
+fernos_error_t bwq_wake_all_threads(basic_wait_queue_t *bwq, ring_t *schedule, fernos_error_t wake_status) {
+    fernos_error_t err;
+
+    if (!bwq || !schedule) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    PROP_ERR(bwq_notify_all(bwq));
+
+    thread_t *woken_thread;
+    while ((err = bwq_pop(bwq, (void **)&woken_thread)) == FOS_E_SUCCESS) {
+        woken_thread->wq = NULL;
+        woken_thread->state = THREAD_STATE_DETATCHED;
+        mem_set(woken_thread->wait_ctx, 0, sizeof(woken_thread->wait_ctx));
+        woken_thread->ctx.eax = wake_status;
+
+        thread_schedule(woken_thread, schedule); 
+    }
+
+    if (err != FOS_E_EMPTY) {
+        return err;
+    }
+
+    return FOS_E_SUCCESS;
+}
