@@ -72,12 +72,60 @@ const handle_state_impl_t PIPE_HS_IMPL = {
 };
 
 static fernos_error_t copy_pipe_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
-    return FOS_E_NOT_IMPLEMENTED;
+    pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
+    
+    pipe_handle_state_t *pipe_hs_copy = al_malloc(hs->ks->al, sizeof(pipe_handle_state_t));
+    if (!pipe_hs_copy) {
+        return FOS_E_NO_MEM;
+    }
+
+    init_base_handle((handle_state_t *)pipe_hs_copy, &PIPE_HS_IMPL, hs->ks, proc, hs->handle, false); 
+    *(pipe_t **)&(pipe_hs_copy->pipe) = pipe_hs->pipe;
+
+    pipe_hs_copy->pipe->ref_count++;
+
+    *out = (handle_state_t *)pipe_hs_copy;
+
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t delete_pipe_handle_state(handle_state_t *hs) {
-    return FOS_E_NOT_IMPLEMENTED;
+    fernos_error_t err;
+
+    pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
+
+    pipe_t *pipe = pipe_hs->pipe;
+
+    // Before anything, let's just free the handle state, this must always be done!
+    al_free(pipe_hs->super.ks->al, pipe_hs);
+
+    // Next, we check if the underlying pipe has hit 0 references!
+    if ((--(pipe->ref_count)) == 0) { 
+        // Time to destruct the pipe!
+
+        // We must wake up all waiting threads with FOS_E_STATE_MISMATCH
+        PROP_ERR(bwq_notify_all(pipe->wq)); // fatal error if this fails.
+        
+        thread_t *woken_thread;
+        while ((err = bwq_pop(pipe->wq, (void **)&woken_thread)) == FOS_E_SUCCESS) {
+            woken_thread->wq = NULL;
+            woken_thread->state = THREAD_STATE_DETATCHED;
+            mem_set(woken_thread->wait_ctx, 0, sizeof(woken_thread->wait_ctx));
+            woken_thread->ctx.eax = (uint32_t)FOS_E_STATE_MISMATCH;
+
+            thread_schedule(woken_thread, &(pipe_hs->super.ks->schedule)); 
+        }
+
+        if (err != FOS_E_EMPTY) {
+            return err;
+        }
+
+        delete_pipe(pipe);
+    }
+
+    return FOS_E_SUCCESS;
 }
+
 
 static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
     return FOS_E_NOT_IMPLEMENTED;

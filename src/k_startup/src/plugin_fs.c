@@ -191,6 +191,7 @@ static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk
 
         thread_t *woken_thread;
         while ((err = bwq_pop(nk_entry->bwq, (void **)&woken_thread)) == FOS_E_SUCCESS) {
+            woken_thread->wq = NULL;
             woken_thread->state = THREAD_STATE_DETATCHED; 
             mem_set(&(woken_thread->wait_ctx), 0, sizeof(woken_thread->wait_ctx));
             woken_thread->ctx.eax = FOS_E_STATE_MISMATCH; 
