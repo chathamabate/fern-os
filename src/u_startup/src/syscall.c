@@ -2,6 +2,7 @@
 #include "u_startup/syscall.h"
 #include "s_bridge/shared_defs.h"
 #include "s_util/str.h"
+#include "s_util/constraints.h"
 
 fernos_error_t sc_proc_fork(proc_id_t *cpid) {
     return (fernos_error_t)trigger_syscall(SCID_PROC_FORK, (uint32_t)cpid, 0, 0, 0);
@@ -108,12 +109,21 @@ fernos_error_t sc_out_write(const void *src, size_t len, size_t *written) {
     return (fernos_error_t)trigger_syscall(SCID_OUT_WRITE, (uint32_t)src, (uint32_t)len, (uint32_t)written, 0);
 }
 
+fernos_error_t sc_out_wait(void) {
+    return (fernos_error_t)trigger_syscall(SCID_OUT_WAIT, 0, 0, 0, 0);
+}
+
+
 fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     return (fernos_error_t)trigger_syscall(handle_cmd_scid(h, cmd_id), arg0, arg1, arg2, arg3);
 }
 
 void sc_handle_close(handle_t h) {
     sc_handle_cmd(h, HCID_CLOSE, 0, 0, 0, 0);
+}
+
+fernos_error_t sc_handle_wait_write_ready(handle_t h) {
+    return sc_handle_cmd(h, HCID_WAIT_WRITE_READY, 0, 0, 0, 0);
 }
 
 fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *written) {
@@ -124,8 +134,8 @@ fernos_error_t sc_handle_read(handle_t h, void *dest, size_t len, size_t *readde
     return sc_handle_cmd(h, HCID_READ, (uint32_t)dest, len, (uint32_t)readden, 0);
 }
 
-fernos_error_t sc_handle_wait(handle_t h) {
-    return sc_handle_cmd(h, HCID_WAIT, 0, 0, 0, 0);
+fernos_error_t sc_handle_wait_read_ready(handle_t h) {
+    return sc_handle_cmd(h, HCID_WAIT_READ_READY, 0, 0, 0, 0);
 }
 
 bool sc_handle_is_cd(handle_t h) {
@@ -138,10 +148,6 @@ fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t a
 
 /*
  * Helpers.
- *
- * NOTE: The default helpers are all copy and pastes of the handle helpers.
- * I kinda wanted to avoid having a `get_default_in/out` handle system call.
- * I may change this later though.
  */
 
 fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len) {
@@ -151,31 +157,28 @@ fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len) {
     while (written < len) {
         size_t tmp_written;
         err = sc_handle_write(h, (const uint8_t *)src + written, len - written, &tmp_written);
-        if (err != FOS_E_SUCCESS) {
-            return err;
+        if (err == FOS_E_SUCCESS) {
+            written += tmp_written;
+        } else if (err == FOS_E_EMPTY) { // this means we should wait until this handle is ready!
+            err = sc_handle_wait_write_ready(h);
+            if (err != FOS_E_SUCCESS) {
+                return err;
+            }
+        } else {
+            return err; // some other error.
         }
-
-        written += tmp_written;
     }
 
     return FOS_E_SUCCESS;
 }
 
 fernos_error_t sc_out_write_full(const void *src, size_t len) {
-    fernos_error_t err;
-
-    size_t written = 0;
-    while (written < len) {
-        size_t tmp_written;
-        err = sc_out_write((const uint8_t *)src + written, len - written, &tmp_written);
-        if (err != FOS_E_SUCCESS) {
-            return err;
-        }
-
-        written += tmp_written;
+    handle_t out = sc_get_out_handle();
+    if (out == FOS_MAX_HANDLES_PER_PROC) {
+        return FOS_E_SUCCESS; // "everything worked fine"
     }
 
-    return FOS_E_SUCCESS;
+    return sc_handle_write_full(out, src, len);
 }
 
 fernos_error_t sc_handle_write_s(handle_t h, const char *str) {
@@ -227,13 +230,13 @@ fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
         size_t tmp_readden;
         err = sc_handle_read(h, (uint8_t *)dest + readden, len - readden, &tmp_readden);
 
-        if (err == FOS_E_EMPTY) { // block!
-            err = sc_handle_wait(h);
+        if (err == FOS_E_SUCCESS) {
+            readden += tmp_readden; // Successful read.
+        } else if (err == FOS_E_EMPTY) { // block!
+            err = sc_handle_wait_read_ready(h);
             if (err != FOS_E_SUCCESS) {
                 return err;
             }
-        } else if (err == FOS_E_SUCCESS) {
-            readden += tmp_readden; // Successful read.
         } else {
             return err; // Unexpected error.
         }
@@ -243,24 +246,10 @@ fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
 }
 
 fernos_error_t sc_in_read_full(void *dest, size_t len) {
-    fernos_error_t err;
-
-    size_t readden = 0;
-    while (readden < len) {
-        size_t tmp_readden;
-        err = sc_in_read((uint8_t *)dest + readden, len - readden, &tmp_readden);
-
-        if (err == FOS_E_EMPTY) { // block!
-            err = sc_in_wait();
-            if (err != FOS_E_SUCCESS) {
-                return err;
-            }
-        } else if (err == FOS_E_SUCCESS) {
-            readden += tmp_readden; // Successful read.
-        } else {
-            return err; // Unexpected error.
-        }
+    handle_t in = sc_get_in_handle();
+    if (in == FOS_MAX_HANDLES_PER_PROC) {
+        return FOS_E_EMPTY; // Nothing to ever read from the default handle.
     }
 
-    return FOS_E_SUCCESS;
+    return sc_handle_read_full(in, dest, len);
 }

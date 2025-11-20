@@ -277,7 +277,7 @@ handle_t sc_get_in_handle(void);
 fernos_error_t sc_in_read(void *dest, size_t len, size_t *readden);
 
 /**
- * Wait on default input handle.
+ * Wait for read ready on default input handle.
  * 
  * If the default input handle is not currently initialized this returns FOS_E_EMPTY.
  */
@@ -305,6 +305,13 @@ handle_t sc_get_out_handle(void);
 fernos_error_t sc_out_write(const void *src, size_t len, size_t *written);
 
 /**
+ * Wait for write ready on the default output handle.
+ *
+ * If the default output handle is not currently initialized, this returns FOS_E_SUCCESS!
+ */
+fernos_error_t sc_out_wait(void);
+
+/**
  * Execute a handle specific command.
  */
 fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
@@ -314,15 +321,37 @@ fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, 
  */
 void sc_handle_close(handle_t h);
 
+/*
+ * Block until data is able to be safely written to `h`.
+ *
+ * Returns FOS_E_SUCCESS when there is space to write!
+ * Returns FOS_E_EMPTY when `h` will never be able to receive more data. 
+ *
+ * (Other errors may be returned)
+ */
+fernos_error_t sc_handle_wait_write_ready(handle_t h);
+
 /**
  * Write data to a handle, `written` is optional.
  *
- * On success, FOS_E_SUCCESS is returned, meaning some or all of the given data was written.
+ * Returns FOS_E_EMPTY if `h` cannot receive data at this time.
+ * Returns FOS_E_BAD_ARGS if `len` = 0.
+ * Returns FOS_E_SUCCESS when some or all of the given data was written.
  * The exact amount written will be stored in `*written`.
  *
- * Returns FOS_E_BAD_ARGS if `len` = 0.
+ * (Other errors may be returned)
  */
 fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *written);
+
+/**
+ * Block until there is data to read from `h`.
+ *
+ * Returns FOS_E_SUCCESS when there is data to read!
+ * Returns FOS_E_EMPTY when there will never be any more data to read from `h`.
+ *
+ * (Other errors may be returned)
+ */
+fernos_error_t sc_handle_wait_read_ready(handle_t h);
 
 /**
  * Read data from a handle. `readden` is optional.
@@ -336,15 +365,6 @@ fernos_error_t sc_handle_write(handle_t h, const void *src, size_t len, size_t *
  */
 fernos_error_t sc_handle_read(handle_t h, void *dest, size_t len, size_t *readden);
 
-/**
- * Block until there is data to read from `h`.
- *
- * Returns FOS_E_SUCCESS when there is data to read!
- * Returns FOS_E_EMPTY when there will never be any more data to read from `h`.
- *
- * (Other errors may be returned)
- */
-fernos_error_t sc_handle_wait(handle_t h);
 
 /**
  * Is this a character display handle?

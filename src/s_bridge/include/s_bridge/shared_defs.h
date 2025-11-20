@@ -165,10 +165,11 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 #define SCID_SET_IN_HANDLE  (0x300U)
 #define SCID_GET_IN_HANDLE  (0x301U)
 #define SCID_IN_READ        (0x302U)
-#define SCID_IN_WAIT        (0x303U)
+#define SCID_IN_WAIT        (0x303U) // wait_read_ready
 #define SCID_SET_OUT_HANDLE (0x304U)
 #define SCID_GET_OUT_HANDLE (0x305U)
 #define SCID_OUT_WRITE      (0x306U) 
+#define SCID_OUT_WAIT       (0x307U) // wait_write_ready
 
 /*
  * Handle Syscalls
@@ -198,11 +199,12 @@ static inline bool scid_is_handle_cmd(syscall_id_t scid) {
     return (scid & SYSCALL_ATTRS_MASK) == HANDLE_CMD_PREFIX;
 }
 
-#define HCID_CLOSE (0x0U)
-#define HCID_WRITE (0x1U)
-#define HCID_READ  (0x2U)
-#define HCID_WAIT  (0x3U)
-#define HCID_IS_CD (0x4U)
+#define HCID_CLOSE            (0x0U)
+#define HCID_WAIT_WRITE_READY (0x1U)
+#define HCID_WRITE            (0x2U)
+#define HCID_WAIT_READ_READY  (0x3U)
+#define HCID_READ             (0x4U)
+#define HCID_IS_CD            (0x5U)
 
 #define NUM_DEFAULT_HCIDS (HCID_IS_CD + 1)
 

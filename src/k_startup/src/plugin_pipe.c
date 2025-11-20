@@ -126,16 +126,13 @@ static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_
      * The default write though WILL NOT overwrite data in the pipe. This means that if the
      * pipe is currently full, the calling thread will block until space frees up in the pipe.
      * (i.e. there's a read)
-     *
-     * The difficult part is how do we know who is just "waiting"? and who actually has a valid wait
-     * ctx?
      */
 
+    // Should all handles have a wait write and wait read???
+    // Ever think about that one?? 
+    // Honestly, such a change, I think I'd really like IMO.
     pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
     thread_t *thr = (thread_t *)(pipe_hs->super.ks->schedule.head);
-    // If what now, this should block then!!
-    // We can have non-blocking and overwrite somewhere else maybe?
-    // Yeah, that could be cool I guess.
     return FOS_E_NOT_IMPLEMENTED;
 }
 
