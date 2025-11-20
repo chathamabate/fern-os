@@ -11,6 +11,8 @@
 typedef struct _pipe_t pipe_t;
 
 struct _pipe_t {
+    allocator_t * const al;
+
     /**
      * How many handle states currently exist which reference this pipe!
      */

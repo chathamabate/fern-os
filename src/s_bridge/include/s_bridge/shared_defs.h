@@ -351,3 +351,15 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  */
 
 #define PLG_VGA_CD_PCID_OPEN      (0U)
+
+/*
+ * ***** Pipe Plugin *****
+ */
+
+#define PLG_PIPE_ID         (4U)
+
+/*
+ * Pipe Plugin Commands.
+ */
+
+#define PLG_PIPE_PCID_OPEN      (0U)
