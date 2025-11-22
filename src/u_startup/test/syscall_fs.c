@@ -89,6 +89,10 @@ static bool test_simple_rw(void) {
     const char *msg = "Hello FS";
     const size_t msg_size = str_len(msg) + 1;
 
+    // A file should always be able to accept data (Unless full)
+    err = sc_handle_wait_write_ready(fh);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
+
     err = sc_handle_write_full(fh, msg, msg_size);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 

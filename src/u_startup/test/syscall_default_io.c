@@ -64,6 +64,10 @@ static bool test_null_io_handles(void) {
     sc_set_out_handle(FOS_MAX_HANDLES_PER_PROC);
     TEST_EQUAL_UINT(FOS_MAX_HANDLES_PER_PROC, sc_get_out_handle());
 
+    // A NULL out handle should always be ready to accept data!
+    err = sc_out_wait();
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
+
     size_t written;
     err = sc_out_write("hello", 5, &written);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
