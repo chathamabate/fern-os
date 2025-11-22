@@ -22,9 +22,10 @@ typedef struct _handle_state_impl_t {
     fernos_error_t (*delete_handle_state)(handle_state_t *hs);
 
     // OPTIONAL!
+    fernos_error_t (*hs_wait_write_ready)(handle_state_t *hs);
     fernos_error_t (*hs_write)(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
+    fernos_error_t (*hs_wait_read_ready)(handle_state_t *hs);
     fernos_error_t (*hs_read)(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden);
-    fernos_error_t (*hs_wait)(handle_state_t *hs);
     fernos_error_t (*hs_cmd)(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 } handle_state_impl_t;
 
@@ -136,6 +137,19 @@ KS_SYSCALL static inline fernos_error_t hs_close(handle_state_t *hs) {
 }
 
 /**
+ * Wait the current thread until data is ready to be accepted by the given handle state.
+ *
+ * FOS_E_SUCCESS means `hs` is accepting data via `hs_write`.
+ * FOS_E_EMPTY no more data will ever be accepted over `hs_write` with this handle.
+ */
+KS_SYSCALL static inline fernos_error_t hs_wait_write_ready(handle_state_t *hs) {
+    if (hs->impl->hs_wait_write_ready) {
+        return hs->impl->hs_wait_write_ready(hs);
+    }
+    DUAL_RET((thread_t *)(hs->ks->schedule.head), FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
+}
+
+/**
  * Write data to the handle.
  *
  * `u_src` and `u_written` are both userspace pointers.
@@ -147,6 +161,19 @@ KS_SYSCALL static inline fernos_error_t hs_close(handle_state_t *hs) {
 KS_SYSCALL static inline fernos_error_t hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
     if (hs->impl->hs_write) {
         return hs->impl->hs_write(hs, u_src, len, u_written);
+    }
+    DUAL_RET((thread_t *)(hs->ks->schedule.head), FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
+}
+
+/**
+ * Block until there is data to read from a given handle.
+ *
+ * FOS_E_SUCCESS means there is data to read!
+ * FOS_E_EMPTY means there will NEVER be anymore data to read from this handle!
+ */
+KS_SYSCALL static inline fernos_error_t hs_wait_read_ready(handle_state_t *hs) {
+    if (hs->impl->hs_wait_read_ready) {
+        return hs->impl->hs_wait_read_ready(hs);
     }
     DUAL_RET((thread_t *)(hs->ks->schedule.head), FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }
@@ -168,19 +195,6 @@ KS_SYSCALL static inline fernos_error_t hs_write(handle_state_t *hs, const void 
 KS_SYSCALL static inline fernos_error_t hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden) {
     if (hs->impl->hs_read) {
         return hs->impl->hs_read(hs, u_dst, len, u_readden);
-    }
-    DUAL_RET((thread_t *)(hs->ks->schedule.head), FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
-}
-
-/**
- * Block until there is data to read from a given handle.
- *
- * FOS_E_SUCCESS means there is data to read!
- * FOS_E_EMPTY means there will NEVER be anymore data to read from this handle!
- */
-KS_SYSCALL static inline fernos_error_t hs_wait(handle_state_t *hs) {
-    if (hs->impl->hs_wait) {
-        return hs->impl->hs_wait(hs);
     }
     DUAL_RET((thread_t *)(hs->ks->schedule.head), FOS_E_NOT_IMPLEMENTED, FOS_E_SUCCESS);
 }

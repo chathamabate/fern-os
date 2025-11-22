@@ -113,7 +113,6 @@ fernos_error_t sc_out_wait(void) {
     return (fernos_error_t)trigger_syscall(SCID_OUT_WAIT, 0, 0, 0, 0);
 }
 
-
 fernos_error_t sc_handle_cmd(handle_t h, handle_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     return (fernos_error_t)trigger_syscall(handle_cmd_scid(h, cmd_id), arg0, arg1, arg2, arg3);
 }

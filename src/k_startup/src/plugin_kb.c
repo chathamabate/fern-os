@@ -15,16 +15,17 @@ static fernos_error_t copy_kb_handle_state(handle_state_t *hs, process_t *proc, 
 static fernos_error_t delete_kb_handle_state(handle_state_t *hs);
 
 static fernos_error_t kb_hs_read(handle_state_t *hs, void *u_dest, size_t len, size_t *u_readden);
-static fernos_error_t kb_hs_wait(handle_state_t *hs);
+static fernos_error_t kb_hs_wait_read_ready(handle_state_t *hs);
 static fernos_error_t kb_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, 
         uint32_t arg2, uint32_t arg3);
 
 const handle_state_impl_t KB_HS_IMPL = {
     .copy_handle_state = copy_kb_handle_state,
     .delete_handle_state = delete_kb_handle_state,
+    .hs_wait_write_ready = NULL,
     .hs_write = NULL,
+    .hs_wait_read_ready = kb_hs_wait_read_ready,
     .hs_read = kb_hs_read,
-    .hs_wait = kb_hs_wait,
     .hs_cmd = kb_hs_cmd
 };
 
@@ -140,7 +141,7 @@ static fernos_error_t kb_hs_read(handle_state_t *hs, void *u_dest, size_t len, s
 /**
  * Here we just check if the calling thread's position matches the current global position.
  */
-static fernos_error_t kb_hs_wait(handle_state_t *hs) {
+static fernos_error_t kb_hs_wait_read_ready(handle_state_t *hs) {
     fernos_error_t err;
 
     plugin_kb_handle_state_t *plg_kb_hs = (plugin_kb_handle_state_t *)hs;

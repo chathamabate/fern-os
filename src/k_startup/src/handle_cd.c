@@ -12,6 +12,7 @@
 
 static fernos_error_t copy_handle_cd_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
 static fernos_error_t delete_handle_cd_state(handle_state_t *hs);
+static fernos_error_t hs_cd_wait_write_ready(handle_state_t *hs);
 static fernos_error_t hs_cd_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
 static fernos_error_t hs_cd_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, 
         uint32_t arg2, uint32_t arg3);
@@ -19,9 +20,10 @@ static fernos_error_t hs_cd_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_
 static const handle_state_impl_t HS_CD_IMPL = {
     .copy_handle_state = copy_handle_cd_state,
     .delete_handle_state = delete_handle_cd_state,
+    .hs_wait_write_ready = hs_cd_wait_write_ready,
     .hs_write = hs_cd_write,
+    .hs_wait_read_ready = NULL,
     .hs_read = NULL,
-    .hs_wait = NULL,
     .hs_cmd = hs_cd_cmd, 
 };
 
@@ -53,6 +55,12 @@ static fernos_error_t copy_handle_cd_state(handle_state_t *hs, process_t *proc, 
 static fernos_error_t delete_handle_cd_state(handle_state_t *hs) {
     al_free(hs->ks->al, hs);
     return FOS_E_SUCCESS;
+}
+
+static fernos_error_t hs_cd_wait_write_ready(handle_state_t *hs) {
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS); // A character display handle can ALWAYs 
+                                                 // accept data!
 }
 
 /**
