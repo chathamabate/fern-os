@@ -190,7 +190,7 @@ static bool test_multithread_rw(void) {
 static void *test_multithread_wait_same_handle_worker(void *arg) {
     handle_t h = *(handle_t *)arg;
 
-    TEST_SUCCESS(sc_handle_wait(h));
+    TEST_SUCCESS(sc_handle_wait_read_ready(h));
 
     return NULL;
 }

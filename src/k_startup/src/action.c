@@ -220,6 +220,10 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
         err = ks_out_write(kernel, (const void *)arg0, (size_t)arg1, (size_t *)arg2);
         break;
 
+    case SCID_OUT_WAIT:
+        err = ks_out_wait(kernel);
+        break;
+
     default:
         // Using a more nested structure here...
         if (scid_is_handle_cmd(id)) {
@@ -244,12 +248,16 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
                     err = hs_write(hs, (const void *)arg0, (size_t)arg1, (size_t *)arg2);
                     break;
 
+                case HCID_WAIT_WRITE_READY:
+                    err = hs_wait_write_ready(hs);
+                    break;
+
                 case HCID_READ:
                     err = hs_read(hs, (void *)arg0, (size_t)arg1, (size_t *)arg2);
                     break;
 
-                case HCID_WAIT:
-                    err = hs_wait(hs);
+                case HCID_WAIT_READ_READY:
+                    err = hs_wait_read_ready(hs);
                     break;
 
                 case HCID_IS_CD:

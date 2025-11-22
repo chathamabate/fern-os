@@ -227,7 +227,7 @@ static bool test_big_adoption(void) {
 
 static void *test_thread_wait_worker(void *arg) {
     handle_t h = *(handle_t *)arg;
-    sc_handle_wait(h);
+    sc_handle_wait_read_ready(h);
     return NULL;
 }
 

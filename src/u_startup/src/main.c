@@ -12,9 +12,27 @@
 #include "s_util/ps2_scancodes.h"
 #include <stdarg.h>
 
+#include "u_startup/test/syscall_fs.h"
+#include "u_startup/test/syscall_default_io.h"
+
 proc_exit_status_t user_main(void) {
     fernos_error_t err;
+    
+    handle_t cd;
+    err = sc_vga_cd_open(&cd);
+    if (err != FOS_E_SUCCESS) {
+        return PROC_ES_FAILURE;
+    }
+    sc_set_out_handle(cd);
+    // We need a simple heap to call exec!
+    err = setup_default_simple_heap(USER_MMP);
+    if (err != FOS_E_SUCCESS) {
+        return PROC_ES_FAILURE;
+    }
+    test_syscall_fs();
+    return PROC_ES_SUCCESS;
 
+    /*
     sc_signal_allow(1 << FSIG_CHLD);
 
     proc_id_t shell_cpid;
@@ -67,4 +85,5 @@ proc_exit_status_t user_main(void) {
             }
         }
     }
+    */
 }
