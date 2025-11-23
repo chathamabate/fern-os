@@ -5,6 +5,11 @@
 #include "k_startup/handle.h"
 
 /**
+ * The max which will be written across a pipe in one go!
+ */
+#define KS_PIPE_TX_MAX_LEN (2048U)
+
+/**
  * I have decided not to place this in `s_data` because it'd be nice if it could 
  * natively copy to userspace!
  */

@@ -1,6 +1,7 @@
 
 #include "k_startup/plugin_pipe.h"
 #include "k_startup/page_helpers.h"
+#include "s_util/misc.h"
 
 /**
  * Create a new pipe!
@@ -136,28 +137,112 @@ static fernos_error_t pipe_hs_wait_write_ready(handle_state_t *hs) {
 }
 
 static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
-    /*
-     * Somewhat unique situation here.
-     *
-     * Write ONLY succeeds if some or all of the given data has been written.
-     * The default write though WILL NOT overwrite data in the pipe. This means that if the
-     * pipe is currently full, the calling thread will block until space frees up in the pipe.
-     * (i.e. there's a read)
-     */
+    fernos_error_t err;
 
-    // Should all handles have a wait write and wait read???
-    // Ever think about that one?? 
-    // Honestly, such a change, I think I'd really like IMO.
     pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
+    pipe_t *pipe = pipe_hs->pipe;
     thread_t *thr = (thread_t *)(pipe_hs->super.ks->schedule.head);
-    return FOS_E_NOT_IMPLEMENTED;
+
+    if (!u_src || len == 0) {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    // If the pipe is full we return FOS_E_EMPTY.
+    if (((pipe->j + 1) % pipe->cap) == pipe->i) {
+        DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
+    }
+
+    // We'll use this later to see if we must wake up sleeping readers.
+    bool was_empty = pipe->i == pipe->j;
+
+    // How many bytes in the pipe contain user data? (Excluding the final empty cell)
+    const size_t occupied_bytes = pipe->i <= pipe->j 
+        ? pipe->j - pipe->i 
+        : (pipe->cap - pipe->i) + pipe->j;
+
+    // How many bytes can significant data be written to?
+    const size_t available_bytes = (pipe->cap - 1) - occupied_bytes;
+    
+    // How many bytes we will attempt to write this call.
+    // (This will expand to a deep ternary, but whatever)
+    const size_t bytes_to_write = MIN(len, MIN(available_bytes, KS_PIPE_TX_MAX_LEN));
+
+    size_t bytes_written = 0;
+    uint32_t copied;
+    err = FOS_E_SUCCESS;
+
+    if (pipe->i <= pipe->j) { // j comes after i.
+        const size_t bytes_to_end = pipe->cap - pipe->j;
+        const size_t first_copy_amt = MIN(bytes_to_write, bytes_to_end);
+
+        err = mem_cpy_from_user(pipe->buf + pipe->j, thr->proc->pd, u_src, first_copy_amt, &copied);
+
+        bytes_written += copied;
+
+        pipe->j += copied;
+        if (pipe->j == pipe->cap) {
+            pipe->j = 0; // Wrap if needed.
+        }
+    }
+
+    if (err == FOS_E_SUCCESS && bytes_to_write - bytes_written > 0) { 
+        // In this situation, it is gauranteed that j < i.
+        // Either a) j < i to start with.
+        // Or b) i <= j to start with and the above if statement executed successfully.
+        // (with bytes left)
+
+        // (NOTE: technically could be the first copy in the case j < i to begin with)
+        const size_t second_copy_amt = bytes_to_write - bytes_written;
+        err = mem_cpy_from_user(pipe->buf + pipe->j, thr->proc->pd, (const uint8_t *)u_src + bytes_written, second_copy_amt, &copied);
+
+        bytes_written += copied;
+
+        pipe->j += copied; // Wrap should be impossible here as j will never pass i.
+    }
+
+    // Cool, so now, the question become, do we wake anybody up?
+    if (was_empty && bytes_written > 0) {
+        // A failure here is catastrophic.
+        PROP_ERR(bwq_wake_all_threads(pipe->wq, &(hs->ks->schedule), FOS_E_SUCCESS));
+    }
+
+    if (u_written) {
+        PROP_ERR(mem_cpy_to_user(thr->proc->pd, u_written, &bytes_written, sizeof(*u_written), NULL));
+    }
+
+    // If we have succeeded until this point, just propegate `err` to user.
+    // NOTE that even when something goes wrong with the signficant copies, we must still
+    // handle the data that WAS written correctly!
+    DUAL_RET(thr, err, FOS_E_SUCCESS);
 }
 
 static fernos_error_t pipe_hs_wait_read_ready(handle_state_t *hs) {
-    return FOS_E_NOT_IMPLEMENTED;
+    fernos_error_t err;
+
+    pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
+    thread_t *thr = (thread_t *)(pipe_hs->super.ks->schedule.head);
+    pipe_t *pipe = pipe_hs->pipe;
+
+    // Ok, so we wait if the pipe is empty.
+
+    // If i == j, the pipe is empty!
+    if (pipe->i == pipe->j) {
+        err = bwq_enqueue(pipe->wq, thr);
+        DUAL_RET_FOS_ERR(err, thr); // Failing to enqueue here is recoverable!
+
+        thread_detach(thr);
+        thr->wq = (wait_queue_t *)(pipe->wq);
+        thr->state = THREAD_STATE_WAITING;
+
+        return FOS_E_SUCCESS;
+    }
+
+    // Pipe is not full! No need to wait!
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 static fernos_error_t pipe_hs_read(handle_state_t *hs, void *u_dest, size_t len, size_t *u_readden) {
+    // Going to be like pipe_hs_write, so just be prepared!
     return FOS_E_NOT_IMPLEMENTED;
 }
 
