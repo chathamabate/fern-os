@@ -95,10 +95,7 @@ static fernos_error_t delete_pipe_handle_state(handle_state_t *hs) {
 
     pipe_t *pipe = pipe_hs->pipe;
 
-    // Before anything, let's just free the handle state, this must always be done!
-    al_free(pipe_hs->super.ks->al, pipe_hs);
-
-    // Next, we check if the underlying pipe has hit 0 references!
+    // First, we check if the underlying pipe has hit 0 references!
     if ((--(pipe->ref_count)) == 0) { 
         // Time to destruct the pipe!
 
@@ -107,6 +104,9 @@ static fernos_error_t delete_pipe_handle_state(handle_state_t *hs) {
 
         delete_pipe(pipe);
     }
+
+    // At the end we free the actual handle state no matter what.
+    al_free(pipe_hs->super.ks->al, pipe_hs);
 
     return FOS_E_SUCCESS;
 }

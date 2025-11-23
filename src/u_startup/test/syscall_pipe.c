@@ -83,8 +83,10 @@ static void *test_multithread_rw0_reader(void *arg) {
         if (len > 0) {
             TEST_SUCCESS(sc_handle_read_full(p, r_buf, len));
 
-            const uint8_t exp_val = r_buf[0];
-            TEST_TRUE(mem_chk(r_buf, exp_val, len));
+            const uint8_t first_val = r_buf[0];
+            for (size_t i = 0; i < len; i++) {
+                TEST_EQUAL_UINT((uint8_t)(first_val + i), r_buf[i]);
+            }
         }
     }
 
@@ -97,7 +99,7 @@ static bool test_multithread_rw0(void) {
 
     rand_t r = rand(0);
 
-    TEST_SUCCESS(sc_pipe_open(&p, 50));
+    TEST_SUCCESS(sc_pipe_open(&p, 100));
 
     pipe_test_arg_t pipe_arg = {
         p, num_trials, 0
@@ -115,7 +117,9 @@ static bool test_multithread_rw0(void) {
         const uint8_t val = next_rand_u8(&r);
         
         w_buf[0] = len;
-        mem_set(w_buf + 1, val, len);
+        for (size_t i = 1; i <= len; i++) {
+            w_buf[i] = (uint8_t)(val + i);
+        }
         TEST_SUCCESS(sc_handle_write_full(p, w_buf, 1 + len));
     }
 
@@ -230,10 +234,78 @@ static bool test_multithread_rw1(void) {
     TEST_SUCCEED();
 }
 
+static void *test_interrupted_waits_worker(void *arg) {
+    TEST_TRUE(arg != NULL);
+
+    pipe_test_arg_t *pipe_arg = (pipe_test_arg_t *)arg;
+    handle_t p = pipe_arg->p;
+    uint32_t should_read = pipe_arg->arg0;
+
+    // NOTE: This used to test for FOS_E_STATE_MISMATCH, but some threads will execute the wait
+    // AFTER `p` has been closed. This would likely result in FOS_E_INVALID_INDEX.
+    if (should_read) {
+        TEST_FAILURE(sc_handle_wait_read_ready(p));
+    } else {
+        TEST_FAILURE(sc_handle_wait_write_ready(p));
+    }
+
+    return NULL;
+}
+
+static bool test_interrupted_waits(void) {
+
+    // First try interrupting readers.
+
+    handle_t p;
+    TEST_SUCCESS(sc_pipe_open(&p, 100));
+
+    pipe_test_arg_t read_arg = {
+        p, 1, 0
+    };
+
+    const size_t num_readers = 10;
+
+    for (size_t i = 0; i < num_readers; i++) {
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_interrupted_waits_worker, &read_arg));
+    }
+
+    sc_thread_sleep(10);
+    sc_handle_close(p);
+
+    for (size_t i = 0; i < num_readers; i++) {
+        TEST_SUCCESS(sc_thread_join(full_join_vector(), NULL, NULL));
+    }
+
+    // Next try interrupting writers.
+    TEST_SUCCESS(sc_pipe_open(&p, 1));
+    TEST_SUCCESS(sc_handle_write_full(p, "a", 1)); // pipe must be full for writers
+                                                                // to block!
+
+    pipe_test_arg_t write_arg = {
+        p, 0, 0,
+    };
+
+    const size_t num_writers = 15;
+
+    for (size_t i = 0; i < num_writers; i++) {
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_interrupted_waits_worker, &write_arg));
+    }
+
+    sc_thread_sleep(10);
+    sc_handle_close(p);
+
+    for (size_t i = 0; i < num_writers; i++) {
+        TEST_SUCCESS(sc_thread_join(full_join_vector(), NULL, NULL));
+    }
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_pipe(void) {
     BEGIN_SUITE("Syscall Pipe");
     RUN_TEST(test_simple_rw0);
     RUN_TEST(test_multithread_rw0);
     RUN_TEST(test_multithread_rw1);
+    RUN_TEST(test_interrupted_waits);
     return END_SUITE();
 }
