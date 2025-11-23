@@ -2,6 +2,7 @@
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_pipe.h"
 #include "u_startup/test/syscall_pipe.h"
+#include "s_util/misc.h"
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
@@ -13,6 +14,11 @@ static bool posttest(void);
 #define POSTTEST() posttest()
 
 #include "s_util/test.h"
+
+/*
+ * Realize that unlike with file handles, it is completely OK to read/write from the same 
+ * handle interchangeably. (Even across multiple threads)
+ */
 
 static size_t old_user_al;
 static bool pretest(void) {
@@ -27,11 +33,146 @@ static bool posttest(void) {
     TEST_SUCCEED();
 }
 
-static bool test1(void) {
+typedef struct _pipe_test_arg_t {
+    handle_t p;
+
+    // Misc fields to use depending on the test.
+    uint32_t arg0;
+    uint32_t arg1;
+} pipe_test_arg_t;
+
+static bool test_simple_rw0(void) {
+    handle_t p;
+
+    TEST_SUCCESS(sc_pipe_open(&p, 16));
+
+    char buf[10];
+
+    // Nothing to read, totally ok!
+    TEST_EQUAL_HEX(FOS_E_EMPTY, sc_handle_read(p, buf, sizeof(buf), NULL));
+
+    // Pipe should be ready to write!
+    TEST_SUCCESS(sc_handle_wait_write_ready(p));
+
+    const char *msg = "Bob";
+    TEST_SUCCESS(sc_handle_write_s(p, msg)); // Remember, this doesn't write NT.
+
+    TEST_SUCCESS(sc_handle_read_full(p, buf, str_len(msg)));
+    buf[str_len(msg) + 1] = '\0';
+
+    TEST_TRUE(str_eq(msg, buf));
+
+    sc_handle_close(p);
+
+    TEST_SUCCEED();
+}
+
+static void *test_multithread_rw_writer(void *arg) {
+    pipe_test_arg_t *pipe_arg = (pipe_test_arg_t *)arg;
+
+    handle_t p = pipe_arg->p;
+    uint32_t len = pipe_arg->arg0;
+
+    uint8_t buf[200];
+    TEST_TRUE(len < sizeof(buf));
+
+    mem_set(buf, 0xAB, len);
+
+    TEST_SUCCESS(sc_handle_write_full(p, buf, len));
+
+    return NULL;
+}
+
+static void *test_multithread_rw_reader(void *arg) {
+    pipe_test_arg_t *pipe_arg = (pipe_test_arg_t *)arg;
+
+    handle_t p = pipe_arg->p;
+    uint32_t len = pipe_arg->arg0;
+
+    uint8_t buf[200];
+    TEST_TRUE(len < sizeof(buf));
+
+    mem_set(buf, 0, len);
+
+    TEST_SUCCESS(sc_handle_read_full(p, buf, len));
+    TEST_TRUE(mem_chk(buf, 0xAB, len));
+
+    return NULL;
+}
+
+static bool test_multithread_rw(void) {
+    // I'd like to test read waiting AND write waiting!
+
+    handle_t p;
+    TEST_SUCCESS(sc_pipe_open(&p, 16));
+
+    pipe_test_arg_t write_args[4] = {
+        {p, 10, 0},
+        {p, 20, 0},
+        {p, 45, 0},
+        {p, 15, 0}
+        // A total of 90 bytes.
+    };
+    const size_t num_write_args = sizeof(write_args) / sizeof(write_args[0]);
+
+    pipe_test_arg_t read_args[5] = {
+        {p, 10, 0},
+        {p, 50, 0},
+        {p, 5, 0},
+        {p, 5, 0},
+        {p, 20, 0}
+        // Also a total of 90 bytes!
+    };
+    const size_t num_read_args = sizeof(read_args) / sizeof(read_args[0]);
+
+    // We'll try spawning in differnet orders to see what happens!
+
+    // 1) Writers then readers.
+    for (size_t i = 0; i < num_write_args; i++) {
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_writer, write_args + i));
+    }
+    sc_thread_sleep(5); // Small sleep cause why not.
+    for (size_t i = 0; i < num_read_args; i++) {
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_reader, read_args + i));
+    }
+    for (size_t i = 0; i < num_write_args + num_read_args; i++) {
+        TEST_SUCCESS(sc_thread_join(full_join_vector(), NULL, NULL));
+    }
+
+    // 2) Readers then writers.
+    for (size_t i = 0; i < num_read_args; i++) {
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_reader, read_args + i));
+    }
+    sc_thread_sleep(5); // Small sleep cause why not.
+    for (size_t i = 0; i < num_write_args; i++) {
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_writer, write_args + i));
+    }
+    for (size_t i = 0; i < num_write_args + num_read_args; i++) {
+        TEST_SUCCESS(sc_thread_join(full_join_vector(), NULL, NULL));
+    }
+
+    // 3) intermixed.
+    for (size_t i = 0; i < MAX(num_read_args, num_write_args); i++) {
+        if (i < num_read_args) {
+            TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_reader, read_args + i));
+        }
+        if (i < num_write_args) {
+            TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_writer, write_args + i));
+        }
+        sc_thread_sleep(1);
+    }
+    for (size_t i = 0; i < num_write_args + num_read_args; i++) {
+        TEST_SUCCESS(sc_thread_join(full_join_vector(), NULL, NULL));
+    }
+
+    sc_handle_close(p);
+
     TEST_SUCCEED();
 }
 
 bool test_syscall_pipe(void) {
     BEGIN_SUITE("Syscall Pipe");
+    RUN_TEST(test_simple_rw0);
+    RUN_TEST(test_multithread_rw);
     return END_SUITE();
 }
