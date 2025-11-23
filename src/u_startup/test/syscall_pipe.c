@@ -2,6 +2,7 @@
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_pipe.h"
 #include "u_startup/test/syscall_pipe.h"
+#include "s_util/constraints.h"
 #include "s_util/misc.h"
 #include "s_util/rand.h"
 
@@ -301,11 +302,54 @@ static bool test_interrupted_waits(void) {
     TEST_SUCCEED();
 }
 
+static bool test_multiproc(void) {
+    // This primarily tests copy constructor and destructor for pipes. 
+
+    sig_vector_t old_sv = sc_signal_allow(full_sig_vector());
+
+    handle_t p;
+    sc_pipe_open(&p, 20);
+
+    char buf[6]; 
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) { // child proc.
+        TEST_SUCCESS(sc_handle_read_full(p, buf, 6));
+        TEST_TRUE(str_eq("Hello", buf));
+
+        sc_signal(FOS_MAX_PROCS, 5);
+
+        TEST_SUCCESS(sc_handle_write_full(p, "Heheh", 6));
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    TEST_SUCCESS(sc_handle_write_full(p, "Hello", 6));
+    TEST_SUCCESS(sc_signal_wait(1 << 5, NULL));
+    TEST_SUCCESS(sc_handle_read_full(p, buf, 6));
+    TEST_TRUE(str_eq("Heheh", buf));
+
+    sc_handle_close(p);
+
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+
+    proc_exit_status_t res;
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &res));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, res);
+
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_pipe(void) {
     BEGIN_SUITE("Syscall Pipe");
     RUN_TEST(test_simple_rw0);
     RUN_TEST(test_multithread_rw0);
     RUN_TEST(test_multithread_rw1);
     RUN_TEST(test_interrupted_waits);
+    RUN_TEST(test_multiproc);
     return END_SUITE();
 }
