@@ -23,7 +23,8 @@ _TEST_SRCS 	?= syscall.c \
 			   syscall_exec.c \
 			   syscall_cd.c \
 			   syscall_default_io.c \
-			   syscall_kb.c
+			   syscall_kb.c \
+			   syscall_pipe.c
 
 -include ../mod_stub.mk
 

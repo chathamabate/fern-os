@@ -36,6 +36,8 @@ static sig_vector_t old_sv;
 static size_t old_user_al;
 
 static bool pretest(void) {
+    TEST_TRUE(get_default_allocator() != NULL);
+
     old_user_al = al_num_user_blocks(get_default_allocator());
 
     fernos_error_t err;
