@@ -14,12 +14,10 @@ static pipe_t *new_pipe(allocator_t *al, size_t sig_cap) {
 
     pipe_t *p = al_malloc(al, sizeof(pipe_t));
     uint8_t *buf = al_malloc(al, cap);
-    basic_wait_queue_t *r_wq = new_basic_wait_queue(al);
-    basic_wait_queue_t *w_wq = new_basic_wait_queue(al);
+    basic_wait_queue_t *wq = new_basic_wait_queue(al);
 
-    if (!p || !buf || !r_wq || !w_wq) {
-        delete_wait_queue((wait_queue_t *)w_wq);
-        delete_wait_queue((wait_queue_t *)r_wq);
+    if (!p || !buf || !wq) {
+        delete_wait_queue((wait_queue_t *)wq);
         al_free(al, buf);
         al_free(al, p);
 
@@ -32,8 +30,7 @@ static pipe_t *new_pipe(allocator_t *al, size_t sig_cap) {
     p->j = 0;
     *(size_t *)&(p->cap) = cap;
     *(uint8_t **)&(p->buf) = buf;
-    *(basic_wait_queue_t **)&(p->read_wq) = r_wq;
-    *(basic_wait_queue_t **)&(p->write_wq) = w_wq;
+    *(basic_wait_queue_t **)&(p->wq) = wq;
 
     return p;
 }
@@ -48,8 +45,7 @@ static void delete_pipe(pipe_t *p) {
     }
 
     al_free(p->al, p->buf);
-    delete_wait_queue((wait_queue_t *)(p->read_wq));
-    delete_wait_queue((wait_queue_t *)(p->write_wq));
+    delete_wait_queue((wait_queue_t *)(p->wq));
     al_free(p->al, p);
 }
 
@@ -60,19 +56,19 @@ static void delete_pipe(pipe_t *p) {
 static fernos_error_t copy_pipe_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
 static fernos_error_t delete_pipe_handle_state(handle_state_t *hs);
 
+static fernos_error_t pipe_hs_wait_write_ready(handle_state_t *hs);
 static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written); 
+static fernos_error_t pipe_hs_wait_read_ready(handle_state_t *hs);
 static fernos_error_t pipe_hs_read(handle_state_t *hs, void *u_dest, size_t len, size_t *u_readden);
-static fernos_error_t pipe_hs_wait(handle_state_t *hs);
-static fernos_error_t pipe_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, 
-        uint32_t arg2, uint32_t arg3);
 
 const handle_state_impl_t PIPE_HS_IMPL = {
     .copy_handle_state = copy_pipe_handle_state,
     .delete_handle_state = delete_pipe_handle_state,
+    .hs_wait_write_ready = pipe_hs_wait_write_ready,
     .hs_write = pipe_hs_write,
+    .hs_wait_read_ready = pipe_hs_wait_read_ready,
     .hs_read = pipe_hs_read,
-    .hs_wait = pipe_hs_wait,
-    .hs_cmd = pipe_hs_cmd
+    .hs_cmd = NULL,
 };
 
 static fernos_error_t copy_pipe_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
@@ -94,8 +90,6 @@ static fernos_error_t copy_pipe_handle_state(handle_state_t *hs, process_t *proc
 }
 
 static fernos_error_t delete_pipe_handle_state(handle_state_t *hs) {
-    fernos_error_t err;
-
     pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
 
     pipe_t *pipe = pipe_hs->pipe;
@@ -107,15 +101,38 @@ static fernos_error_t delete_pipe_handle_state(handle_state_t *hs) {
     if ((--(pipe->ref_count)) == 0) { 
         // Time to destruct the pipe!
 
-        PROP_ERR(bwq_wake_all_threads(pipe->read_wq, 
-                    &(pipe_hs->super.ks->schedule), FOS_E_STATE_MISMATCH));
-        PROP_ERR(bwq_wake_all_threads(pipe->write_wq, 
-                    &(pipe_hs->super.ks->schedule), FOS_E_STATE_MISMATCH));
+        // Wake up all potentially waiting threads.
+        PROP_ERR(bwq_wake_all_threads(pipe->wq, &(pipe_hs->super.ks->schedule), FOS_E_STATE_MISMATCH));
 
         delete_pipe(pipe);
     }
 
     return FOS_E_SUCCESS;
+}
+
+static fernos_error_t pipe_hs_wait_write_ready(handle_state_t *hs) {
+    fernos_error_t err;
+
+    pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
+    thread_t *thr = (thread_t *)(pipe_hs->super.ks->schedule.head);
+    pipe_t *pipe = pipe_hs->pipe;
+
+    // Ok, so we wait if the pipe is full!
+
+    // If j borders i to the left, the pipe is full!
+    if (((pipe->j + 1) % pipe->cap) == pipe->i) {
+        err = bwq_enqueue(pipe->wq, thr);
+        DUAL_RET_FOS_ERR(err, thr); // Failing to enqueue here is recoverable!
+
+        thread_detach(thr);
+        thr->wq = (wait_queue_t *)(pipe->wq);
+        thr->state = THREAD_STATE_WAITING;
+
+        return FOS_E_SUCCESS;
+    }
+
+    // Pipe is not full! No need to wait!
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
@@ -136,16 +153,11 @@ static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_
     return FOS_E_NOT_IMPLEMENTED;
 }
 
+static fernos_error_t pipe_hs_wait_read_ready(handle_state_t *hs) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+
 static fernos_error_t pipe_hs_read(handle_state_t *hs, void *u_dest, size_t len, size_t *u_readden) {
-    return FOS_E_NOT_IMPLEMENTED;
-}
-
-static fernos_error_t pipe_hs_wait(handle_state_t *hs) {
-    return FOS_E_NOT_IMPLEMENTED;
-}
-
-static fernos_error_t pipe_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, 
-        uint32_t arg2, uint32_t arg3) {
     return FOS_E_NOT_IMPLEMENTED;
 }
 

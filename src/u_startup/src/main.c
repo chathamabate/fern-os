@@ -14,6 +14,7 @@
 
 #include "u_startup/test/syscall_fs.h"
 #include "u_startup/test/syscall_default_io.h"
+#include "u_startup/test/syscall_kb.h"
 
 proc_exit_status_t user_main(void) {
     fernos_error_t err;
@@ -29,7 +30,8 @@ proc_exit_status_t user_main(void) {
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
-    test_syscall_fs();
+    // Ok, now we need to wrap up the 
+    test_kb_simple_prompt();
     return PROC_ES_SUCCESS;
 
     /*

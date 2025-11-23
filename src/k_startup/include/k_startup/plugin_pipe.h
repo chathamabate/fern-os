@@ -47,25 +47,12 @@ struct _pipe_t {
     uint8_t * const buf; 
 
     /**
-     * This will hold threads which are waiting for there to be data to read.
-     * The wait context will be empty, as threads are just notified that there may be data.
-     */
-    basic_wait_queue_t * const read_wq;
-
-    /**
-     * This will hold threads which are waiting to write data. 
-     * This is a unique scenario specific to this plugin. Vanilla writing will block
-     * until there is space in the pipe to write at least 1 byte.
+     * When the buffer is empty (`i == j`), this holds threads which called
+     * `wait_read_ready`.
      *
-     * wait_ctx[0] = (const void *)u_src
-     * wait_ctx[1] = (size_t)len
-     * wait_ctx[2] = (size_t *)u_written
-     *
-     * NOTE: pipe handles will also expose other versions of write which will
-     * never block. We need a blocking vanilla wait though for this function
-     * to work the way the helpers expect.
+     * When the buffer is full, this holds threads which called `wait_write_ready`.
      */
-    basic_wait_queue_t * const write_wq;
+    basic_wait_queue_t * const wq;
 };
 
 typedef struct _pipe_handle_state_t pipe_handle_state_t;
