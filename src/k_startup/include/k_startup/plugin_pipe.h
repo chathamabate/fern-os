@@ -10,6 +10,11 @@
 #define KS_PIPE_TX_MAX_LEN (2048U)
 
 /**
+ * Max size of a pipe!
+ */
+#define KS_PIPE_MAX_LEN (0xFFFFFU)
+
+/**
  * I have decided not to place this in `s_data` because it'd be nice if it could 
  * natively copy to userspace!
  */
@@ -71,5 +76,5 @@ struct _pipe_handle_state_t {
     pipe_t * const pipe;
 };
 
-plugin_t *new_pipe_plugin(kernel_state_t *ks);
+plugin_t *new_plugin_pipe(kernel_state_t *ks);
 

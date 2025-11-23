@@ -153,7 +153,7 @@ static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_
     }
 
     // We'll use this later to see if we must wake up sleeping readers.
-    bool was_empty = pipe->i == pipe->j;
+    const bool was_empty = pipe->i == pipe->j;
 
     // How many bytes in the pipe contain user data? (Excluding the final empty cell)
     const size_t occupied_bytes = pipe->i <= pipe->j 
@@ -207,7 +207,9 @@ static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_
     }
 
     if (u_written) {
-        PROP_ERR(mem_cpy_to_user(thr->proc->pd, u_written, &bytes_written, sizeof(*u_written), NULL));
+        // We don't want to overwrite a potential error stored in `err` from above.
+        fernos_error_t cpy_out_err = mem_cpy_to_user(thr->proc->pd, u_written, &bytes_written, sizeof(size_t), NULL);
+        DUAL_RET_FOS_ERR(cpy_out_err, thr);
     }
 
     // If we have succeeded until this point, just propegate `err` to user.
@@ -237,13 +239,79 @@ static fernos_error_t pipe_hs_wait_read_ready(handle_state_t *hs) {
         return FOS_E_SUCCESS;
     }
 
-    // Pipe is not full! No need to wait!
+    // Pipe is not empty! No need to wait!
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 static fernos_error_t pipe_hs_read(handle_state_t *hs, void *u_dest, size_t len, size_t *u_readden) {
-    // Going to be like pipe_hs_write, so just be prepared!
-    return FOS_E_NOT_IMPLEMENTED;
+    fernos_error_t err;
+
+    pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
+    pipe_t *pipe = pipe_hs->pipe;
+
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
+
+    if (!u_dest || len == 0) {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    // Ok, we are requesting a non-zero amount of data into a real buffer,
+    // is there data to read though?
+
+    if (pipe->i == pipe->j) { // Pipe is empty when i == j.
+        DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
+    }
+
+    // Pipe is full when `j` is directly to the left of `i`.
+    const bool was_full = (pipe->j + 1) % pipe->cap == pipe->i;
+
+    // How many bytes in the pipe contain user data? (Excluding the final empty cell)
+    const size_t occupied_bytes = pipe->i <= pipe->j 
+        ? pipe->j - pipe->i 
+        : (pipe->cap - pipe->i) + pipe->j;
+
+    // How many bytes we will try to read in this call.
+    const size_t bytes_to_read = MIN(len, MIN(occupied_bytes, KS_PIPE_TX_MAX_LEN));
+
+    size_t bytes_readden = 0;
+    uint32_t copied;
+    err = FOS_E_SUCCESS;
+
+    if (pipe->j < pipe->i) { // In this case, we read up until the end of the buffer first.
+        const size_t first_copy_amt = MIN(pipe->cap - pipe->i, bytes_to_read);
+
+        err = mem_cpy_to_user(thr->proc->pd, u_dest, pipe->buf + pipe->i, first_copy_amt, &copied);
+
+        bytes_readden += copied;
+
+        pipe->i += copied;
+        if (pipe->i == pipe->cap) {
+            pipe->i = 0;
+        }
+    }
+
+    if (err == FOS_E_SUCCESS && bytes_to_read - bytes_readden > 0) {
+        const size_t second_copy_amt = bytes_to_read - bytes_readden;
+
+        err = mem_cpy_to_user(thr->proc->pd, (uint8_t *)u_dest + bytes_readden, pipe->buf + pipe->i, second_copy_amt, &copied);
+
+        bytes_readden += copied;
+
+        pipe->i += copied; // Impossible `i` surpasses `j` here.
+    }
+
+    // Ok, final maneuvers here.
+
+    if (was_full && bytes_readden > 0) {
+        PROP_ERR(bwq_wake_all_threads(pipe->wq, &(hs->ks->schedule), FOS_E_SUCCESS));
+    }
+
+    if (u_readden) {
+        fernos_error_t cpy_out_err = mem_cpy_to_user(thr->proc->pd, u_readden, &bytes_readden, sizeof(size_t), NULL);
+        DUAL_RET_FOS_ERR(cpy_out_err, thr);
+    }
+
+    DUAL_RET(thr, err, FOS_E_SUCCESS);
 }
 
 static fernos_error_t pipe_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd, 
@@ -259,7 +327,7 @@ static const plugin_impl_t PLUGIN_PIPE_IMPL = {
     .plg_on_reap_proc = NULL,
 };
 
-plugin_t *new_pipe_plugin(kernel_state_t *ks) {
+plugin_t *new_plugin_pipe(kernel_state_t *ks) {
     plugin_t *pipe_plg = al_malloc(ks->al, sizeof(plugin_t));
     if (!pipe_plg) {
         return NULL;
@@ -297,7 +365,7 @@ static fernos_error_t pipe_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t 
         handle_t *u_handle = (handle_t *)arg0;
         size_t sig_cap = (size_t)arg1;
 
-        if (!u_handle || sig_cap == 0) {
+        if (!u_handle || sig_cap == 0 || sig_cap > KS_PIPE_MAX_LEN) {
             DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 

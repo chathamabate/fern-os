@@ -26,6 +26,7 @@
 #include "k_startup/plugin_fut.h"
 #include "k_startup/plugin_fs.h"
 #include "k_startup/plugin_kb.h"
+#include "k_startup/plugin_pipe.h"
 #include "k_startup/plugin_vga_cd.h"
 
 #include "s_util/char_display.h"
@@ -165,6 +166,12 @@ static void init_kernel_plugins(void) {
         setup_fatal("Failed to create VGA Character Display plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_VGA_CD_ID, plg_vga_cd), "Failed to set VGA CD Plugin in the kernel");
+
+    plugin_t *plg_pipe = new_plugin_pipe(kernel);
+    if (!plg_pipe) {
+        setup_fatal("Failed to create Pipe plugin");
+    }
+    try_setup_step(ks_set_plugin(kernel, PLG_PIPE_ID, plg_pipe), "Failed to set Pipe Plugin in the kernel");
 }
 
 void start_kernel(void) {
