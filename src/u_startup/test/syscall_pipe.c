@@ -3,6 +3,7 @@
 #include "u_startup/syscall_pipe.h"
 #include "u_startup/test/syscall_pipe.h"
 #include "s_util/misc.h"
+#include "s_util/rand.h"
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
@@ -67,7 +68,66 @@ static bool test_simple_rw0(void) {
     TEST_SUCCEED();
 }
 
-static void *test_multithread_rw_writer(void *arg) {
+static void *test_multithread_rw0_reader(void *arg) {
+    TEST_TRUE(arg != NULL);
+
+    pipe_test_arg_t *pipe_arg = (pipe_test_arg_t *)arg;
+    const handle_t p = pipe_arg->p;
+    const size_t trials = pipe_arg->arg0;
+
+    uint8_t r_buf[255];
+    for (size_t trial = 0; trial < trials; trial++) {
+        uint8_t len;
+        TEST_SUCCESS(sc_handle_read_full(p, &len, sizeof(len)));
+
+        if (len > 0) {
+            TEST_SUCCESS(sc_handle_read_full(p, r_buf, len));
+
+            const uint8_t exp_val = r_buf[0];
+            TEST_TRUE(mem_chk(r_buf, exp_val, len));
+        }
+    }
+
+    return NULL;
+}
+
+static bool test_multithread_rw0(void) {
+    handle_t p;
+    const uint32_t num_trials = 100;
+
+    rand_t r = rand(0);
+
+    TEST_SUCCESS(sc_pipe_open(&p, 50));
+
+    pipe_test_arg_t pipe_arg = {
+        p, num_trials, 0
+    };
+
+    thread_id_t tid;
+    TEST_SUCCESS(sc_thread_spawn(&tid, test_multithread_rw0_reader, &pipe_arg));
+
+    // 1 for length, 255 for values.
+    uint8_t w_buf[256];
+
+    // Random test time!
+    for (size_t trial = 0; trial < num_trials; trial++) { // run the same thing a bunch of times.
+        const uint8_t len = next_rand_u8(&r);
+        const uint8_t val = next_rand_u8(&r);
+        
+        w_buf[0] = len;
+        mem_set(w_buf + 1, val, len);
+        TEST_SUCCESS(sc_handle_write_full(p, w_buf, 1 + len));
+    }
+
+    TEST_SUCCESS(sc_thread_join(1 << tid, NULL, NULL));
+
+    sc_handle_close(p);
+
+    TEST_SUCCEED();
+}
+
+
+static void *test_multithread_rw1_writer(void *arg) {
     pipe_test_arg_t *pipe_arg = (pipe_test_arg_t *)arg;
 
     handle_t p = pipe_arg->p;
@@ -83,7 +143,7 @@ static void *test_multithread_rw_writer(void *arg) {
     return NULL;
 }
 
-static void *test_multithread_rw_reader(void *arg) {
+static void *test_multithread_rw1_reader(void *arg) {
     pipe_test_arg_t *pipe_arg = (pipe_test_arg_t *)arg;
 
     handle_t p = pipe_arg->p;
@@ -100,7 +160,7 @@ static void *test_multithread_rw_reader(void *arg) {
     return NULL;
 }
 
-static bool test_multithread_rw(void) {
+static bool test_multithread_rw1(void) {
     // I'd like to test read waiting AND write waiting!
 
     handle_t p;
@@ -129,11 +189,11 @@ static bool test_multithread_rw(void) {
 
     // 1) Writers then readers.
     for (size_t i = 0; i < num_write_args; i++) {
-        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_writer, write_args + i));
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw1_writer, write_args + i));
     }
     sc_thread_sleep(5); // Small sleep cause why not.
     for (size_t i = 0; i < num_read_args; i++) {
-        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_reader, read_args + i));
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw1_reader, read_args + i));
     }
     for (size_t i = 0; i < num_write_args + num_read_args; i++) {
         TEST_SUCCESS(sc_thread_join(full_join_vector(), NULL, NULL));
@@ -141,11 +201,11 @@ static bool test_multithread_rw(void) {
 
     // 2) Readers then writers.
     for (size_t i = 0; i < num_read_args; i++) {
-        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_reader, read_args + i));
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw1_reader, read_args + i));
     }
     sc_thread_sleep(5); // Small sleep cause why not.
     for (size_t i = 0; i < num_write_args; i++) {
-        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_writer, write_args + i));
+        TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw1_writer, write_args + i));
     }
     for (size_t i = 0; i < num_write_args + num_read_args; i++) {
         TEST_SUCCESS(sc_thread_join(full_join_vector(), NULL, NULL));
@@ -154,10 +214,10 @@ static bool test_multithread_rw(void) {
     // 3) intermixed.
     for (size_t i = 0; i < MAX(num_read_args, num_write_args); i++) {
         if (i < num_read_args) {
-            TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_reader, read_args + i));
+            TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw1_reader, read_args + i));
         }
         if (i < num_write_args) {
-            TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw_writer, write_args + i));
+            TEST_SUCCESS(sc_thread_spawn(NULL, test_multithread_rw1_writer, write_args + i));
         }
         sc_thread_sleep(1);
     }
@@ -173,6 +233,7 @@ static bool test_multithread_rw(void) {
 bool test_syscall_pipe(void) {
     BEGIN_SUITE("Syscall Pipe");
     RUN_TEST(test_simple_rw0);
-    RUN_TEST(test_multithread_rw);
+    RUN_TEST(test_multithread_rw0);
+    RUN_TEST(test_multithread_rw1);
     return END_SUITE();
 }
