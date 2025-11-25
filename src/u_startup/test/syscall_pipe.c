@@ -25,8 +25,7 @@ typedef struct _pipe_test_arg_t {
 } pipe_test_arg_t;
 
 static bool test_simple_rw0(void) {
-    handle_t wp;
-    handle_t rp;
+    handle_t wp, rp;
 
     TEST_SUCCESS(sc_pipe_open(&wp, &rp, 16));
 
@@ -44,10 +43,43 @@ static bool test_simple_rw0(void) {
     TEST_SUCCESS(sc_handle_read_full(rp, buf, str_len(msg)));
     buf[str_len(msg)] = '\0';
 
-    LOGF_METHOD(buf);
     TEST_TRUE(str_eq(msg, buf));
 
     sc_handle_close(wp);
+    sc_handle_close(rp);
+
+    TEST_SUCCEED();
+}
+
+static bool test_simple_end_cases(void) {
+    handle_t wp, rp;
+    TEST_SUCCESS(sc_pipe_open(&wp, &rp, 16));
+
+    sc_handle_close(rp);
+
+    // When a read handle is closed, we shouldn't be able to give any data at all to the 
+    // write end.
+    TEST_EQUAL_HEX(FOS_E_EMPTY, sc_handle_wait_write_ready(wp));
+    TEST_EQUAL_HEX(FOS_E_EMPTY, sc_handle_write(wp, "Hello", 5, NULL));
+
+    sc_handle_close(wp);
+
+    TEST_SUCCESS(sc_pipe_open(&wp, &rp, 16));
+
+    TEST_SUCCESS(sc_handle_write_s(wp, "hello"));
+
+    sc_handle_close(wp);
+
+    char buf[16];
+
+    // When there are no write handles, we should still be able to read whatever data is left!
+    TEST_SUCCESS(sc_handle_read_full(rp, buf, 5));
+    TEST_TRUE(mem_cmp(buf, "hello", 5));
+
+    // Now that the pipe is empty, reading/read waiting should return empty!
+    TEST_EQUAL_HEX(FOS_E_EMPTY, sc_handle_read(rp, buf, 4, NULL));
+    TEST_EQUAL_HEX(FOS_E_EMPTY, sc_handle_wait_read_ready(rp));
+
     sc_handle_close(rp);
 
     TEST_SUCCEED();
@@ -224,75 +256,6 @@ static bool test_multithread_rw1(void) {
     TEST_SUCCEED();
 }
 
-/*
-static void *test_interrupted_waits_worker(void *arg) {
-    TEST_TRUE(arg != NULL);
-
-    pipe_test_arg_t *pipe_arg = (pipe_test_arg_t *)arg;
-    handle_t p = pipe_arg->p;
-    uint32_t should_read = pipe_arg->arg0;
-
-    // NOTE: This used to test for FOS_E_STATE_MISMATCH, but some threads will execute the wait
-    // AFTER `p` has been closed. This would likely result in FOS_E_INVALID_INDEX.
-    if (should_read) {
-        TEST_FAILURE(sc_handle_wait_read_ready(p));
-    } else {
-        TEST_FAILURE(sc_handle_wait_write_ready(p));
-    }
-
-    return NULL;
-}
-
-static bool test_interrupted_waits(void) {
-
-    // First try interrupting readers.
-
-    handle_t p;
-    TEST_SUCCESS(sc_pipe_open(&p, 100));
-
-    pipe_test_arg_t read_arg = {
-        p, 1, 0
-    };
-
-    const size_t num_readers = 10;
-
-    for (size_t i = 0; i < num_readers; i++) {
-        TEST_SUCCESS(sc_thread_spawn(NULL, test_interrupted_waits_worker, &read_arg));
-    }
-
-    sc_thread_sleep(10);
-    sc_handle_close(p);
-
-    for (size_t i = 0; i < num_readers; i++) {
-        TEST_SUCCESS(sc_thread_join(full_join_vector(), NULL, NULL));
-    }
-
-    // Next try interrupting writers.
-    TEST_SUCCESS(sc_pipe_open(&p, 1));
-    TEST_SUCCESS(sc_handle_write_full(p, "a", 1)); // pipe must be full for writers
-                                                                // to block!
-
-    pipe_test_arg_t write_arg = {
-        p, 0, 0,
-    };
-
-    const size_t num_writers = 15;
-
-    for (size_t i = 0; i < num_writers; i++) {
-        TEST_SUCCESS(sc_thread_spawn(NULL, test_interrupted_waits_worker, &write_arg));
-    }
-
-    sc_thread_sleep(10);
-    sc_handle_close(p);
-
-    for (size_t i = 0; i < num_writers; i++) {
-        TEST_SUCCESS(sc_thread_join(full_join_vector(), NULL, NULL));
-    }
-
-    TEST_SUCCEED();
-}
-*/
-
 static bool test_multiproc(void) {
     // This primarily tests copy constructor and destructor for pipes. 
 
@@ -336,12 +299,134 @@ static bool test_multiproc(void) {
     TEST_SUCCEED();
 }
 
+static const char *MULTIPROC_COMPLEX0_CASES[] = {
+    "hello",
+    "AYE Yo 123",
+    "AAAAAAAAAAAAAAAAAAaaaaaaaaaaaaaaaaaaaBBBBBBBBBBBBBBCVCCCCCCCCCCCCCCcc",
+    "WOOOOOOOO 123213123 hello woooo what is up ???????"
+};
+static const size_t MULTIPROC_COMPLEX0_CASES_LEN = sizeof(MULTIPROC_COMPLEX0_CASES) / sizeof(MULTIPROC_COMPLEX0_CASES[0]);
+
+static void *test_multiproc_complex0_worker(void *arg) {
+    TEST_TRUE(arg != NULL);
+    handle_t wp = *(handle_t *)arg; 
+
+    for (size_t i = 0; i < MULTIPROC_COMPLEX0_CASES_LEN; i++) {
+        // This will probably block, as it will take time for the reader to process input!
+        // This is expected and desired!
+        TEST_SUCCESS(sc_handle_write_s(wp, MULTIPROC_COMPLEX0_CASES[i]));
+    }
+
+    // The worker will close the handle when it's done!
+    sc_handle_close(wp);
+    
+    return NULL;
+}
+
+static bool test_multiproc_complex0(void) {
+    // this will be like a test I wrote for the file system.
+    
+    // parent -> pipe0 ----*
+    //                     |
+    //               Child (does some sort of data manipulation)
+    //                     |
+    // parent <- pipe1 ----*
+
+    fernos_error_t err;
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    handle_t wp0, rp0;
+    TEST_SUCCESS(sc_pipe_open(&wp0, &rp0, 16));
+
+    handle_t rp1, wp1;
+    TEST_SUCCESS(sc_pipe_open(&wp1, &rp1, 15));
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+
+    if (cpid == FOS_MAX_PROCS) {
+        sc_handle_close(wp0);
+        sc_handle_close(rp1);
+
+        char child_buf[16];
+
+        while (true) {
+            size_t readden;
+            while ((err = sc_handle_read(rp0, child_buf, sizeof(child_buf), &readden)) == FOS_E_SUCCESS) {
+                for (size_t i = 0; i < readden; i++) {
+                    if ('a' <= child_buf[i] && child_buf[i] <= 'z') {
+                        child_buf[i] += 'A' - 'a'; // Capitalize!
+                    }
+                }
+
+                TEST_SUCCESS(sc_handle_write_full(wp1, child_buf, readden));
+            }
+
+            if (err == FOS_E_EMPTY) {
+                err = sc_handle_wait_read_ready(rp0);
+
+                // We expect that at a certain point the parent process will close its write end on
+                // pipe0. This should cause FOS_E_EMPTY to be returned from wait read ready!
+                if (err != FOS_E_SUCCESS) {
+                    sc_proc_exit(err == FOS_E_EMPTY ? PROC_ES_SUCCESS : PROC_ES_FAILURE);
+                }
+            } else {
+                // Anything other then success or Empty from the read call is an automatic failure!
+                sc_proc_exit(PROC_ES_FAILURE);
+            }
+        }
+    }
+
+    sc_handle_close(rp0);
+    sc_handle_close(wp1);
+
+    thread_id_t worker_tid;
+    TEST_SUCCESS(sc_thread_spawn(&worker_tid, test_multiproc_complex0_worker, &wp0));
+    (void)wp0; // From this point on the worker owns `wp0`! It will close it when done!
+
+    char parent_buf[1024];
+    for (size_t i = 0; i < MULTIPROC_COMPLEX0_CASES_LEN; i++) {
+        const char *c = MULTIPROC_COMPLEX0_CASES[i];
+        const size_t slen = str_len(c);
+
+        TEST_SUCCESS(sc_handle_read_full(rp1, parent_buf, str_len(c)));
+
+        for (size_t j = 0; j < slen; j++) {
+            char exp = c[j];
+            if ('a' <= exp && exp <= 'z') {
+                exp += 'A' - 'a';
+            }
+            TEST_EQUAL_UINT(exp, parent_buf[j]);
+        }
+    }
+
+    // When we've read everything out, we can join on our worker!
+    TEST_SUCCESS(sc_thread_join(1 << worker_tid, NULL, NULL));
+
+    // Next we can wait and reap our child process!
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+
+    proc_exit_status_t rces;
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &rces));
+    TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
+
+    // Finally, we can close the last remaining open pipe handle `rp1`
+    sc_handle_close(rp1);
+
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_pipe(void) {
     BEGIN_SUITE("Syscall Pipe");
     RUN_TEST(test_simple_rw0);
+    RUN_TEST(test_simple_end_cases);
     RUN_TEST(test_multithread_rw0);
     RUN_TEST(test_multithread_rw1);
-    //RUN_TEST(test_interrupted_waits);
     RUN_TEST(test_multiproc);
+    RUN_TEST(test_multiproc_complex0);
     return END_SUITE();
 }
