@@ -303,7 +303,9 @@ static const char *MULTIPROC_COMPLEX0_CASES[] = {
     "hello",
     "AYE Yo 123",
     "AAAAAAAAAAAAAAAAAAaaaaaaaaaaaaaaaaaaaBBBBBBBBBBBBBBCVCCCCCCCCCCCCCCcc",
-    "WOOOOOOOO 123213123 hello woooo what is up ???????"
+    "WOOOOOOOO 123213123 hello woooo what is up ???????",
+    "s",
+    "TTTTT",
 };
 static const size_t MULTIPROC_COMPLEX0_CASES_LEN = sizeof(MULTIPROC_COMPLEX0_CASES) / sizeof(MULTIPROC_COMPLEX0_CASES[0]);
 
@@ -420,6 +422,80 @@ static bool test_multiproc_complex0(void) {
     TEST_SUCCEED();
 }
 
+static bool test_many_readers(void) {
+    // This will test having MANY child processes all reading from the same pipe!
+
+    fernos_error_t err;
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    handle_t wp, rp;
+    TEST_SUCCESS(sc_pipe_open(&wp, &rp, 5));
+
+    const size_t NUM_CHILDREN = 10;
+    for (size_t i = 0; i < NUM_CHILDREN; i++) {
+        proc_id_t cpid; 
+        TEST_SUCCESS(sc_proc_fork(&cpid));
+
+        if (cpid == FOS_MAX_PROCS) { // In the child!
+            sc_handle_close(wp); // Child doesn't need the writing end.
+
+            uint8_t b;
+            TEST_SUCCESS(sc_handle_read_full(rp, &b, sizeof(b)));
+            TEST_EQUAL_HEX(0xAB, b);
+
+            // After reading the desired byte, we wait for `rp` to return empty on wait.
+            while (true) {
+                err = sc_handle_wait_read_ready(rp);
+                if (err == FOS_E_EMPTY) {
+                    sc_proc_exit(PROC_ES_SUCCESS);
+                }
+
+                if (err != FOS_E_SUCCESS) {
+                    sc_proc_exit(PROC_ES_FAILURE);
+                }
+            }
+        }
+    }
+
+    // In the parent we don't need the reading end.
+    sc_handle_close(rp);
+
+    // We will write out 1 0xAB for each child!
+    uint8_t wx_buf[100];
+    TEST_TRUE(sizeof(wx_buf) >= NUM_CHILDREN);
+    mem_set(wx_buf, 0xAB, NUM_CHILDREN);
+
+    TEST_SUCCESS(sc_handle_write_full(wp, wx_buf, NUM_CHILDREN));
+
+    // Finally, we close the `wp` handle, signaling to children to exit.
+    sc_handle_close(wp);
+
+    // Now we can reap!
+    size_t reaped = 0;
+
+    while (reaped < NUM_CHILDREN) {
+        proc_exit_status_t rces;
+        err = sc_proc_reap(FOS_MAX_PROCS, NULL, &rces);
+        if (err == FOS_E_SUCCESS) {
+            TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
+            reaped++;
+        } else {
+            TEST_EQUAL_HEX(FOS_E_EMPTY, err);
+
+            // We are waiting for more to reap!
+            TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+        }
+    }
+
+    // When we are done reaping, make sure to clear any lingering signal bit.
+    sc_signal_clear(1 << FSIG_CHLD);
+
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_pipe(void) {
     BEGIN_SUITE("Syscall Pipe");
     RUN_TEST(test_simple_rw0);
@@ -428,5 +504,6 @@ bool test_syscall_pipe(void) {
     RUN_TEST(test_multithread_rw1);
     RUN_TEST(test_multiproc);
     RUN_TEST(test_multiproc_complex0);
+    RUN_TEST(test_many_readers);
     return END_SUITE();
 }
