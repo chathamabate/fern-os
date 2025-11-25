@@ -67,7 +67,7 @@ static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_
 static fernos_error_t pipe_hs_wait_read_ready(handle_state_t *hs);
 static fernos_error_t pipe_hs_read(handle_state_t *hs, void *u_dest, size_t len, size_t *u_readden);
 
-const handle_state_impl_t PIPE_WRITER_HS_IMPL = {
+static const handle_state_impl_t PIPE_WRITER_HS_IMPL = {
     .copy_handle_state = copy_pipe_handle_state,
     .delete_handle_state = delete_pipe_handle_state,
     .hs_wait_write_ready = pipe_hs_wait_write_ready,
@@ -77,7 +77,7 @@ const handle_state_impl_t PIPE_WRITER_HS_IMPL = {
     .hs_cmd = NULL,
 };
 
-const handle_state_impl_t PIPE_READER_HS_IMPL = {
+static const handle_state_impl_t PIPE_READER_HS_IMPL = {
     .copy_handle_state = copy_pipe_handle_state,
     .delete_handle_state = delete_pipe_handle_state,
     .hs_wait_write_ready = NULL,
@@ -412,7 +412,6 @@ static fernos_error_t pipe_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t 
 
     fernos_error_t err;
 
-    (void)arg2;
     (void)arg3;
 
     switch (cmd) {
@@ -471,7 +470,7 @@ static fernos_error_t pipe_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t 
         *(pipe_t **)&(pipe_w_hs->pipe) = pipe;
         idtb_set(proc->handle_table, wh, pipe_w_hs);
 
-        init_base_handle((handle_state_t *)pipe_r_hs, &PIPE_READER_HS_IMPL, ks, proc, wh, false);
+        init_base_handle((handle_state_t *)pipe_r_hs, &PIPE_READER_HS_IMPL, ks, proc, rh, false);
         *(pipe_t **)&(pipe_r_hs->pipe) = pipe;
         idtb_set(proc->handle_table, rh, pipe_r_hs);
 
