@@ -31,8 +31,7 @@ proc_exit_status_t user_main(void) {
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
-    // Ok, now we need to wrap up the 
-    test_syscall_pipe();
+
     return PROC_ES_SUCCESS;
 
     /*

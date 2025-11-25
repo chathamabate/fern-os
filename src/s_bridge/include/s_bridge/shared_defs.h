@@ -26,6 +26,12 @@ typedef id_t sig_id_t;
 #define FSIG_CHLD (0x0U)
 
 /**
+ * A signal used for killing a process. (This is an arbitrary signal with no special meaning
+ * to the kernel) This is an allowable signal!
+ */
+#define FSIG_KILL (0x1U)
+
+/**
  * This is a bit vector which can be used to represent pending signals, or
  * signals which are meant to be allowed.
  */

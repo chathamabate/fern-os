@@ -15,10 +15,12 @@ static pipe_t *new_pipe(allocator_t *al, size_t sig_cap) {
 
     pipe_t *p = al_malloc(al, sizeof(pipe_t));
     uint8_t *buf = al_malloc(al, cap);
-    basic_wait_queue_t *wq = new_basic_wait_queue(al);
+    basic_wait_queue_t *w_wq = new_basic_wait_queue(al);
+    basic_wait_queue_t *r_wq = new_basic_wait_queue(al);
 
-    if (!p || !buf || !wq) {
-        delete_wait_queue((wait_queue_t *)wq);
+    if (!p || !buf || !w_wq || !r_wq) {
+        delete_wait_queue((wait_queue_t *)w_wq);
+        delete_wait_queue((wait_queue_t *)r_wq);
         al_free(al, buf);
         al_free(al, p);
 
@@ -26,12 +28,14 @@ static pipe_t *new_pipe(allocator_t *al, size_t sig_cap) {
     }
 
     *(allocator_t **)&(p->al) = al;
-    p->ref_count = 0;
+    p->write_refs = 0;
+    p->read_refs = 0;
     p->i = 0;
     p->j = 0;
     *(size_t *)&(p->cap) = cap;
     *(uint8_t **)&(p->buf) = buf;
-    *(basic_wait_queue_t **)&(p->wq) = wq;
+    *(basic_wait_queue_t **)&(p->w_wq) = w_wq;
+    *(basic_wait_queue_t **)&(p->r_wq) = r_wq;
 
     return p;
 }
@@ -46,7 +50,8 @@ static void delete_pipe(pipe_t *p) {
     }
 
     al_free(p->al, p->buf);
-    delete_wait_queue((wait_queue_t *)(p->wq));
+    delete_wait_queue((wait_queue_t *)(p->w_wq));
+    delete_wait_queue((wait_queue_t *)(p->r_wq));
     al_free(p->al, p);
 }
 
@@ -62,11 +67,21 @@ static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_
 static fernos_error_t pipe_hs_wait_read_ready(handle_state_t *hs);
 static fernos_error_t pipe_hs_read(handle_state_t *hs, void *u_dest, size_t len, size_t *u_readden);
 
-const handle_state_impl_t PIPE_HS_IMPL = {
+const handle_state_impl_t PIPE_WRITER_HS_IMPL = {
     .copy_handle_state = copy_pipe_handle_state,
     .delete_handle_state = delete_pipe_handle_state,
     .hs_wait_write_ready = pipe_hs_wait_write_ready,
     .hs_write = pipe_hs_write,
+    .hs_wait_read_ready = NULL,
+    .hs_read = NULL,
+    .hs_cmd = NULL,
+};
+
+const handle_state_impl_t PIPE_READER_HS_IMPL = {
+    .copy_handle_state = copy_pipe_handle_state,
+    .delete_handle_state = delete_pipe_handle_state,
+    .hs_wait_write_ready = NULL,
+    .hs_write = NULL,
     .hs_wait_read_ready = pipe_hs_wait_read_ready,
     .hs_read = pipe_hs_read,
     .hs_cmd = NULL,
@@ -74,16 +89,25 @@ const handle_state_impl_t PIPE_HS_IMPL = {
 
 static fernos_error_t copy_pipe_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
     pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
+
+    const handle_state_impl_t * const impl = pipe_hs->super.impl;
+    pipe_t * const pipe = pipe_hs->pipe;
     
     pipe_handle_state_t *pipe_hs_copy = al_malloc(hs->ks->al, sizeof(pipe_handle_state_t));
     if (!pipe_hs_copy) {
         return FOS_E_NO_MEM;
     }
 
-    init_base_handle((handle_state_t *)pipe_hs_copy, &PIPE_HS_IMPL, hs->ks, proc, hs->handle, false); 
-    *(pipe_t **)&(pipe_hs_copy->pipe) = pipe_hs->pipe;
+    init_base_handle((handle_state_t *)pipe_hs_copy, impl, hs->ks, proc, hs->handle, false); 
+    *(pipe_t **)&(pipe_hs_copy->pipe) = pipe;
 
-    pipe_hs_copy->pipe->ref_count++;
+    if (impl == &PIPE_WRITER_HS_IMPL) {
+        pipe->write_refs++;
+    } else if (impl == &PIPE_READER_HS_IMPL) {
+        pipe->read_refs++; 
+    } else {
+        return FOS_E_ABORT_SYSTEM; // Something very wrong if we make it here!
+    }
 
     *out = (handle_state_t *)pipe_hs_copy;
 
@@ -93,14 +117,38 @@ static fernos_error_t copy_pipe_handle_state(handle_state_t *hs, process_t *proc
 static fernos_error_t delete_pipe_handle_state(handle_state_t *hs) {
     pipe_handle_state_t *pipe_hs = (pipe_handle_state_t *)hs;
 
-    pipe_t *pipe = pipe_hs->pipe;
+    pipe_t * const pipe = pipe_hs->pipe;
 
-    // First, we check if the underlying pipe has hit 0 references!
-    if ((--(pipe->ref_count)) == 0) { 
+    const handle_state_impl_t * const impl = pipe_hs->super.impl;
+
+    // NOTE that the r_wq and w_wq are mutually exclusive.
+    // If r_wq is non-empty w_wq is empty and vice versa.
+    // 
+    // If for example, the final write handle is closed, the read queue is woken up with 
+    // FOS_E_EMPTY signaling no more data will ever come. The write queue is woken up
+    // with FOS_E_STATE_MISMATCH signaling strange user behavior. (i.e. deleting a handle
+    // when a thread is waiting on it?)
+
+    if (impl == &PIPE_WRITER_HS_IMPL) {
+        pipe->write_refs--;
+        if (pipe->write_refs == 0) {
+            PROP_ERR(bwq_wake_all_threads(pipe->w_wq, &(pipe_hs->super.ks->schedule), FOS_E_STATE_MISMATCH));
+            PROP_ERR(bwq_wake_all_threads(pipe->r_wq, &(pipe_hs->super.ks->schedule), FOS_E_EMPTY));
+        }
+    } else if (impl == &PIPE_READER_HS_IMPL) {
+        pipe->read_refs--;
+        if (pipe->read_refs == 0) {
+            PROP_ERR(bwq_wake_all_threads(pipe->w_wq, &(pipe_hs->super.ks->schedule), FOS_E_EMPTY));
+            PROP_ERR(bwq_wake_all_threads(pipe->r_wq, &(pipe_hs->super.ks->schedule), FOS_E_STATE_MISMATCH));
+        }
+    } else {
+        return FOS_E_ABORT_SYSTEM; // VERY BAD!
+    }
+
+    // If no more references at all we can delete the pipe, we know the above cases will
+    // catch waking up threads as needed before deletion.
+    if ((pipe->write_refs + pipe->read_refs) == 0) { 
         // Time to destruct the pipe!
-
-        // Wake up all potentially waiting threads.
-        PROP_ERR(bwq_wake_all_threads(pipe->wq, &(pipe_hs->super.ks->schedule), FOS_E_STATE_MISMATCH));
 
         delete_pipe(pipe);
     }
@@ -118,15 +166,18 @@ static fernos_error_t pipe_hs_wait_write_ready(handle_state_t *hs) {
     thread_t *thr = (thread_t *)(pipe_hs->super.ks->schedule.head);
     pipe_t *pipe = pipe_hs->pipe;
 
-    // Ok, so we wait if the pipe is full!
+    // With no readers, the pipe will NEVER accept anymore data!
+    if (pipe->read_refs == 0) {
+        DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
+    }
 
     // If j borders i to the left, the pipe is full!
     if (((pipe->j + 1) % pipe->cap) == pipe->i) {
-        err = bwq_enqueue(pipe->wq, thr);
+        err = bwq_enqueue(pipe->w_wq, thr);
         DUAL_RET_FOS_ERR(err, thr); // Failing to enqueue here is recoverable!
 
         thread_detach(thr);
-        thr->wq = (wait_queue_t *)(pipe->wq);
+        thr->wq = (wait_queue_t *)(pipe->w_wq);
         thr->state = THREAD_STATE_WAITING;
 
         return FOS_E_SUCCESS;
@@ -145,6 +196,11 @@ static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_
 
     if (!u_src || len == 0) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    // With no readers, the pipe will NOT accept anymore data!
+    if (pipe->read_refs == 0) {
+        DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
     }
 
     // If the pipe is full we return FOS_E_EMPTY.
@@ -200,10 +256,11 @@ static fernos_error_t pipe_hs_write(handle_state_t *hs, const void *u_src, size_
         pipe->j += copied; // Wrap should be impossible here as j will never pass i.
     }
 
-    // Cool, so now, the question become, do we wake anybody up?
+    // Cool, so now, the question becomes, do we wake anybody up?
+    // If we were empty and no we aren't, wake up any potentially waiting readers!
     if (was_empty && bytes_written > 0) {
         // A failure here is catastrophic.
-        PROP_ERR(bwq_wake_all_threads(pipe->wq, &(hs->ks->schedule), FOS_E_SUCCESS));
+        PROP_ERR(bwq_wake_all_threads(pipe->r_wq, &(hs->ks->schedule), FOS_E_SUCCESS));
     }
 
     if (u_written) {
@@ -229,11 +286,16 @@ static fernos_error_t pipe_hs_wait_read_ready(handle_state_t *hs) {
 
     // If i == j, the pipe is empty!
     if (pipe->i == pipe->j) {
-        err = bwq_enqueue(pipe->wq, thr);
+        // If there is no more writers around, the pipe will never be written to again!
+        if (pipe->write_refs == 0) {
+            DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
+        }
+
+        err = bwq_enqueue(pipe->r_wq, thr);
         DUAL_RET_FOS_ERR(err, thr); // Failing to enqueue here is recoverable!
 
         thread_detach(thr);
-        thr->wq = (wait_queue_t *)(pipe->wq);
+        thr->wq = (wait_queue_t *)(pipe->r_wq);
         thr->state = THREAD_STATE_WAITING;
 
         return FOS_E_SUCCESS;
@@ -254,6 +316,10 @@ static fernos_error_t pipe_hs_read(handle_state_t *hs, void *u_dest, size_t len,
     if (!u_dest || len == 0) {
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
+
+    // NOTE: Unlike with write, a reader can continue to read from a pipe even if there are no
+    // write handles open! FOS_E_EMPTY is not returned until the pipe itself is completely
+    // void of data!
 
     // Ok, we are requesting a non-zero amount of data into a real buffer,
     // is there data to read though?
@@ -303,7 +369,8 @@ static fernos_error_t pipe_hs_read(handle_state_t *hs, void *u_dest, size_t len,
     // Ok, final maneuvers here.
 
     if (was_full && bytes_readden > 0) {
-        PROP_ERR(bwq_wake_all_threads(pipe->wq, &(hs->ks->schedule), FOS_E_SUCCESS));
+        // Wake up all potential writers if the queue was made non-full!
+        PROP_ERR(bwq_wake_all_threads(pipe->w_wq, &(hs->ks->schedule), FOS_E_SUCCESS));
     }
 
     if (u_readden) {
@@ -353,8 +420,9 @@ static fernos_error_t pipe_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t 
     /*
      * Create a new pipe!
      *
-     * arg0 - User pointer to a handle (where to write created handle)
-     * arg1 - size_t significant capacity. (The max data held at once by the pipe)
+     * arg0 - User pointer to a handle (where to write created write handle)
+     * arg1 - User pointer to a handle (where to write created read handle)
+     * arg2 - size_t significant capacity. (The max data held at once by the pipe)
      *
      * If `u_handle` is NULL or sig_cap is 0, FOS_E_BAD_ARGS is returned to the user.
      * If handle table is full, FOS_E_EMPTY is returned to the user.
@@ -362,56 +430,50 @@ static fernos_error_t pipe_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t 
      * Errors can also occur when writing created handle back to userspace.
      */
     case PLG_PIPE_PCID_OPEN: {
-        handle_t *u_handle = (handle_t *)arg0;
-        size_t sig_cap = (size_t)arg1;
+        handle_t *u_write_handle = (handle_t *)arg0;
+        handle_t *u_read_handle = (handle_t *)arg1;
+        size_t sig_cap = (size_t)arg2;
 
-        if (!u_handle || sig_cap == 0 || sig_cap > KS_PIPE_MAX_LEN) {
+        if (!u_write_handle || !u_read_handle || sig_cap == 0 || sig_cap > KS_PIPE_MAX_LEN) {
             DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 
-        err = FOS_E_SUCCESS;
 
         const handle_t NULL_HANDLE = idtb_null_id(proc->handle_table);  
-        handle_t h = idtb_pop_id(proc->handle_table);
-        if (h == NULL_HANDLE) {
-            err = FOS_E_NO_MEM;
-        }
 
-        pipe_t *pipe = NULL;
+        handle_t wh = idtb_pop_id(proc->handle_table);
+        handle_t rh = idtb_pop_id(proc->handle_table);
+        pipe_handle_state_t *pipe_w_hs = al_malloc(plg->ks->al, sizeof(pipe_handle_state_t));;
+        pipe_handle_state_t *pipe_r_hs = al_malloc(plg->ks->al, sizeof(pipe_handle_state_t));
+        pipe_t *pipe = new_pipe(plg->ks->al, sig_cap);
+
+        err = mem_cpy_to_user(proc->pd, u_write_handle, &wh, sizeof(handle_t), NULL); 
         if (err == FOS_E_SUCCESS) {
-            pipe = new_pipe(plg->ks->al, sig_cap);
-            if (!pipe) {
-                err = FOS_E_NO_MEM;
-            }
+            err = mem_cpy_to_user(proc->pd, u_read_handle, &rh, sizeof(handle_t), NULL); 
         }
 
-        pipe_handle_state_t *pipe_hs = NULL;
-        if (err == FOS_E_SUCCESS) {
-            pipe_hs = al_malloc(plg->ks->al, sizeof(pipe_handle_state_t));
-            if (!pipe_hs) {
-                err = FOS_E_NO_MEM;
-            }
-        }
-
-        if (err == FOS_E_SUCCESS) {
-            err = mem_cpy_to_user(proc->pd, u_handle, &h, sizeof(handle_t), NULL); 
-        }
-
-        if (err != FOS_E_SUCCESS) {
-            al_free(plg->ks->al, pipe_hs);
+        if (wh == NULL_HANDLE || rh == NULL_HANDLE || !pipe_w_hs || !pipe_r_hs || !pipe || err != FOS_E_SUCCESS) {
             delete_pipe(pipe);
-            idtb_push_id(proc->handle_table, h);
+            al_free(plg->ks->al, pipe_r_hs);
+            al_free(plg->ks->al, pipe_w_hs);
+            idtb_push_id(proc->handle_table, rh);
+            idtb_push_id(proc->handle_table, wh);
 
-            DUAL_RET(thr, err, FOS_E_SUCCESS);
+            // Just doing unknown here to make my life easier.
+            DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
         }
 
         // Success!!!
-        pipe->ref_count = 1; // Starting reference count 1 for creating process.
+        pipe->write_refs = 1;
+        pipe->read_refs = 1;
         
-        init_base_handle((handle_state_t *)pipe_hs, &PIPE_HS_IMPL, ks, proc, h, false);
-        *(pipe_t **)&(pipe_hs->pipe) = pipe;
+        init_base_handle((handle_state_t *)pipe_w_hs, &PIPE_WRITER_HS_IMPL, ks, proc, wh, false);
+        *(pipe_t **)&(pipe_w_hs->pipe) = pipe;
+        idtb_set(proc->handle_table, wh, pipe_w_hs);
 
-        idtb_set(proc->handle_table, h, pipe_hs);
+        init_base_handle((handle_state_t *)pipe_r_hs, &PIPE_READER_HS_IMPL, ks, proc, wh, false);
+        *(pipe_t **)&(pipe_r_hs->pipe) = pipe;
+        idtb_set(proc->handle_table, rh, pipe_r_hs);
 
         DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }

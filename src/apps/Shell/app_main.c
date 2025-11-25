@@ -7,9 +7,14 @@
 #include <stddef.h>
 #include "s_util/ps2_scancodes.h"
 
+
 /*
- * NOTE: The Shell binary expects keyboard on default in and a character display on default out.
+ * NOTE: The Shell binary expects key codes on default in and a character display on default out.
  * The shell will fail if default out is not a character display.
+ * 
+ * I think there need to be some special characters in place?
+ * <ARG> := Hmmmm, I don't really even know the best way to do this?
+ * <CMD> := 
  */
 
 #define CMD_BUF_LEN (512U)
@@ -23,6 +28,8 @@ static void single_prompt(void);
 static void run_cmd(const char *cmd);
 
 proc_exit_status_t app_main(const char * const *args, size_t num_args) {
+    // Probably will redo all of this tbh...
+    // Maybe not right now though...
     handle_t h = sc_get_out_handle();
     if (h == FOS_MAX_HANDLES_PER_PROC || !sc_handle_is_cd(h)) {
         return PROC_ES_FAILURE;

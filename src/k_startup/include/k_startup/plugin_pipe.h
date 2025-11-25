@@ -24,9 +24,14 @@ struct _pipe_t {
     allocator_t * const al;
 
     /**
-     * How many handle states currently exist which reference this pipe!
+     * How many write handles exist for this pipe. 
      */
-    size_t ref_count;
+    size_t write_refs;
+
+    /**
+     * How many read handles exist for this pipe.
+     */
+    size_t read_refs;
 
     /**
      * Start of data within the pipe.
@@ -57,16 +62,22 @@ struct _pipe_t {
     uint8_t * const buf; 
 
     /**
-     * When the buffer is empty (`i == j`), this holds threads which called
-     * `wait_read_ready`.
-     *
-     * When the buffer is full, this holds threads which called `wait_write_ready`.
+     * Writing threads waiting for the pipe to be non-full.
      */
-    basic_wait_queue_t * const wq;
+    basic_wait_queue_t * const w_wq;
+
+    /**
+     * Reading threads waiting for the pipe to be non-empty.
+     */
+    basic_wait_queue_t * const r_wq;
 };
 
 typedef struct _pipe_handle_state_t pipe_handle_state_t;
 
+/**
+ * Kinda confusing here, but both reader and writer handles will use the same structure.
+ * Which implementation pointer is used determines the type!
+ */
 struct _pipe_handle_state_t {
     handle_state_t super;
     
