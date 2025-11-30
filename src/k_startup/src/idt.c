@@ -130,5 +130,11 @@ fernos_error_t init_idt(void) {
 
     pic_remap(32, 40);
     
+    // I thought this would trigger an IRQ0
+    // 1 M / 1000 = 1000 times per second. 
+    // It is definitely a lot slower though, maybe just because
+    // we are in QEMU?
+    init_pit(1000);
+    
     return FOS_E_SUCCESS;
 }

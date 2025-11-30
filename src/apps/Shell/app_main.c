@@ -9,6 +9,10 @@
 
 
 /*
+ * NOTE: Probably going to come back to this after graphics!
+ */
+
+/*
  * NOTE: The Shell binary expects key codes on default in and a character display on default out.
  * The shell will fail if default out is not a character display.
  * 
@@ -16,6 +20,7 @@
  * <ARG> := Hmmmm, I don't really even know the best way to do this?
  * <CMD> := 
  */
+
 
 #define CMD_BUF_LEN (512U)
 

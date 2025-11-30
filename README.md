@@ -17,7 +17,7 @@ __NOTE:__ In its current condition, FernOS does not boot from a disk image. The 
 
 ```bash
 # Build and run FernOS in qemu
-make qemu.bin
+make run
 
 # Clean all build artifacts
 make clean
@@ -25,6 +25,6 @@ make clean
 
 ### Requirements
 
-The above `make` commands will only success if you have the `i686-elf-binutils` and `qemu`.
+The above `make` commands will only success if you have the `i686-elf-binutils`, `qemu`, and `mtools`.
 
 
