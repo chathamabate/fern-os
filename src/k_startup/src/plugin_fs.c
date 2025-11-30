@@ -22,17 +22,19 @@ static const plugin_impl_t PLUGIN_FS_IMPL = {
 
 static fernos_error_t copy_fs_handle_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
 static fernos_error_t delete_fs_handle_state(handle_state_t *hs);
+static fernos_error_t fs_hs_wait_write_ready(handle_state_t *hs);
 static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
+static fernos_error_t fs_hs_wait_read_ready(handle_state_t *hs);
 static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, size_t *u_readden);
-static fernos_error_t fs_hs_wait(handle_state_t *hs);
 static fernos_error_t fs_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
 const handle_state_impl_t FS_HS_IMPL = {
     .copy_handle_state = copy_fs_handle_state,
     .delete_handle_state = delete_fs_handle_state,
+    .hs_wait_write_ready = fs_hs_wait_write_ready,
     .hs_write = fs_hs_write,
+    .hs_wait_read_ready = fs_hs_wait_read_ready,
     .hs_read = fs_hs_read,
-    .hs_wait = fs_hs_wait,
     .hs_cmd = fs_hs_cmd
 };
 
@@ -191,6 +193,7 @@ static fernos_error_t plg_fs_deregister_nk(plugin_fs_t *plg_fs, fs_node_key_t nk
 
         thread_t *woken_thread;
         while ((err = bwq_pop(nk_entry->bwq, (void **)&woken_thread)) == FOS_E_SUCCESS) {
+            woken_thread->wq = NULL;
             woken_thread->state = THREAD_STATE_DETATCHED; 
             mem_set(&(woken_thread->wait_ctx), 0, sizeof(woken_thread->wait_ctx));
             woken_thread->ctx.eax = FOS_E_STATE_MISMATCH; 
@@ -482,7 +485,7 @@ static fernos_error_t plg_fs_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t ar
         }
 
         if (err == FOS_E_SUCCESS) {
-            init_base_handle((handle_state_t *)hs, &FS_HS_IMPL, plg_fs->super.ks, proc, h);
+            init_base_handle((handle_state_t *)hs, &FS_HS_IMPL, plg_fs->super.ks, proc, h, false);
             *(plugin_fs_t **)&(hs->plg_fs) = plg_fs;
             hs->pos = 0;
             *(fs_node_key_t *)&(hs->nk) = kernel_nk;
@@ -578,7 +581,7 @@ static fernos_error_t copy_fs_handle_state(handle_state_t *hs, process_t *proc, 
     }
     (*nk_entry)->references++;
 
-    init_base_handle((handle_state_t *)fs_hs_copy, hs->impl, hs->ks, proc, hs->handle);
+    init_base_handle((handle_state_t *)fs_hs_copy, hs->impl, hs->ks, proc, hs->handle, false);
     *(plugin_fs_t **)&(fs_hs_copy->plg_fs) = plg_fs;
     fs_hs_copy->pos = fs_hs->pos;
     *(fs_node_key_t *)&(fs_hs_copy->nk) = fs_hs->nk;
@@ -608,6 +611,37 @@ static fernos_error_t delete_fs_handle_state(handle_state_t *hs) {
     al_free(fs_hs->super.ks->al, fs_hs);
 
     return FOS_E_SUCCESS;
+}
+
+/**
+ * Wait write ready for a file will pretty much always return success without blocking.
+ * Unless, the file is already at its max size, in which case, FOS_E_EMPTY is returned.
+ */
+static fernos_error_t fs_hs_wait_write_ready(handle_state_t *hs) {
+    fernos_error_t err;
+
+    plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
+    plugin_fs_t *plg_fs = fs_hs->plg_fs;
+
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
+
+    fs_node_info_t info;
+    err = fs_get_node_info(plg_fs->fs, fs_hs->nk, &info);
+    DUAL_RET_FOS_ERR(err, thr);
+
+    if (info.is_dir) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    if (fs_hs->pos > info.len) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    if (fs_hs->pos == info.len && info.len == SIZE_MAX) { // Are we at the end of a full file?
+        DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
+    }
+
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 /**
@@ -730,6 +764,56 @@ static fernos_error_t fs_hs_write(handle_state_t *hs, const void *u_src, size_t 
     return FOS_E_SUCCESS;
 }
 
+static fernos_error_t fs_hs_wait_read_ready(handle_state_t *hs) {
+    fernos_error_t err;
+
+    plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
+    plugin_fs_t *plg_fs = fs_hs->plg_fs;
+
+    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
+
+    fs_node_info_t info;
+    err = fs_get_node_info(plg_fs->fs, fs_hs->nk, &info);
+    DUAL_RET_FOS_ERR(err, thr);
+
+    if (info.is_dir) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    if (fs_hs->pos > info.len) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    if (fs_hs->pos == info.len) { // Potentially a blocking case.
+        if (info.len == SIZE_MAX) {
+            DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
+        }
+
+        // Block!
+        plugin_fs_nk_map_entry_t **nk_entry_p = mp_get(plg_fs->nk_map, &(fs_hs->nk));
+        if (!nk_entry_p || !*nk_entry_p) {
+            return FOS_E_STATE_MISMATCH;
+        }
+
+        basic_wait_queue_t *bwq = (*nk_entry_p)->bwq;
+
+        err = bwq_enqueue(bwq, thr);
+        DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+
+        thread_detach(thr);
+
+        thr->wq = (wait_queue_t *)bwq;
+        thr->wait_ctx[0] = (uint32_t)fs_hs;
+        thr->state = THREAD_STATE_WAITING;
+
+        // Current thread is now waiting, just return one code to kernel space.
+        return FOS_E_SUCCESS;
+    }
+
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+}
+
+
 /**
  * Non-Blocking read.
  *
@@ -799,55 +883,6 @@ static fernos_error_t fs_hs_read(handle_state_t *hs, void *u_dst, size_t len, si
     // SUCCESS!
 
     fs_hs->pos += bytes_to_read;
-
-    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
-}
-
-static fernos_error_t fs_hs_wait(handle_state_t *hs) {
-    fernos_error_t err;
-
-    plugin_fs_handle_state_t *fs_hs = (plugin_fs_handle_state_t *)hs;
-    plugin_fs_t *plg_fs = fs_hs->plg_fs;
-
-    thread_t *thr = (thread_t *)(hs->ks->schedule.head);
-
-    fs_node_info_t info;
-    err = fs_get_node_info(plg_fs->fs, fs_hs->nk, &info);
-    DUAL_RET_FOS_ERR(err, thr);
-
-    if (info.is_dir) {
-        return FOS_E_STATE_MISMATCH;
-    }
-
-    if (fs_hs->pos > info.len) {
-        return FOS_E_STATE_MISMATCH;
-    }
-
-    if (fs_hs->pos == info.len) { // Potentially a blocking case.
-        if (info.len == SIZE_MAX) {
-            DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
-        }
-
-        // Block!
-        plugin_fs_nk_map_entry_t **nk_entry_p = mp_get(plg_fs->nk_map, &(fs_hs->nk));
-        if (!nk_entry_p || !*nk_entry_p) {
-            return FOS_E_STATE_MISMATCH;
-        }
-
-        basic_wait_queue_t *bwq = (*nk_entry_p)->bwq;
-
-        err = bwq_enqueue(bwq, thr);
-        DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
-
-        thread_detach(thr);
-
-        thr->wq = (wait_queue_t *)bwq;
-        thr->wait_ctx[0] = (uint32_t)fs_hs;
-        thr->state = THREAD_STATE_WAITING;
-
-        // Current thread is now waiting, just return one code to kernel space.
-        return FOS_E_SUCCESS;
-    }
 
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }

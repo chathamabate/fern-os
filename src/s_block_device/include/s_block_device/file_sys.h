@@ -82,6 +82,8 @@ size_t next_filename(const char *path, char *dest);
  *
  * `dir` should be a buffer with size at least FS_MAX_PATH_LEN + 1
  * `basename` should be a buffer with size at least FS_MAX_FILENAME_LEN + 1
+ *
+ * NOTE: Very important, if the given path is just a basename. "./" is written to `dir`.
  */
 fernos_error_t separate_path(const char *path, char *dir, char *basename);
 

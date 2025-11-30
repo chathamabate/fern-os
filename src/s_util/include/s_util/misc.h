@@ -61,3 +61,13 @@ void _dump_hex_pairs(void (*pf)(const char *fmt, ...), ...);
 
 #define dump_hex_pairs(...) _dump_hex_pairs(__VA_ARGS__, NULL)
 
+/**
+ * In place minimum! (Be careful of values with side affects)
+ */
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
+
+/**
+ * In place maximum! (Be carefule of values with side affects)
+ */
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
+

@@ -211,7 +211,7 @@ static handle_state_t *new_mock_handle_state(allocator_t *al, process_t *proc, h
 
     // I think for such a simple handle, having the kernel and process be NULL
     // (just for this test) is OK.
-    init_base_handle((handle_state_t *)mhs, &MOCK_HS_IMPL, NULL, proc, h);
+    init_base_handle((handle_state_t *)mhs, &MOCK_HS_IMPL, NULL, proc, h, false);
 
     mhs->al = al;
     mhs->ok_to_copy = otc;

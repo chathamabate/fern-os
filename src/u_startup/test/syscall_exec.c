@@ -22,7 +22,7 @@ static bool posttest(void);
 
 #include "s_util/test.h"
 
-#define TEST_APP "/test_apps/Test"
+#define TEST_APP "/Bin/Test"
 
 #define _SYSCALL_EXEC_TEST_DIR "syscall_exec_test_dir"
 #define SYSCALL_EXEC_TEST_DIR "/" _SYSCALL_EXEC_TEST_DIR
@@ -227,7 +227,7 @@ static bool test_big_adoption(void) {
 
 static void *test_thread_wait_worker(void *arg) {
     handle_t h = *(handle_t *)arg;
-    sc_handle_wait(h);
+    sc_handle_wait_read_ready(h);
     return NULL;
 }
 

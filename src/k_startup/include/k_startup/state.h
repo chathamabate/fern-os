@@ -432,7 +432,7 @@ KS_SYSCALL fernos_error_t ks_set_in_handle(kernel_state_t *ks, handle_t in);
 KS_SYSCALL fernos_error_t ks_in_read(kernel_state_t *ks, void *u_dest, size_t len, size_t *u_readden);
 
 /**
- * Wait on default input handle.
+ * Wait for read ready on default input handle.
  *
  * If the default input handle is not currently initialized this returns FOS_E_EMPTY to userspace.
  */
@@ -453,5 +453,12 @@ KS_SYSCALL fernos_error_t ks_set_out_handle(kernel_state_t *ks, handle_t out);
  * were successfully written.
  */
 KS_SYSCALL fernos_error_t ks_out_write(kernel_state_t *ks, const void *u_src, size_t len, size_t *u_written);
+
+/**
+ * Wait for write ready on the default out handle.
+ *
+ * If there is no default handle, this always returns FOS_E_SUCCESS!
+ */
+KS_SYSCALL fernos_error_t ks_out_wait(kernel_state_t *ks);
 
 

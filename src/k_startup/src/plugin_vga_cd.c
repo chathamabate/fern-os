@@ -6,6 +6,7 @@
 #include "s_bridge/shared_defs.h"
 #include "k_startup/handle_cd.h"
 #include "k_startup/vga_cd.h"
+#include "k_startup/page_helpers.h"
 
 static fernos_error_t vga_cd_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
@@ -62,6 +63,10 @@ static fernos_error_t vga_cd_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint
             if (!vga_cd_hs) {
                 err = FOS_E_NO_MEM;
             }
+        }
+
+        if (err == FOS_E_SUCCESS) {
+            err = mem_cpy_to_user(proc->pd, u_handle, &h, sizeof(handle_t), NULL);
         }
 
         if (err != FOS_E_SUCCESS) {

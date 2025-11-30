@@ -1108,7 +1108,7 @@ KS_SYSCALL fernos_error_t ks_in_wait(kernel_state_t *ks) {
     }
 
     // If the handle is mapped, default to handle wait
-    return hs_wait(hs);
+    return hs_wait_read_ready(hs);
 }
 
 KS_SYSCALL fernos_error_t ks_set_out_handle(kernel_state_t *ks, handle_t out) {
@@ -1158,5 +1158,21 @@ KS_SYSCALL fernos_error_t ks_out_write(kernel_state_t *ks, const void *u_src, si
     return hs_write(hs, u_src, len, u_written);
 }
 
+KS_SYSCALL fernos_error_t ks_out_wait(kernel_state_t *ks) {
+    if (!(ks->schedule.head)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    thread_t *thr = (thread_t *)(ks->schedule.head);
+    process_t *proc = thr->proc;
+
+    handle_state_t *hs = idtb_get(proc->handle_table, proc->out_handle);
+    if (!hs) {
+        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    // If the handle is mapped, default to handle wait
+    return hs_wait_write_ready(hs);
+}
 
 

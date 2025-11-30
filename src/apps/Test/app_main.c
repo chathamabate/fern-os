@@ -59,6 +59,10 @@ proc_exit_status_t app_main(const char * const *args, size_t num_args) {
         return status;
     }
 
+    case 'd': {
+        sc_out_write_s(args[0]); 
+        return PROC_ES_SUCCESS;
+    }
 
     default:
         return PROC_ES_SUCCESS;

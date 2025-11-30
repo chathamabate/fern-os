@@ -68,3 +68,28 @@ void pic_send_eoi(uint8_t irq);
  */
 void _nop_master_irq7_handler(void);
 void _nop_slave_irq15_handler(void);
+
+// PIT Stuff... These all assume operation in kernel space where interrupts
+// are disabled!
+
+/**
+ * Initilize the Programmable interval timer.
+ *
+ * NOTE: You don't NEED to call this function, but you should!
+ * It'll determine how often IRQ0 occurs!
+ */
+void init_pit(uint16_t init_reload_val);
+
+/**
+ * Set the reload value on channel 0.
+ *
+ * IRQ0 will trigger at 1.19 Million / `reload_val` Hz
+ *
+ * NOTE: This assumes the PIT is setup with lo/hi access mode!
+ */
+void pit_set_reload_val(uint16_t reload_val);
+
+/**
+ * Gets the current count value on channel 0.
+ */
+uint16_t pit_get_count(void);

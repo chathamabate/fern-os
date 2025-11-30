@@ -26,6 +26,12 @@ typedef id_t sig_id_t;
 #define FSIG_CHLD (0x0U)
 
 /**
+ * A signal used for killing a process. (This is an arbitrary signal with no special meaning
+ * to the kernel) This is an allowable signal!
+ */
+#define FSIG_KILL (0x1U)
+
+/**
  * This is a bit vector which can be used to represent pending signals, or
  * signals which are meant to be allowed.
  */
@@ -163,10 +169,13 @@ static inline bool scid_is_vanilla(syscall_id_t scid) {
 
 /* Default IO Syscalls (See Handle Syscalls) */
 #define SCID_SET_IN_HANDLE  (0x300U)
-#define SCID_IN_READ        (0x301U)
-#define SCID_IN_WAIT        (0x302U)
-#define SCID_SET_OUT_HANDLE (0x303U)
-#define SCID_OUT_WRITE      (0x304U) 
+#define SCID_GET_IN_HANDLE  (0x301U)
+#define SCID_IN_READ        (0x302U)
+#define SCID_IN_WAIT        (0x303U) // wait_read_ready
+#define SCID_SET_OUT_HANDLE (0x304U)
+#define SCID_GET_OUT_HANDLE (0x305U)
+#define SCID_OUT_WRITE      (0x306U) 
+#define SCID_OUT_WAIT       (0x307U) // wait_write_ready
 
 /*
  * Handle Syscalls
@@ -196,12 +205,14 @@ static inline bool scid_is_handle_cmd(syscall_id_t scid) {
     return (scid & SYSCALL_ATTRS_MASK) == HANDLE_CMD_PREFIX;
 }
 
-#define HCID_CLOSE (0x0U)
-#define HCID_WRITE (0x1U)
-#define HCID_READ  (0x2U)
-#define HCID_WAIT  (0x3U)
+#define HCID_CLOSE            (0x0U)
+#define HCID_WAIT_WRITE_READY (0x1U)
+#define HCID_WRITE            (0x2U)
+#define HCID_WAIT_READ_READY  (0x3U)
+#define HCID_READ             (0x4U)
+#define HCID_IS_CD            (0x5U)
 
-#define NUM_DEFAULT_HCIDS (HCID_WAIT + 1)
+#define NUM_DEFAULT_HCIDS (HCID_IS_CD + 1)
 
 // All other handle commands are custom/implementation specific!
 
@@ -348,3 +359,15 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  */
 
 #define PLG_VGA_CD_PCID_OPEN      (0U)
+
+/*
+ * ***** Pipe Plugin *****
+ */
+
+#define PLG_PIPE_ID         (4U)
+
+/*
+ * Pipe Plugin Commands.
+ */
+
+#define PLG_PIPE_PCID_OPEN      (0U)

@@ -158,3 +158,15 @@ void thread_schedule(thread_t *thr, ring_t *r);
  * NOTHING is done to the process's page directory!
  */
 void delete_thread(thread_t *thr);
+
+/**
+ * Helper for waking up all threads within a basic wait queue.
+ *
+ * This function pops all pointers off the given basic wait queue.
+ * It then assumes said pointers are thread pointers.
+ * Each thread is reset to a detached state and given `eax` value of `wake_status`.
+ * Finally each thread is added to the given schedule.
+ *
+ * FOS_E_SUCCESS is returned on success.
+ */
+fernos_error_t bwq_wake_all_threads(basic_wait_queue_t *bwq, ring_t *schedule, fernos_error_t wake_status);

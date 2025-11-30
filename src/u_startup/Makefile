@@ -10,6 +10,7 @@ _SRCS 		?= main.c \
 			   syscall_cd.c \
 			   syscall_fs.c \
 			   syscall_vga_cd.c \
+			   syscall_pipe.c \
 			   syscall_kb.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
@@ -22,7 +23,8 @@ _TEST_SRCS 	?= syscall.c \
 			   syscall_exec.c \
 			   syscall_cd.c \
 			   syscall_default_io.c \
-			   syscall_kb.c
+			   syscall_kb.c \
+			   syscall_pipe.c
 
 -include ../mod_stub.mk
 

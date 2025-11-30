@@ -36,6 +36,8 @@ static sig_vector_t old_sv;
 static size_t old_user_al;
 
 static bool pretest(void) {
+    TEST_TRUE(get_default_allocator() != NULL);
+
     old_user_al = al_num_user_blocks(get_default_allocator());
 
     fernos_error_t err;
@@ -84,8 +86,14 @@ static bool test_simple_rw(void) {
     err = sc_fs_open("./a.txt", &fh);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
+    TEST_FALSE(sc_handle_is_cd(fh));
+
     const char *msg = "Hello FS";
     const size_t msg_size = str_len(msg) + 1;
+
+    // A file should always be able to accept data (Unless full)
+    err = sc_handle_wait_write_ready(fh);
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     err = sc_handle_write_full(fh, msg, msg_size);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
@@ -188,7 +196,7 @@ static bool test_multithread_rw(void) {
 static void *test_multithread_wait_same_handle_worker(void *arg) {
     handle_t h = *(handle_t *)arg;
 
-    TEST_SUCCESS(sc_handle_wait(h));
+    TEST_SUCCESS(sc_handle_wait_read_ready(h));
 
     return NULL;
 }

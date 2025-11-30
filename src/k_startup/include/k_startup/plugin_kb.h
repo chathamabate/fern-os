@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "plugin.h"
+#include "k_startup/plugin.h"
 #include "k_startup/handle.h"
 #include "s_data/wait_queue.h"
 

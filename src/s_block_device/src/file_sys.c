@@ -188,15 +188,23 @@ fernos_error_t fs_touch_path(file_sys_t *fs, fs_node_key_t cwd, const char *path
         return err;
     }
 
-    fs_node_key_t parent_key;
-    err = fs_new_key(fs, cwd, dir, &parent_key);
-    if (err != FOS_E_SUCCESS) {
-        return err;
+    if (str_eq("./", dir)) {
+        // In the case of essentially just a basename is given as the path,
+        // we won't bother with creating some new FS key. We'll just use the cwd.
+        err = fs_touch(fs, cwd, basename, key);
+    } else {
+        fs_node_key_t parent_key;
+
+        err = fs_new_key(fs, cwd, dir, &parent_key);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        err = fs_touch(fs, parent_key, basename, key);
+
+        fs_delete_key(fs, parent_key);
     }
 
-    err = fs_touch(fs, parent_key, basename, key);
-
-    fs_delete_key(fs, parent_key);
 
     return err;
 }
@@ -216,15 +224,19 @@ fernos_error_t fs_mkdir_path(file_sys_t *fs, fs_node_key_t cwd, const char *path
         return err;
     }
 
-    fs_node_key_t parent_key;
-    err = fs_new_key(fs, cwd, dir, &parent_key);
-    if (err != FOS_E_SUCCESS) {
-        return err;
+    if (str_eq("./", dir)) {
+        err = fs_mkdir(fs, cwd, basename, key);
+    } else {
+        fs_node_key_t parent_key;
+        err = fs_new_key(fs, cwd, dir, &parent_key);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        err = fs_mkdir(fs, parent_key, basename, key);
+
+        fs_delete_key(fs, parent_key);
     }
-
-    err = fs_mkdir(fs, parent_key, basename, key);
-
-    fs_delete_key(fs, parent_key);
 
     return err;
 }
@@ -244,15 +256,19 @@ fernos_error_t fs_remove_path(file_sys_t *fs, fs_node_key_t cwd, const char *pat
         return err;
     }
 
-    fs_node_key_t parent_key;
-    err = fs_new_key(fs, cwd, dir, &parent_key);
-    if (err != FOS_E_SUCCESS) {
-        return err;
+    if (str_eq("./", dir)) {
+        err = fs_remove(fs, cwd, basename);
+    } else {
+        fs_node_key_t parent_key;
+        err = fs_new_key(fs, cwd, dir, &parent_key);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        err = fs_remove(fs, parent_key, basename);
+
+        fs_delete_key(fs, parent_key);
     }
-
-    err = fs_remove(fs, parent_key, basename);
-
-    fs_delete_key(fs, parent_key);
 
     return err;
 }
