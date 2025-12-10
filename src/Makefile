@@ -276,24 +276,17 @@ apps.clean.clangd: $(APPS_CLEAN_CLANGD_TARS)
 
 
 ISO_DIR  := $(BUILD_DIR)/iso
-BOOT_DIR := $(ISO_DIR)/boot
-GRUB_DIR := $(BOOT_DIR)/grub
-
-GRUB_CFG := $(GRUB_DIR)/grub.cfg
+GRUB_CFG := $(SRC_DIR)/grub.cfg
 ISO_FILE := $(BUILD_DIR)/$(OS_NAME).iso
 
 $(ISO_DIR) $(BOOT_DIR) $(GRUB_DIR):
 	mkdir -p $@
 
-$(GRUB_CFG): | $(GRUB_DIR)
-	echo 'menuentry "FernOS" {' > $@
-	echo '  multiboot2 /boot/$(OS_NAME).elf;' >> $@
-	echo '  boot;' >> $@
-	echo '}' >> $@
-
-$(ISO_FILE): $(ELF_FILE) $(GRUB_CFG) | $(BOOT_DIR)
+$(ISO_FILE): $(ELF_FILE) $(GRUB_CFG)
 	i686-elf-grub-file --is-x86-multiboot2 $(ELF_FILE)
-	cp $(ELF_FILE) $(BOOT_DIR)/$(OS_NAME).elf
+	mkdir -p $(ISO_DIR)/boot/grub
+	cp $(ELF_FILE) $(ISO_DIR)/boot/
+	cp $(GRUB_CFG) $(ISO_DIR)/boot/grub/
 	i686-elf-grub-mkrescue -o $@ $(ISO_DIR)
 
 .PHONY: _iso iso.shallow iso
