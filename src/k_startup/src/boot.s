@@ -3,14 +3,25 @@
 
 .section .multiboot
 header_start:
-    .long 0xe85250d6               
+    .long 0xE85250D6               
     .long 0                       
     .long header_end - header_start 
-    .long -(0xe85250d6 + 0 + (header_end - header_start)) 
-    
+    .long -(0xE85250D6 + 0 + (header_end - header_start)) 
+
+entry_tag:
+    .short 3
+    .short 0
+    .long  16
+    .long  _start
+
+    // pad
+    .long 0
+
+null_tag: 
     .short 0    
     .short 0    
-    .long 8    
+    .long  8    
+
 header_end:
 
 .section .text

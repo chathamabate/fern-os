@@ -6,6 +6,8 @@
 
 #include <stdarg.h>
 
+#include "u_startup/test/syscall.h"
+
 proc_exit_status_t user_main(void) {
     fernos_error_t err;
     
@@ -16,7 +18,7 @@ proc_exit_status_t user_main(void) {
     }
     sc_set_out_handle(cd);
 
-    sc_out_write_s("Hello, World!\n");
+    test_syscall();
 
     return PROC_ES_SUCCESS;
 }
