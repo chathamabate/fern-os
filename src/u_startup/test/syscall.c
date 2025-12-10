@@ -269,6 +269,8 @@ static bool test_complex_fork0(void) {
 
     if (cpids[0] == FOS_MAX_PROCS) {
 
+        sc_signal_allow(1 << FSIG_CHLD);
+
         err = sc_proc_fork(&(cpids[1]));
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
@@ -286,6 +288,8 @@ static bool test_complex_fork0(void) {
             
             sc_proc_exit(PROC_ES_SUCCESS);
         }
+
+        sc_signal_allow(empty_sig_vector());
 
         // inside proc0.
         // Proc0 will be forecfully exited because it does not allow FSIG_CHLD!

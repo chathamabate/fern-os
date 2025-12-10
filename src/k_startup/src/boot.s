@@ -11,7 +11,7 @@ header_start:
 entry_tag:
     .short 3
     .short 0
-    .long  16
+    .long  12
     .long  _start
 
     // pad
