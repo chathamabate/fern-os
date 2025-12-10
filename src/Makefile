@@ -287,14 +287,26 @@ $(ISO_DIR) $(BOOT_DIR) $(GRUB_DIR):
 
 $(GRUB_CFG): | $(GRUB_DIR)
 	echo 'menuentry "FernOS" {' > $@
-	echo '  multiboot2 /boot/$(OS_NAME).elf' >> $@
-	echo '  boot' >> $@
+	echo '  multiboot2 /boot/$(OS_NAME).elf;' >> $@
+	echo '  boot;' >> $@
 	echo '}' >> $@
 
-iso: elf $(GRUB_CFG) | $(BOOT_DIR)
-	grub-file --is-x86-multiboot2 $(ELF_FILE)
+$(ISO_FILE): $(ELF_FILE) $(GRUB_CFG) | $(BOOT_DIR)
+	i686-elf-grub-file --is-x86-multiboot2 $(ELF_FILE)
 	cp $(ELF_FILE) $(BOOT_DIR)/$(OS_NAME).elf
-	grub-mkrescue -o $(ISO_FILE) -p $(ISO_DIR) --modules="multiboot2 normal iso9660 bios disk"
+	i686-elf-grub-mkrescue -o $@ $(ISO_DIR)
+
+.PHONY: _iso iso.shallow iso
+
+_iso: $(ISO_FILE)
+	@echo > /dev/null
+
+iso.shallow: _iso
+	$(call DONE_MSG,ISO Built [shallow kernel])
+
+iso: elf
+	$(MY_MAKE) -C $(SRC_DIR) _iso
+	$(call DONE_MSG,ISO Built)
 
 ####################################################################################################
 
@@ -333,28 +345,21 @@ disk: elf
 
 .PHONY: run run.shallow
 
-run.shallow: disk.shallow
+run.shallow: iso.shallow disk.shallow
 	qemu-system-x86_64 \
 		-m 4G \
-		-kernel $(ELF_FILE) \
+		-boot d \
+		-cdrom $(ISO_FILE) \
 		-drive file=$(DISK),format=raw,index=0,media=disk \
 		-display sdl \
 		-full-screen \
 		-monitor stdio
 
-run.iso: 
+run: iso disk
 	qemu-system-x86_64 \
 		-m 4G \
 		-boot d \
-		-cdrom $(BUILD_DIR)/fernos.iso \
-		-display sdl \
-		-full-screen \
-		-monitor stdio
-
-run: disk
-	qemu-system-x86_64 \
-		-m 4G \
-		-kernel $(ELF_FILE) \
+		-cdrom $(ISO_FILE) \
 		-drive file=$(DISK),format=raw,index=0,media=disk \
 		-display sdl \
 		-full-screen \
