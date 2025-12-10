@@ -175,6 +175,14 @@ static void init_kernel_plugins(void) {
 }
 
 void start_kernel(void) {
+    // Some early kernel work is needed here.
+
+    // Graphics will be fun! Then maybe retro gaming???
+    // Could be #lit!
+
+
+    lock_up();
+
     try_setup_step(validate_constraints(), "Failed to validate memory areas");
 
     try_setup_step(init_gdt(), "Failed to initialize GDT");

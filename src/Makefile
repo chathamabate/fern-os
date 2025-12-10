@@ -272,6 +272,32 @@ apps.clean.clangd: $(APPS_CLEAN_CLANGD_TARS)
 
 ####################################################################################################
 
+# ISO File (Soon disk setup will be swallowed by this section)
+
+
+ISO_DIR  := $(BUILD_DIR)/iso
+BOOT_DIR := $(ISO_DIR)/boot
+GRUB_DIR := $(BOOT_DIR)/grub
+
+GRUB_CFG := $(GRUB_DIR)/grub.cfg
+ISO_FILE := $(BUILD_DIR)/$(OS_NAME).iso
+
+$(ISO_DIR) $(BOOT_DIR) $(GRUB_DIR):
+	mkdir -p $@
+
+$(GRUB_CFG): | $(GRUB_DIR)
+	echo 'menuentry "FernOS" {' > $@
+	echo '  multiboot2 /boot/$(OS_NAME).elf' >> $@
+	echo '  boot' >> $@
+	echo '}' >> $@
+
+iso: elf $(GRUB_CFG) | $(BOOT_DIR)
+	grub-file --is-x86-multiboot2 $(ELF_FILE)
+	cp $(ELF_FILE) $(BOOT_DIR)/$(OS_NAME).elf
+	grub-mkrescue -o $(ISO_FILE) -p $(ISO_DIR) --modules="multiboot2 normal iso9660 bios disk"
+
+####################################################################################################
+
 # Disk Setup
 
 # NOTE: One annoying caveat of mtools is that they don't give an easy way to force the usage of 
@@ -312,6 +338,15 @@ run.shallow: disk.shallow
 		-m 4G \
 		-kernel $(ELF_FILE) \
 		-drive file=$(DISK),format=raw,index=0,media=disk \
+		-display sdl \
+		-full-screen \
+		-monitor stdio
+
+run.iso: 
+	qemu-system-x86_64 \
+		-m 4G \
+		-boot d \
+		-cdrom $(BUILD_DIR)/fernos.iso \
 		-display sdl \
 		-full-screen \
 		-monitor stdio
