@@ -174,11 +174,20 @@ static void init_kernel_plugins(void) {
     try_setup_step(ks_set_plugin(kernel, PLG_PIPE_ID, plg_pipe), "Failed to set Pipe Plugin in the kernel");
 }
 
-void start_kernel(void) {
-    // Some early kernel work is needed here.
+void start_kernel(uint32_t m2_magic, const void *m2_info) {
+    // Start by checking the multiboot2 magic number.
+    if (m2_magic != 0x36D76289) {
+        lock_up();
+    }
+
+    // Next, let's read out the info?
+    
 
     // Graphics will be fun! Then maybe retro gaming???
     // Could be #lit!
+
+    lock_up(); // I think this actually worked tbh...
+               //
 
     try_setup_step(validate_constraints(), "Failed to validate memory areas");
 

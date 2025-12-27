@@ -14,7 +14,21 @@ entry_tag:
     .long  12
     .long  _start
 
-    // pad
+    /* pad */
+    .long 0
+
+gfx_tag:
+    .short 5
+    .short 0
+    .long  20
+
+    /* 1024 x 768 (16 bpp) */
+    .long  1024
+    .long  768
+
+    .long  16
+
+    /* pad */
     .long 0
 
 null_tag: 
@@ -39,6 +53,14 @@ _start:
 	movl $(FERNOS_STACK_END+1-4), %esp
     movl %esp, %ebp
 
+    /*
+    Upon entering the kernel, grub should load %eax with some multiboot2 magic number
+    and %ebx with the physical address of the multiboot2 information structure.
+
+    We'll pass these both directly as args into `start_kernel`.
+    */
+    pushl %ebx 
+    pushl %eax
     call start_kernel
 
     /*
