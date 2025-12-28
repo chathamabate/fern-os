@@ -35,8 +35,9 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
 
     uint64_t end = fb_tag->addr + (fb_tag->pitch * fb_tag->height);
 
-    // Confirm the screen is setup as expected!
-    if (fb_tag->addr < FOS_AREA_END || end > 0x100000000ULL ||
+    // Confirm the screen is setup as expected! 
+    // (Remember, the final page of the epilogue will be unmapped in kernel space)
+    if (fb_tag->addr < FOS_AREA_END || end > ALIGN(0xFFFFFFFF, M_4K) ||
             fb_tag->width != FERNOS_GFX_WIDTH ||
             fb_tag->height != FERNOS_GFX_HEIGHT || fb_tag->bpp != FERNOS_GFX_BPP) {
         mem_set((void *)(fb_tag->addr), 0xFF, end - fb_tag->addr);

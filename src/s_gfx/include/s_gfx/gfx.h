@@ -31,7 +31,12 @@ typedef struct _gfx_buffer_t {
     uint16_t height;
 
     /**
-     * 
+     * The buffer itself with size `pitch * height`.
      */
     gfx_color_t *buffer;
 } gfx_buffer_t;
+
+/**
+ * Set all pixels in the given buffer to `color`.
+ */
+void gfx_clear(gfx_buffer_t *buf, gfx_color_t color);

@@ -209,6 +209,9 @@ void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
 
+    gfx_clear(SCREEN, gfx_color(255, 0, 0));
+    lock_up();
+
     thread_t *first_thread = (thread_t *)(kernel->schedule.head);
     return_to_ctx(&(first_thread->ctx));
 }

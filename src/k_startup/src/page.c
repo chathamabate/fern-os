@@ -233,6 +233,14 @@ static fernos_error_t _init_kernel_pd(void) {
     // the same place!
     PROP_ERR(_place_range(pd, (uint8_t *)(FOS_KERNEL_STACK_START + M_4K), (uint8_t *)FOS_KERNEL_STACK_END, _R_WRITEABLE | _R_IDENTITY));
 
+    // Due to how I wrote `_place_range`, we cannot map the final page of the memory space.
+    // Instead of actually solving this problem, I'll just leave that page unmapped.
+    //
+    // The epilogue is being mapped into the kernel space so we have access to the framebuffer
+    // and potentially other structures set up by grub.
+    PROP_ERR(_place_range(pd, (uint8_t *)EPILOGUE_START, (const uint8_t *)ALIGN(EPILOGUE_END, M_4K),
+                _R_WRITEABLE | _R_IDENTITY));
+
     // Now setup up the free kernel pages!
     // THIS IS VERY CONFUSING SADLY!
     phys_addr_t fkp = (phys_addr_t)free_kernel_pages;
