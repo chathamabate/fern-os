@@ -31,11 +31,7 @@
 
 #include "s_util/char_display.h"
 #include "k_startup/vga_cd.h"
-
-#include "s_bridge/test/app.h"
-
-#include "k_startup/test/page_helpers.h"
-#include "s_block_device/test/file_sys_helpers.h"
+#include "k_sys/m2.h"
 
 #include <stdint.h>
 
@@ -174,20 +170,43 @@ static void init_kernel_plugins(void) {
     try_setup_step(ks_set_plugin(kernel, PLG_PIPE_ID, plg_pipe), "Failed to set Pipe Plugin in the kernel");
 }
 
-void start_kernel(uint32_t m2_magic, const void *m2_info) {
-    // Start by checking the multiboot2 magic number.
-    if (m2_magic != 0x36D76289) {
-        lock_up();
+void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
+    // Later we will remove/rewrite setup failure!
+
+    if (m2_magic != M2_EAX_MAGIC) {
+        setup_fatal("Bad %eax magic value");
     }
 
-    // Next, let's read out the info?
-    
+    const m2_info_tag_framebuffer_t *fb_tag = NULL;
 
-    // Graphics will be fun! Then maybe retro gaming???
-    // Could be #lit!
+    const m2_info_tag_base_t *tag = m2_info_tag_area(m2_info);
+    while (tag->type) {
+        if (tag->type == M2_ITT_FRAMEBUFFER) {
+            fb_tag = (const m2_info_tag_framebuffer_t *)tag;
+            break;
+        }
+        tag = m2_next_info_tag(tag);
+    }
 
-    lock_up(); // I think this actually worked tbh...
-               //
+    if (!fb_tag) {
+        setup_fatal("No framebuffer tag");
+    }
+
+    if (fb_tag->type != M2_FBT_DIRECT_RGB) {
+        setup_fatal("Incorrect framebuffer type");
+    }
+
+    if (fb_tag->bpp != 16) {
+        setup_fatal("Incorrect BPP");
+    }
+
+    const uint8_t color = fb_tag->addr >= FOS_AREA_END ? 0xFF : 0x0;
+        
+    const uint32_t display_size = fb_tag->pitch * fb_tag->height;
+    mem_set((void *)(fb_tag->addr), color, display_size);
+    lock_up();
+
+    // Let's come back to this later...
 
     try_setup_step(validate_constraints(), "Failed to validate memory areas");
 

@@ -22,11 +22,10 @@ gfx_tag:
     .short 0
     .long  20
 
-    /* 1024 x 768 (16 bpp) */
-    .long  1024
-    .long  768
-
-    .long  16
+    /* width, hegiht, bpp */
+    .long  FERNOS_GFX_WIDHT
+    .long  FERNOS_GFX_HEIGHT
+    .long  FERNOS_GFX_BPP
 
     /* pad */
     .long 0

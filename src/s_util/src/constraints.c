@@ -105,6 +105,12 @@
 #error "Invalid value for FOS_MAX_PLUGINS!"
 #endif
 
+// Quick graphics Checks
+// NOTE: We require BPP to be 16?
+#if FERNOS_GFX_BPP != 16
+#error "FernOS requires 16 bits per pixel!"
+#endif
+
 fernos_error_t validate_constraints(void) {
     // This used to do something, but then I learned about preprocessor errors.
     // Leaving this in here so that there is something to compile.

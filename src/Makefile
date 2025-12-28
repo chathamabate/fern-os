@@ -62,7 +62,12 @@ FERNOS_END     := 0xBFFFFFFF
 EPILOGUE_START := 0xC0000000
 EPILOGUE_END   := 0xFFFFFFFF
 
-SECT_DEFS := PROLOGUE_START PROLOGUE_END \
+FERNOS_GFX_WIDTH  := 1024
+FERNOS_GFX_HEIGHT := 768
+FERNOS_GFX_BPP    := 16
+
+# All Important OS Definitions
+OS_DEFS :=   PROLOGUE_START PROLOGUE_END \
 			 FERNOS_START \
 			 FERNOS_KERNEL_START FERNOS_KERNEL_END \
 			 FERNOS_APP_START FERNOS_APP_END \
@@ -70,7 +75,9 @@ SECT_DEFS := PROLOGUE_START PROLOGUE_END \
 			 FERNOS_FREE_START FERNOS_FREE_END \
 			 FERNOS_STACK_START FERNOS_STACK_END \
 			 FERNOS_END \
-			 EPILOGUE_START EPILOGUE_END 
+			 EPILOGUE_START EPILOGUE_END \
+			 FERNOS_GFX_WIDTH FERNOS_GFX_HEIGHT \
+			 FERNOS_GFX_BPP
 
 C_MACRO_GEN = echo "\#define $1 $($1)UL" >> $@;
 LD_DEF_GEN = echo "$1 = ($($1));" >> $@; 
@@ -79,17 +86,17 @@ S_DEF_GEN = echo ".equ $1, $($1)" >> $@;
 OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
 $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
 	echo "#pragma once" > $@
-	$(foreach def,$(SECT_DEFS),$(call C_MACRO_GEN,$(def)))
+	$(foreach def,$(OS_DEFS),$(call C_MACRO_GEN,$(def)))
 
 OS_DEFS_LD := $(INSTALL_DIR)/os_defs.ld
 $(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
 	rm $@; touch $@;
-	$(foreach def,$(SECT_DEFS),$(call LD_DEF_GEN,$(def)))
+	$(foreach def,$(OS_DEFS),$(call LD_DEF_GEN,$(def)))
 
 OS_DEFS_S := $(INCLUDE_DIR)/os_defs.s
 $(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
 	rm $@; touch $@;
-	$(foreach def,$(SECT_DEFS),$(call S_DEF_GEN,$(def)))
+	$(foreach def,$(OS_DEFS),$(call S_DEF_GEN,$(def)))
 
 ####################################################################################################
 
