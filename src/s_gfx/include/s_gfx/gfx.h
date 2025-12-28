@@ -19,19 +19,19 @@ static inline gfx_color_t gfx_color(uint8_t r, uint8_t g, uint8_t b) {
 
 typedef struct _gfx_buffer_t {
     /**
-     * Bytes per row in the buffer!
+     * Bytes per row in the buffer! (must be non-negative)
      */
-    uint32_t pitch;
+    int32_t pitch;
 
     /**
-     * Visible pixels per row.
+     * Visible pixels per row. (must be non-negative)
      */
-    uint16_t width;
+    int32_t width;
 
     /**
-     * Number of rows.
+     * Number of rows. (must be non-negative)
      */
-    uint16_t height;
+    int32_t height;
 
     /**
      * The buffer itself with size `pitch * height`.
@@ -66,10 +66,20 @@ typedef struct _gfx_view_t {
     int32_t origin_x;
     int32_t origin_y;
 
-    uint32_t width;
-    uint32_t height;
+    /*
+     * NOTE: `width` and `height` must both be non-negative.
+     * I am using signed integers though to help with math.
+     */
+
+    int32_t width;
+    int32_t height;
 } gfx_view_t;
 
+/**
+ * NULL is returned on error.
+ *
+ * `w` and `h` must both be non-negative!
+ */
 gfx_view_t *new_gfx_view(allocator_t *al, gfx_buffer_t *pb, int32_t x, int32_t y, uint32_t w, uint32_t h);
 static inline gfx_view_t *new_da_gfx_view(gfx_buffer_t *pb, int32_t x, int32_t y, uint32_t w, uint32_t h) {
     return new_gfx_view(get_default_allocator(), pb, x, y, w, h);
@@ -80,5 +90,6 @@ void delete_gfx_view(gfx_view_t *view);
  * Fill a rectangle within a view.
  *
  * `(x, y)` is the top left corner of the rectangle relative to the view origin.
+ * `w` and `h` must both be non-negative.
  */
-void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, uint32_t w, uint32_t h, gfx_color_t color);
+void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color);

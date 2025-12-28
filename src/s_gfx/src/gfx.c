@@ -1,5 +1,6 @@
 
 #include "s_gfx/gfx.h"
+#include <limits.h>
 
 /**
  * Return a pointer to row `row` within `buf`.
@@ -20,7 +21,7 @@ void gfx_clear(gfx_buffer_t *buf, gfx_color_t color) {
 }
 
 gfx_view_t *new_gfx_view(allocator_t *al, gfx_buffer_t *pb, int32_t x, int32_t y, uint32_t w, uint32_t h) {
-    if (!al || !pb) {
+    if (!al || !pb || w < 0 || h < 0) {
         return NULL;
     }
 
@@ -45,7 +46,23 @@ void delete_gfx_view(gfx_view_t *view) {
     }
 }
 
-void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, uint32_t w, uint32_t h, gfx_color_t color) {
+void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color) {
+    if (w <= 0 || h <= 0) {
+        return;
+    }
+
+    if (x < 0) {
+        if (x == INT32_MIN) {
+            return;
+        }
+
+        if (x + w < ) {
+
+        }
+        
+        x = 0;
+
+    }
     // Does this box even intersect with the view??
     // Does the view even intersect with the parent buffer?
 }
