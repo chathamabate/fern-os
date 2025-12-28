@@ -20,6 +20,7 @@ MODS := \
 		s_block_device \
 		s_data \
 		s_mem \
+		s_gfx \
 		s_util 
 
 # Static memory layout header and linker generation:
@@ -64,7 +65,7 @@ EPILOGUE_END   := 0xFFFFFFFF
 
 FERNOS_GFX_WIDTH  := 1024
 FERNOS_GFX_HEIGHT := 768
-FERNOS_GFX_BPP    := 16
+FERNOS_GFX_BPP    := 32
 
 # All Important OS Definitions
 OS_DEFS :=   PROLOGUE_START PROLOGUE_END \

@@ -74,19 +74,17 @@ struct _m2_info_tag_base_t {
 /**
  * Given an info tag, advance to the next.
  *
- * If the given info tag is the NULL tag, `it` is just returned as is.
+ * If the given info tag is the NULL tag or the next tag is the NULL tag, NULL is returned.
  */
-static inline const m2_info_tag_base_t *m2_next_info_tag(const m2_info_tag_base_t *it) {
-    if (it->type == M2_ITT_NULL) {
-        return it;
-    }
-    const uint8_t *next = ((const uint8_t *)it + it->size);
-    if (!(IS_ALIGNED(next, 8))) {
-        next += 8;
-        next = (const uint8_t *)ALIGN(next, 8);
-    }
-    return (const m2_info_tag_base_t *)next;
-}
+const m2_info_tag_base_t *m2_next_info_tag(const m2_info_tag_base_t *it);
+
+/**
+ * Given a pointer into the information tag array, find the next tag with type `type`.
+ * NOTE: `it` is included in this search!
+ *
+ * If no tag is found, NULL is returned.
+ */
+const m2_info_tag_base_t *m2_find_info_tag(const m2_info_tag_base_t *it, uint32_t type);
 
 #define M2_ITT_FRAMEBUFFER (8U)
 

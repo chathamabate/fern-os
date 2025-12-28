@@ -107,8 +107,8 @@
 
 // Quick graphics Checks
 // NOTE: We require BPP to be 16?
-#if FERNOS_GFX_BPP != 16
-#error "FernOS requires 16 bits per pixel!"
+#if FERNOS_GFX_BPP != 32 
+#error "FernOS requires 32 bits per pixel!"
 #endif
 
 fernos_error_t validate_constraints(void) {

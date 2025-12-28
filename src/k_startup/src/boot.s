@@ -23,7 +23,7 @@ gfx_tag:
     .long  20
 
     /* width, hegiht, bpp */
-    .long  FERNOS_GFX_WIDHT
+    .long  FERNOS_GFX_WIDTH
     .long  FERNOS_GFX_HEIGHT
     .long  FERNOS_GFX_BPP
 
