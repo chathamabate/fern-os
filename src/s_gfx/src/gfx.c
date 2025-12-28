@@ -18,3 +18,34 @@ void gfx_clear(gfx_buffer_t *buf, gfx_color_t color) {
         }
     }
 }
+
+gfx_view_t *new_gfx_view(allocator_t *al, gfx_buffer_t *pb, int32_t x, int32_t y, uint32_t w, uint32_t h) {
+    if (!al || !pb) {
+        return NULL;
+    }
+
+    gfx_view_t *view = al_malloc(al, sizeof(gfx_view_t));
+    if (!view) {
+        return NULL;
+    }
+
+    view->al = al;
+    view->parent_buffer = pb;
+    view->origin_x = x;
+    view->origin_y = y;
+    view->width = w;
+    view->height = h;
+
+    return view;
+}
+
+void delete_gfx_view(gfx_view_t *view) {
+    if (view) {
+        al_free(view->al, view);
+    }
+}
+
+void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, uint32_t w, uint32_t h, gfx_color_t color) {
+    // Does this box even intersect with the view??
+    // Does the view even intersect with the parent buffer?
+}

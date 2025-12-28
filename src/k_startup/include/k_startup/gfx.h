@@ -8,6 +8,11 @@
 extern gfx_buffer_t * const SCREEN;
 
 /**
+ * This static view covers the entire screen.
+ */
+extern gfx_view_t * const SCREEN_VIEW;
+
+/**
  * This function extracts necessary information from the multiboot2 info
  * tags for setting up the screen.
  *

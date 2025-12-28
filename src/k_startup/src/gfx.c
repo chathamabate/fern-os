@@ -11,6 +11,13 @@ static gfx_buffer_t screen_buffer = {
 
 gfx_buffer_t * const SCREEN = &screen_buffer;
 
+static gfx_view_t screen_view = {
+    .al = NULL,
+    .parent_buffer = NULL,
+};
+
+gfx_view_t * const SCREEN_VIEW = &screen_view;
+
 fernos_error_t init_screen(const m2_info_start_t *m2_info) {
     if (!m2_info) {
         return FOS_E_BAD_ARGS;
@@ -51,6 +58,15 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
         .width = fb_tag->width,
         .height = fb_tag->height,
         .buffer = (gfx_color_t *)(fb_tag->addr)
+    };
+
+    screen_view = (gfx_view_t) {
+        .al = NULL,
+        .parent_buffer = SCREEN,
+        .origin_x = 0,
+        .origin_y = 0,
+        .width = fb_tag->width,
+        .height = fb_tag->height,
     };
 
     return FOS_E_SUCCESS;
