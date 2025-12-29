@@ -17,7 +17,6 @@ entry_tag:
     /* pad */
     .long 0
 
-/*
 gfx_tag:
     .short 5
     .short 0
@@ -28,7 +27,6 @@ gfx_tag:
     .long  FERNOS_GFX_BPP
 
     .long 0 // pad
-*/
 
 null_tag: 
     .short 0    
