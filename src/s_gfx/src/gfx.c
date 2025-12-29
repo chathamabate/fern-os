@@ -22,6 +22,10 @@ void gfx_clear(gfx_buffer_t *buf, gfx_color_t color) {
 }
 
 void gfx_fill_rect(gfx_buffer_t *buf, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color) {
+    if (gfx_color_is_clear(color)) {
+        return; 
+    }
+
     if (!intervals_overlap(&x, &w, buf->width)) {
         return;
     }

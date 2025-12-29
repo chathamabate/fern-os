@@ -14,7 +14,19 @@
 typedef uint32_t gfx_color_t;
 
 static inline gfx_color_t gfx_color(uint8_t r, uint8_t g, uint8_t b) {
-    return (r << 16UL) | (g << 8UL) | (b << 0UL);
+    return (1 << 24) | (r << 16UL) | (g << 8UL) | (b << 0UL);
+}
+
+/**
+ * A color value which is clear!
+ */
+#define GFX_COLOR_CLEAR (0UL)
+
+/**
+ * Whether or not a color is clear.
+ */
+static inline bool gfx_color_is_clear(gfx_color_t color) {
+    return (color & 0xFF000000) == 0;
 }
 
 typedef struct _gfx_buffer_t {
@@ -44,6 +56,7 @@ typedef struct _gfx_buffer_t {
  */
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color);
 
+
 /**
  * Fill a rectangle within a view.
  *
@@ -51,3 +64,11 @@ void gfx_clear(gfx_buffer_t *buf, gfx_color_t color);
  * `w` and `h` must both be non-negative.
  */
 void gfx_fill_rect(gfx_buffer_t *buf, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color);
+
+/**
+ * Fill a monochrome bitmap on the screen?
+ */
+void gfx_fill_bitmap(gfx_buffer_t *buf, int32_t x, int32_t y, uint8_t w_scale, uint8_t h_scale,
+        uint8_t *bitmap, uint8_t bitmap_rows, uint8_t bitmap_cols, gfx_color_t fg_color, gfx_color_t bg_color);
+
+
