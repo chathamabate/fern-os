@@ -46,22 +46,79 @@ void delete_gfx_view(gfx_view_t *view) {
     }
 }
 
-void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color) {
+/**
+ * Here we have two interval on a number line.
+ *
+ * `[*pos, *pos + len)` and `[0, window_len)`.
+ * 
+ * `true` is returned iff the two intervals overlap.
+ *
+ * If `true` is returned, the overlapping position is written to `*pos` and `*len`.
+ *
+ * If `*len` or `window_len` are negative or 0, `false` is always returned.
+ */
+static bool intervals_overlap(int32_t *pos, int32_t *len, int32_t window_len)  {
+    int32_t p = *pos;  
+    int32_t l = *len;
+
+    if (l <= 0 || window_len <= 0) {
+        return false;
+    }
+
+    if (p < 0) {
+        // With p < 0, wrap is impossible here given `l` is positive.
+        if (p + l <= 0) {
+            return false;
+        }
+        
+        // Chop off left side. `l` must be greater than zero after the chop.
+        l += p;
+        p = 0;
+    } else if (p >= window_len) {
+        return false; // Too far off to the right.
+    } else { /* 0 <= p && p < window_len */
+        // Since `p` is positive, now there is a chance for wrap when adding
+        // another positive number.
+        if (p + l < 0) { 
+            // This makes the maximum possible value of `p + l` INT32_MAX.
+            // WHICH IS OK! because the largest window interval describeable is
+            // [0, INT32_MAX)... INT32_MAX will never be able to be in the overlapping
+            // interval.
+            l = INT32_MAX - p; 
+        }
+
+        if (p + l > window_len) {
+            // Chop off right hanging side.
+            l = window_len - p;
+        }
+    }
+
+    *pos = p;
+    *len = l;
+
+    return true;
+}
+
+void gfxv_fill_rect(gfx_view_t *view, 
+        int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color) {
     if (w <= 0 || h <= 0) {
         return;
     }
 
     if (x < 0) {
-        if (x == INT32_MIN) {
-            return;
+        if (x + w <= 0) {
+            return; // Fully off screen to the left.
         }
 
-        if (x + w < ) {
-
-        }
-        
+        // Chop off area to the left of screen.
+        w += x;
         x = 0;
-
+    } else if (/* x >= 0 && */ x < view->width) {
+        if (x + w > view->width) {
+            w = view->width - x;
+        }
+    } else /* if (x >= view->width) */ {
+        return;
     }
     // Does this box even intersect with the view??
     // Does the view even intersect with the parent buffer?

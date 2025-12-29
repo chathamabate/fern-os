@@ -15,7 +15,8 @@ _ASMS		?= str.s
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= str.c \
-			   char_display.c
+			   char_display.c \
+			   misc.c
 
 -include ../mod_stub.mk
 

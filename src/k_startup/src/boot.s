@@ -17,18 +17,18 @@ entry_tag:
     /* pad */
     .long 0
 
+/*
 gfx_tag:
     .short 5
     .short 0
     .long  20
 
-    /* width, hegiht, bpp */
     .long  FERNOS_GFX_WIDTH
     .long  FERNOS_GFX_HEIGHT
     .long  FERNOS_GFX_BPP
 
-    /* pad */
-    .long 0
+    .long 0 // pad
+*/
 
 null_tag: 
     .short 0    

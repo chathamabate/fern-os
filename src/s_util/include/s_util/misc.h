@@ -2,6 +2,7 @@
 #pragma once
 
 #include "s_util/err.h"
+#include <stdbool.h>
 
 #define NULL ((void *)0)
 
@@ -70,4 +71,19 @@ void _dump_hex_pairs(void (*pf)(const char *fmt, ...), ...);
  * In place maximum! (Be carefule of values with side affects)
  */
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
+
+/**
+ * Here we have two interval on a number line.
+ *
+ * `[*pos, *pos + len)` and `[0, window_len)`.
+ * 
+ * `true` is returned iff the two intervals overlap.
+ *
+ * If `true` is returned, the overlapping position is written to `*pos` and `*len`.
+ *
+ * If `*len` or `window_len` are negative or 0, `false` is always returned.
+ *
+ * NOTE: This does not check if `pos` or `len` are NULL.
+ */
+bool intervals_overlap(int32_t *pos, int32_t *len, int32_t window_len);
 
