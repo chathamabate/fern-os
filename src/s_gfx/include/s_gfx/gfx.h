@@ -45,51 +45,9 @@ typedef struct _gfx_buffer_t {
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color);
 
 /**
- * A view will be a rectangular section of a graphics buffer!
- */
-typedef struct _gfx_view_t {
-    /**
-     * Allocator of this view. (Doesn't need to be used for views which are statically allocated)
-     */
-    allocator_t *al;
-    
-    gfx_buffer_t *parent_buffer;
-
-    /*
-     * The top left hand corner of this view will live at (`origin_x`, `origin_y`)
-     * in the parent buffer.
-     *
-     * NOTE: These are SIGNED integers as it is completely valid for this view to 
-     * begin/extend off screen.
-     */
-
-    int32_t origin_x;
-    int32_t origin_y;
-
-    /*
-     * NOTE: `width` and `height` must both be non-negative.
-     * I am using signed integers though to help with math.
-     */
-
-    int32_t width;
-    int32_t height;
-} gfx_view_t;
-
-/**
- * NULL is returned on error.
- *
- * `w` and `h` must both be non-negative!
- */
-gfx_view_t *new_gfx_view(allocator_t *al, gfx_buffer_t *pb, int32_t x, int32_t y, uint32_t w, uint32_t h);
-static inline gfx_view_t *new_da_gfx_view(gfx_buffer_t *pb, int32_t x, int32_t y, uint32_t w, uint32_t h) {
-    return new_gfx_view(get_default_allocator(), pb, x, y, w, h);
-}
-void delete_gfx_view(gfx_view_t *view);
-
-/**
  * Fill a rectangle within a view.
  *
  * `(x, y)` is the top left corner of the rectangle relative to the view origin.
  * `w` and `h` must both be non-negative.
  */
-void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color);
+void gfx_fill_rect(gfx_buffer_t *buf, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color);
