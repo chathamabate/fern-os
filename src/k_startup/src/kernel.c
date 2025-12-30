@@ -209,15 +209,21 @@ void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
 
+    // Cool that this works, maybe now I can just write my own font!
+    // That could be fun!
     uint8_t bm[] = {
+        0xAA,
+        0x55,
+        0xAA,
+        0x55
     };
 
-    // It would be cool to be able to test this all out it someway right???
-    gfx_clear(SCREEN, gfx_color(255, 0, 0));
-    gfx_fill_bitmap(SCREEN, -100, 100, 
-            255, 100, bm, 4, 16, 
-            GFX_COLOR_CLEAR, 
-            gfx_color(0, 0, 255));
+    gfx_clear(SCREEN, gfx_color(100, 0, 0));
+    gfx_fill_bitmap(SCREEN, 10, 10, 20, 40, 
+            bm, 4, 7, 
+            gfx_color(0, 0, 100),
+            GFX_COLOR_CLEAR);
+
     lock_up();
 
     thread_t *first_thread = (thread_t *)(kernel->schedule.head);

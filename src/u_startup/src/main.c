@@ -11,16 +11,7 @@
 #include "s_mem/simple_heap.h"
 
 proc_exit_status_t user_main(void) {
-    fernos_error_t err;
-    
-    handle_t cd;
-    err = sc_vga_cd_open(&cd);
-    if (err != FOS_E_SUCCESS) {
-        return PROC_ES_FAILURE;
-    }
-    sc_set_out_handle(cd);
-
-    sc_out_write_s("Hello, World!\n");
+    while (1);
 
     return PROC_ES_SUCCESS;
 }
