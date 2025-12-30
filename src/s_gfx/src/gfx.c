@@ -64,6 +64,12 @@ void gfx_fill_bitmap(gfx_buffer_t *buf,
         return;
     }
 
+    /**
+     * Size of each bitmap row in BYTES!!!
+     */
+    const int32_t bitmap_row_size = bitmap_cols % 8 == 0
+        ? bitmap_cols / 8 : (bitmap_cols / 8) + 1;
+
     // Ok, now, let's think about much area this bitmap will occupy.
     //
     // All of the values below are int32's to avoid arithmetic warnings.
@@ -80,9 +86,6 @@ void gfx_fill_bitmap(gfx_buffer_t *buf,
     }
     int32_t end_x = start_x + width - 1; // Inclusive
 
-    int32_t start_col = (start_x - x) / w_scale; 
-    int32_t end_col = (end_x - x) / w_scale; // Inclusive
-
     int32_t start_y = y;
     int32_t height = h_scale * bitmap_rows;
     if (!intervals_overlap(&start_y, &height, buf->height)) {
@@ -90,16 +93,21 @@ void gfx_fill_bitmap(gfx_buffer_t *buf,
     }
     int32_t end_y = start_y + height - 1; // Inclusive
 
-    int32_t start_row = (start_y - y) / h_scale;
-    int32_t end_row = (end_y - y) / h_scale; // Inclusive
-     
-    for (int32_t row_ind = start_row; row_ind <= end_row; row_ind++) {
-        gfx_color_t *row = gfx_row(buf, row_ind);
-        // Ok, so how many times do we go for this row??
-        for () {
+    for (int32_t y_iter = start_y; y_iter <= end_y; y_iter++) {
+        gfx_color_t *row = gfx_row(buf, y_iter);
+        int32_t row_ind = (y_iter - y) / h_scale;
 
+        for (int32_t x_iter = start_x; x_iter <= end_x; x_iter++) {
+            int32_t col_ind = (x_iter - x) / w_scale;
+
+            bool fg_pixel = bitmap[(row_ind * bitmap_row_size) + (col_ind / 8)] & 
+                (1 << (7 - (col_ind % 8))); // Remember, left to right!
+
+            if (fg_pixel && !fg_is_clear) {
+                row[x_iter] = fg_color;
+            } else if (!fg_pixel && !bg_is_clear) {
+                row[x_iter] = bg_color;
+            }
         }
     }
-
-
 }

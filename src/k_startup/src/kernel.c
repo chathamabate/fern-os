@@ -209,10 +209,21 @@ void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
 
-    gfx_clear(SCREEN, gfx_color(0, 0, 0));
-    for (uint8_t r = 0; ; r++) {
-        // Damn, this is actually pretty fast tbh...
-        gfx_clear(SCREEN, gfx_color(r, 0, 0));
+    uint8_t bm[] = {
+        0x30,
+        0xC0,
+        0x10,
+        0x10
+    };
+
+    for (uint8_t s = 1; ; s++) {
+        gfx_clear(SCREEN, gfx_color(255, 0, 0));
+        gfx_fill_bitmap(SCREEN, 100, 100, 
+                s, s, bm, 4, 4, 
+                gfx_color(0, 255, 0), 
+                gfx_color(0, 0, 255));
+        // ugh does this even fucking work... kinda hella slow I think!!
+        // Maybe don't scale glyphs so much and it'd be faster??
     }
     lock_up();
 
