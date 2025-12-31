@@ -45,11 +45,19 @@ static inline bool gfx_color_is_clear(gfx_color_t color) {
     return (color & 0xFF000000) == 0;
 }
 
+/**
+ * A gfx buffer is meant to be an intermediate target for graphics.
+ * We expect the kernel to be able to take this type of structure and render it onto 
+ * the visible screen somehow.
+ */
 typedef struct _gfx_buffer_t {
     /**
-     * Bytes per row in the buffer! (must be non-negative)
+     * The allocator used to allocate this structure and `buffer`.
+     *
+     * This structure is intentially simple though to allow for 
+     * easily setting up a buffer in static memory.
      */
-    int32_t pitch;
+    allocator_t *al;
 
     /**
      * Visible pixels per row. (must be non-negative)
@@ -62,7 +70,7 @@ typedef struct _gfx_buffer_t {
     int32_t height;
 
     /**
-     * The buffer itself with size `pitch * height`.
+     * The buffer itself with size `width * height * sizeof(gfx_color_t)`.
      */
     gfx_color_t *buffer;
 } gfx_buffer_t;
@@ -71,7 +79,6 @@ typedef struct _gfx_buffer_t {
  * Set all pixels in the given buffer to `color`.
  */
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color);
-
 
 /**
  * Fill a rectangle within a view.

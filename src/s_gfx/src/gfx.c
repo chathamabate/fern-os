@@ -18,7 +18,7 @@ bool gfx_color_equal(gfx_color_t c0, gfx_color_t c1) {
  * THIS DOES NO CHECKS ON `row` !
  */
 static gfx_color_t *gfx_row(gfx_buffer_t *buf, int32_t row) {
-    return (gfx_color_t *)((uint8_t *)(buf->buffer) + (row * buf->pitch));
+    return buf->buffer + (row * buf->width);
 }
 
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color) {

@@ -218,11 +218,12 @@ void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
         0x55
     };
 
-    gfx_clear(SCREEN, gfx_color(100, 0, 0));
-    gfx_fill_bitmap(SCREEN, 10, 10, 20, 40, 
+    gfx_clear(BACK_BUFFER, gfx_color(100, 0, 0));
+    gfx_fill_bitmap(BACK_BUFFER, 10, 10, 20, 40, 
             bm, 4, 7, 
             gfx_color(0, 0, 100),
             GFX_COLOR_CLEAR);
+    gfx_render();
 
     lock_up();
 
