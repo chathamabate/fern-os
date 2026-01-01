@@ -111,6 +111,13 @@ void fos_pf_action(user_ctx_t *ctx) {
     return_to_curr_thread();
 }
 
+#include "s_gfx/gfx.h"
+#include "s_gfx/mono_fonts.h"
+
+#include "k_startup/gfx.h"
+
+static uint32_t tick = 0;
+static uint32_t frame_no = 0;
 void fos_timer_action(user_ctx_t *ctx) {
     ks_save_ctx(kernel, ctx);
     
@@ -119,6 +126,28 @@ void fos_timer_action(user_ctx_t *ctx) {
         term_put_fmt_s("[Timer Error 0x%X]", err);
         ks_shutdown(kernel);
     }
+
+    if (tick % 20 == 0) {
+        char buf[129];
+        for (size_t i = 0; i < 128; i++) {
+            buf[i] = i;
+        }
+        buf[128] = '\0';
+
+        gfx_clear(BACK_BUFFER, gfx_color(100, 0, 0));
+        gfx_draw_ascii_mono_text(
+            BACK_BUFFER, "AB", ASCII_MONO_8X8, 
+            -100, -100, frame_no % 256, frame_no % 256, 
+            gfx_color(0, 255, 0),
+            gfx_color(0, 0, 255)
+        );
+
+        gfx_render();
+
+        frame_no++;
+    }
+
+    tick++;
 
     return_to_curr_thread();
 }

@@ -167,8 +167,17 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const char *str,
         return;
     }
 
+    const size_t amf_bytes_per_row = ((amf->char_width - 1) / 8) + 1;
+    const size_t amf_bytes_per_char = amf_bytes_per_row * amf->char_height;
+
     const uint16_t char_width = w_scale * amf->char_width;
     const uint16_t char_height = h_scale * amf->char_height;
+
+    // This check will happen no matter what by `intervals_overlap`.
+    // But I want to prevent a division by 0 when calcing `max_str_len`.
+    if (char_width == 0 || char_height == 0) {
+        return;
+    }
 
     // We want to make sure that when we calculate the length of the full string in pixels that
     // the qauntity doesn't wrap. So, we'll only consider characters up to a certain length.
@@ -185,7 +194,7 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const char *str,
     if (!intervals_overlap(&start_x, &width, buf->width)) {
         return;
     }
-    int32_t end_x = x + width - 1; // inclusive.
+    int32_t end_x = start_x + width - 1; // inclusive.
 
     int32_t start_y = y;
     int32_t height = char_height;
@@ -206,7 +215,8 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const char *str,
             c = '\0';
         }
 
-        gfx_fill_bitmap(buf, ci_x, y, w_scale, h_scale, amf->bitmaps, 
+        gfx_fill_bitmap(buf, ci_x, y, w_scale, h_scale, 
+                amf->bitmaps + (c * amf_bytes_per_char), 
                 amf->char_height, 
                 amf->char_width, fg_color, bg_color);
     }

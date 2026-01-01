@@ -353,7 +353,6 @@ run.shallow: iso.shallow disk.shallow
 		-cdrom $(ISO_FILE) \
 		-drive file=$(DISK),format=raw,index=0,media=disk \
 		-display sdl \
-		-full-screen \
 		-monitor stdio
 
 run: iso disk
@@ -363,7 +362,6 @@ run: iso disk
 		-cdrom $(ISO_FILE) \
 		-drive file=$(DISK),format=raw,index=0,media=disk \
 		-display sdl \
-		-full-screen \
 		-monitor stdio
 
 .PHONY: clean

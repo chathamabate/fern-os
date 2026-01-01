@@ -54,7 +54,7 @@ void gfx_fill_rect(gfx_buffer_t *buf, int32_t x, int32_t y, int32_t w, int32_t h
 void gfx_fill_bitmap(gfx_buffer_t *buf, 
         int32_t x, int32_t y, 
         uint8_t w_scale, uint8_t h_scale,
-        uint8_t *bitmap, uint8_t bitmap_rows, uint8_t bitmap_cols, 
+        const uint8_t *bitmap, uint8_t bitmap_rows, uint8_t bitmap_cols, 
         gfx_color_t fg_color, gfx_color_t bg_color) {
 
     // Both colors are clear, don't even bother.
