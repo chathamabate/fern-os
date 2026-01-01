@@ -79,4 +79,14 @@ static inline void gfx_render(void) {
  */
 fernos_error_t init_screen(const m2_info_start_t *m2_info);
 
+/**
+ * This function is meant to replace the old `out_bios_vga` function.
+ *
+ * It renders a string message onto the back buffer, renders the back buffer, than locks up the
+ * CPU.
+ *
+ * You cannot call this function until after `init_screen` above.
+ * It's purpose if for printing out a message during an extremely catostrophic error situation.
+ */
+void gfx_out_fatal(const char *msg);
 

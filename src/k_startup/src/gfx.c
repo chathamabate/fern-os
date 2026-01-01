@@ -3,7 +3,9 @@
 
 #include "os_defs.h"
 #include "s_util/constraints.h"
+#include "k_sys/debug.h"
 #include "s_util/str.h"
+#include "s_gfx/mono_fonts.h"
 
 void gfx_to_screen(gfx_screen_t *screen, gfx_buffer_t *frame) {
     // We'll put a memory barrier both before and after cause why not.
@@ -105,4 +107,14 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
     };
 
     return FOS_E_SUCCESS;
+}
+
+void gfx_out_fatal(const char *msg) {
+    gfx_draw_ascii_mono_text(BACK_BUFFER, 
+        msg, ASCII_MONO_8X16, 0, 0, 2, 2, 
+        gfx_color(255, 255, 255),
+        gfx_color(255, 0, 0)
+    );
+    gfx_render();
+    lock_up();
 }

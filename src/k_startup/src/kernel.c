@@ -39,14 +39,9 @@
 
 #include <stdint.h>
 
-static inline void setup_fatal(const char *msg) {
-    out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), msg);
-    lock_up();
-}
-
 static inline void try_setup_step(fernos_error_t err, const char *msg) {
     if (err != FOS_E_SUCCESS) {
-        setup_fatal(msg);
+        gfx_out_fatal(msg); 
     }
 }
 
@@ -83,23 +78,23 @@ kernel_state_t *kernel = NULL;
 static void init_kernel_state(void) {
     kernel = new_da_kernel_state();
     if (!kernel) {
-        setup_fatal("Failed to allocate kernel state");
+        gfx_out_fatal("Failed to allocate kernel state");
     }
     // Let's setup our first user process.
 
     proc_id_t pid = idtb_pop_id(kernel->proc_table);
     if (pid == idtb_null_id(kernel->proc_table)) {
-        setup_fatal("Failed to pop root pid");
+        gfx_out_fatal("Failed to pop root pid");
     }
 
     phys_addr_t user_pd = pop_initial_user_pd_copy();
     if (user_pd == NULL_PHYS_ADDR) {
-        setup_fatal("Failed to get user PD");
+        gfx_out_fatal("Failed to get user PD");
     }
 
     process_t *proc = new_da_process(pid, user_pd, NULL);
     if (!proc) {
-        setup_fatal("Failed to allocate first process");
+        gfx_out_fatal("Failed to allocate first process");
     }
 
     kernel->root_proc = proc;
@@ -108,7 +103,7 @@ static void init_kernel_state(void) {
     thread_t *thr = proc_new_thread(kernel->root_proc, 
             (uintptr_t)user_main, 0, 0, 0);
     if (!thr) {
-        setup_fatal("Failed to allocate first thread");
+        gfx_out_fatal("Failed to allocate first thread");
     }
 
     // Finally, schedule our first thread!
@@ -120,7 +115,7 @@ static void init_kernel_plugins(void) {
 
     plugin_t *plg_fut = new_plugin_fut(kernel);
     if (!plg_fut) {
-        setup_fatal("Failed to create Futex plugin");
+        gfx_out_fatal("Failed to create Futex plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_FUTEX_ID, plg_fut), "Failed to set Futex plugin");
 
@@ -130,7 +125,7 @@ static void init_kernel_plugins(void) {
     );
 
     if (!bd) {
-        setup_fatal("Failed to created block device");
+        gfx_out_fatal("Failed to created block device");
     }
 
     file_sys_t *fs;
@@ -138,38 +133,38 @@ static void init_kernel_plugins(void) {
     if (err != FOS_E_SUCCESS) {
         err = init_fat32(bd, 0, bd_num_sectors(bd), 8);
         if (err != FOS_E_SUCCESS) {
-            setup_fatal("Failed to init FAT32");
+            gfx_out_fatal("Failed to init FAT32");
         }
 
         // NOTE: This is a temporary fix and VERY VERY dangerous. 
         // It basically resets the entire disk if it fails to parse it the first time.
         err = parse_new_da_fat32_file_sys(bd, 0, 0, true, now, &fs);
         if (err != FOS_E_SUCCESS) {
-            setup_fatal("Failed to create FAT32 FS");
+            gfx_out_fatal("Failed to create FAT32 FS");
         }
     }
 
     plugin_t *plg_fs = new_plugin_fs(kernel, fs);
     if (!plg_fs) {
-        setup_fatal("Failed to create File System plugin");
+        gfx_out_fatal("Failed to create File System plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_FILE_SYS_ID, plg_fs), "Failed to set FS Plugin in the kernel");
 
     plugin_t *plg_kb = new_plugin_kb(kernel);
     if (!plg_kb) {
-        setup_fatal("Failed to create Keyboard plugin");
+        gfx_out_fatal("Failed to create Keyboard plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_KEYBOARD_ID, plg_kb), "Failed to set up KB Plugin in the kernel");
 
     plugin_t *plg_vga_cd = new_plugin_vga_cd(kernel);
     if (!plg_vga_cd) {
-        setup_fatal("Failed to create VGA Character Display plugin");
+        gfx_out_fatal("Failed to create VGA Character Display plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_VGA_CD_ID, plg_vga_cd), "Failed to set VGA CD Plugin in the kernel");
 
     plugin_t *plg_pipe = new_plugin_pipe(kernel);
     if (!plg_pipe) {
-        setup_fatal("Failed to create Pipe plugin");
+        gfx_out_fatal("Failed to create Pipe plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_PIPE_ID, plg_pipe), "Failed to set Pipe Plugin in the kernel");
 }
@@ -183,7 +178,8 @@ void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
         lock_up();
     }
     
-    // We must setup the screen before doing anything else!
+    // Screen is setup, so we can safely call `gfx_out_fatal` from here on out.
+    // (Given we setup paging correctly when enabling virtual memory)
         
     try_setup_step(validate_constraints(), "Failed to validate memory areas");
 

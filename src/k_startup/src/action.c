@@ -21,6 +21,8 @@
 
 #include "k_sys/kb.h"
 
+#include "k_startup/gfx.h"
+
 /**
  * This function is pretty special. It is for when the kernel has no threads to schedule.
  *
@@ -72,15 +74,12 @@ static void return_to_curr_thread(void) {
 
 void fos_lock_up_action(user_ctx_t *ctx) {
     (void)ctx;
-    out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), "Lock Up Triggered");
-    lock_up();
+    gfx_out_fatal("Lock Up Triggered");
 }
 
 void fos_gpf_action(user_ctx_t *ctx) {
     if (ctx->cr3 == get_kernel_pd()) { // Are we currently in the kernel?
-        out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), 
-                "Kernel Locking up in GPF Action");
-        lock_up();
+        gfx_out_fatal("Kernel Locking up in GPF Action");
     }
 
     ks_exit_proc(kernel, PROC_ES_GPF);
@@ -93,9 +92,7 @@ void fos_pf_action(user_ctx_t *ctx) {
     // handler with some special stack.
 
     if (ctx->cr3 == get_kernel_pd()) {
-        out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), 
-                "Kernel Locking up in PF Action");
-        lock_up();
+        gfx_out_fatal("Kernel Locking up in PF Action");
     }
 
     ks_save_ctx(kernel, ctx);
@@ -114,7 +111,6 @@ void fos_pf_action(user_ctx_t *ctx) {
 #include "s_gfx/gfx.h"
 #include "s_gfx/mono_fonts.h"
 
-#include "k_startup/gfx.h"
 
 static uint32_t tick = 0;
 static uint32_t frame_no = 0;
@@ -136,16 +132,21 @@ void fos_timer_action(user_ctx_t *ctx) {
 
         gfx_clear(BACK_BUFFER, gfx_color(100, 0, 0));
         gfx_draw_ascii_mono_text(
-            BACK_BUFFER, "AB", ASCII_MONO_8X8, 
-            -100, -100, frame_no % 256, frame_no % 256, 
+            BACK_BUFFER, buf + 1, ASCII_MONO_8X16, 
+            -(frame_no % 1500) * 2, 100, 2, 2, 
             gfx_color(0, 255, 0),
             gfx_color(0, 0, 255)
         );
 
         gfx_render();
 
+        if (frame_no == 200) {
+            gfx_out_fatal("Something went wrong!");
+        }
+
         frame_no++;
     }
+
 
     tick++;
 
