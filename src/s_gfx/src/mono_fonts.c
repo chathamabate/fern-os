@@ -1,5 +1,7 @@
 
 #include "s_gfx/mono_fonts.h"
+#include "s_util/str.h"
+#include "s_util/misc.h"
 #include <stdint.h>
 
 // Each character is defined by 8 bytes (one per row)
@@ -160,14 +162,53 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const char *str,
         int32_t x, int32_t y, 
         uint8_t w_scale, uint8_t h_scale,
         gfx_color_t fg_color, gfx_color_t bg_color) {
-    if (false) {
-
-    }
-
     // Don't bother if fg and bg are both clear.
     if (gfx_color_is_clear(fg_color) && gfx_color_is_clear(bg_color)) {
         return;
     }
 
-    // We really just need the indeces of the first and last characters to draw.
+    const uint16_t char_width = w_scale * amf->char_width;
+    const uint16_t char_height = h_scale * amf->char_height;
+
+    // We want to make sure that when we calculate the length of the full string in pixels that
+    // the qauntity doesn't wrap. So, we'll only consider characters up to a certain length.
+    //
+    // NOTE: This is a pretty niche case that will likely never happen.
+    const int32_t max_str_len = INT32_MAX / char_width;
+    size_t slen = str_len(str);
+
+    // sig_len for "significant length" (The only characters we care about).
+    int32_t sig_len = (int32_t)MIN(slen, (size_t)max_str_len);
+
+    int32_t start_x = x;
+    int32_t width = sig_len * char_width; // Gauranteed to be less that INT32_MAX (and non-negative)
+    if (!intervals_overlap(&start_x, &width, buf->width)) {
+        return;
+    }
+    int32_t end_x = x + width - 1; // inclusive.
+
+    int32_t start_y = y;
+    int32_t height = char_height;
+    if (!intervals_overlap(&start_y, &height, buf->height)) {
+        return;
+    }
+
+    // Ok, now we actually determine which characters we actually need to render.
+    size_t start_ci = (start_x - x) / char_width;
+    size_t end_ci = (end_x - x) / char_width;  // inclusive.
+
+    size_t ci = start_ci;
+    int32_t ci_x = x + (start_ci * char_width);
+    for (; ci <= end_ci; ci++, ci_x += char_width) {
+        char c = str[ci];
+        if (c & 0x80U) { // We reduce extension ascii characters to the NT. May change this 
+                         // later.
+            c = '\0';
+        }
+
+        gfx_fill_bitmap(buf, ci_x, y, w_scale, h_scale, amf->bitmaps, 
+                amf->char_height, 
+                amf->char_width, fg_color, bg_color);
+    }
 }
+
