@@ -11,12 +11,12 @@
  */
 typedef struct _ascii_mono_font_t {
     /**
-     * Width of all characters in pixels.
+     * Width of all characters in pixels. (Must be non-zero)
      */
     uint8_t char_width;
 
     /**
-     * Height of all characters in pixels.
+     * Height of all characters in pixels. (Must be non-zero)
      */
     uint8_t char_height;
 
@@ -45,6 +45,7 @@ typedef struct _ascii_mono_font_t {
 } ascii_mono_font_t;
 
 extern const ascii_mono_font_t * const ASCII_MONO_8X8;
+extern const ascii_mono_font_t * const ASCII_MONO_8X16;
 
 /**
  * Draw a string to a buffer using an ascii monospace font.
