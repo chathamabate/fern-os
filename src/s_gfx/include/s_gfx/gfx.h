@@ -60,14 +60,9 @@ typedef struct _gfx_buffer_t {
     allocator_t *al;
 
     /**
-     * Visible pixels per row. (must be non-negative)
+     * Dimmensions of the buffer, must be non-negative.
      */
-    int32_t width;
-
-    /**
-     * Number of rows. (must be non-negative)
-     */
-    int32_t height;
+    int32_t width, height;
 
     /**
      * The buffer itself with size `width * height * sizeof(gfx_color_t)`.
@@ -81,12 +76,65 @@ typedef struct _gfx_buffer_t {
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color);
 
 /**
+ * A `gfx_view_t` is a bounding box which wraps around a buffer.
+ *
+ * This way, the user can clip graphics how they want. (Not just at the edges of the buffer)
+ */
+typedef struct _gfx_view_t {
+    /**
+     * Like with `gfx_buffer_t`, this field will be left as NULL for statically allocated
+     * views.
+     */
+    allocator_t *al;
+
+    /**
+     * Underlying buffer, NOT OWNED by this structure.
+     */
+    gfx_buffer_t *buffer;
+
+    /**
+     * Top left corner of the view. (relative to top left corner of the buffer)
+     * These CAN be negative!
+     */
+    int32_t x, y;
+
+    /**
+     * Dimmensions of the view, must be non-negative!
+     *
+     * VERY VERY IMPORTANT!
+     * For a view to be valid, `x + width` <= INT32_MIN and `y + height` <= INT32_MIN.
+     * Undefined behavior if these values wrap!
+     */
+    int32_t width, height;
+} gfx_view_t;
+
+
+/**
  * Fill a rectangle within a view.
  *
  * `(x, y)` is the top left corner of the rectangle relative to the view origin.
  * `w` and `h` must both be non-negative.
  */
-void gfx_fill_rect(gfx_buffer_t *buf, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color);
+void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color);
+
+/**
+ * Fill an entire view with a given color.
+ */
+static inline void gfxv_clear(gfx_view_t *view, gfx_color_t color) {
+    gfxv_fill_rect(view, 0, 0, view->width, view->height, color);
+}
+
+/**
+ * Fill a rectangle relative to the buffer.
+ */
+static inline void gfx_fill_rect(gfx_buffer_t *buf, int32_t x, int32_t y, int32_t w, int32_t h,
+        gfx_color_t color) {
+    gfx_view_t view = {
+        .buffer = buf, .x = 0, .y = 0, .width = buf->width, .height = buf->height,
+    };
+    gfxv_fill_rect(&view, x, y, w, h, color);
+}
+
 
 /**
  * Fill a monochrome bitmap on the screen.

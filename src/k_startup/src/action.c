@@ -123,30 +123,49 @@ void fos_timer_action(user_ctx_t *ctx) {
         ks_shutdown(kernel);
     }
 
+    // I mean, we can still make this work...
+    // Ok, and before this, we want a simple text display though right??
+    // Can we make that happen?
+    //
+    // Should we get the mouse hooked up though?
+    // I mean the mouse is cool tbh..
+    // No mouse could also be cool imo??
+    // No window overlap could be fast as well...?
+    // I mean, there'll have to be some overlap at times right?
+    // How much can we go for here? Hmmmm, I mean without a mouse, would things be difficult to
+    // use? 
+    // No Mouse + window tiling? Maybe that could be cool.
+    // I mean we could still do window tiling right?
+    // Hmmmmmm....
+    //
+    // Mouse is mid?
+    // What would window tiling even look like though?
+    // I mean, windows could be cool, don't need to think too much about it right?
+    // native memcpy could be fast?
+    // I mean, the mouse is pretty helpful... without the mouse, why even have a gui?
+    // RIGHT?
+    //
+    // Can we handle all these buffers tbh? 
+    // I don't really know... No window resizing?
+    // Jumping between applications? Graphics helps with simple games, also math stuff...
+    //
+    // SCREEN <- BACK_BUFFER <- - APP BUFFER <- APP BB
+    //                          - APP BUFFER <- APP BB
+    //                          - APP BUFFER <- APP BB
+    //                          - APP BUFFER <- APP BB
+
     if (tick % 20 == 0) {
-        char buf[129];
-        for (size_t i = 0; i < 128; i++) {
-            buf[i] = i;
-        }
-        buf[128] = '\0';
-
-        gfx_clear(BACK_BUFFER, gfx_color(100, 0, 0));
-        gfx_draw_ascii_mono_text(
-            BACK_BUFFER, buf + 1, ASCII_MONO_8X16, 
-            -(frame_no % 1500) * 2, 100, 2, 2, 
-            gfx_color(0, 255, 0),
-            gfx_color(0, 0, 255)
-        );
-
+        gfx_clear(BACK_BUFFER, gfx_color(100, 0, 100));
+        gfx_view_t view = {
+            .buffer = BACK_BUFFER, 
+            .x = -100 , .y = -200, .width = 600, .height = 500
+        };
+        gfxv_clear(&view, gfx_color(0, 100, 0));
+        gfxv_fill_rect(&view, 100, 200, 20, 20,  gfx_color(255, 0, 0));
         gfx_render();
-
-        if (frame_no == 200) {
-            gfx_out_fatal("Something went wrong!");
-        }
 
         frame_no++;
     }
-
 
     tick++;
 
