@@ -13,53 +13,95 @@ bool gfx_color_equal(gfx_color_t c0, gfx_color_t c1) {
 }
 
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color) {
-    for (int32_t r = 0; r < buf->height; r++) {
+    for (uint16_t r = 0; r < buf->height; r++) {
         gfx_color_t *row = buf->buffer + (r * buf->width);
-        for (int32_t c = 0; c < buf->width; c++) {
+        for (uint16_t c = 0; c < buf->width; c++) {
             row[c] = color;
         }
     }
 }
 
+bool gfx_clip(const gfx_box_t *clip_area, gfx_box_t *box) {
+    int32_t clip_x_bound = clip_area->x + clip_area->width;
+    if (clip_x_bound <= box->x) {
+        return false;
+    }
+    int32_t box_x_bound = box->x + box->width;
+    if (box_x_bound <= clip_area->x) {
+        return false;
+    }
 
-void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color) {
+    int32_t clip_y_bound = clip_area->y + clip_area->height;
+    if (clip_y_bound <= box->y) {
+        return false;
+    }
+
+    int32_t box_y_bound = box->y + box->height;
+    if (box_y_bound <= clip_area->y) {
+        return false;
+    }
+
+    // Intersection!
+    
+    if (box->x < clip_area->x) {
+        box->x = clip_area->x;
+    }
+
+    if (clip_x_bound < box_x_bound) {
+        box->width = clip_x_bound - box->x;
+    }
+
+    if (box->y < clip_area->y) {
+        box->y = clip_area->y;
+    }
+
+    if (clip_y_bound < box_y_bound) {
+        box->height = clip_y_bound - box->y;
+    }
+
+    return true;
+}
+
+bool gfx_clip_with_buffer(const gfx_buffer_t *buf, 
+        const gfx_box_t *clip_area, gfx_box_t *box) {
+    gfx_box_t buffer_box = {
+        .x = 0, .y = 0,
+        .width = buf->width, .height = buf->height
+    };
+
+    if (clip_area) {
+        if (!gfx_clip(clip_area, &buffer_box)) {
+            return false;
+        }
+    }
+
+    return gfx_clip(&buffer_box, box);
+}
+
+void gfx_fill_rect(gfx_buffer_t *buf, const gfx_box_t *clip_area, 
+        int32_t x, int32_t y, uint16_t w, uint16_t h, gfx_color_t color) {
     if (gfx_color_is_clear(color)) {
         return; 
     }
 
-    gfx_buffer_t * const buffer = view->buffer;
-
-    // Rectangle ~ view ~ buffer
-
-    if (!intervals_overlap(&x, &w, view->width)) {
-        return;
-    }
-    if (!intervals_overlap(&y, &h, view->height)) {
-        return;
-    }
-
-    // Ok, now we have `x,w,y,h` clipped to the view. Let's get their positions relative to the
-    // buffer! (NOTE, at this point `x` < `view->width` and `y` < `view->height`, thus the below 
-    // addiitons will NEVER wrap!)
-    x += view->x;
-    y += view->y;
-
-    if (!intervals_overlap(&x, &w, buffer->width)) {
-        return;
-    }
-    if (!intervals_overlap(&y, &h, buffer->height)) {
+    gfx_box_t rect = {
+        .x = x, .y = y,
+        .width = w, .height = h
+    };
+    
+    if (!gfx_clip_with_buffer(buf, clip_area, &rect)) {
         return;
     }
 
-    for (int32_t r = y; r < y + h; r++) {
-        gfx_color_t *row = buffer->buffer + (r * buffer->width);
-        for (int32_t c = x; c < x + w; c++) {
-            row[c] = color;
+    for (int32_t y_i = rect.y; y_i < rect.y + rect.height; y_i++) {
+        gfx_color_t *row = buf->buffer + (y_i * buf->width);
+        for (int32_t x_i = rect.x; x_i < rect.x + rect.width; x_i++) {
+            row[x_i] = color;
         }
     }
 }
 
-void gfx_fill_bitmap(gfx_buffer_t *buf, 
+void gfxv_fill_bitmap(gfx_view_t *view,
         int32_t x, int32_t y, 
         uint8_t w_scale, uint8_t h_scale,
         const uint8_t *bitmap, uint8_t bitmap_rows, uint8_t bitmap_cols, 
@@ -84,24 +126,41 @@ void gfx_fill_bitmap(gfx_buffer_t *buf,
     //
     // This is all safe also because both `x` and `y` must be greater than INT32_MIN in the
     // case of overlap!
-
-    // Below, x's and y's always refer to pixel positions within the given buffer.
-    // row's and col's refer to bit positions within the bitmap
+    
+    // Ok, start with relative to the view.
     
     int32_t start_x = x;
     int32_t width = w_scale * bitmap_cols; // Impossible to wrap as 0xFF * 0xFF < 0x1_0000UL < INT32_MAX
-    if (!intervals_overlap(&start_x, &width, buf->width)) {
+    if (!intervals_overlap(&start_x, &width, view->width)) {
         return;
     }
+
+    int32_t start_y = y;
+    int32_t height = h_scale * bitmap_rows;
+    if (!intervals_overlap(&start_y, &height, view->height)) {
+        return;
+    }
+
+    // Now, move to relative to the buffer.
+    start_x += view->x; // Gauranteed to not wrap!
+    start_y += view->y;
+
+    if (!intervals_overlap(&start_x, &width, view->buffer->width)) {
+        return;
+    }
+    if (!intervals_overlap(&start_y, &height, view->buffer->height)) {
+        return;
+    }
+
+    // Might this wrap?? Isn't this all very confusing??
+    // Why do we check so hard for wrap, isn't that hella slow (AND CONFUSING??)
+    const int32_t abs_x = x + view->x;
+    const int32_t abs_y = y + view->y;
+
     int32_t end_x = start_x + width - 1; // Inclusive
     int32_t start_col = (start_x - x) / w_scale;
     int32_t end_col = (end_x - x) / w_scale;
 
-    int32_t start_y = y;
-    int32_t height = h_scale * bitmap_rows;
-    if (!intervals_overlap(&start_y, &height, buf->height)) {
-        return;
-    }
     int32_t end_y = start_y + height - 1; // Inclusive
     int32_t start_row = (start_y - y) / h_scale;
     int32_t end_row = (end_y - y) / h_scale;
