@@ -326,7 +326,8 @@ static const ascii_mono_font_t ASCII_MONO_8X16_VAL = {
 
 const ascii_mono_font_t * const ASCII_MONO_8X16 = &ASCII_MONO_8X16_VAL;
 
-void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const char *str, 
+void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        const char *str, 
         const ascii_mono_font_t *amf, 
         int32_t x, int32_t y, 
         uint8_t w_scale, uint8_t h_scale,
@@ -352,28 +353,27 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const char *str,
     // the qauntity doesn't wrap. So, we'll only consider characters up to a certain length.
     //
     // NOTE: This is a pretty niche case that will likely never happen.
-    const int32_t max_str_len = INT32_MAX / char_width;
-    size_t slen = str_len(str);
+    const uint16_t max_str_len = UINT16_MAX / char_width;
+    const size_t slen = str_len(str);
 
     // sig_len for "significant length" (The only characters we care about).
-    int32_t sig_len = (int32_t)MIN(slen, (size_t)max_str_len);
+    const uint16_t sig_len = MIN(slen, max_str_len);
 
-    int32_t start_x = x;
-    int32_t width = sig_len * char_width; // Gauranteed to be less that INT32_MAX (and non-negative)
-    if (!intervals_overlap(&start_x, &width, buf->width)) {
+    gfx_box_t render_area = {
+        .x = x, .y = y,
+        .width = sig_len * char_width,
+        .height = char_height
+    };
+
+    if (!gfx_clip_with_buffer(buf, clip_area, &render_area)) {
         return;
     }
-    int32_t end_x = start_x + width - 1; // inclusive.
 
-    int32_t start_y = y;
-    int32_t height = char_height;
-    if (!intervals_overlap(&start_y, &height, buf->height)) {
-        return;
-    }
+    const int32_t render_area_end_x = render_area.x + render_area.width - 1;
 
     // Ok, now we actually determine which characters we actually need to render.
-    size_t start_ci = (start_x - x) / char_width;
-    size_t end_ci = (end_x - x) / char_width;  // inclusive.
+    size_t start_ci = (render_area.x - x) / char_width;
+    size_t end_ci = (render_area_end_x - x) / char_width;  // inclusive.
 
     size_t ci = start_ci;
     int32_t ci_x = x + (start_ci * char_width);
@@ -384,7 +384,8 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const char *str,
             c = '\0';
         }
 
-        gfx_fill_bitmap(buf, ci_x, y, w_scale, h_scale, 
+        gfx_fill_bitmap(buf, &render_area,
+                ci_x, y, w_scale, h_scale, 
                 amf->bitmaps + (c * amf_bytes_per_char), 
                 amf->char_height, 
                 amf->char_width, fg_color, bg_color);

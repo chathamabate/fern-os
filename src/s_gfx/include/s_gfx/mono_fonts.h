@@ -53,8 +53,11 @@ extern const ascii_mono_font_t * const ASCII_MONO_8X16;
  * drawn as the NULL character.
  *
  * `(x, y)` will be the top left corner of the first letter in `str`.
+ *
+ * `clip_area` can be NULL.
  */
-void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const char *str, 
+void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        const char *str, 
         const ascii_mono_font_t *amf, 
         int32_t x, int32_t y, 
         uint8_t w_scale, uint8_t h_scale,

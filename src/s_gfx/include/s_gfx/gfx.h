@@ -126,6 +126,14 @@ bool gfx_clip_with_buffer(const gfx_buffer_t *buf,
         const gfx_box_t *clip_area, gfx_box_t *box);
 
 /**
+ * Fill a box on screen. (relative to top left corner of buffer)
+ *
+ * `clip_area` is optional.
+ */
+void gfx_fill_box(gfx_buffer_t *buf, const gfx_box_t *clip_area, 
+        gfx_box_t box, gfx_color_t color);
+
+/**
  * Fill a rectangle within the buffer.
  *
  * `(x, y)` is the top left corner of the rectangle relative to the buffer origin.
@@ -136,9 +144,12 @@ bool gfx_clip_with_buffer(const gfx_buffer_t *buf,
  * NOTE: `clip_area` is an optional argument, if non-null, only pixels within the clipped area
  * are able to be drawn to!
  */
-void gfx_fill_rect(gfx_buffer_t *buf, const gfx_box_t *clip_area, 
-        int32_t x, int32_t y, uint16_t w, uint16_t h, gfx_color_t color);
-
+static inline void gfx_fill_rect(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        int32_t x, int32_t y, uint16_t w, uint16_t h, gfx_color_t color) {
+    gfx_fill_box(buf, clip_area, 
+            (gfx_box_t) {.x = x, .y = y, .width = w, .height = h},
+            color);
+}
 
 /**
  * Fill a monochrome bitmap on the screen.
@@ -157,7 +168,8 @@ void gfx_fill_rect(gfx_buffer_t *buf, const gfx_box_t *clip_area,
  * the bitmap should have 16 bits (2 bytes) for each row where the final 5 bits of 
  * each row aren't rendered.
  */
-void gfxv_fill_bitmap(gfx_view_t *view, int32_t x, int32_t y, uint8_t w_scale, uint8_t h_scale,
+void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        int32_t x, int32_t y, uint8_t w_scale, uint8_t h_scale,
         const uint8_t *bitmap, uint8_t bitmap_rows, uint8_t bitmap_cols, gfx_color_t fg_color, gfx_color_t bg_color);
 
 
