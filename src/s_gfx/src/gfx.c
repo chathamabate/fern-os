@@ -21,22 +21,6 @@ void gfx_clear(gfx_buffer_t *buf, gfx_color_t color) {
     }
 }
 
-void gfx_init_style(gfx_style_t *style) {
-    *style = (gfx_style_t) {
-        .x_scale = 1,
-        .y_scale = 1,
-        .width_scale = 1,
-        .height_scale = 1,
-        .fg_color = gfx_color(0, 0, 0),
-        .bg_color = gfx_color(255, 255, 255),
-        .clip_area = {
-            .x = 0,
-            .y = 0,
-            .width = UINT16_MAX,
-            .height = UINT16_MAX
-        }
-    };
-}
 
 void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color) {
     if (gfx_color_is_clear(color)) {

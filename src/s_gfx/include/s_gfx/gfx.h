@@ -60,9 +60,9 @@ typedef struct _gfx_buffer_t {
     allocator_t *al;
 
     /**
-     * Dimmensions of this buffer in pixels.
+     * Dimmensions of the buffer, must be non-negative.
      */
-    uint16_t width, height;
+    int32_t width, height;
 
     /**
      * The buffer itself with size `width * height * sizeof(gfx_color_t)`.
@@ -76,56 +76,46 @@ typedef struct _gfx_buffer_t {
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color);
 
 /**
- * A rectangular area.
- */
-typedef struct _gfx_box_t {
-    int32_t x, y;
-    uint16_t width, height;
-} gfx_box_t;
-
-/**
- * A way of styling what is to be rendered.
- */
-typedef struct _gfx_style_t {
-    /** x coordinates will be multiplied by this value */
-    uint8_t x_scale;
-
-    /** y coordinates will be multiplied by this value */
-    uint8_t y_scale;
-
-    /** widths will be multiplied by this value */
-    uint8_t width_scale;
-
-    /** heights will be multiplied by this value */
-    uint8_t height_scale;
-
-    /** Foreground color of what is to be rendered */
-    gfx_color_t fg_color;
-
-    /** Backgroudn color of what is to be rendered */
-    gfx_color_t bg_color;
-    
-    /**
-     * Only pixels in this area will be rendered.
-     * (x, y) of the clip area is relative to the origin of whatever buffer is being drawn to.
-     * When drawing to a buffer, coordinates should also be relative to the buffer, NOT this area.
-     */
-    gfx_box_t clip_area;
-} gfx_style_t;
-
-/**
- * Initialize a style to default values.
+ * A `gfx_view_t` is a bounding box which wraps around a buffer.
  *
- * The clip_area will just be as large as possible.
+ * This way, the user can clip graphics how they want. (Not just at the edges of the buffer)
  */
-void gfx_init_style(gfx_style_t *style);
+typedef struct _gfx_view_t {
+    /**
+     * Like with `gfx_buffer_t`, this field will be left as NULL for statically allocated
+     * views.
+     */
+    allocator_t *al;
+
+    /**
+     * Underlying buffer, NOT OWNED by this structure.
+     */
+    gfx_buffer_t *buffer;
+
+    /**
+     * Top left corner of the view. (relative to top left corner of the buffer)
+     * These CAN be negative!
+     */
+    int32_t x, y;
+
+    /**
+     * Dimmensions of the view, must be non-negative!
+     *
+     * VERY VERY IMPORTANT!
+     * For a view to be valid, `x + width` <= INT32_MIN and `y + height` <= INT32_MIN.
+     * Undefined behavior if these values wrap!
+     */
+    int32_t width, height;
+} gfx_view_t;
+
 
 /**
- * Fill a rectangle.
+ * Fill a rectangle within a view.
  *
  * `(x, y)` is the top left corner of the rectangle relative to the view origin.
+ * `w` and `h` must both be non-negative.
  */
-void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, uint16_t w, uint16_t h);
+void gfxv_fill_rect(gfx_view_t *view, int32_t x, int32_t y, int32_t w, int32_t h, gfx_color_t color);
 
 /**
  * Fill an entire view with a given color.
