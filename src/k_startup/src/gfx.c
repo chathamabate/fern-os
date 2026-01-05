@@ -110,7 +110,7 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
 }
 
 void gfx_out_fatal(const char *msg) {
-    gfx_draw_ascii_mono_text(BACK_BUFFER, 
+    gfx_draw_ascii_mono_text(BACK_BUFFER, NULL,
         msg, ASCII_MONO_8X16, 0, 0, 2, 2, 
         gfx_color(255, 255, 255),
         gfx_color(255, 0, 0)

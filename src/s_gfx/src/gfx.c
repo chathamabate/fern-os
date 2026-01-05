@@ -49,19 +49,21 @@ bool gfx_clip(const gfx_box_t *clip_area, gfx_box_t *box) {
     // Intersection!
     
     if (box->x < clip_area->x) {
+        box->width -= clip_area->x - box->x;
         box->x = clip_area->x;
     }
 
     if (clip_x_bound < box_x_bound) {
-        box->width = clip_x_bound - box->x;
+        box->width -= box_x_bound - clip_x_bound;
     }
 
     if (box->y < clip_area->y) {
+        box->height -= clip_area->y - box->y;
         box->y = clip_area->y;
     }
 
     if (clip_y_bound < box_y_bound) {
-        box->height = clip_y_bound - box->y;
+        box->height -= box_y_bound - clip_y_bound;
     }
 
     return true;
@@ -101,7 +103,7 @@ void gfx_fill_box(gfx_buffer_t *buf, const gfx_box_t *clip_area,
     }
 }
 
-void gfxv_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         int32_t x, int32_t y, 
         uint8_t w_scale, uint8_t h_scale,
         const uint8_t *bitmap, uint8_t bitmap_rows, uint8_t bitmap_cols, 
