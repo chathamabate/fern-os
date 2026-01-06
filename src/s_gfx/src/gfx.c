@@ -116,8 +116,8 @@ void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
 
     gfx_box_t render_area = {
         .x = x, .y = y,
-        .width = w_scale * bitmap_cols,
-        .height = h_scale * bitmap_rows
+        .width = (uint16_t)w_scale * bitmap_cols,
+        .height = (uint16_t)h_scale * bitmap_rows
     };
 
     if (!gfx_clip_with_buffer(buf, clip_area, &render_area)) {

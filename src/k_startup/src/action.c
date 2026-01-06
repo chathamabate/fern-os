@@ -22,6 +22,7 @@
 #include "k_sys/kb.h"
 
 #include "k_startup/gfx.h"
+#include "s_gfx/test/gfx.h"
 
 /**
  * This function is pretty special. It is for when the kernel has no threads to schedule.
@@ -132,13 +133,7 @@ void fos_timer_action(user_ctx_t *ctx) {
 
     if (tick % 10 == 0) {
         gfx_clear(BACK_BUFFER, gfx_color(100, 0, 100));
-        gfx_fill_box(BACK_BUFFER, NULL, clip_area, gfx_color(0, 100, 0));
-
-        // IDK, some tests would be nice tbh!!
-        gfx_draw_ascii_mono_text(BACK_BUFFER, &clip_area, "Hello", ASCII_MONO_8X16, 200, 200,
-                3, 3, gfx_color(0, 255, 255), gfx_color(0, 100, 100));
-        // More or less looking good?
-
+        gfx_test_bouncing_rect(BACK_BUFFER, NULL);
         gfx_render();
 
         frame_no++;
