@@ -1,6 +1,7 @@
 
 #include "s_gfx/gfx.h"
 #include <limits.h>
+#include "s_util/str.h"
 #include "s_util/misc.h"
 
 #define GFX_COLOR_ALPHA_MASK (0xFF000000UL)
@@ -95,11 +96,14 @@ void gfx_fill_box(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         return;
     }
 
-    for (int32_t y_i = box.y; y_i < box.y + box.height; y_i++) {
-        gfx_color_t *row = buf->buffer + (y_i * buf->width);
-        for (int32_t x_i = box.x; x_i < box.x + box.width; x_i++) {
-            row[x_i] = color;
-        }
+    gfx_color_t *row0 = buf->buffer + (box.y * buf->width);
+    for (int32_t x_i = box.x; x_i < box.x + box.width; x_i++) {
+        row0[x_i] = color;
+    }
+
+    gfx_color_t *row = row0 + buf->width;
+    for (int32_t y_i = box.y + 1; y_i < box.y + box.height; y_i++, row += buf->width) {
+        mem_cpy(row + box.x, row0 + box.x, box.width * sizeof(gfx_color_t));
     }
 }
 
