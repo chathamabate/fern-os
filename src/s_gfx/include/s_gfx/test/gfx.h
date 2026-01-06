@@ -11,6 +11,12 @@
  */
 
 /**
+ * This is a static drawing, not an animation.
+ * It draws a grid of rectangles with 1 pixel borders.
+ */
+void gfx_test_rect_grid(gfx_buffer_t *buffer, const gfx_box_t *clip);
+
+/**
  * In this test, a rectangle bounces around the buffer's edges.
  * Starting from the top left corner.
  *

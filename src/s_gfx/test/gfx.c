@@ -2,6 +2,28 @@
 
 #include "s_gfx/test/gfx.h"
 
+void gfx_test_rect_grid(gfx_buffer_t *buffer, const gfx_box_t *clip) {
+    const uint16_t rect_w = 100;
+    const uint16_t rect_h = 50;
+
+    for (uint16_t x = 0; x < buffer->width; x += rect_w) {
+        for (uint16_t y = 0; y < buffer->height; y += rect_h) {
+            uint16_t width = rect_w - 1; 
+            if (x + width > buffer->width) {
+                width = buffer->width - x;
+            }
+
+            uint16_t height = rect_h - 1;
+            if (y + height > buffer->height) {
+                height = buffer->height - y;
+            }
+
+            gfx_fill_rect(buffer, clip, x, y, width, height, 
+                    gfx_color((x / rect_w) * 15, 0, (y / rect_h) * 15));
+        }
+    }
+}
+
 void gfx_test_bouncing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip) {
     const uint16_t rect_w = 100;
     const uint16_t rect_h = 150;
