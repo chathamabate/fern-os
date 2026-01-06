@@ -98,23 +98,24 @@ bool gfx_clip_with_buffer(const gfx_buffer_t *buf,
 }
 
 void gfx_fill_box(gfx_buffer_t *buf, const gfx_box_t *clip_area, 
-        gfx_box_t box, gfx_color_t color) {
+        const gfx_box_t *box, gfx_color_t color) {
     if (gfx_color_is_clear(color)) {
         return; 
     }
 
-    if (!gfx_clip_with_buffer(buf, clip_area, &box)) {
+    gfx_box_t true_box = *box;
+    if (!gfx_clip_with_buffer(buf, clip_area, &true_box)) {
         return;
     }
 
-    gfx_color_t *row0 = buf->buffer + (box.y * buf->width);
-    for (int32_t x_i = box.x; x_i < box.x + box.width; x_i++) {
+    gfx_color_t *row0 = buf->buffer + (true_box.y * buf->width);
+    for (int32_t x_i = true_box.x; x_i < true_box.x + true_box.width; x_i++) {
         row0[x_i] = color;
     }
 
     gfx_color_t *row = row0 + buf->width;
-    for (int32_t y_i = box.y + 1; y_i < box.y + box.height; y_i++, row += buf->width) {
-        mem_cpy(row + box.x, row0 + box.x, box.width * sizeof(gfx_color_t));
+    for (int32_t y_i = true_box.y + 1; y_i < true_box.y + true_box.height; y_i++, row += buf->width) {
+        mem_cpy(row + true_box.x, row0 + true_box.x, true_box.width * sizeof(gfx_color_t));
     }
 }
 
@@ -153,7 +154,7 @@ void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
 
     for (int32_t row_ind = start_row; row_ind <= end_row; row_ind++) {
         for (int32_t col_ind = start_col; col_ind <= end_col; col_ind++) {
-            // Each pixel in the bitmap will become a `h_scale X w_scale` rectangle 
+            // Each pixel in the bitmap will become a `w_scale X h_scale` rectangle 
             // in the buffer!
 
             bool fg_pixel = bitmap[(row_ind * bitmap_row_size) + (col_ind / 8)] & 
@@ -178,7 +179,7 @@ void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
 
             int32_t rect_start_y = y + (row_ind * h_scale);
             int32_t rect_end_y = rect_start_y + h_scale - 1;
-            if (rect_start_y < render_area_end_y) {
+            if (rect_start_y < render_area.y) {
                 rect_start_y = render_area.y;
             }
             if (rect_end_y > render_area_end_y) {

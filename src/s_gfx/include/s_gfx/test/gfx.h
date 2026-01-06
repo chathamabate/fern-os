@@ -38,3 +38,9 @@ void gfx_test_outside_bouncing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip)
  * Stateful function.
  */
 void gfx_test_growing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip);
+
+/**
+ * This will render a seriese of bitmaps scaled and unscaled in rows on the screen.
+ * This is stateless and not an animation.
+ */
+void gfx_test_bitmaps(gfx_buffer_t *buffer, const gfx_box_t *clip);

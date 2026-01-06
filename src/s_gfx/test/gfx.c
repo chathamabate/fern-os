@@ -127,3 +127,68 @@ void gfx_test_growing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip) {
             width, height, gfx_color(200, 100, 0));
 }
 
+void gfx_test_bitmaps(gfx_buffer_t *buffer, const gfx_box_t *clip) {
+    const struct bm_case_t {
+        uint8_t cols;
+        uint8_t rows;
+        uint8_t map[16];
+    } bitmaps[] = {
+        // First bitmap will be a 4x4 Box
+        {
+            .cols = 4, .rows = 4,
+            .map = {
+                0xF0,
+                0x90,
+                0x90,
+                0xF0
+            }
+        },
+
+        // Second Bitmap will be a 10x2 dotted line.
+        {
+            .cols = 10, .rows = 2,
+            .map = {
+                0xAA, 0x80,
+                0xAA, 0x80
+            }
+        },
+
+        // Third will be a 8x8 Letter 'F'.
+        {
+            .cols = 8, .rows = 8,
+            .map = {
+                0xFF,
+                0xFE,
+                0xE0,
+                0xE0,
+                0xFE,
+                0xFF,
+                0xE0,
+                0xC0
+            }
+        }
+    };
+
+    const size_t num_bms = sizeof(bitmaps) / sizeof(bitmaps[0]);
+
+    uint16_t y = 100;
+
+    for (size_t i = 0; i < num_bms; i++) {
+        // For each bitmap, we'll draw three scaled versions.
+        struct bm_case_t c = bitmaps[i];
+
+        for (size_t w_scale_addon = 0; w_scale_addon <= 2; w_scale_addon++) {
+            uint16_t x = 100;
+            for (size_t scale = 1; scale <= 7; scale++) {
+                gfx_fill_bitmap(buffer, clip, x, y, 
+                        scale + w_scale_addon, scale, c.map, c.rows, c.cols,
+                        gfx_color(0, 255, 0),
+                        gfx_color(0, 0, 0));
+
+                x += ((scale + w_scale_addon) * c.cols) + 20;
+            }
+
+            y += 70;
+        }
+    }
+}

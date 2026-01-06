@@ -131,7 +131,7 @@ bool gfx_clip_with_buffer(const gfx_buffer_t *buf,
  * `clip_area` is optional.
  */
 void gfx_fill_box(gfx_buffer_t *buf, const gfx_box_t *clip_area, 
-        gfx_box_t box, gfx_color_t color);
+        const gfx_box_t *box, gfx_color_t color);
 
 /**
  * Fill a rectangle within the buffer.
@@ -146,9 +146,10 @@ void gfx_fill_box(gfx_buffer_t *buf, const gfx_box_t *clip_area,
  */
 static inline void gfx_fill_rect(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         int32_t x, int32_t y, uint16_t w, uint16_t h, gfx_color_t color) {
-    gfx_fill_box(buf, clip_area, 
-            (gfx_box_t) {.x = x, .y = y, .width = w, .height = h},
-            color);
+    gfx_box_t box = {
+        .x = x, .y = y, .width = w, .height = h
+    };
+    gfx_fill_box(buf, clip_area, &box, color);
 }
 
 /**

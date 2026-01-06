@@ -124,16 +124,19 @@ void fos_timer_action(user_ctx_t *ctx) {
         ks_shutdown(kernel);
     }
 
-    const gfx_box_t clip_area = {
-        .x = 100,
-        .y = 100,
-        .width = BACK_BUFFER->width - 200,
-        .height = BACK_BUFFER->height - 200
-    };
 
     if (tick % 10 == 0) {
+        uint16_t no = (frame_no % 150) * 2;
+        const gfx_box_t clip_area = {
+            .x = no,
+            .y = no,
+            .width = BACK_BUFFER->width - (2 * no),
+            .height = BACK_BUFFER->height - (2 * no)
+        };
         gfx_clear(BACK_BUFFER, gfx_color(100, 0, 100));
-        gfx_test_rect_grid(BACK_BUFFER, NULL);
+        gfx_fill_box(BACK_BUFFER, NULL, &clip_area, gfx_color(0, 0, 100));
+        gfx_test_bitmaps(BACK_BUFFER, &clip_area);
+        gfx_test_bouncing_rect(BACK_BUFFER, &clip_area);
         gfx_render();
 
         frame_no++;
