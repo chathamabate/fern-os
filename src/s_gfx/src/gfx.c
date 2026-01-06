@@ -14,11 +14,22 @@ bool gfx_color_equal(gfx_color_t c0, gfx_color_t c1) {
 }
 
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color) {
-    for (uint16_t r = 0; r < buf->height; r++) {
-        gfx_color_t *row = buf->buffer + (r * buf->width);
-        for (uint16_t c = 0; c < buf->width; c++) {
-            row[c] = color;
-        }
+    if (gfx_color_is_clear(color)) {
+            return;
+    }
+
+    if (buf->height == 0) {
+        return;
+    }
+
+    gfx_color_t *row0 = buf->buffer;
+    for (uint16_t c = 0; c < buf->width; c++) {
+        row0[c] = color;
+    }
+
+    gfx_color_t *row = row0 + buf->width;
+    for (uint16_t r = 1; r < buf->height; r++, row += buf->width) {
+        mem_cpy(row, row0, buf->width * sizeof(gfx_color_t));
     }
 }
 

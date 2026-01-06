@@ -69,3 +69,39 @@ void gfx_test_outside_bouncing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip)
     gfx_fill_rect(buffer, clip, x_pos, y_pos, 
             rect_w, rect_h, gfx_color(200, 0, 200));
 }
+
+void gfx_test_growing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip) {
+    static int32_t width = 10;
+    static int32_t width_per_frame = 5;
+
+    const int32_t width_max = 1300;
+
+    static int32_t height = 10;
+    static int32_t height_per_frame = 4;
+
+    const int32_t height_max = 1200;
+
+    width += width_per_frame;
+    if (width >= width_max) {
+        width = width_max;
+        width_per_frame *= -1;
+    } else if (width <= 0) {
+        width = 0;
+        width_per_frame *= -1;
+    }
+
+    height += height_per_frame;
+    if (height >= height_max) {
+        height = height_max;
+        height_per_frame *= -1;
+    } else if (height <= 0) {
+        height = 0;
+        height_per_frame *= -1;
+    }
+
+    gfx_fill_rect(buffer, clip, 
+            (buffer->width - width) / 2, 
+            (buffer->height - height) / 2,
+            width, height, gfx_color(200, 100, 0));
+}
+

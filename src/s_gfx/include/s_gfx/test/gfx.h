@@ -21,5 +21,14 @@ void gfx_test_bouncing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip);
 /**
  * Just like `gfx_test_bouncing_rect`, this function test bouncing a round a box who's bounds
  * are larger than the buffer itself! (Should should automatic clipping off the buffer's edges.)
+ *
+ * Stateful function.
  */
 void gfx_test_outside_bouncing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip);
+
+/**
+ * Just a rectangle at the middle of the screen which slowly gets larger than smaller.
+ *
+ * Stateful function.
+ */
+void gfx_test_growing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip);

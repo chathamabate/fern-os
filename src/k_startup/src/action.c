@@ -133,9 +133,7 @@ void fos_timer_action(user_ctx_t *ctx) {
 
     if (tick % 10 == 0) {
         gfx_clear(BACK_BUFFER, gfx_color(100, 0, 100));
-        gfx_fill_box(BACK_BUFFER, NULL, clip_area, gfx_color(0, 100, 0));
-        gfx_test_bouncing_rect(BACK_BUFFER, &clip_area);
-        gfx_test_outside_bouncing_rect(BACK_BUFFER, &clip_area);
+        gfx_test_growing_rect(BACK_BUFFER, NULL);
         gfx_render();
 
         frame_no++;
