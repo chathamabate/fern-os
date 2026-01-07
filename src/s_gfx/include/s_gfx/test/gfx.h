@@ -44,3 +44,11 @@ void gfx_test_growing_rect(gfx_buffer_t *buffer, const gfx_box_t *clip);
  * This is stateless and not an animation.
  */
 void gfx_test_bitmaps(gfx_buffer_t *buffer, const gfx_box_t *clip);
+
+/**
+ * This is just like `gfx_test_outside_bouncing_rect`, but with a bouncing bitmap instead!
+ *
+ * Stateful function.
+ */
+void gfx_test_outside_bouncing_bitmap(gfx_buffer_t *buffer, const gfx_box_t *clip);
+

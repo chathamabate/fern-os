@@ -134,9 +134,7 @@ void fos_timer_action(user_ctx_t *ctx) {
             .height = BACK_BUFFER->height - (2 * no)
         };
         gfx_clear(BACK_BUFFER, gfx_color(100, 0, 100));
-        gfx_fill_box(BACK_BUFFER, NULL, &clip_area, gfx_color(0, 0, 100));
-        gfx_test_bitmaps(BACK_BUFFER, &clip_area);
-        gfx_test_bouncing_rect(BACK_BUFFER, &clip_area);
+        gfx_test_outside_bouncing_bitmap(BACK_BUFFER, NULL);
         gfx_render();
 
         frame_no++;

@@ -133,14 +133,14 @@ void gfx_test_bitmaps(gfx_buffer_t *buffer, const gfx_box_t *clip) {
         uint8_t rows;
         uint8_t map[16];
     } bitmaps[] = {
-        // First bitmap will be a 4x4 Box
+        // First bitmap will be a 5x4 Box
         {
-            .cols = 4, .rows = 4,
+            .cols = 5, .rows = 4,
             .map = {
-                0xF0,
+                0xF8,
                 0x90,
                 0x90,
-                0xF0
+                0xF8
             }
         },
 
@@ -191,4 +191,55 @@ void gfx_test_bitmaps(gfx_buffer_t *buffer, const gfx_box_t *clip) {
             y += 70;
         }
     }
+}
+
+void gfx_test_outside_bouncing_bitmap(gfx_buffer_t *buffer, const gfx_box_t *clip) {
+    // This should be an upward arrow with a tail to the left. 10 x 6
+    const uint8_t bitmap[] = {
+        0x0C, 0x00, // 0000 1100 0000
+        0x1E, 0x00, // 0001 1110 0000
+        0x3F, 0x00, // 0011 1111 0000
+        0x6D, 0x80, // 0110 1101 1000
+        0xCC, 0xC0, // 1100 1100 1100
+        0x0C, 0x00, // 0000 1100 0000
+        0x0C, 0x00, // 0000 1100 0000
+        0xFC, 0x00, // 1111 1100 0000
+    };
+    const uint8_t rows = 8;
+    const uint8_t cols = 10;
+
+    const uint8_t w_scale = 10;
+    const uint8_t h_scale = 10;
+
+    const uint16_t width = (uint16_t)cols * w_scale;
+    const uint16_t height = (uint16_t)rows * h_scale;
+
+    static int32_t x_pos = 100;
+    static int32_t x_per_frame = 4;
+
+    static int32_t y_pos = 100;
+    static int32_t y_per_frame = 7;
+
+    const uint16_t pad = 100;
+
+    x_pos += x_per_frame;
+    if (x_pos + width >= buffer->width + pad) {
+        x_pos = (int32_t)(buffer->width + pad) - width;
+        x_per_frame *= -1;
+    } else if (x_pos <= -(int32_t)pad) {
+        x_pos = -(int32_t)pad;
+        x_per_frame *= -1;
+    }
+
+    y_pos += y_per_frame;
+    if (y_pos + height >= buffer->height + pad) {
+        y_pos = (int32_t)(buffer->height + pad) - height;
+        y_per_frame *= -1;
+    } else if (y_pos <= -(int32_t)pad) {
+        y_pos = -(int32_t)pad;
+        y_per_frame *= -1;
+    }
+
+    gfx_fill_bitmap(buffer, clip, x_pos, y_pos, w_scale, h_scale, bitmap, rows, cols, 
+            gfx_color(255, 0, 0), GFX_COLOR_CLEAR);
 }
