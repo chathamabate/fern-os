@@ -1,6 +1,64 @@
 
 
+#include "k_startup/vga_cd.h"
+#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+
+#include "s_util/test.h"
+
 #include "s_gfx/test/gfx.h"
+
+/**
+ * Test clipping boxes which don't overlap.
+ */
+static bool test_gfx_clip_misses(void) {
+    const gfx_box_t cases[][2] = {
+        {
+            {0, 0, 10, 10},
+
+            // Too far to the left.
+            {-10, 0, 5, 10}
+        },
+        {
+            {20, 0, 20, 20},
+
+            // Too far to the right.
+            {80, 0, 20, 20}
+        },
+        {
+            {0, 0, 10, 10},
+
+            // Too far above.
+            {0, INT32_MIN, 0, 1000}
+        },
+        {
+            {100, -100, 40, 50},
+
+            // Too far Below!
+            {0, -50, 100, 100}
+        }
+    };
+    const size_t num_cases = sizeof(cases) / sizeof(cases[0]);
+
+    for (size_t i = 0; i < num_cases; i++) {
+        const gfx_box_t clip_area = cases[i][0];
+        gfx_box_t other = cases[i][1];
+
+        TEST_FALSE(gfx_clip(&clip_area, &other));
+
+        TEST_EQUAL_INT(cases[i][1].x, other.x);
+        TEST_EQUAL_INT(cases[i][1].y, other.y);
+        TEST_EQUAL_UINT(cases[i][1].width, other.width);
+        TEST_EQUAL_UINT(cases[i][1].height, other.height);
+    }
+
+    TEST_SUCCEED();
+}
+
+bool test_gfx(void) {
+    BEGIN_SUITE("GFX Logic");
+    RUN_TEST(test_gfx_clip_misses);
+    return END_SUITE();
+}
 
 void gfx_test_rect_grid(gfx_buffer_t *buffer, const gfx_box_t *clip) {
     const uint16_t rect_w = 100;

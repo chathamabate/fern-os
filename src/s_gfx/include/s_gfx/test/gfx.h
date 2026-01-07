@@ -3,6 +3,12 @@
 
 #include "s_gfx/gfx.h"
 
+/**
+ * This is a test suite similar to the other test suites in this project.
+ * It tests out the more easily verifiable logic of `gfx.c`.
+ */
+bool test_gfx(void);
+
 /*
  * Here are a set of animations which test out graphics functionalities!
  * We except each of these functions be called in a timed loop.

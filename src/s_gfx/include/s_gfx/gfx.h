@@ -108,6 +108,7 @@ typedef struct _gfx_box_t {
  * `box` is modified to be within the `clip_area` if possible.
  *
  * If `box` and `clip_area` don't intersect, false is returned!
+ * In this case `box` is left unmodified.
  * 
  * On intersection, true is returned.
  */
