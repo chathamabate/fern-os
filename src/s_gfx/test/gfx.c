@@ -54,11 +54,78 @@ static bool test_gfx_clip_misses(void) {
     TEST_SUCCEED();
 }
 
+/**
+ * Here we test clipping areas which do overlap.
+ */
+static bool test_gfx_clip(void) {
+    typedef struct {
+        gfx_box_t boxes[2];
+        gfx_box_t exp;
+    } case_t;
+
+    const case_t cases[] = {
+        {
+            .boxes = {
+                {0, 0, 10, 10}, 
+                {0, 0, 10, 10}
+            },
+            .exp = {
+                0, 0, 10, 10
+            }
+        },
+        {
+            .boxes = {
+                {5, 0, 5, 10}, 
+                {0, 5, 10, 5}
+            },
+            .exp = {
+                5, 5, 5, 5
+            }
+        },
+        {
+            .boxes = {
+                {-100, -100, 200, 200}, 
+                {0, 0, 50, 50}
+            },
+            .exp = {
+                0, 0, 50, 50
+            }
+        },
+        {
+            .boxes = {
+                {-100, -100, 200, 200}, 
+                {0, 0, 200, 200}
+            },
+            .exp = {
+                0, 0, 100, 100
+            }
+        }
+    };
+    const size_t num_cases = sizeof(cases) / sizeof(cases[0]);
+
+    for (size_t i = 0; i < num_cases; i++) {
+        case_t c = cases[i];
+
+        gfx_box_t out = c.boxes[1];
+        TEST_TRUE(gfx_clip(&(c.boxes[0]), &out));
+
+        TEST_EQUAL_INT(c.exp.x, out.x);
+        TEST_EQUAL_INT(c.exp.y, out.y);
+        TEST_EQUAL_UINT(c.exp.width, out.width);
+        TEST_EQUAL_UINT(c.exp.height, out.height);
+    }
+
+    TEST_SUCCEED();
+}
+
 bool test_gfx(void) {
     BEGIN_SUITE("GFX Logic");
     RUN_TEST(test_gfx_clip_misses);
+    RUN_TEST(test_gfx_clip);
     return END_SUITE();
 }
+
+// Animation based tests.
 
 void gfx_test_rect_grid(gfx_buffer_t *buffer, const gfx_box_t *clip) {
     const uint16_t rect_w = 100;

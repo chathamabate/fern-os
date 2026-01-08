@@ -13,7 +13,7 @@ _SRCS 		?= gfx.c mono_fonts.c
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= gfx.c 
+_TEST_SRCS 	?= gfx.c mono_fonts.c
 
 -include ../mod_stub.mk
 
