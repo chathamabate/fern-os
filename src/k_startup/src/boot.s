@@ -42,6 +42,17 @@ header_end:
 _start:
 
     /*
+
+    NOTE: VERY VERY IMPORTANT.
+    This project so far assumes a 4-byte stack alignment always.
+    On modern systems, 16-byte alignment is prefered. It actually may become required depending
+    on how I decide to handle floating point support.
+
+    This change will require I rewrite some of the assembly here and in other areas of this project.
+
+    */
+
+    /*
     The kernel stack will start at the end of the FERNOS Area.
     Remeber though that FERNOS_END is inclusive (We must +1)
     Also, the last 4 bytes of the stack area will always be reserved for the kernel 
