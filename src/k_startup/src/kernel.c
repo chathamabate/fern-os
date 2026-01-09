@@ -34,6 +34,7 @@
 #include "k_sys/m2.h"
 
 #include "s_gfx/gfx.h"
+#include "s_gfx/test/gfx.h"
 #include "s_gfx/mono_fonts.h"
 #include "k_startup/gfx.h"
 

@@ -26,7 +26,7 @@ gfx_tag:
     .long  FERNOS_GFX_HEIGHT
     .long  FERNOS_GFX_BPP
 
-    .long 0 // pad
+    .long 0  // pad
 
 null_tag: 
     .short 0    

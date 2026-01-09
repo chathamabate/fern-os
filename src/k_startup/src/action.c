@@ -22,7 +22,6 @@
 #include "k_sys/kb.h"
 
 #include "k_startup/gfx.h"
-#include "s_gfx/test/gfx.h"
 
 /**
  * This function is pretty special. It is for when the kernel has no threads to schedule.
@@ -109,12 +108,6 @@ void fos_pf_action(user_ctx_t *ctx) {
     return_to_curr_thread();
 }
 
-#include "s_gfx/gfx.h"
-#include "s_gfx/mono_fonts.h"
-
-
-static uint32_t tick = 0;
-static uint32_t frame_no = 0;
 void fos_timer_action(user_ctx_t *ctx) {
     ks_save_ctx(kernel, ctx);
     
@@ -123,24 +116,6 @@ void fos_timer_action(user_ctx_t *ctx) {
         term_put_fmt_s("[Timer Error 0x%X]", err);
         ks_shutdown(kernel);
     }
-
-
-    if (tick % 10 == 0) {
-        uint16_t no = (frame_no % 150) * 2;
-        const gfx_box_t clip_area = {
-            .x = no,
-            .y = no,
-            .width = BACK_BUFFER->width - (2 * no),
-            .height = BACK_BUFFER->height - (2 * no)
-        };
-        gfx_clear(BACK_BUFFER, gfx_color(100, 0, 100));
-        gfx_test_outside_bouncing_bitmap(BACK_BUFFER, NULL);
-        gfx_render();
-
-        frame_no++;
-    }
-
-    tick++;
 
     return_to_curr_thread();
 }
