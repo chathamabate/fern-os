@@ -1,22 +1,19 @@
 
 
-# NOTE: This module is freestanding utility code.
-# IT DEPENDS ON NOTHING!!!
+# NOTE: This module is to help with dynamic memory allocation in
+# both kernel or user space.
 
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
-MOD_NAME 	?= s_util
+MOD_NAME 	?= s_gfx
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= str.c misc.c constraints.c rand.c hash.c ps2_scancodes.c  \
-			   char_display.c
+_SRCS 		?= gfx.c mono_fonts.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
-_ASMS		?= str.s
+_ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= str.c \
-			   char_display.c \
-			   misc.c
+_TEST_SRCS 	?= gfx.c mono_fonts.c
 
 -include ../mod_stub.mk
 

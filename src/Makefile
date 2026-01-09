@@ -20,6 +20,7 @@ MODS := \
 		s_block_device \
 		s_data \
 		s_mem \
+		s_gfx \
 		s_util 
 
 # Static memory layout header and linker generation:
@@ -62,7 +63,12 @@ FERNOS_END     := 0xBFFFFFFF
 EPILOGUE_START := 0xC0000000
 EPILOGUE_END   := 0xFFFFFFFF
 
-SECT_DEFS := PROLOGUE_START PROLOGUE_END \
+FERNOS_GFX_WIDTH  := 1024
+FERNOS_GFX_HEIGHT := 768
+FERNOS_GFX_BPP    := 32
+
+# All Important OS Definitions
+OS_DEFS :=   PROLOGUE_START PROLOGUE_END \
 			 FERNOS_START \
 			 FERNOS_KERNEL_START FERNOS_KERNEL_END \
 			 FERNOS_APP_START FERNOS_APP_END \
@@ -70,7 +76,9 @@ SECT_DEFS := PROLOGUE_START PROLOGUE_END \
 			 FERNOS_FREE_START FERNOS_FREE_END \
 			 FERNOS_STACK_START FERNOS_STACK_END \
 			 FERNOS_END \
-			 EPILOGUE_START EPILOGUE_END 
+			 EPILOGUE_START EPILOGUE_END \
+			 FERNOS_GFX_WIDTH FERNOS_GFX_HEIGHT \
+			 FERNOS_GFX_BPP
 
 C_MACRO_GEN = echo "\#define $1 $($1)UL" >> $@;
 LD_DEF_GEN = echo "$1 = ($($1));" >> $@; 
@@ -79,17 +87,17 @@ S_DEF_GEN = echo ".equ $1, $($1)" >> $@;
 OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
 $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
 	echo "#pragma once" > $@
-	$(foreach def,$(SECT_DEFS),$(call C_MACRO_GEN,$(def)))
+	$(foreach def,$(OS_DEFS),$(call C_MACRO_GEN,$(def)))
 
 OS_DEFS_LD := $(INSTALL_DIR)/os_defs.ld
 $(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
 	rm $@; touch $@;
-	$(foreach def,$(SECT_DEFS),$(call LD_DEF_GEN,$(def)))
+	$(foreach def,$(OS_DEFS),$(call LD_DEF_GEN,$(def)))
 
 OS_DEFS_S := $(INCLUDE_DIR)/os_defs.s
 $(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
 	rm $@; touch $@;
-	$(foreach def,$(SECT_DEFS),$(call S_DEF_GEN,$(def)))
+	$(foreach def,$(OS_DEFS),$(call S_DEF_GEN,$(def)))
 
 ####################################################################################################
 
@@ -272,6 +280,37 @@ apps.clean.clangd: $(APPS_CLEAN_CLANGD_TARS)
 
 ####################################################################################################
 
+# ISO File (Soon disk setup will be swallowed by this section)
+
+
+ISO_DIR  := $(BUILD_DIR)/iso
+GRUB_CFG := $(SRC_DIR)/grub.cfg
+ISO_FILE := $(BUILD_DIR)/$(OS_NAME).iso
+
+$(ISO_DIR) $(BOOT_DIR) $(GRUB_DIR):
+	mkdir -p $@
+
+$(ISO_FILE): $(ELF_FILE) $(GRUB_CFG)
+	i686-elf-grub-file --is-x86-multiboot2 $(ELF_FILE)
+	mkdir -p $(ISO_DIR)/boot/grub
+	cp $(ELF_FILE) $(ISO_DIR)/boot/
+	cp $(GRUB_CFG) $(ISO_DIR)/boot/grub/
+	i686-elf-grub-mkrescue -o $@ $(ISO_DIR)
+
+.PHONY: _iso iso.shallow iso
+
+_iso: $(ISO_FILE)
+	@echo > /dev/null
+
+iso.shallow: _iso
+	$(call DONE_MSG,ISO Built [shallow kernel])
+
+iso: elf
+	$(MY_MAKE) -C $(SRC_DIR) _iso
+	$(call DONE_MSG,ISO Built)
+
+####################################################################################################
+
 # Disk Setup
 
 # NOTE: One annoying caveat of mtools is that they don't give an easy way to force the usage of 
@@ -307,22 +346,22 @@ disk: elf
 
 .PHONY: run run.shallow
 
-run.shallow: disk.shallow
+run.shallow: iso.shallow disk.shallow
 	qemu-system-x86_64 \
 		-m 4G \
-		-kernel $(ELF_FILE) \
+		-boot d \
+		-cdrom $(ISO_FILE) \
 		-drive file=$(DISK),format=raw,index=0,media=disk \
 		-display sdl \
-		-full-screen \
 		-monitor stdio
 
-run: disk
+run: iso disk
 	qemu-system-x86_64 \
 		-m 4G \
-		-kernel $(ELF_FILE) \
+		-boot d \
+		-cdrom $(ISO_FILE) \
 		-drive file=$(DISK),format=raw,index=0,media=disk \
 		-display sdl \
-		-full-screen \
 		-monitor stdio
 
 .PHONY: clean
@@ -330,3 +369,4 @@ run: disk
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -f $(OS_DEFS_LD)
+

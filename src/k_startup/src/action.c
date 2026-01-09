@@ -21,6 +21,8 @@
 
 #include "k_sys/kb.h"
 
+#include "k_startup/gfx.h"
+
 /**
  * This function is pretty special. It is for when the kernel has no threads to schedule.
  *
@@ -72,15 +74,12 @@ static void return_to_curr_thread(void) {
 
 void fos_lock_up_action(user_ctx_t *ctx) {
     (void)ctx;
-    out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), "Lock Up Triggered");
-    lock_up();
+    gfx_out_fatal("Lock Up Triggered");
 }
 
 void fos_gpf_action(user_ctx_t *ctx) {
     if (ctx->cr3 == get_kernel_pd()) { // Are we currently in the kernel?
-        out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), 
-                "Kernel Locking up in GPF Action");
-        lock_up();
+        gfx_out_fatal("Kernel Locking up in GPF Action");
     }
 
     ks_exit_proc(kernel, PROC_ES_GPF);
@@ -93,9 +92,7 @@ void fos_pf_action(user_ctx_t *ctx) {
     // handler with some special stack.
 
     if (ctx->cr3 == get_kernel_pd()) {
-        out_bios_vga((uint8_t)char_display_style(CDC_BRIGHT_RED, CDC_BLACK), 
-                "Kernel Locking up in PF Action");
-        lock_up();
+        gfx_out_fatal("Kernel Locking up in PF Action");
     }
 
     ks_save_ctx(kernel, ctx);

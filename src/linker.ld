@@ -51,6 +51,12 @@ SECTIONS
      * Each table gets one full page, which should be more than enough!
      */
     
+    .multiboot : {
+        . = ALIGN(4K);
+		*(.multiboot)
+        . = ALIGN(4K);
+    } > fernos_kernel_area
+    
     .sys_tables : {
         . = ALIGN(4K);
         _sys_tables_start = .;
@@ -77,7 +83,6 @@ SECTIONS
     .text.shared : {
         . = ALIGN(4K);
         _ro_shared_start = .;
-		*(.multiboot)
         *libs_*.a:*.o(.text)
         *libs_*.a:*.o(.rodata)
         . = ALIGN(4K);

@@ -16,6 +16,7 @@ _SRCS 		?= kernel.c \
 			   plugin_vga_cd.c \
 			   action.c \
 			   tss.c \
+			   gfx.c \
 			   gdt.c \
 			   idt.c \
 			   page.c \
