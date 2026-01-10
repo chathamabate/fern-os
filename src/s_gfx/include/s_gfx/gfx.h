@@ -72,13 +72,38 @@ typedef struct _gfx_buffer_t {
     /**
      * Dimmensions of the buffer in pixels.
      */
-    const uint16_t width, height;
+    uint16_t width, height;
 
     /**
      * The buffer itself with size `width * height * sizeof(gfx_color_t)`.
      */
-    gfx_color_t * const buffer;
+    gfx_color_t *buffer;
 } gfx_buffer_t;
+
+/**
+ * Create a new dynamically allocated gfx buffer with dimmensions w x h.
+ */
+gfx_buffer_t *new_gfx_buffer(allocator_t *al, uint16_t w, uint16_t h);
+
+/**
+ * Delete a gfx buffer. 
+ * (This does nothing if the allocator of `buf` is NULL)
+ */
+void delete_gfx_buffer(gfx_buffer_t *buf);
+
+/**
+ * Attempt to resize `buf`.
+ * 
+ * If `strict` is true, on success, `buf` will have size exactly `w * h * sizeof(gfx_color_t)`.
+ * If `strict` is false, on success, `buf` will have size at least `w * h * sizeof(gfx_color_t)`.
+ *
+ * If `buf` has no allocator, this always fails.
+ * Otherwise, this fails if there are insufficient resources.
+ *
+ * On success, the contents of the buffer or undefined.
+ * On failure, the buffer is left unmodified.
+ */
+fernos_error_t gfx_resize_buffer(gfx_buffer_t *buf, uint16_t w, uint16_t h, bool strict);
 
 /**
  * Set all pixels in the given buffer to `color`.

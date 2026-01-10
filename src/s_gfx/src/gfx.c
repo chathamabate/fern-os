@@ -13,6 +13,18 @@ bool gfx_color_equal(gfx_color_t c0, gfx_color_t c1) {
     return (c0 & ~GFX_COLOR_ALPHA_MASK) == (c1 & ~GFX_COLOR_ALPHA_MASK);
 }
 
+gfx_buffer_t *new_gfx_buffer(allocator_t *al, uint16_t w, uint16_t h) {
+    return NULL;
+}
+
+void delete_gfx_buffer(gfx_buffer_t *buf) {
+    return;
+}
+
+fernos_error_t gfx_resize_buffer(gfx_buffer_t *buf, uint16_t w, uint16_t h, bool strict) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color) {
     if (gfx_color_is_clear(color)) {
             return;
