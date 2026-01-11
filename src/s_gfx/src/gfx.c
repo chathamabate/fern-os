@@ -60,24 +60,26 @@ fernos_error_t gfx_resize_buffer(gfx_buffer_t *buf, uint16_t w, uint16_t h, bool
 
     gfx_color_t *new_buf;
 
-    if (new_size < old_size && shrink) {
-        if (new_size == 0) {
-            al_free(buf->al, buf->buffer);
-            new_buf = NULL;
-        } else { // new_size > 0
-            new_buf = al_realloc(buf->al, buf->buffer, new_size);
-            if (!new_buf) {
-                return FOS_E_UNKNWON_ERROR; // shrink error should never really happen.
+    if (new_size < old_size) {
+        if (shrink) {
+            if (new_size == 0) {
+                al_free(buf->al, buf->buffer);
+                new_buf = NULL;
+            } else { // new_size > 0
+                new_buf = al_realloc(buf->al, buf->buffer, new_size);
+                if (!new_buf) {
+                    return FOS_E_UNKNWON_ERROR; // shrink error should never really happen.
+                }
             }
+        } else { // Smaller size, but no shrink. Do nothing.
+            new_buf = buf->buffer;
         }
-    } else if (new_size > old_size) {
+    } else { // new_size >= old_size
         new_buf = al_realloc(buf->al, buf->buffer, new_size);
         if (!new_buf) {
             return FOS_E_NO_MEM; // Couldn't stretch the buffer.
         }
-    } else { // new_size <= old_size && !shrink (Do nothing)
-        new_buf = buf->buffer;
-    }
+    } 
 
     // Success!
 
