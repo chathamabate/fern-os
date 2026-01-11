@@ -14,15 +14,78 @@ bool gfx_color_equal(gfx_color_t c0, gfx_color_t c1) {
 }
 
 gfx_buffer_t *new_gfx_buffer(allocator_t *al, uint16_t w, uint16_t h) {
-    return NULL;
+    gfx_buffer_t *gfx_buf = al_malloc(al, sizeof(gfx_buffer_t));
+
+    if (!gfx_buf) {
+        return NULL;
+    }
+
+    gfx_color_t *buf = NULL; 
+
+    uint32_t total_buf_size = (uint32_t)w * (uint32_t)h * sizeof(gfx_color_t);
+
+    if (total_buf_size > 0) {
+        buf = al_malloc(al, total_buf_size);
+
+        if (!buf) {
+            al_free(al, gfx_buf);
+            return NULL;
+        }
+    }
+
+    *(allocator_t **)&(gfx_buf->al) = al;
+    gfx_buf->width = w;
+    gfx_buf->height = h;
+    gfx_buf->buffer = buf;
+
+    return gfx_buf;
 }
 
 void delete_gfx_buffer(gfx_buffer_t *buf) {
-    return;
+    if (!buf || !(buf->al)) {
+        return;
+    }
+
+    al_free(buf->al, buf->buffer);
+    al_free(buf->al, buf);
 }
 
-fernos_error_t gfx_resize_buffer(gfx_buffer_t *buf, uint16_t w, uint16_t h, bool strict) {
-    return FOS_E_NOT_IMPLEMENTED;
+fernos_error_t gfx_resize_buffer(gfx_buffer_t *buf, uint16_t w, uint16_t h, bool shrink) {
+    if (!(buf->al)) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    uint32_t old_size = (uint32_t)(buf->width) * (uint32_t)(buf->height) * sizeof(gfx_color_t);
+    uint32_t new_size = (uint32_t)w * (uint32_t)h * sizeof(gfx_color_t);
+
+    gfx_color_t *new_buf;
+
+    if (new_size < old_size && shrink) {
+        if (new_size == 0) {
+            al_free(buf->al, buf->buffer);
+            new_buf = NULL;
+        } else { // new_size > 0
+            new_buf = al_realloc(buf->al, buf->buffer, new_size);
+            if (!new_buf) {
+                return FOS_E_UNKNWON_ERROR; // shrink error should never really happen.
+            }
+        }
+    } else if (new_size > old_size) {
+        new_buf = al_realloc(buf->al, buf->buffer, new_size);
+        if (!new_buf) {
+            return FOS_E_NO_MEM; // Couldn't stretch the buffer.
+        }
+    } else { // new_size <= old_size && !shrink (Do nothing)
+        new_buf = buf->buffer;
+    }
+
+    // Success!
+
+    buf->buffer = new_buf;
+    buf->width = w;
+    buf->height = h;
+
+    return FOS_E_SUCCESS;
 }
 
 void gfx_clear(gfx_buffer_t *buf, gfx_color_t color) {

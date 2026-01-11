@@ -82,8 +82,14 @@ typedef struct _gfx_buffer_t {
 
 /**
  * Create a new dynamically allocated gfx buffer with dimmensions w x h.
+ *
+ * Returns NULL on error.
  */
 gfx_buffer_t *new_gfx_buffer(allocator_t *al, uint16_t w, uint16_t h);
+
+static inline gfx_buffer_t *new_da_gfx_buffer(uint16_t w, uint16_t h) {
+    return new_gfx_buffer(get_default_allocator(), w, h);
+}
 
 /**
  * Delete a gfx buffer. 
@@ -94,8 +100,8 @@ void delete_gfx_buffer(gfx_buffer_t *buf);
 /**
  * Attempt to resize `buf`.
  * 
- * If `strict` is true, on success, `buf` will have size exactly `w * h * sizeof(gfx_color_t)`.
- * If `strict` is false, on success, `buf` will have size at least `w * h * sizeof(gfx_color_t)`.
+ * If `shrink` is false, then resizing to a smaller cumulative size will do nothing memory wise.
+ * If `shrink` is true, resizing to a smaller cumulative size may shrink the buffer in memory.
  *
  * If `buf` has no allocator, this always fails.
  * Otherwise, this fails if there are insufficient resources.
@@ -103,7 +109,7 @@ void delete_gfx_buffer(gfx_buffer_t *buf);
  * On success, the contents of the buffer or undefined.
  * On failure, the buffer is left unmodified.
  */
-fernos_error_t gfx_resize_buffer(gfx_buffer_t *buf, uint16_t w, uint16_t h, bool strict);
+fernos_error_t gfx_resize_buffer(gfx_buffer_t *buf, uint16_t w, uint16_t h, bool shrink);
 
 /**
  * Set all pixels in the given buffer to `color`.
