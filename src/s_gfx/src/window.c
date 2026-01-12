@@ -12,67 +12,88 @@ void deinit_window_base(window_t *w) {
     delete_gfx_buffer(w->buf);
 }
 
-/**
- * Helper function for entering error state.
- *
- * Does no checks on current state.
- */
-static void window_error_out(window_t *w, fernos_error_t error) {
-    window_state_t old_state = w->state;
+window_state_t win_change_state(window_t *w, window_state_t new_state) {
+    if (w->state == WINSTATE_CLOSED || new_state == w->state) {
+        return w->state;
+    }
 
-    w->state = WINSTATE_ERRORED_OUT;
-    w->error = error;
-    w->impl->window_on_state_change(w, old_state);
-}
-
-fernos_error_t window_change_state(window_t *w, window_state_t new_state) {
-    fernos_error_t err;
-
-    if (w->state == WINSTATE_CLOSED || w->state == WINSTATE_ERRORED_OUT) {
-        return FOS_E_NOT_PERMITTED;
+    if (new_state == WINSTATE_CLOSED) {
+        return win_close(w, FOS_E_SUCCESS);
     }
 
     window_state_t old_state = w->state;
     w->state = new_state;
 
-    err = w->impl->window_on_state_change(w, old_state);
-
-    if (err != FOS_E_SUCCESS) {
-        window_error_out(w, err);
-        return err;
+    if (w->impl->win_on_state_change) {
+        w->impl->win_on_state_change(w, old_state);
     }
 
-    return FOS_E_SUCCESS;
+    return old_state;
 }
 
-fernos_error_t window_resize(window_t *w, uint16_t width, uint16_t height) {
+window_state_t win_close(window_t *w, fernos_error_t close_status) {
+    if (w->state == WINSTATE_CLOSED) {
+        return w->state;
+    }
+
+    window_state_t old_state = w->state;
+
+    w->state = WINSTATE_CLOSED;
+    w->close_status = close_status;
+
+    if (w->impl->win_on_state_change) {
+        w->impl->win_on_state_change(w, old_state);
+    }
+
+    return old_state;
+}
+
+window_state_t win_resize(window_t *w, uint16_t width, uint16_t height) {
     fernos_error_t err;
 
-    if (w->state == WINSTATE_CLOSED || w->state == WINSTATE_ERRORED_OUT) {
-        return FOS_E_NOT_PERMITTED;
+    if (w->state == WINSTATE_CLOSED) {
+        return w->state;
     }
 
     err = gfx_resize_buffer(w->buf, width, height, false);
     if (err != FOS_E_SUCCESS) {
-        window_error_out(w, err);
-        return err;
+        return win_close(w, err);
     }
 
-    return FOS_E_SUCCESS;
+    window_state_t old_state = w->state;
+
+    if (w->impl->win_on_resize) {
+        w->impl->win_on_resize(w);
+    }
+
+    return old_state;
 }
 
-fernos_error_t window_forward_key_input(window_t *w, scs1_code_t key_code) {
-    fernos_error_t err;
 
-    if (w->state == WINSTATE_CLOSED || w->state == WINSTATE_ERRORED_OUT) {
-        return FOS_E_NOT_PERMITTED;
+window_state_t win_forward_key_input(window_t *w, scs1_code_t key_code) {
+    if (w->state == WINSTATE_CLOSED) {
+        return w->state;
     }
 
-    err = w->impl->window_on_key_input(w, key_code);
-    if (err != FOS_E_SUCCESS) {
-        window_error_out(w, err);
-        return err;
+    window_state_t old_state = w->state;
+
+    if (w->impl->win_on_key_input) {
+        w->impl->win_on_key_input(w, key_code);
     }
 
-    return FOS_E_SUCCESS;
+    return old_state;
+}
+
+window_state_t win_tick(window_t *w) {
+    if (w->state == WINSTATE_CLOSED) {
+        return w->state;
+    }
+
+    window_state_t old_state = w->state;
+
+    if (w->impl->win_on_tick) {
+        w->impl->win_on_tick(w);
+    }
+
+    return old_state;
 }
