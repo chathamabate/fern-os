@@ -79,6 +79,11 @@ typedef uint16_t fernos_error_t;
  */
 #define FOS_E_NOT_PERMITTED      (15)
 
+/**
+ * An error has occured which more significant than other possible errors.
+ */
+#define FOS_E_FATAL              (16)
+
 
 
 
