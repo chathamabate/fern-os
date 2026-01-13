@@ -22,6 +22,14 @@ struct _window_t {
      * Screen tearing may occur depending on how this window is managed and output to the screen.
      */
     gfx_buffer_t * const buf;
+
+    /**
+     * DO NOT SET THIS MANUALLY.
+     *
+     * If a fatal error is encountered during a window's lifetime, this field is set to true.
+     * Once set to true, all further operations return FOS_E_FATAL.
+     */
+    bool fatal_error_encountered;
 };
 
 struct _window_impl_t {
@@ -74,7 +82,6 @@ static inline void delete_window(window_t *w) {
     }
 }
 
-
 /**
  * This resizes the window's internal graphics buffer, then afterwards calls the on_resize
  * handler.
@@ -93,12 +100,7 @@ fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height);
  * FOS_E_FATAL if the key press failed, and the window is no longer useable.
  * Other errors mean the key press failed, but the window is still useable.
  */
-static inline fernos_error_t win_forward_key_input(window_t *w, scs1_code_t key_code) {
-    if (w->impl->win_forward_key_input) {
-        return w->impl->win_forward_key_input(w, key_code);
-    }
-    return FOS_E_SUCCESS;
-}
+fernos_error_t win_forward_key_input(window_t *w, scs1_code_t key_code);
 
 /**
  * Tell the window a time step has passed, and that it can update its state/graphics buffer.
@@ -107,10 +109,5 @@ static inline fernos_error_t win_forward_key_input(window_t *w, scs1_code_t key_
  * FOS_E_FATAL if the tick failed and the window is no longer useable.
  * Other errors mean the tick failed, but the window is still useable.
  */
-static inline fernos_error_t win_tick(window_t *w) {
-    if (w->impl->win_tick) {
-        return w->impl->win_tick(w);
-    }
-    return FOS_E_SUCCESS;
-}
+fernos_error_t win_tick(window_t *w);
 
