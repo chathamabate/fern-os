@@ -34,6 +34,16 @@ typedef uint32_t window_event_code_t;
  */
 #define WINEC_DEREGISTERED (3U)
 
+/**
+ * The window has been focused. (What this means is kinda up to you)
+ */
+#define WINEC_FOCUSED (4U)
+
+/**
+ * The window has been unfocused. (Again, kinda up to you)
+ */
+#define WINEC_UNFOCUSED (5U)
+
 typedef struct _window_event_t {
     window_event_code_t event_code;
 
@@ -66,7 +76,7 @@ struct _window_t {
     /**
      * Is this window active? 
      *
-     * For inactive windows, all operation return FOS_E_INACTIVE.
+     * For inactive windows, most operations return FOS_E_INACTIVE automatically.
      */
     bool is_active;
 
@@ -104,12 +114,15 @@ struct _window_impl_t {
      * It is only forwarded AFTER the container window's deregister function has run AND
      * `w->container` has been set to NULL. The receiver of this event code can assume that it is
      * no longer referenced by the old container window. 
+     * VERY IMPORTANT: Even if a window is inactive, it may still have this event forwarded!
+     * (This way a container window can safely deregister an inactive child window)
      * The return value of this handler is ignored.
      */
     fernos_error_t (*win_on_event)(window_t *w, window_event_t ev);
 
     /*
-     * Below endpoints are ALL OPTIONAL!
+     * For container windows, the below two functions must both be defined.
+     * Otherwise, both should be NULL.
      */
 
     /*
@@ -135,6 +148,9 @@ struct _window_impl_t {
      * VERY IMPORTANT, this handler should remove ALL references to `sw`
      * from `w`. `sw` assumes this, and may be deleted after this handler
      * runs.
+     *
+     * ALSO VERY IMPORTANT, even if `w` is inactive, this endpoint can still be called!
+     * An inactive window must still be able to have children deregistered!
      */
     void (*win_deregister_child)(window_t *w, window_t *sw);
 };
@@ -142,7 +158,7 @@ struct _window_impl_t {
 /**
  * Initialize the window base fields.
  *
- * NOTE: Window starts in the INVISIBLE state!
+ * NOTE: Window starts in an active state.
  *
  * `buf` becomes OWNED by `w`!
  */
@@ -181,6 +197,9 @@ fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height);
  * FOS_E_SUCCESS means the event succeeded.
  * FOS_E_INACTIVE means this window is inactive.
  * Other errors mean the event failed, but the window is still active.
+ *
+ * UNDEFINED BEHAVIOR if the given event is a RESIZE or DEREGISTER event.
+ * (These should never be sent using this function)
  */
 fernos_error_t win_fwd_event(window_t *w, window_event_t ev);
 
@@ -203,6 +222,9 @@ fernos_error_t win_register_child(window_t *w, window_t *sw);
 
 /**
  * Deregister `w` from it's parent container.
+ *
+ * NOTE: `w` can be inactive AND `w->container` can be inactive! This function will
+ * still execute as follows!
  *
  * In order this function:
  * 1) Calls `w->container`'s deregister function

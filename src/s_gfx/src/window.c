@@ -4,7 +4,7 @@
 void init_window_base(window_t *w, gfx_buffer_t *buf, const window_impl_t *impl) {
     *(const window_impl_t **)&(w->impl) = impl;
     *(gfx_buffer_t **)&(w->buf) = buf;
-    w->fatal_error_encountered = false;
+    w->is_active = true;
     w->container = NULL;
 }
 
@@ -15,8 +15,8 @@ void deinit_window_base(window_t *w) {
 fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height) {
     fernos_error_t err;
 
-    if (w->fatal_error_encountered) {
-        return FOS_E_FATAL;
+    if (!(w->is_active)) {
+        return FOS_E_INACTIVE;
     }
 
     err = gfx_resize_buffer(w->buf, width, height, false);
@@ -24,64 +24,38 @@ fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height) {
         return FOS_E_NO_MEM; // regardless of error, return no mem.
     }
 
-    if (w->impl->win_on_resize) {
-        err = w->impl->win_on_resize(w);
-        if (err != FOS_E_SUCCESS) {
-            w->fatal_error_encountered = true;
-            return FOS_E_FATAL;
-        }
+    err = w->impl->win_on_event(w, (window_event_t) {.event_code = WINEC_RESIZED});
+    if (err != FOS_E_SUCCESS) {
+        w->is_active = false;
+        return FOS_E_INACTIVE;
     }
 
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t win_on_key_input(window_t *w, scs1_code_t key_code) {
+fernos_error_t win_fwd_event(window_t *w, window_event_t ev) {
     fernos_error_t err;
 
-    if (w->fatal_error_encountered) {
-        return FOS_E_FATAL;
+    if (!(w->is_active)) {
+        return FOS_E_INACTIVE;
     }
 
-    if (w->impl->win_on_key_input) {
-        err = w->impl->win_on_key_input(w, key_code);
+    err = w->impl->win_on_event(w, ev);
 
-        if (err == FOS_E_FATAL) {
-            w->fatal_error_encountered = true;
-            return FOS_E_FATAL;
-        }
-
-        return err;
+    if (err == FOS_E_INACTIVE) {
+        w->is_active = false;
+        return FOS_E_INACTIVE;
     }
 
-    return FOS_E_SUCCESS;
+    return err;
 }
 
-fernos_error_t win_tick(window_t *w) {
-    fernos_error_t err;
-
-    if (w->fatal_error_encountered) {
-        return FOS_E_FATAL;
-    }
-
-    if (w->impl->win_tick) {
-        err = w->impl->win_tick(w);
-
-        if (err == FOS_E_FATAL) {
-            w->fatal_error_encountered = true;
-            return FOS_E_FATAL;
-        }
-
-        return err;
-    }
-
-    return FOS_E_SUCCESS;
-}
 
 fernos_error_t win_register_child(window_t *w, window_t *sw) {
     fernos_error_t err;
 
-    if (w->fatal_error_encountered) {
-        return FOS_E_FATAL;
+    if (!(w->is_active)) {
+        return FOS_E_INACTIVE;
     }
 
     if (!(w->impl->win_register_child)) {
@@ -98,9 +72,9 @@ fernos_error_t win_register_child(window_t *w, window_t *sw) {
 
     err = w->impl->win_register_child(w, sw);
 
-    if (err == FOS_E_FATAL) {
-        w->fatal_error_encountered = true;
-        return FOS_E_FATAL;
+    if (err == FOS_E_INACTIVE) {
+        w->is_active = false;
+        return FOS_E_INACTIVE;
     }
 
     if (err == FOS_E_SUCCESS) {
@@ -111,21 +85,14 @@ fernos_error_t win_register_child(window_t *w, window_t *sw) {
     return err;
 }
 
-void win_deregister_child(window_t *w, window_t *sw) {
-    if (!sw || sw->container != w) {
+void win_deregister(window_t *w) {
+    if (!w || !(w->container)) {
         return;
     }
 
-    if (w->fatal_error_encountered) {
-        return;
-    }
-
-    if (w->impl->win_deregister_child) {
-        w->impl->win_deregister_child(w, sw);
-    }
-
-    sw->container = NULL;
-    if (sw->impl->win_on_deregister) {
-        sw->impl->win_on_deregister(sw);
-    }
+    // Per the docs, we assume that all container windows implement the
+    // deregister child endpoint.
+    w->container->impl->win_deregister_child(w->container, w);
+    w->container = NULL;
+    w->impl->win_on_event(w, (window_event_t) {.event_code = WINEC_DEREGISTERED});
 }
