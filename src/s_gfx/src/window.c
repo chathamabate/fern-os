@@ -5,6 +5,7 @@ void init_window_base(window_t *w, gfx_buffer_t *buf, const window_impl_t *impl)
     *(const window_impl_t **)&(w->impl) = impl;
     *(gfx_buffer_t **)&(w->buf) = buf;
     w->fatal_error_encountered = false;
+    w->container = NULL;
 }
 
 void deinit_window_base(window_t *w) {
@@ -87,6 +88,14 @@ fernos_error_t win_register_child(window_t *w, window_t *sw) {
         return FOS_E_NOT_IMPLEMENTED;
     }
 
+    if (!sw) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (sw->container) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
     err = w->impl->win_register_child(w, sw);
 
     if (err == FOS_E_FATAL) {
@@ -94,11 +103,16 @@ fernos_error_t win_register_child(window_t *w, window_t *sw) {
         return FOS_E_FATAL;
     }
 
+    if (err == FOS_E_SUCCESS) {
+        sw->container = w;
+        return FOS_E_SUCCESS;
+    }
+
     return err;
 }
 
 void win_deregister_child(window_t *w, window_t *sw) {
-    if (!sw) {
+    if (!sw || sw->container != w) {
         return;
     }
 
@@ -109,4 +123,6 @@ void win_deregister_child(window_t *w, window_t *sw) {
     if (w->impl->win_deregister_child) {
         w->impl->win_deregister_child(w, sw);
     }
+
+    sw->container = NULL;
 }

@@ -5,6 +5,23 @@
 #include "s_gfx/gfx.h"
 #include "s_util/ps2_scancodes.h"
 
+typedef uint32_t window_event_code_t;
+
+/**
+ * The window will no longer be used
+ */
+#define WINEC_CAN_DESTRUCT (0U)
+
+
+typedef struct _window_event_t {
+    window_event_code_t event_code;
+
+    union {
+        
+        int x;
+    } data;
+} window_event_t;
+
 typedef struct _window_t window_t;
 typedef struct _window_impl_t window_impl_t;
 
@@ -30,6 +47,12 @@ struct _window_t {
      * Once set to true, all further operations return FOS_E_FATAL.
      */
     bool fatal_error_encountered;
+
+    /**
+     * If this window is a subwindow of some larger composite window, this points to the composite
+     * window. Otherwise, this is NULL.
+     */
+    window_t *container;
 };
 
 struct _window_impl_t {
@@ -55,7 +78,25 @@ struct _window_impl_t {
     fernos_error_t (*win_forward_key_input)(window_t *w, scs1_code_t key_code);
     fernos_error_t (*win_tick)(window_t *w);
 
+    /*
+     * The below two endpoints have some automatic checking before being called.
+     * I usually don't do this type of thing, but I am making an exception.
+     */
+
+    /**
+     * When this endpoint is called, it is gauranteed `sw` is non-null
+     * AND `sw->container` is NULL.
+     *
+     * Afterwards, the wrapper will set `sw->container` to `w`.
+     */
     fernos_error_t (*win_register_child)(window_t *w, window_t *sw);
+
+    /**
+     * When this handler is called, it is gauranteed `sw` is non-null 
+     * AND that `sw->container == w`.
+     *
+     * Afterwards, the wrapper will set `sw->container` to NULL.
+     */
     void (*win_deregister_child)(window_t *w, window_t *sw);
 };
 
@@ -124,9 +165,12 @@ fernos_error_t win_tick(window_t *w);
  * using the below function. A subwindow in error state should not be automatically deregistered.
  *
  * FOS_E_NOT_IMPLEMENTED if this window does not support subwindows.
+ * FOS_E_STATE_MISMATCH if `sw` already belongs to a container.
  * FOS_E_SUCCESS if the subwindow was successfully registered.
  * FOS_E_FATAL if the register failed and the window is no longer useable.
  * Other errors mean the register failed, but the window is still useable.
+ *
+ * VERY IMPORTANT, On Success, this automatically set's `sw->container` to `w`.
  */
 fernos_error_t win_register_child(window_t *w, window_t *sw);
 
