@@ -5,23 +5,6 @@
 #include "s_gfx/gfx.h"
 #include "s_util/ps2_scancodes.h"
 
-typedef uint32_t window_event_code_t;
-
-/**
- * The window will no longer be used
- */
-#define WINEC_CAN_DESTRUCT (0U)
-
-
-typedef struct _window_event_t {
-    window_event_code_t event_code;
-
-    union {
-        
-        int x;
-    } data;
-} window_event_t;
-
 typedef struct _window_t window_t;
 typedef struct _window_impl_t window_impl_t;
 
@@ -41,8 +24,6 @@ struct _window_t {
     gfx_buffer_t * const buf;
 
     /**
-     * DO NOT SET THIS MANUALLY.
-     *
      * If a fatal error is encountered during a window's lifetime, this field is set to true.
      * Once set to true, all further operations return FOS_E_FATAL.
      */
@@ -74,8 +55,20 @@ struct _window_impl_t {
      * window.
      */
     fernos_error_t (*win_on_resize)(window_t *w);
+    fernos_error_t (*win_on_key_input)(window_t *w, scs1_code_t key_code);
 
-    fernos_error_t (*win_forward_key_input)(window_t *w, scs1_code_t key_code);
+    /**
+     * This is called whenever THIS window is deregistered from a container window
+     * using the `win_deregister_child` function.
+     *
+     * When this function is called it can be assumed that `w->container` is NULL.
+     * AND that the old container window no longer holds a reference to `w`.
+     *
+     * If `w` only exists in the context of its container, you may implement this as 
+     * deleting `w` now that's its no longer referenced.
+     */
+    void (*win_on_deregister)(window_t *w);
+
     fernos_error_t (*win_tick)(window_t *w);
 
     /*
@@ -96,6 +89,7 @@ struct _window_impl_t {
      * AND that `sw->container == w`.
      *
      * Afterwards, the wrapper will set `sw->container` to NULL.
+     * It will finally call `sw->on_deregister(sw)`.
      */
     void (*win_deregister_child)(window_t *w, window_t *sw);
 };
@@ -138,13 +132,13 @@ static inline void delete_window(window_t *w) {
 fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height);
 
 /**
- * Forward a keycode to the window.
+ * Forward an key code to the window.
  *
- * FOS_E_SUCCESS if the key code was successfully forwarded.
- * FOS_E_FATAL if the key press failed and the window is no longer useable.
- * Other errors mean the key press failed, but the window is still useable.
+ * FOS_E_SUCCESS if the key code was forwarded successfully.
+ * FOS_E_FATAL if the key code failed and the window is no longer useable.
+ * Other errors mean the key code failed, but the window is still useable.
  */
-fernos_error_t win_forward_key_input(window_t *w, scs1_code_t key_code);
+fernos_error_t win_on_key_input(window_t *w, scs1_code_t key_code);
 
 /**
  * Tell the window a time step has passed, and that it can update its state/graphics buffer.
@@ -161,8 +155,6 @@ fernos_error_t win_tick(window_t *w);
 
 /**
  * Register a subwindow. (You decide exactly what this means)
- * A subwindow should exist as "registered" until explicitly "deregistered" 
- * using the below function. A subwindow in error state should not be automatically deregistered.
  *
  * FOS_E_NOT_IMPLEMENTED if this window does not support subwindows.
  * FOS_E_STATE_MISMATCH if `sw` already belongs to a container.
@@ -176,8 +168,6 @@ fernos_error_t win_register_child(window_t *w, window_t *sw);
 
 /**
  * Deregister a subwindow.
- *
- * Never fails.
  */
 void win_deregister_child(window_t *w, window_t *sw);
 

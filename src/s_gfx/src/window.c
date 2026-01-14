@@ -35,15 +35,15 @@ fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height) {
     return FOS_E_SUCCESS;
 }
 
-fernos_error_t win_forward_key_input(window_t *w, scs1_code_t key_code) {
+fernos_error_t win_on_key_input(window_t *w, scs1_code_t key_code) {
     fernos_error_t err;
 
     if (w->fatal_error_encountered) {
         return FOS_E_FATAL;
     }
 
-    if (w->impl->win_forward_key_input) {
-        err = w->impl->win_forward_key_input(w, key_code);
+    if (w->impl->win_on_key_input) {
+        err = w->impl->win_on_key_input(w, key_code);
 
         if (err == FOS_E_FATAL) {
             w->fatal_error_encountered = true;
@@ -125,4 +125,7 @@ void win_deregister_child(window_t *w, window_t *sw) {
     }
 
     sw->container = NULL;
+    if (sw->impl->win_on_deregister) {
+        sw->impl->win_on_deregister(sw);
+    }
 }
