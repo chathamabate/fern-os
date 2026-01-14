@@ -84,6 +84,11 @@ typedef uint16_t fernos_error_t;
  */
 #define FOS_E_FATAL              (16)
 
+/**
+ * A requested resource is no longer active/useable
+ */
+#define FOS_E_INACTIVE           (17)
+
 
 
 
