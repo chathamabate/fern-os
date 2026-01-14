@@ -76,3 +76,37 @@ fernos_error_t win_tick(window_t *w) {
     return FOS_E_SUCCESS;
 }
 
+fernos_error_t win_register_child(window_t *w, window_t *sw) {
+    fernos_error_t err;
+
+    if (w->fatal_error_encountered) {
+        return FOS_E_FATAL;
+    }
+
+    if (!(w->impl->win_register_child)) {
+        return FOS_E_NOT_IMPLEMENTED;
+    }
+
+    err = w->impl->win_register_child(w, sw);
+
+    if (err == FOS_E_FATAL) {
+        w->fatal_error_encountered = true;
+        return FOS_E_FATAL;
+    }
+
+    return err;
+}
+
+void win_deregister_child(window_t *w, window_t *sw) {
+    if (!sw) {
+        return;
+    }
+
+    if (w->fatal_error_encountered) {
+        return;
+    }
+
+    if (w->impl->win_deregister_child) {
+        w->impl->win_deregister_child(w, sw);
+    }
+}

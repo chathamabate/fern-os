@@ -54,6 +54,9 @@ struct _window_impl_t {
 
     fernos_error_t (*win_forward_key_input)(window_t *w, scs1_code_t key_code);
     fernos_error_t (*win_tick)(window_t *w);
+
+    fernos_error_t (*win_register_child)(window_t *w, window_t *sw);
+    void (*win_deregister_child)(window_t *w, window_t *sw);
 };
 
 /**
@@ -89,7 +92,7 @@ static inline void delete_window(window_t *w) {
  * FOS_E_SUCCESS if the resize succeeded.
  * FOS_E_NO_MEM if there was a failure with this initial resize of the gfx buffer.
  * FOS_E_FATAL if the initial resize succeeded, but the on_resize handler failed.
- * The window should be deleted and no longer used in this case.
+ * The window is no longer useable.
  */
 fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height);
 
@@ -97,7 +100,7 @@ fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height);
  * Forward a keycode to the window.
  *
  * FOS_E_SUCCESS if the key code was successfully forwarded.
- * FOS_E_FATAL if the key press failed, and the window is no longer useable.
+ * FOS_E_FATAL if the key press failed and the window is no longer useable.
  * Other errors mean the key press failed, but the window is still useable.
  */
 fernos_error_t win_forward_key_input(window_t *w, scs1_code_t key_code);
@@ -110,4 +113,27 @@ fernos_error_t win_forward_key_input(window_t *w, scs1_code_t key_code);
  * Other errors mean the tick failed, but the window is still useable.
  */
 fernos_error_t win_tick(window_t *w);
+
+/*
+ * Composite window functions.
+ */
+
+/**
+ * Register a subwindow. (You decide exactly what this means)
+ * A subwindow should exist as "registered" until explicitly "deregistered" 
+ * using the below function. A subwindow in error state should not be automatically deregistered.
+ *
+ * FOS_E_NOT_IMPLEMENTED if this window does not support subwindows.
+ * FOS_E_SUCCESS if the subwindow was successfully registered.
+ * FOS_E_FATAL if the register failed and the window is no longer useable.
+ * Other errors mean the register failed, but the window is still useable.
+ */
+fernos_error_t win_register_child(window_t *w, window_t *sw);
+
+/**
+ * Deregister a subwindow.
+ *
+ * Never fails.
+ */
+void win_deregister_child(window_t *w, window_t *sw);
 
