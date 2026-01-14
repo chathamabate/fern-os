@@ -11,7 +11,7 @@
 typedef uint32_t window_event_code_t;
 
 /**
- * An event which can be expected to occur repeatedly while a window is active.
+ * An event which can be expected to occur repeatedly while a window is active and visible.
  */
 #define WINEC_TICK (0U)
 

@@ -7,7 +7,8 @@
 MOD_NAME 	?= s_gfx
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= gfx.c mono_fonts.c window.c
+_SRCS 		?= gfx.c mono_fonts.c window.c \
+			   window_qgrid.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= 
