@@ -276,5 +276,25 @@ void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
 
 void gfx_paste_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
     const gfx_buffer_t *sub_buf, int32_t x, int32_t y) {
-  // NOT IMPLEMENTED.
+
+    gfx_box_t rbox = {
+        .x = x,
+        .y = y,
+        .width = sub_buf->width,
+        .height = sub_buf->height
+    };
+
+    if (!gfx_clip_with_buffer(buf, clip_area, &rbox)) {
+        return; // No intersection!
+    }
+
+    // It should be the case that:
+    // x <= rbox.x && rbox.x - x < sub_buf->width
+    // (Given how `gfx_clip_with_buffer` works)
+    const uint16_t x_off = (uint16_t)(rbox.x - x);
+    const uint16_t y_off = (uint16_t)(rbox.y - y);
+
+    for (uint16_t r = 0; r < clip_area->height; r++) {
+         
+    }
 }
