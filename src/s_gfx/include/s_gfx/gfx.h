@@ -205,4 +205,10 @@ void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         int32_t x, int32_t y, uint8_t w_scale, uint8_t h_scale,
         const uint8_t *bitmap, uint8_t bitmap_rows, uint8_t bitmap_cols, gfx_color_t fg_color, gfx_color_t bg_color);
 
+/**
+ * Paste the contents of one buffer into another.
+ */
+void gfx_paste_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+    const gfx_buffer_t *sub_buf, int32_t x, int32_t y);
+
 

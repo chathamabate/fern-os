@@ -273,3 +273,8 @@ void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         }
     }
 }
+
+void gfx_paste_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+    const gfx_buffer_t *sub_buf, int32_t x, int32_t y) {
+  // NOT IMPLEMENTED.
+}

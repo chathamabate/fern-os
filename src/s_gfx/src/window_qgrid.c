@@ -84,9 +84,25 @@ void delete_window_qgrid(window_t *w) {
 }
 
 static void win_qg_render(window_qgrid_t *win_qg) {
+    gfx_buffer_t * const buf = win_qg->super.buf;
+
+    const uint16_t tile_width = (buf->width - WIN_QGRID_BORDER_WIDTH) / 2;
+    const uint16_t tile_height = (buf->height - WIN_QGRID_BORDER_WIDTH) / 2;
+
+    const gfx_color_t border_color = gfx_color(150, 50, 50);
+    const gfx_color_t focused_border_color = gfx_color(200, 50, 50);
+    const gfx_color_t empty_tile_color = gfx_color(120, 50, 120);
+
     for (size_t r = 0; r < 2; r++) {
         for (size_t c = 0; c < 2; c++) {
             window_t *sw = win_qg->grid[r][c];
+
+            // Fill top left and top right borders first.
+            gfx_fill_rect(buf, NULL, c * tile_width, r * tile_height, 
+                    tile_width, WIN_QGRID_BORDER_WIDTH, border_color);
+
+            gfx_fill_rect(buf, NULL, c * tile_width, r * tile_height + WIN_QGRID_BORDER_WIDTH, 
+                    WIN_QGRID_BORDER_WIDTH, tile_width - WIN_QGRID_BORDER_WIDTH, border_color);
 
             // Buffer in buffer tbh.
             if (sw) {
