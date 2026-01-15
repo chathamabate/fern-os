@@ -1,8 +1,9 @@
 
 #include "s_gfx/window.h"
 
-void init_window_base(window_t *w, gfx_buffer_t *buf, const window_impl_t *impl) {
+void init_window_base(window_t *w, gfx_buffer_t *buf, const window_attrs_t *attrs, const window_impl_t *impl) {
     *(const window_impl_t **)&(w->impl) = impl;
+    *(window_attrs_t *)&(w->attrs) = *attrs;
     *(gfx_buffer_t **)&(w->buf) = buf;
     w->is_active = true;
     w->container = NULL;
@@ -17,6 +18,14 @@ fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height) {
 
     if (!(w->is_active)) {
         return FOS_E_INACTIVE;
+    }
+
+    if (width < w->attrs.min_width || w->attrs.max_width < width) {
+        return FOS_E_NOT_PERMITTED;
+    }
+
+    if (height < w->attrs.min_height || w->attrs.max_height < height) {
+        return FOS_E_NOT_PERMITTED;
     }
 
     err = gfx_resize_buffer(w->buf, width, height, false);

@@ -10,6 +10,11 @@
 #define WIN_QGRID_BORDER_WIDTH (10U)
 
 /**
+ * The focused tile will have an extra thinner border.
+ */
+#define WIN_QGRID_FOCUS_BORDER_WIDTH (3U)
+
+/**
  * The minimum height/width of the entire qgrid window.
  */
 #define WIN_QGRID_MIN_DIM ((2 * WIN_QGRID_MIN_TILE_DIM) + (3 * WIN_QGRID_BORDER_WIDTH))

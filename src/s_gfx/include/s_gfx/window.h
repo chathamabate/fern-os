@@ -55,8 +55,17 @@ typedef struct _window_event_t {
     } d;
 } window_event_t;
 
+typedef struct _window_attrs_t window_attrs_t;
 typedef struct _window_t window_t;
 typedef struct _window_impl_t window_impl_t;
+
+struct _window_attrs_t {
+    uint16_t min_width; 
+    uint16_t min_height;
+    uint16_t max_width;
+    uint16_t max_height;
+};
+
 
 struct _window_t {
     /**
@@ -72,6 +81,11 @@ struct _window_t {
      * Screen tearing may occur depending on how this window is managed and output to the screen.
      */
     gfx_buffer_t * const buf;
+
+    /**
+     * Core attributes of this window.
+     */
+    const window_attrs_t attrs;
 
     /**
      * Is this window active? 
@@ -159,10 +173,13 @@ struct _window_impl_t {
  * Initialize the window base fields.
  *
  * NOTE: Window starts in an active state.
+ * Undefined behavior if `buf` has dimmensions outside min/maxx bounds described in `attrs`.
  *
  * `buf` becomes OWNED by `w`!
+ * The pointer for `impl` is stored within `w`.
+ * The value pointed to by `attrs` is copied into `w`.
  */
-void init_window_base(window_t *w, gfx_buffer_t *buf, const window_impl_t *impl);
+void init_window_base(window_t *w, gfx_buffer_t *buf, const window_attrs_t *attrs, const window_impl_t *impl);
 
 /**
  * This deletes the dynamic parts of the window base fields.
@@ -185,6 +202,7 @@ static inline void delete_window(window_t *w) {
  * This resizes the window's internal graphics buffer, then afterwards sends a 
  * window resize event to `w`.
  *
+ * FOS_E_NOT_PERMITTED if the given `width`/`height` values are not within this window's bounds.
  * FOS_E_INACTIVE if this window is inactive.
  * FOS_E_SUCCESS if the resize succeeded.
  * FOS_E_NO_MEM if there was a failure with this initial resize of the gfx buffer.
