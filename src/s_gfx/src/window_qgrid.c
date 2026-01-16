@@ -91,12 +91,17 @@ void delete_window_qgrid(window_t *w) {
  */
 static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x, uint16_t y, 
         uint16_t w, uint16_t h, bool focused) {
+    const gfx_color_t gap_fill_color = gfx_color(0, 0, 50);
+
+    if (!sw) {
+        gfx_fill_rect(win_qg->super.buf, NULL, x, y, w, h, gap_fill_color);
+        return;
+    }
+
     gfx_box_t clip = {
         .x = x, .y = y, .width = w, .height = h
     };
     gfx_paste_buffer(win_qg->super.buf, &clip, sw->buf, x, y);
-
-    const gfx_color_t gap_fill_color = gfx_color(0, 0, 50);
 
     // I kinda go heavily out the way to not need to paint twice over the same pixel.
 
@@ -142,17 +147,49 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
 static void win_qg_render(window_qgrid_t *win_qg) {
     gfx_buffer_t * const buf = win_qg->super.buf;
 
-    const uint16_t tile_width = (buf->width - WIN_QGRID_BORDER_WIDTH) / 2;
-    const uint16_t tile_height = (buf->height - WIN_QGRID_BORDER_WIDTH) / 2;
-
     const gfx_color_t border_color = gfx_color(150, 50, 50);
-    const gfx_color_t focused_border_color = gfx_color(200, 50, 50);
-    const gfx_color_t empty_tile_color = gfx_color(120, 50, 120);
 
-    for (size_t r = 0; r < 2; r++) {
-        for (size_t c = 0; c < 2; c++) {
-            window_t *sw = win_qg->grid[r][c];
+    // We are going to draw the exterior border 1 pixel thicker, this way, when we are in grid 
+    // mode, there is no possibility of issues with divison by 2 round off.
+    // (This only really works because we are rendering a 2x2 grid.)
+    gfx_draw_rect(buf, NULL, 0, 0, buf->width, buf->height, 
+            WIN_QGRID_BORDER_WIDTH + 1, border_color);
 
+    if (win_qg->single_pane_mode) { // single pane mode is simplest.
+        win_qg_render_tile(win_qg, 
+            win_qg->grid[win_qg->focused_row][win_qg->focused_col], 
+            WIN_QGRID_BORDER_WIDTH, WIN_QGRID_BORDER_WIDTH, 
+            buf->width - (2 * WIN_QGRID_BORDER_WIDTH),
+            buf->height - (2 * WIN_QGRID_BORDER_WIDTH),
+            win_qg->focused
+        ); 
+    } else {
+        const uint16_t tile_width = (buf->width - (3 * WIN_QGRID_BORDER_WIDTH)) / 2;
+        const uint16_t tile_height = (buf->height - (3 * WIN_QGRID_BORDER_WIDTH)) / 2;
+
+        // Here we draw a cross with center overlap.
+        gfx_fill_rect(buf, NULL, 
+            WIN_QGRID_BORDER_WIDTH + tile_width, WIN_QGRID_BORDER_WIDTH, 
+            WIN_QGRID_BORDER_WIDTH, buf->height - (2 * WIN_QGRID_BORDER_WIDTH), 
+            border_color
+        );
+
+        gfx_fill_rect(buf, NULL,
+            WIN_QGRID_BORDER_WIDTH,WIN_QGRID_BORDER_WIDTH + tile_height,
+            buf->width - (2 * WIN_QGRID_BORDER_WIDTH), WIN_QGRID_BORDER_WIDTH,
+            border_color
+        );
+
+        for (size_t r = 0; r < 2; r++) {
+            for (size_t c = 0; c < 2; c++) {
+                window_t *sw = win_qg->grid[r][c];
+                win_qg_render_tile(win_qg, sw, 
+                    WIN_QGRID_BORDER_WIDTH + (c * (tile_width + WIN_QGRID_BORDER_WIDTH)), 
+                    WIN_QGRID_BORDER_WIDTH + (r * (tile_height + WIN_QGRID_BORDER_WIDTH)),
+                    tile_width, tile_height, 
+                    win_qg->focused && r == win_qg->focused_row && c == win_qg->focused_col
+                );
+            }
         }
     }
 }
