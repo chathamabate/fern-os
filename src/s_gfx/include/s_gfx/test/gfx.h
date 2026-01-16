@@ -60,7 +60,7 @@ void gfx_test_outside_bouncing_bitmap(gfx_buffer_t *buffer, const gfx_box_t *cli
 
 /**
  * This just generates a buffer with some gradient, then pastes it into the given buffer
- * at (100, 100)
+ * at (x, y)
  */
-void gfx_test_gradient_buffer_paste(gfx_buffer_t *buffer, const gfx_box_t *clip);
+void gfx_test_gradient_buffer_paste(gfx_buffer_t *buffer, const gfx_box_t *clip, int32_t x, int32_t y);
 

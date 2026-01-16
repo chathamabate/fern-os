@@ -83,6 +83,62 @@ void delete_window_qgrid(window_t *w) {
     al_free(win_qg->al, win_qg);
 }
 
+/**
+ * This is unsafe and assumes that x, y, w, and h form a box entirely visible on 
+ * `win_qg->buf`.
+ *
+ * It also assumes there is room for the focus border!
+ */
+static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x, uint16_t y, 
+        uint16_t w, uint16_t h, bool focused) {
+    gfx_box_t clip = {
+        .x = x, .y = y, .width = w, .height = h
+    };
+    gfx_paste_buffer(win_qg->super.buf, &clip, sw->buf, x, y);
+
+    const gfx_color_t gap_fill_color = gfx_color(0, 0, 50);
+
+    // I kinda go heavily out the way to not need to paint twice over the same pixel.
+
+    if (sw->buf->width < w) {
+        gfx_fill_rect(win_qg->super.buf, NULL,
+            x + sw->buf->width, y, 
+            w - sw->buf->width, sw->buf->height, 
+            gap_fill_color
+        ); 
+    }
+
+    if (sw->buf->height < h) {
+        gfx_fill_rect(win_qg->super.buf, NULL,
+            x, y + sw->buf->height,
+            sw->buf->width, h - sw->buf->height,
+            gap_fill_color
+        );
+    }
+
+    if (sw->buf->width < w && sw->buf->height < h) {
+        gfx_fill_rect(win_qg->super.buf, NULL,
+            x + sw->buf->width, y + sw->buf->height,
+            w - sw->buf->width, h - sw->buf->height, 
+            gap_fill_color
+        );
+    }
+
+    const gfx_color_t focus_border_color = gfx_color(255, 255, 255);
+
+    if (focused) {
+        gfx_draw_rect(
+           win_qg->super.buf, NULL,
+           x - WIN_QGRID_FOCUS_BORDER_WIDTH,
+           y - WIN_QGRID_FOCUS_BORDER_WIDTH, 
+           w + (2 * WIN_QGRID_FOCUS_BORDER_WIDTH),
+           h + (2 * WIN_QGRID_FOCUS_BORDER_WIDTH),
+           WIN_QGRID_FOCUS_BORDER_WIDTH, 
+           focus_border_color
+        );
+    }
+}
+
 static void win_qg_render(window_qgrid_t *win_qg) {
     gfx_buffer_t * const buf = win_qg->super.buf;
 
@@ -97,19 +153,6 @@ static void win_qg_render(window_qgrid_t *win_qg) {
         for (size_t c = 0; c < 2; c++) {
             window_t *sw = win_qg->grid[r][c];
 
-            // Fill top left and top right borders first.
-            gfx_fill_rect(buf, NULL, c * tile_width, r * tile_height, 
-                    tile_width, WIN_QGRID_BORDER_WIDTH, border_color);
-
-            gfx_fill_rect(buf, NULL, c * tile_width, r * tile_height + WIN_QGRID_BORDER_WIDTH, 
-                    WIN_QGRID_BORDER_WIDTH, tile_width - WIN_QGRID_BORDER_WIDTH, border_color);
-
-            // Buffer in buffer tbh.
-            if (sw) {
-                
-            } else {
-
-            }
         }
     }
 }

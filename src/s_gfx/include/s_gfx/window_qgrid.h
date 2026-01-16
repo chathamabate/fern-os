@@ -42,6 +42,9 @@
  * expanded/shrunk.
  *
  * IMPORTANT: Quad Grid Window's assume subwindows never resize themselves!
+ * If a window cannot be resized due to its min/max dimmension attributes, it will still be 
+ * rendered starting at the top left corner of its tile. If the window is larger than the tile,
+ * its excess is clipped. If the window is smaller than the tile, the gap will be blacked out.
  *
  * Controls:
  * <CNTL> + Arrow Keys : Navigate around panes. (Only in Grid Mode)
@@ -49,6 +52,8 @@
  * <CNTL> + X : Deregister the window in the focused tile.
  *
  * (When <CNTL> is held, no key inputs are forwarded to subwindows)
+ *
+ * Finally, inactive subwindows are deregistered.
  */
 typedef struct _window_qgrid_t {
     window_t super;

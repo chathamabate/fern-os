@@ -196,6 +196,41 @@ void gfx_fill_box(gfx_buffer_t *buf, const gfx_box_t *clip_area,
     }
 }
 
+void gfx_draw_box(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        const gfx_box_t *box, uint16_t thickness, gfx_color_t color) {
+    gfx_fill_rect(buf, clip_area, 
+        box->x, 
+        box->y, 
+        box->width - thickness, 
+        thickness, 
+        color
+    );
+
+    gfx_fill_rect(buf, clip_area, 
+        box->x + box->width - thickness, 
+        box->y, 
+        thickness, 
+        box->height - thickness, 
+        color
+    );
+
+    gfx_fill_rect(buf, clip_area, 
+        box->x + thickness, 
+        box->y + box->height - thickness, 
+        box->width - thickness, 
+        thickness, 
+        color
+    );
+
+    gfx_fill_rect(buf, clip_area, 
+        box->x, 
+        box->y + thickness, 
+        thickness, 
+        box->height - thickness, 
+        color
+    );
+}
+
 void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         int32_t x, int32_t y, 
         uint8_t w_scale, uint8_t h_scale,
