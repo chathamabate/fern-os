@@ -10,6 +10,8 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev);
 fernos_error_t win_qg_register_child(window_t *w, window_t *sw);
 void win_qg_deregister_child(window_t *w, window_t *sw);
 
+static void win_qg_render(window_qgrid_t *win_qg);
+
 static const window_impl_t QGRID_IMPL = {
     .delete_window = delete_window_qgrid,
     .win_on_event = win_qg_on_event,
@@ -62,6 +64,9 @@ window_t *new_window_qgrid(allocator_t *al, uint16_t width, uint16_t height) {
     win_qg->single_pane_mode = false;
     win_qg->cntl_held = false;
     win_qg->focused = false;
+
+    // Populate the buffer right off the bat.
+    win_qg_render(win_qg);
 
     return (window_t *)win_qg;
 }
@@ -195,21 +200,82 @@ static void win_qg_render(window_qgrid_t *win_qg) {
 }
 
 fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
+    fernos_error_t err;
+    window_t *sw;
+
     window_qgrid_t *win_qg = (window_qgrid_t *)w;
+    gfx_buffer_t *buf = win_qg->super.buf;
 
     switch (ev.event_code) {
 
     case WINEC_TICK: {
-        // Here we actually render to buffer.
-        return FOS_E_NOT_IMPLEMENTED;         
+        if (win_qg->single_pane_mode) {
+            // In single pane mode, we just forward a tick to the window on display.
+            sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col]; 
+            if (sw) {
+                err = win_fwd_event(sw, (window_event_t) {.event_code = WINEC_TICK});
+                if (err == FOS_E_INACTIVE) {
+                    win_deregister(sw);
+                }
+            }
+
+            return FOS_E_SUCCESS;
+        }
+
+        // In grid mode we forward a tick to all tiles.
+        for (size_t r = 0; r < 2; r++) {
+            for (size_t c = 0; c < 2; c++) {
+                sw = win_qg->grid[r][c];
+                if (sw) {
+                    err = win_fwd_event(sw, (window_event_t) {.event_code = WINEC_TICK});
+                    if (err == FOS_E_INACTIVE) {
+                        win_deregister(sw);
+                    }
+                }
+            }
+        }
+        
+        return FOS_E_SUCCESS;
     }
 
     case WINEC_RESIZED: {
-        // Here we resize children.
-        return FOS_E_NOT_IMPLEMENTED;            
+        if (win_qg->single_pane_mode) {
+            // In single pane mode we just resize the visible pane!
+            sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col]; 
+            if (sw) {
+                err = win_resize(sw, 
+                    buf->width - (2 * WIN_QGRID_BORDER_WIDTH),
+                   buf->height - (2 * WIN_QGRID_BORDER_WIDTH)
+                );
+                if (err == FOS_E_INACTIVE) {
+                    win_deregister(sw);
+                }
+            }
+            
+            return FOS_E_SUCCESS;
+        }
+
+        const uint16_t tile_width = (buf->width - (3 * WIN_QGRID_BORDER_WIDTH)) / 2;
+        const uint16_t tile_height = (buf->height - (3 * WIN_QGRID_BORDER_WIDTH)) / 2;
+
+        // For grid mode let's try and resize each individual tile.
+        for (size_t r = 0; r < 2; r++) {
+            for (size_t c = 0; c < 2; c++) {
+                sw = win_qg->grid[r][c];
+                if (sw) {
+                    err = win_resize(sw, tile_width, tile_height);
+                    if (err == FOS_E_INACTIVE) {
+                        win_deregister(sw);
+                    }
+                }
+            }
+        }
+
+        return FOS_E_SUCCESS;
     }
 
     case WINEC_KEY_INPUT: {
+        // This is the real beheamoth tbh.
         return FOS_E_NOT_IMPLEMENTED;            
     }
 
