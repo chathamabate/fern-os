@@ -368,3 +368,26 @@ void gfx_test_outside_bouncing_bitmap(gfx_buffer_t *buffer, const gfx_box_t *cli
     gfx_fill_bitmap(buffer, clip, x_pos, y_pos, w_scale, h_scale, bitmap, rows, cols, 
             gfx_color(255, 0, 0), GFX_COLOR_CLEAR);
 }
+
+void gfx_test_gradient_buffer_paste(gfx_buffer_t *buffer, const gfx_box_t *clip) {
+    gfx_color_t image[200][300];
+    const uint16_t image_rows = sizeof(image) / sizeof(image[0]) ;
+    const uint16_t image_cols = sizeof(image[0]) / sizeof(image[0][0]);
+
+    for (uint16_t r = 0; r < image_rows; r++) {
+        const uint8_t red = ((uint32_t)r * 256) / image_rows;
+        for (uint16_t c = 0; c < image_cols; c++) {
+            const uint8_t blue = ((uint32_t)c * 256) / image_cols;
+            image[r][c] =  gfx_color(red, 0, blue);
+        }
+    }
+
+    gfx_buffer_t buf = {
+        .al = NULL,
+        .buffer = (gfx_color_t *)image,
+        .width = image_cols,
+        .height = image_rows 
+    };
+
+    gfx_paste_buffer(buffer, clip, &buf, 100, 100);
+}

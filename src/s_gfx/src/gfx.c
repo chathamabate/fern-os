@@ -291,10 +291,15 @@ void gfx_paste_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
     // It should be the case that:
     // x <= rbox.x && rbox.x - x < sub_buf->width
     // (Given how `gfx_clip_with_buffer` works)
-    const uint16_t x_off = (uint16_t)(rbox.x - x);
-    const uint16_t y_off = (uint16_t)(rbox.y - y);
+    const uint16_t start_col = (uint16_t)(rbox.x - x);
 
-    for (uint16_t r = 0; r < clip_area->height; r++) {
-         
+    const uint16_t start_row = (uint16_t)(rbox.y - y);
+    const uint16_t end_row = start_row + rbox.height; // This should never wrap.
+
+    for (uint16_t r = start_row; r < end_row; r++) {
+        gfx_color_t *dest_row = buf->buffer + (buf->width * (rbox.y + (r - start_row)));
+        const gfx_color_t *src_row = sub_buf->buffer + (sub_buf->width * r);
+
+        mem_cpy(dest_row + rbox.x, src_row + start_col, rbox.width * sizeof(gfx_color_t));
     }
 }
