@@ -189,12 +189,12 @@ static inline char scs1_to_ascii_uc(scs1_code_t sc) {
  */
 
 /**
- * Get the uppercase ascii equivelant of a scancode.
+ * Get the make version of a scancode.
  *
  * If no such character exists, 0 is returned!
  */
 static inline scs1_code_t scs1_as_make(scs1_code_t sc) {
-    return sc & ~(1U << 7);
+    return sc & ~(1U << 7); // This will work for extended codes too!
 }
 
 /**

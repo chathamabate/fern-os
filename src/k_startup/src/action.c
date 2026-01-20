@@ -108,6 +108,11 @@ void fos_pf_action(user_ctx_t *ctx) {
     return_to_curr_thread();
 }
 
+// DELETE ME!
+#include "s_gfx/gfx.h"
+#include "k_startup/gfx.h"
+#include "s_gfx/test/gfx.h"
+
 void fos_timer_action(user_ctx_t *ctx) {
     ks_save_ctx(kernel, ctx);
     
@@ -116,6 +121,26 @@ void fos_timer_action(user_ctx_t *ctx) {
         term_put_fmt_s("[Timer Error 0x%X]", err);
         ks_shutdown(kernel);
     }
+
+    static uint32_t tick = 0; 
+    static uint32_t frame = 0;
+    if (tick % 20 == 0) {
+        const uint16_t c = (frame % 150) * 2;
+        const gfx_box_t clip = {
+            .x = c, .y = c,
+            .width = BACK_BUFFER->width - (2 * c),
+            .height = BACK_BUFFER->height - (2 * c)
+        };
+        gfx_clear(BACK_BUFFER, gfx_color(0, 40, 0));
+        gfx_fill_box(BACK_BUFFER, NULL, &clip, gfx_color(0, 50, 50));
+        gfx_draw_rect(BACK_BUFFER, &clip, 
+                200, 200, 200, 300, frame % 200, gfx_color(255, 0, 0));
+        gfx_render();
+
+        frame++;
+    }
+
+    tick++;
 
     return_to_curr_thread();
 }

@@ -134,9 +134,10 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
         );
     }
 
-    const gfx_color_t focus_border_color = gfx_color(255, 255, 255);
 
     if (focused) {
+        const gfx_color_t focus_border_color = 
+            win_qg->cntl_held ?  gfx_color(255, 0, 0) : gfx_color(255, 255, 255);
         gfx_draw_rect(
            win_qg->super.buf, NULL,
            x - WIN_QGRID_FOCUS_BORDER_WIDTH,
@@ -234,6 +235,9 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
                 }
             }
         }
+
+        // After forwarding all tick events, we render!
+        win_qg_render(win_qg);
         
         return FOS_E_SUCCESS;
     }
@@ -271,12 +275,90 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
             }
         }
 
+        // Consider an immediate rerender.
+
         return FOS_E_SUCCESS;
     }
 
     case WINEC_KEY_INPUT: {
-        // This is the real beheamoth tbh.
-        return FOS_E_NOT_IMPLEMENTED;            
+
+        // Alright, so, if control is not held, all key codes get forwarded immediately
+        // to the focused window.
+
+        const scs1_code_t kc = ev.d.key_code;
+        const scs1_code_t make_code = scs1_as_make(kc);
+        const bool is_make = scs1_is_make(kc);
+
+        if (make_code == SCS1_LCTRL || make_code == SCS1_E_RCTRL) {
+            win_qg->cntl_held = is_make;
+            return FOS_E_SUCCESS;
+        }
+
+        if (!(win_qg->cntl_held)) { // arbitrary character forward!
+            sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
+            if (sw) {
+                err = win_fwd_event(sw, (window_event_t) {
+                    .event_code = WINEC_KEY_INPUT,
+                    .d.key_code = kc
+                });
+                if (err == FOS_E_INACTIVE) {
+                    win_deregister(sw);
+                }
+            }
+
+            return FOS_E_SUCCESS;
+        }
+
+        switch (kc) { // we use the raw key code here because we only care about key presses.
+
+        case SCS1_E_UP: {
+            if (win_qg->focused_row > 0) {
+                win_qg->focused_row--;
+            }
+            return FOS_E_SUCCESS;
+        }
+
+        case SCS1_E_DOWN: {
+            if (win_qg->focused_row < 1) {
+                win_qg->focused_row++;
+            }
+            return FOS_E_SUCCESS;
+        }
+
+        case SCS1_E_LEFT: {
+            if (win_qg->focused_col > 0) {
+                win_qg->focused_col--;
+            }
+            return FOS_E_SUCCESS;
+        }
+
+        case SCS1_E_RIGHT: {
+            if (win_qg->focused_col < 1) {
+                win_qg->focused_col++;
+            }
+            return FOS_E_SUCCESS;
+        }
+
+        case SCS1_F: {
+            win_qg->single_pane_mode = !(win_qg->single_pane_mode);
+            return FOS_E_SUCCESS;
+        }
+
+        case SCS1_X: { // Deregister focused window.
+            sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
+            if (sw) {
+                win_deregister(sw);
+            }
+            return FOS_E_SUCCESS;
+        }
+
+        default: { // Unmapped controls sequences are ignored!
+            return FOS_E_SUCCESS;
+        }
+
+        }
+
+        // Consider a  forced rerender instead of all key cases returning?
     }
 
     case WINEC_DEREGISTERED: {

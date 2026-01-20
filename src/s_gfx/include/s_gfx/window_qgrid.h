@@ -47,7 +47,7 @@
  * its excess is clipped. If the window is smaller than the tile, the gap will be blacked out.
  *
  * Controls:
- * <CNTL> + Arrow Keys : Navigate around panes. (Only in Grid Mode)
+ * <CNTL> + Arrow Keys : Navigate around panes. (Works in both modes)
  * <CNTL> + F : Enter/Exit Single Pane mode with whatever tile is focused.
  * <CNTL> + X : Deregister the window in the focused tile.
  *

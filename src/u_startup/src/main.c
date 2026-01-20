@@ -11,6 +11,7 @@ proc_exit_status_t user_main(void) {
      *
      * The user has no ability to render anything to the screen at this commit.
      */
+    while (1);
 
     return PROC_ES_SUCCESS;
 }
