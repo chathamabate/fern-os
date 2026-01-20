@@ -6,14 +6,14 @@
 #endif
 
 void delete_window_qgrid(window_t *w);
+void win_qg_render(window_t *w);
 fernos_error_t win_qg_on_event(window_t *w, window_event_t ev);
 fernos_error_t win_qg_register_child(window_t *w, window_t *sw);
 void win_qg_deregister_child(window_t *w, window_t *sw);
 
-static void win_qg_render(window_qgrid_t *win_qg);
-
 static const window_impl_t QGRID_IMPL = {
     .delete_window = delete_window_qgrid,
+    .win_render = win_qg_render,
     .win_on_event = win_qg_on_event,
     .win_register_child = win_qg_register_child,
     .win_deregister_child = win_qg_deregister_child
@@ -65,9 +65,6 @@ window_t *new_window_qgrid(allocator_t *al, uint16_t width, uint16_t height) {
     win_qg->cntl_held = false;
     win_qg->focused = false;
 
-    // Populate the buffer right off the bat.
-    win_qg_render(win_qg);
-
     return (window_t *)win_qg;
 }
 
@@ -89,10 +86,8 @@ void delete_window_qgrid(window_t *w) {
 }
 
 /**
- * This is unsafe and assumes that x, y, w, and h form a box entirely visible on 
- * `win_qg->buf`.
- *
- * It also assumes there is room for the focus border!
+ * Render a single tile given it's (x, y, w, h)
+ * (A focus border will be drawn around/outside this tile if focused)
  */
 static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x, uint16_t y, 
         uint16_t w, uint16_t h, bool focused) {
@@ -102,6 +97,10 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
         gfx_fill_rect(win_qg->super.buf, NULL, x, y, w, h, gap_fill_color);
         return;
     }
+
+    // With the new render virtual function design, it is the container's responsibility to call
+    // the render function of subwindows!
+    win_render(sw); // must do this before pasting into container buffer.
 
     gfx_box_t clip = {
         .x = x, .y = y, .width = w, .height = h
@@ -134,7 +133,6 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
         );
     }
 
-
     if (focused) {
         const gfx_color_t focus_border_color = 
             win_qg->cntl_held ?  gfx_color(255, 0, 0) : gfx_color(255, 255, 255);
@@ -150,7 +148,8 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
     }
 }
 
-static void win_qg_render(window_qgrid_t *win_qg) {
+void win_qg_render(window_t *w) {
+    window_qgrid_t * const win_qg = (window_qgrid_t *)w;
     gfx_buffer_t * const buf = win_qg->super.buf;
 
     const gfx_color_t border_color = gfx_color(150, 50, 50);
@@ -256,25 +255,11 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
     window_t *sw;
 
     window_qgrid_t *win_qg = (window_qgrid_t *)w;
-    gfx_buffer_t *buf = win_qg->super.buf;
 
     switch (ev.event_code) {
 
     case WINEC_TICK: {
-        if (win_qg->single_pane_mode) {
-            // In single pane mode, we just forward a tick to the window on display.
-            sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col]; 
-            if (sw) {
-                err = win_fwd_event(sw, (window_event_t) {.event_code = WINEC_TICK});
-                if (err == FOS_E_INACTIVE) {
-                    win_deregister(sw);
-                }
-            }
-
-            return FOS_E_SUCCESS;
-        }
-
-        // In grid mode we forward a tick to all tiles.
+        // We forward a tick to all subwindows always!
         for (size_t r = 0; r < 2; r++) {
             for (size_t c = 0; c < 2; c++) {
                 sw = win_qg->grid[r][c];
@@ -287,9 +272,8 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
             }
         }
 
-        // After forwarding all tick events, we render!
-        win_qg_render(win_qg);
-        
+        // We used to render here before we had a separate virtual render endpoint!
+
         return FOS_E_SUCCESS;
     }
 
@@ -325,8 +309,6 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
                 }
             }
         }
-
-        // Consider an immediate rerender.
 
         return FOS_E_SUCCESS;
     }
@@ -474,12 +456,22 @@ fernos_error_t win_qg_register_child(window_t *w, window_t *sw) {
         }
     }
 
-
     return FOS_E_NO_SPACE;
 }
 
 void win_qg_deregister_child(window_t *w, window_t *sw) {
+    window_qgrid_t *win_qg = (window_qgrid_t *)w;
 
+    // Here we just search for `sw` in the grid, dereferencing it if found!
+
+    for (size_t r = 0; r < 2; r++) {
+        for (size_t c = 0; c < 2; c++) {
+            if (win_qg->grid[r][c] == sw) {
+                win_qg->grid[r][c] = NULL; 
+                return;
+            }
+        }
+    }
 }
 
 

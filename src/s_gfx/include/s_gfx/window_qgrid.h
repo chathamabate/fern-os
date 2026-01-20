@@ -32,14 +32,16 @@
  * In Grid Mode, all 4 tiles will be visible. 
  * A tile being 1 cell in the 2x2 grid.
  * Each tile can either hold one subwindow or be empty.
- * All subwindows are forwarded tick events.
  * There is at most 1 focused tile. If the focused tile contains a window,
  * that window is forwarded key events.
  *
  * In Single Pane Mode, one of the 4 tiles is expanded to fill the whole 
- * screen. Only that tile will receive tick events.
+ * screen. 
  * Entering/Exiting Single Pane Mode resizes whatever window is being 
  * expanded/shrunk.
+ *
+ * In both modes, all subwindows are forwarded tick events.
+ * The mode determines which subwindow is actually rendered.
  *
  * IMPORTANT: Quad Grid Window's assume subwindows never resize themselves!
  * If a window cannot be resized due to its min/max dimmension attributes, it will still be 

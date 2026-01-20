@@ -11,7 +11,7 @@
 typedef uint32_t window_event_code_t;
 
 /**
- * An event which can be expected to occur repeatedly while a window is active and visible.
+ * An event which can be expected to occur repeatedly while a window is active.
  */
 #define WINEC_TICK (0U)
 
@@ -111,6 +111,20 @@ struct _window_impl_t {
     void (*delete_window)(window_t *w);
 
     /**
+     * All writing to a window's buffer should happen within this function!
+     * NOWHERE ELSE!
+     */
+    void (*win_render)(window_t *w);
+
+    /*
+     * NOTE: None of the below functions should internally call `win_render` or do
+     * any modification of the `buf`.
+     *
+     * The idea here is that rendering will likely be the slowest lifecycle step for windows.
+     * The user of a window will entirely control when and when NOT a window should redraw itself.
+     */
+
+    /**
      * Handle an event!
      *
      * To signal to the user that this window should no longer be used, return FOS_E_INACTIVE.
@@ -195,6 +209,15 @@ void deinit_window_base(window_t *w);
 static inline void delete_window(window_t *w) {
     if (w) {
         w->impl->delete_window(w);
+    }
+}
+
+/**
+ * Write the the window's internal graphics buffer.
+ */
+static inline void win_render(window_t *w) {
+    if (w->is_active) {
+        w->impl->win_render(w);
     }
 }
 
