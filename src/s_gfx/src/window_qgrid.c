@@ -388,7 +388,16 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
 
             sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
             if (sw) { // If there is a focused window, we must resize it!
+                const size_t new_width = win_qg->single_pane_mode 
+                    ? win_qg_large_tile_width(win_qg) : win_qg_tile_width(win_qg);
 
+                const size_t new_height = win_qg->single_pane_mode 
+                    ? win_qg_large_tile_height(win_qg) : win_qg_tile_height(win_qg);
+
+                err = win_resize(sw, new_width, new_height);
+                if (err == FOS_E_INACTIVE) {
+                    win_deregister(sw);
+                }
             }
 
             return FOS_E_SUCCESS;
@@ -442,10 +451,25 @@ fernos_error_t win_qg_register_child(window_t *w, window_t *sw) {
         for (size_t c = 0; c < 2; c++) {
             if (!(win_qg->grid[r][c])) { // We found a spot!
                 // Let's attempt a resize. 
-                err = win_resize(sw, 
-                    win_qg->single_pane_mode ? 
-                );
+                const size_t new_width = win_qg->single_pane_mode 
+                    ? win_qg_large_tile_width(win_qg) : win_qg_tile_width(win_qg);
 
+                const size_t new_height = win_qg->single_pane_mode 
+                    ? win_qg_large_tile_height(win_qg) : win_qg_tile_height(win_qg);
+
+                err = win_resize(sw, new_width, new_height);
+                if (err == FOS_E_INACTIVE) {
+                    return FOS_E_UNKNWON_ERROR; // `sw` broke during register.
+                }
+
+                // VERY IMPORTANT, let's set the focus position BEFORE placing `sw` into the grid.
+                // THIS IS REQUIRED given how `win_qg_set_focus_position` works.
+                win_qg_set_focus_position(win_qg, r, c);
+
+                // Success!
+                win_qg->grid[r][c] = sw;
+
+                return FOS_E_SUCCESS;
             }
         }
     }
