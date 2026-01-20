@@ -146,7 +146,7 @@ struct _window_impl_t {
 
     /**
      * When this endpoint is called, it is gauranteed `sw` is non-null
-     * AND `sw->container` is NULL.
+     * AND `sw->container` is NULL AND `sw` is active.
      *
      * Afterwards, the wrapper will set `sw->container` to `w`.
      */

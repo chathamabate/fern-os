@@ -165,13 +165,13 @@ static void win_qg_render(window_qgrid_t *win_qg) {
         win_qg_render_tile(win_qg, 
             win_qg->grid[win_qg->focused_row][win_qg->focused_col], 
             WIN_QGRID_BORDER_WIDTH, WIN_QGRID_BORDER_WIDTH, 
-            buf->width - (2 * WIN_QGRID_BORDER_WIDTH),
-            buf->height - (2 * WIN_QGRID_BORDER_WIDTH),
+            win_qg_large_tile_width(win_qg),
+            win_qg_large_tile_height(win_qg),
             win_qg->focused
         ); 
     } else {
-        const uint16_t tile_width = (buf->width - (3 * WIN_QGRID_BORDER_WIDTH)) / 2;
-        const uint16_t tile_height = (buf->height - (3 * WIN_QGRID_BORDER_WIDTH)) / 2;
+        const uint16_t tile_width = win_qg_tile_width(win_qg);
+        const uint16_t tile_height = win_qg_tile_height(win_qg);
 
         // Here we draw a cross with center overlap.
         gfx_fill_rect(buf, NULL, 
@@ -198,6 +198,57 @@ static void win_qg_render(window_qgrid_t *win_qg) {
             }
         }
     }
+}
+
+/**
+ * Set the focus position of the window.
+ *
+ * Does nothing if (r, c) is invalid or already focused.
+ * In single pane mode, this will shrink the current focused window, and expand the newly
+ * focused window!
+ */
+static void win_qg_set_focus_position(window_qgrid_t *win_qg, size_t r, size_t c) {
+    fernos_error_t err;
+
+    if (r >= 2 || c >= 2) { // Invalid position.
+        return;
+    }
+
+    if (r == win_qg->focused_row && c == win_qg->focused_col) { // already focused.
+        return;
+    }
+
+    // We are going to move!
+
+    if (win_qg->single_pane_mode) {
+        // In single pane mode, we always shrink current window back to correct tile size.        
+        window_t *init_focus = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
+        if (init_focus) {
+            err = win_resize(init_focus, 
+                    win_qg_tile_width(win_qg),
+                    win_qg_tile_height(win_qg)
+            );
+            if (err == FOS_E_INACTIVE) {
+                win_deregister(init_focus);
+            }
+        }
+
+        window_t *next_focus = win_qg->grid[r][c];
+        if (next_focus) {
+            err = win_resize(next_focus, 
+                    win_qg_large_tile_width(win_qg),
+                    win_qg_large_tile_height(win_qg)
+            );
+            if (err == FOS_E_INACTIVE) {
+                win_deregister(next_focus);
+            }
+        }
+    }
+
+    // In grid mode, all subwindows will have identical size, no need to resize anything.
+
+    win_qg->focused_row = r;
+    win_qg->focused_col = c;
 }
 
 fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
@@ -248,8 +299,8 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
             sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col]; 
             if (sw) {
                 err = win_resize(sw, 
-                    buf->width - (2 * WIN_QGRID_BORDER_WIDTH),
-                   buf->height - (2 * WIN_QGRID_BORDER_WIDTH)
+                        win_qg_large_tile_width(win_qg),
+                        win_qg_large_tile_height(win_qg)
                 );
                 if (err == FOS_E_INACTIVE) {
                     win_deregister(sw);
@@ -259,8 +310,8 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
             return FOS_E_SUCCESS;
         }
 
-        const uint16_t tile_width = (buf->width - (3 * WIN_QGRID_BORDER_WIDTH)) / 2;
-        const uint16_t tile_height = (buf->height - (3 * WIN_QGRID_BORDER_WIDTH)) / 2;
+        const uint16_t tile_width = win_qg_tile_width(win_qg);
+        const uint16_t tile_height = win_qg_tile_height(win_qg);
 
         // For grid mode let's try and resize each individual tile.
         for (size_t r = 0; r < 2; r++) {
@@ -312,35 +363,34 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
         switch (kc) { // we use the raw key code here because we only care about key presses.
 
         case SCS1_E_UP: {
-            if (win_qg->focused_row > 0) {
-                win_qg->focused_row--;
-            }
+            win_qg_set_focus_position(win_qg, win_qg->focused_row - 1, win_qg->focused_col);
             return FOS_E_SUCCESS;
         }
 
         case SCS1_E_DOWN: {
-            if (win_qg->focused_row < 1) {
-                win_qg->focused_row++;
-            }
+            win_qg_set_focus_position(win_qg, win_qg->focused_row + 1, win_qg->focused_col);
             return FOS_E_SUCCESS;
         }
 
         case SCS1_E_LEFT: {
-            if (win_qg->focused_col > 0) {
-                win_qg->focused_col--;
-            }
+            win_qg_set_focus_position(win_qg, win_qg->focused_row, win_qg->focused_col - 1);
             return FOS_E_SUCCESS;
         }
 
         case SCS1_E_RIGHT: {
-            if (win_qg->focused_col < 1) {
-                win_qg->focused_col++;
-            }
+            win_qg_set_focus_position(win_qg, win_qg->focused_row, win_qg->focused_col + 1);
             return FOS_E_SUCCESS;
         }
 
         case SCS1_F: {
+            // Toggle single pane mode.
             win_qg->single_pane_mode = !(win_qg->single_pane_mode);
+
+            sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
+            if (sw) { // If there is a focused window, we must resize it!
+
+            }
+
             return FOS_E_SUCCESS;
         }
 
@@ -383,7 +433,25 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
 }
 
 fernos_error_t win_qg_register_child(window_t *w, window_t *sw) {
-    return FOS_E_NOT_IMPLEMENTED;
+    fernos_error_t err;
+    window_qgrid_t *win_qg = (window_qgrid_t *)w;
+
+    // Here we will look for an open spot!
+
+    for (size_t r = 0; r < 2; r++) {
+        for (size_t c = 0; c < 2; c++) {
+            if (!(win_qg->grid[r][c])) { // We found a spot!
+                // Let's attempt a resize. 
+                err = win_resize(sw, 
+                    win_qg->single_pane_mode ? 
+                );
+
+            }
+        }
+    }
+
+
+    return FOS_E_NO_SPACE;
 }
 
 void win_qg_deregister_child(window_t *w, window_t *sw) {

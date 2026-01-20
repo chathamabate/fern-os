@@ -67,6 +67,10 @@ typedef struct _window_qgrid_t {
      * The tiles. 
      *
      * NULL means an empty tile!
+     *
+     * In single pane mode, the focused pane will have a large size where as all
+     * other panes will have the normal tile size.
+     * In grid mode, all tiles have the normal tiles size.
      */
     window_t *grid[2][2];
 
@@ -88,6 +92,35 @@ typedef struct _window_qgrid_t {
      */
     bool focused;
 } window_qgrid_t;
+
+/*
+ * The below functions are used for getting the correct dimmensions of a tile in different 
+ * contexts.
+ *
+ * In grid mode, all tiles have the same dimmensions. Use `win_qg_tile_width/height`
+ * In single pane mode, all unfocused tiles are invisible and retain their dimmensions from
+ * grid mode. The focused tile is expanded with size `win_qg_large_tile_width/height`.
+ *
+ * NOTE: When we are in single pane mode and switch panes, the new focused pane will be expanded
+ * whereas the initial pane will be shrunk.
+ */
+
+static inline uint16_t win_qg_tile_width(window_qgrid_t *win_qg) {
+    return (win_qg->super.buf->width - (WIN_QGRID_BORDER_WIDTH * 3)) / 2;
+}
+
+static inline uint16_t win_qg_tile_height(window_qgrid_t *win_qg) {
+    // BORDER WIDTH AND HEIGHT ARE THE SANE! THIS IS CORRECT!
+    return (win_qg->super.buf->height - (WIN_QGRID_BORDER_WIDTH * 3)) / 2;
+}
+
+static inline uint16_t win_qg_large_tile_width(window_qgrid_t *win_qg) {
+    return win_qg->super.buf->width - (WIN_QGRID_BORDER_WIDTH * 2);
+}
+
+static inline uint16_t win_qg_large_tile_height(window_qgrid_t *win_qg) {
+    return win_qg->super.buf->height - (WIN_QGRID_BORDER_WIDTH * 2);
+}
 
 /**
  * Create a new Quad Grid Window.

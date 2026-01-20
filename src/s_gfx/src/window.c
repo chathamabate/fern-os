@@ -71,11 +71,7 @@ fernos_error_t win_register_child(window_t *w, window_t *sw) {
         return FOS_E_NOT_IMPLEMENTED;
     }
 
-    if (!sw) {
-        return FOS_E_BAD_ARGS;
-    }
-
-    if (sw->container) {
+    if (sw->container || !(sw->is_active)) {
         return FOS_E_STATE_MISMATCH;
     }
 
