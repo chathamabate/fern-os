@@ -185,6 +185,24 @@ static inline void tb_default_clear(term_buffer_t *tb) {
  */
 fernos_error_t tb_resize(term_buffer_t *tb, uint16_t rows, uint16_t cols);
 
+/**
+ * Shift terminal contents `shift` rows up.
+ *
+ * Leaving new rows at the bottom of the terminal.
+ *
+ * Cursor position remains unchanged.
+ */
+void tb_scroll_up(term_buffer_t *tb, uint16_t shift);
+
+/**
+ * Shift terminal contents `shift` rows down.
+ *
+ * Leaving new rows at the top of the terminal.
+ *
+ * Cursor position remains unchanged.
+ */
+void tb_scroll_down(term_buffer_t *tb, uint16_t shift);
+
 
 
 

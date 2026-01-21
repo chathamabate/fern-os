@@ -1,5 +1,6 @@
 
 #include "s_data/term_buffer.h"
+#include "s_util/str.h"
 
 term_buffer_t *new_term_buffer(allocator_t *al, term_cell_t default_cell, uint16_t rows, uint16_t cols) {
     term_buffer_t *tb = al_malloc(al, sizeof(term_buffer_t));
@@ -64,5 +65,60 @@ fernos_error_t tb_resize(term_buffer_t *tb, uint16_t rows, uint16_t cols) {
     tb_clear(tb, tb->default_cell);
 
     return FOS_E_SUCCESS;
+}
+
+void tb_scroll_up(term_buffer_t *tb, uint16_t shift) {
+    if (shift == 0) {
+        return;
+    }
+
+    if (shift >= tb->rows) {
+        tb_default_clear(tb);
+    }
+
+    const uint16_t left_over_rows = tb->rows - shift;
+
+    for (uint16_t r = 0; r < left_over_rows; r++) {
+        mem_cpy(tb->buf + (r * tb->cols), tb->buf + ((r + shift) * tb->cols), tb->cols * sizeof(term_cell_t));
+    }
+
+    // Given the shift is greater than 0, we know the final row will always need to be reset.
+    term_cell_t * const final_row = tb->buf + ((tb->rows - 1) * tb->cols);
+
+    for (uint16_t c = 0; c < tb->cols; c++) {
+        final_row[c] = tb->default_cell;
+    }
+
+    // Now we can memcpy from the final row into other new rows needing to be reset.
+    for (uint16_t r = left_over_rows; r < tb->rows - 1; r++) {
+        mem_cpy(tb->buf + (r * tb->cols), final_row, tb->cols * sizeof(term_cell_t));
+    }
+}
+
+void tb_scroll_down(term_buffer_t *tb, uint16_t shift) {
+    // Same thing as scroll up, just needs to be reversed.
+
+    if (shift == 0) {
+        return;
+    }
+
+    if (shift >= tb->rows) {
+        tb_default_clear(tb);
+    }
+
+    for (uint16_t r = tb->rows - 1; r >= shift; r--) {
+        mem_cpy(tb->buf + (r * tb->cols), tb->buf + ((r - shift) * tb->cols), tb->cols * sizeof(term_cell_t));
+    }
+
+    // Given shift is greater than 0, first row must be reset.
+    term_cell_t * const first_row = tb->buf;
+
+    for (uint16_t c = 0; c < tb->cols; c++) {
+        first_row[c] = tb->default_cell;
+    }
+
+    for (uint16_t r = 1; r < shift; r++) {
+        mem_cpy(tb->buf + (r * tb->cols), first_row, tb->cols * sizeof(term_cell_t));
+    }
 }
 
