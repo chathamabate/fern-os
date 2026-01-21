@@ -342,6 +342,8 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
             return FOS_E_SUCCESS;
         }
 
+        // Control sequence!
+
         switch (kc) { // we use the raw key code here because we only care about key presses.
 
         case SCS1_E_UP: {
