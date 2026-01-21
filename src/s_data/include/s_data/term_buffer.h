@@ -138,6 +138,12 @@ typedef struct _term_buffer_t {
     uint16_t cursor_row, cursor_col;
 
     /**
+     * The style of the next character to be printed.
+     * This can be changed with ANSI control sequences.
+     */
+    term_style_t curr_style;
+
+    /**
      * Buf must have size AT LEAST `rows * cols * sizeof(term_cell_t)`.
      */
     term_cell_t *buf;
@@ -147,7 +153,7 @@ typedef struct _term_buffer_t {
  * Allocate a new terminal buffer!
  *
  * (The state of the cells in the created buffer is undefined)
- * cursor starts at (0, 0)
+ * cursor starts at (0, 0) with default style.
  *
  * Returns NULL on error.
  */
@@ -165,7 +171,8 @@ void delete_term_buffer(term_buffer_t *tb);
 /**
  * Set all cells within the buffer to a single value.
  *
- * Cursor is set to (0, 0)
+ * Cursor is set to (0, 0) 
+ * Current style remains unchanged.
  */
 void tb_clear(term_buffer_t *tb, term_cell_t cell_val);
 
@@ -189,6 +196,7 @@ fernos_error_t tb_resize(term_buffer_t *tb, uint16_t rows, uint16_t cols);
  * Shift terminal contents `shift` rows up.
  *
  * Leaving new rows at the bottom of the terminal.
+ * (New rows populated with default cell value)
  *
  * Cursor position remains unchanged.
  */
@@ -198,138 +206,15 @@ void tb_scroll_up(term_buffer_t *tb, uint16_t shift);
  * Shift terminal contents `shift` rows down.
  *
  * Leaving new rows at the top of the terminal.
+ * (New rows populated with default cell value)
  *
  * Cursor position remains unchanged.
  */
 void tb_scroll_down(term_buffer_t *tb, uint16_t shift);
 
 
-
-
-typedef struct _char_display_t char_display_t;
-typedef struct _char_display_impl_t char_display_impl_t;
-
-struct _char_display_impl_t {
-    void (*delete_char_display)(char_display_t *cd);
-
-    /*
-     * The below functions will be "private virtual". The user will only interact with
-     * a character display using the put_s and put_c functions.
-     *
-     * THEY SHOULD NEVER modify the state within the char_display base class.
-     * (They should have no knowledge of a cursor)
-     */
-
-    /**
-     * Get the value of a single cell in the grid.
-     *
-     * If `style` is non-NULL, the style of the given cell is written to `*style`.
-     * If `c` is non-NULL, the character displayed in the given cell is written to `*c`.
-     */
-    void (*cd_get_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t *style, char *c);
-
-    /**
-     * Place a character on the screen at position (`row`, `col`) with style `style`.
-     * 
-     * This should only do anything if:
-     * 0 <= `row` < `rows`
-     * 0 <= `col` < `cols`
-     */
-    void (*cd_set_c)(char_display_t *cd, size_t row, size_t col, char_display_style_t style, char c);
-
-    /**
-     * Shift all rows up leaving new rows at the bottom of the screen.
-     *
-     * The new rows should be filled with ' ''s using the default style.
-     *
-     * If `shift` >= `rows`, this clears the screen.
-     */
-    void (*cd_scroll_up)(char_display_t *cd, size_t shift);
-
-    /**
-     * Shift all rows down leaving new rows at the top of the screen.
-     *
-     * The new rows should be filled with ' ''s using the default style.
-     *
-     * If `shift` >= `rows`, this clears the screen.
-     */
-    void (*cd_scroll_down)(char_display_t *cd, size_t shift);
-
-    /**
-     * Set an entire row to a single character.
-     *
-     * This should only do anything if:
-     * 0 <= `row` < `rows`
-     */
-    void (*cd_set_row)(char_display_t *cd, size_t row, char_display_style_t style, char c);
-
-    /**
-     * Set the entire grid to a single character with a single style.
-     */
-    void (*cd_set_grid)(char_display_t *cd, char_display_style_t style, char c);
-};
-
 /**
- * A Char Display is some sort of abstract grid of characters.
- *
- * The grid has a constant number of rows and columns.
- *
- * A character display has no notion of history past the current values in the grid.
- *
- * The char display should be able to handle all ASCII printable characters 
- * (i.e. in the range [32, 127)) 
- */
-struct _char_display_t {
-    const char_display_impl_t * const impl;
-
-    const size_t rows;
-    const size_t cols;
-
-    /**
-     * 0-indexed row of the cursor.
-     */
-    size_t cursor_row;
-
-    /**
-     * 0-indexed column of the cursor.
-     */
-    size_t cursor_col;
-
-    /**
-     * When an ANSI Reset code is processed, this is the style returned to.
-     */
-    const char_display_style_t default_style;
-
-    /**
-     * The current style used for printing text.
-     */
-    char_display_style_t curr_style;
-};
-
-/**
- * Initialize the char_display_t base class fields.
- *
- * This is a helper function to be used in the constructors of derrived classes.
- *
- * The starting cursor position will be the top left corner (0, 0)
- * NOTE: THIS DOES NOT call any of the given virtual functions AT ALL.
- *
- * Make sure your derrived constructor clears the display and renders the cursor!
- */
-void init_char_display_base(char_display_t *base, const char_display_impl_t *impl, size_t rows, size_t cols,
-        char_display_style_t default_style);
-
-/**
- * Delete the character display.
- */
-static inline void delete_char_display(char_display_t *cd) {
-    if (cd) {
-        cd->impl->delete_char_display(cd);
-    }
-}
-
-/**
- * Write a character to the terminal.
+ * Write a character to the terminal buffer.
  *
  * Control Characters Supported:
  * '\n' - Move cursor to the beginning of the next line. (Scrolling if needed)
@@ -339,10 +224,10 @@ static inline void delete_char_display(char_display_t *cd) {
  * Undefined behavior if `c` is not a ASCII printable character or one of the listed control 
  * sequences.
  */
-void cd_put_c(char_display_t *cd, char c);
+void tb_put_c(term_buffer_t *tb, char c);
 
 /**
- * Write a string to the terminal.
+ * Write a string to the terminal buffer.
  *
  * Control Characters Supported:
  * '\n' - Move cursor to the beginning of the next line. (Scrolling if needed)
@@ -353,8 +238,7 @@ void cd_put_c(char_display_t *cd, char c);
  *
  * Undefined behavior if a non-supported control character or sequence is encountered in `s`.
  */
-void cd_put_s(char_display_t *cd, const char *s);
+void tb_put_s(term_buffer_t *tb, const char *s);
 
 #define CHAR_DISPLAY_FMT_BUF_SIZE 1024
-void cd_put_fmt_s(char_display_t *cd, const char *fmt, ...);
-
+void tb_put_fmt_s(term_buffer_t *tb, const char *fmt, ...);
