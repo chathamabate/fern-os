@@ -2,7 +2,6 @@
 
 #include "k_sys/debug.h"
 #include "s_bridge/ctx.h"
-#include "k_startup/vga_cd.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
 #include "s_mem/allocator.h"
@@ -74,12 +73,12 @@ static void return_to_curr_thread(void) {
 
 void fos_lock_up_action(user_ctx_t *ctx) {
     (void)ctx;
-    gfx_out_fatal("Lock Up Triggered");
+    gfx_direct_fatal("Lock Up Triggered");
 }
 
 void fos_gpf_action(user_ctx_t *ctx) {
     if (ctx->cr3 == get_kernel_pd()) { // Are we currently in the kernel?
-        gfx_out_fatal("Kernel Locking up in GPF Action");
+        gfx_direct_fatal("Kernel Locking up in GPF Action");
     }
 
     ks_exit_proc(kernel, PROC_ES_GPF);
@@ -92,7 +91,7 @@ void fos_pf_action(user_ctx_t *ctx) {
     // handler with some special stack.
 
     if (ctx->cr3 == get_kernel_pd()) {
-        gfx_out_fatal("Kernel Locking up in PF Action");
+        gfx_direct_fatal("Kernel Locking up in PF Action");
     }
 
     ks_save_ctx(kernel, ctx);
@@ -108,39 +107,14 @@ void fos_pf_action(user_ctx_t *ctx) {
     return_to_curr_thread();
 }
 
-// DELETE ME!
-#include "s_gfx/gfx.h"
-#include "k_startup/gfx.h"
-#include "s_gfx/test/gfx.h"
-
 void fos_timer_action(user_ctx_t *ctx) {
     ks_save_ctx(kernel, ctx);
     
     fernos_error_t err = ks_tick(kernel);
     if (err != FOS_E_SUCCESS) {
-        term_put_fmt_s("[Timer Error 0x%X]", err);
+        gfx_direct_put_fmt_s("[Timer Error 0x%X]", err);
         ks_shutdown(kernel);
     }
-
-    static uint32_t tick = 0; 
-    static uint32_t frame = 0;
-    if (tick % 20 == 0) {
-        const uint16_t c = (frame % 150) * 2;
-        const gfx_box_t clip = {
-            .x = c, .y = c,
-            .width = BACK_BUFFER->width - (2 * c),
-            .height = BACK_BUFFER->height - (2 * c)
-        };
-        gfx_clear(BACK_BUFFER, gfx_color(0, 40, 0));
-        gfx_fill_box(BACK_BUFFER, NULL, &clip, gfx_color(0, 50, 50));
-        gfx_draw_rect(BACK_BUFFER, &clip, 
-                200, 200, 200, 300, frame % 200, gfx_color(255, 0, 0));
-        gfx_render();
-
-        frame++;
-    }
-
-    tick++;
 
     return_to_curr_thread();
 }
@@ -315,7 +289,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     }
 
     if (err != FOS_E_SUCCESS) {
-        term_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
+        gfx_direct_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
         ks_shutdown(kernel);
     }
 
@@ -355,7 +329,7 @@ void fos_irq1_action(user_ctx_t *ctx) {
         if (plg_kb) {
             err = plg_kernel_cmd(plg_kb, PLG_KB_KCID_KEY_EVENT, sc, 0, 0, 0);
             if (err != FOS_E_SUCCESS) {
-                term_put_fmt_s("[KeyEvent Error 0x%X]\n", err);
+                gfx_direct_put_fmt_s("[KeyEvent Error 0x%X]\n", err);
                 ks_shutdown(kernel);
             }
         }

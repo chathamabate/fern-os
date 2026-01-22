@@ -7,13 +7,11 @@ _SRCS 		?= kernel.c \
 			   thread.c \
 			   process.c \
 			   state.c \
-			   handle_cd.c \
 			   plugin.c \
 			   plugin_fut.c \
 			   plugin_fs.c \
 			   plugin_kb.c \
 			   plugin_pipe.c \
-			   plugin_vga_cd.c \
 			   action.c \
 			   tss.c \
 			   gfx.c \
@@ -22,7 +20,6 @@ _SRCS 		?= kernel.c \
 			   page.c \
 			   page_helpers.c \
 			   ata_block_device.c \
-			   vga_cd.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= boot.s \

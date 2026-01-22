@@ -3,6 +3,8 @@
 
 #include "plugin.h"
 
+// TO BE DELETED/REFACTORED!
+
 /**
  * The max number of characters which can be written to the vga terminal
  * display from userspace in one go.

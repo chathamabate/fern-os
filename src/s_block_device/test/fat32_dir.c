@@ -10,7 +10,7 @@
 #include "s_block_device/mem_block_device.h"
 #include "s_block_device/fat32.h"
 #include "s_block_device/fat32_dir.h"
-#include "k_startup/vga_cd.h"
+#include "k_startup/gfx.h"
 #include "s_util/rand.h"
 
 static bool pretest(void);
@@ -19,7 +19,7 @@ static bool posttest(void);
 #define PRETEST() pretest()
 #define POSTTEST() posttest()
 
-#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s(__VA_ARGS__)
 
 #include "s_util/test.h"
 

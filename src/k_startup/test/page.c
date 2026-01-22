@@ -3,12 +3,12 @@
 #include "k_startup/page.h"
 #include "k_sys/page.h"
 
-#include "k_startup/vga_cd.h"
 #include "k_sys/debug.h"
 #include "s_util/err.h"
 #include "s_util/constraints.h"
 #include "s_util/str.h"
 #include <stdint.h>
+#include "k_startup/gfx.h"
 
 static bool pretest(void);
 static bool posttest(void);
@@ -16,7 +16,7 @@ static bool posttest(void);
 #define PRETEST() pretest()
 #define POSTTEST() posttest()
 
-#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() lock_up()
 
 #include "s_util/test.h"

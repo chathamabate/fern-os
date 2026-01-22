@@ -5,7 +5,7 @@
 #include "s_block_device/block_device.h"
 #include "s_block_device/cached_block_device.h"
 #include "s_block_device/mem_block_device.h"
-#include "k_startup/vga_cd.h"
+#include "k_startup/gfx.h"
 #include "s_util/rand.h"
 #include "s_util/str.h"
 
@@ -30,7 +30,7 @@ bool test_cached_block_device(void) {
  * It assumes the mem_block_device works.
  */
 
-#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s(__VA_ARGS__)
 
 #include "s_util/test.h"
 

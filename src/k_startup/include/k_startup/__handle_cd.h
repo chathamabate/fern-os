@@ -1,6 +1,10 @@
 
 #pragma once
 
+/*
+ * TO BE DELETED/REFACTORED!
+ */
+
 #include "state.h"
 #include "handle.h"
 #include "s_util/char_display.h"

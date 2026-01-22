@@ -3,7 +3,7 @@
 #include "s_util/ansi.h"
 #include "s_util/str.h"
 #include "s_util/rand.h"
-#include "k_startup/vga_cd.h"
+#include "k_startup/gfx.h"
 
 /*
  * THIS WILL BE DELETED SOON
@@ -24,7 +24,7 @@ static bool pretest(void);
  * If the tests pass though, we'd expect everything to be printed out correctly.
  */
 
-#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s(__VA_ARGS__)
 
 #include "s_util/test.h"
 

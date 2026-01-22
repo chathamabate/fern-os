@@ -4,6 +4,8 @@
 #include "s_util/err.h"
 #include "s_util/char_display.h"
 
+// TO BE REMOVED/REFACTORED!
+
 /**
  * Write a string directly to the BIOS VGA Terminal.
  *

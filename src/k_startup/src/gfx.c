@@ -50,7 +50,7 @@ static gfx_buffer_t back_buffer = {
 gfx_buffer_t * const BACK_BUFFER = &back_buffer;
 
 #define DIRECT_TERM_ROWS (40U)
-#define DIRECT_TERM_COLS (30U)
+#define DIRECT_TERM_COLS (60U)
 
 static term_cell_t direct_term_arr[DIRECT_TERM_ROWS][DIRECT_TERM_COLS];
 
