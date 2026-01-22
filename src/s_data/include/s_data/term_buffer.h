@@ -106,8 +106,18 @@ term_style_t ts_with_ansi_style_code(term_style_t ts, uint8_t ansi_style_code);
 
 typedef struct _term_cell_t {
     term_style_t style;
+
+    /**
+     * We can assume this value will always an ascii printable character.
+     *
+     * Undefined behavior if this is not the case.
+     */
     char c;
 } term_cell_t;
+
+static inline bool tc_equals(term_cell_t tc0, term_cell_t tc1) {
+    return tc0.style == tc1.style && tc0.c == tc1.c;
+}
 
 typedef struct _term_buffer_t {
     /**
@@ -152,7 +162,7 @@ typedef struct _term_buffer_t {
 /**
  * Allocate a new terminal buffer!
  *
- * (The state of the cells in the created buffer is undefined)
+ * The full buffer is initialized to the default cell.
  * cursor starts at (0, 0) with default style.
  *
  * Returns NULL on error.

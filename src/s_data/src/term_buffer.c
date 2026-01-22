@@ -99,6 +99,10 @@ term_buffer_t *new_term_buffer(allocator_t *al, term_cell_t default_cell, uint16
     tb->cursor_col = 0;
     tb->buf = buf;
 
+    // At this point the buffer is pretty much created, although
+    // the values inside `buf` may be invalid, let's reset them.
+    tb_default_clear(tb);
+
     return tb; 
 }
 
@@ -110,10 +114,13 @@ void delete_term_buffer(term_buffer_t *tb) {
 }
 
 void tb_clear(term_buffer_t *tb, term_cell_t cell_val) {
-    for (size_t r = 0; r < tb->rows; r++) {
-        for (size_t c = 0; c < tb->cols; c++) {
-            tb->buf[(tb->cols * r) + c] = cell_val;
-        }
+    term_cell_t * const first_row = tb->buf;
+    for (uint16_t c = 0; c < tb->cols; c++) {
+        first_row[c] = cell_val;
+    }
+
+    for (uint16_t r = 1; r < tb->rows; r++) {
+        mem_cpy(tb->buf + (tb->cols * r), first_row, tb->cols * sizeof(term_cell_t));
     }
 
     tb->cursor_row = 0;

@@ -392,3 +392,57 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const gfx_box_t *clip_area,
     }
 }
 
+void gfx_draw_term_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        const term_buffer_t *curr_tb, const term_buffer_t *next_tb, 
+        const ascii_mono_font_t *amf, const gfx_ansi_palette_t *palette,
+        int32_t x, int32_t y, uint8_t w_scale, uint8_t h_scale) {
+
+    // Dims much match if `curr_tb` is given.
+    if (curr_tb && !(curr_tb->rows == next_tb->rows && curr_tb->cols == next_tb->cols)) {
+        return;
+    }
+
+    const size_t amf_bytes_per_row = ((amf->char_width - 1) / 8) + 1;
+    const size_t amf_bytes_per_char = amf_bytes_per_row * amf->char_height;
+
+    const uint16_t char_width = w_scale * amf->char_width;
+    const uint16_t char_height = h_scale * amf->char_height;
+
+    gfx_box_t render_area = {
+        .x = x, .y = y,
+        .width = char_width * next_tb->cols,
+        .height = char_height * next_tb->rows
+    };
+
+    if (!gfx_clip_with_buffer(buf, clip_area, &render_area)) {
+        return;
+    }
+
+    // So, what (r, c) must we start and end at with rendering? 
+    const uint16_t start_col = (render_area.x - x) / char_width;
+    const uint16_t end_col = (render_area.x + render_area.width - 1 - x) / char_width;
+
+    const uint16_t start_row = (render_area.y - y) / char_height;
+    const uint16_t end_row = (render_area.y + render_area.height - 1 - y) / char_height;
+
+    uint32_t cell_ind = (start_row * next_tb->cols) + start_col;
+    for (uint16_t r = start_row; r <= end_row; r++) {
+        for (uint16_t c = start_col; c <= end_col; c++, cell_ind++) {
+            term_cell_t tc = next_tb->buf[cell_ind];
+
+            if (!curr_tb || !tc_equals(curr_tb->buf[cell_ind], tc)) {
+                // Render time baby!
+                gfx_fill_bitmap(buf, &render_area,
+                        x + (c * char_width), 
+                        y + (r * char_height), 
+                        w_scale, h_scale, 
+                        amf->bitmaps + (tc.c * amf_bytes_per_char),  // tc.c should alway be ascii printable.
+                        amf->char_height, 
+                        amf->char_width, 
+                        palette->colors[ts_fg_color(tc.style)], 
+                        palette->colors[ts_bg_color(tc.style)]);
+            }
+        }
+    }
+}
+

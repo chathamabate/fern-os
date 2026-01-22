@@ -5,6 +5,10 @@
 #include "s_util/rand.h"
 #include "k_startup/vga_cd.h"
 
+/*
+ * THIS WILL BE DELETED SOON
+ */
+
 static bool pretest(void);
 
 #define PRETEST() pretest()
