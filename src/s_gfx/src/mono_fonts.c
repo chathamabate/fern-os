@@ -392,6 +392,31 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const gfx_box_t *clip_area,
     }
 }
 
+static const gfx_ansi_palette_t BASIC_ANSI_PALETTE_VAL = {
+    .colors = {
+        gfx_color(0, 0, 0), // Black
+        gfx_color(0, 0, 180), // Blue
+        gfx_color(0, 180, 0), // Green
+        gfx_color(0, 180, 180), // Cyan
+        gfx_color(180, 0, 0), // Red
+        gfx_color(180, 0, 180), // Magenta
+        gfx_color(180, 180, 0), // Brown
+        gfx_color(180, 180, 180), // Grey
+
+        // Brights
+        gfx_color(0, 0, 0), // Black
+        gfx_color(0, 0, 255), // Blue
+        gfx_color(0, 255, 0), // Green
+        gfx_color(0, 255, 255), // Cyan
+        gfx_color(255, 0, 0), // Red
+        gfx_color(255, 0, 255), // Magenta
+        gfx_color(255, 255, 0), // Brown
+        gfx_color(255, 255, 255), // Grey
+    }
+};
+
+const gfx_ansi_palette_t * const BASIC_ANSI_PALETTE = &BASIC_ANSI_PALETTE_VAL;
+
 void gfx_draw_term_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         const term_buffer_t *curr_tb, const term_buffer_t *next_tb, 
         const ascii_mono_font_t *amf, const gfx_ansi_palette_t *palette,
@@ -429,14 +454,17 @@ void gfx_draw_term_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
     for (uint16_t r = start_row; r <= end_row; r++) {
         for (uint16_t c = start_col; c <= end_col; c++, cell_ind++) {
             term_cell_t tc = next_tb->buf[cell_ind];
+            if (!is_ascii_printable(tc.c)) {
+                tc.c = ' ';
+            }
 
-            if (!curr_tb || !tc_equals(curr_tb->buf[cell_ind], tc)) {
+            if (!curr_tb || !tc_ascii_printable_equals(curr_tb->buf[cell_ind], tc)) {
                 // Render time baby!
                 gfx_fill_bitmap(buf, &render_area,
                         x + (c * char_width), 
                         y + (r * char_height), 
                         w_scale, h_scale, 
-                        amf->bitmaps + (tc.c * amf_bytes_per_char),  // tc.c should alway be ascii printable.
+                        amf->bitmaps + (tc.c * amf_bytes_per_char), 
                         amf->char_height, 
                         amf->char_width, 
                         palette->colors[ts_fg_color(tc.style)], 

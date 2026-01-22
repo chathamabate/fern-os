@@ -59,7 +59,6 @@ extern gfx_buffer_t * const BACK_BUFFER;
  *
  * This is helpful for displaying text output before entering user mode.
  * Also for printing out information during a fatal kernel error.
- *
  */
 extern term_buffer_t * const DIRECT_TERM;
 
@@ -115,12 +114,9 @@ void gfx_direct_put_s(const char *s);
 
 /**
  * This function is meant to replace the old `out_bios_vga` function.
- *
- * It renders a string message onto the back buffer, renders the back buffer, than locks up the
- * CPU.
- *
- * You cannot call this function until after `init_screen` above.
- * It's purpose if for printing out a message during an extremely catostrophic error situation.
+ * 
+ * It prints a message to the direct terminal, and renders the terminal.
+ * Finally, it locks up the CPU.
  */
 void gfx_direct_fatal(const char *msg);
 

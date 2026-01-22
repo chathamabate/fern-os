@@ -55,18 +55,27 @@ gfx_buffer_t * const BACK_BUFFER = &back_buffer;
 static term_cell_t direct_term_arr[DIRECT_TERM_ROWS][DIRECT_TERM_COLS];
 
 /**
- * Unlike the gfx_buffer and screen above, this structure actually needs
- * to be initialized!
+ * Lucky for us, terminal buffers can now be statically allocated at compile time!
  */
-static term_buffer_t direct_term;
+static term_buffer_t direct_term = {
+    .al = NULL, // Static buffer.
+    
+    .rows = DIRECT_TERM_ROWS,
+    .cols = DIRECT_TERM_COLS,
+
+    .cursor_row = 0,
+    .cursor_col = 0,
+
+    .default_cell = {
+        .c = ' ',
+        .style = term_style(TC_WHITE, TC_BLACK)
+    },
+    .curr_style = term_style(TC_WHITE, TC_BLACK),
+
+    .buf = (term_cell_t *)direct_term_arr
+};
 
 term_buffer_t * const DIRECT_TERM = &direct_term;
-
-/**
- * This will also be initialized with `init_screen`.
- * (If this were CPP we could use some nice constexpr functions! Alas)
- */
-static gfx_ansi_palette_t direct_term_palette;
 
 fernos_error_t init_screen(const m2_info_start_t *m2_info) {
     if (!m2_info) {
@@ -125,40 +134,14 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
         .buffer = (gfx_color_t *)(uint32_t)(fb_tag->addr)
     };
 
-    // init direct term, and its palette.
-    init_static_term_buffer(DIRECT_TERM, (term_cell_t *)direct_term_arr, 
-            (term_cell_t) {.c = ' ', .style = term_style(TC_WHITE, TC_BLACK)}, 
-            DIRECT_TERM_ROWS, DIRECT_TERM_COLS);
-
-    direct_term_palette = (gfx_ansi_palette_t) {
-        .colors = {
-            gfx_color(0, 0, 0), // Black
-            gfx_color(0, 0, 180), // Blue
-            gfx_color(0, 180, 0), // Green
-            gfx_color(0, 180, 180), // Cyan
-            gfx_color(180, 0, 0), // Red
-            gfx_color(180, 0, 180), // Magenta
-            gfx_color(180, 180, 0), // Brown
-            gfx_color(180, 180, 180), // Grey
-
-            // Brights
-            gfx_color(0, 0, 0), // Black
-            gfx_color(0, 0, 255), // Blue
-            gfx_color(0, 255, 0), // Green
-            gfx_color(0, 255, 255), // Cyan
-            gfx_color(255, 0, 0), // Red
-            gfx_color(255, 0, 255), // Magenta
-            gfx_color(255, 255, 0), // Brown
-            gfx_color(255, 255, 255), // Grey
-        }
-    };
+    tb_default_clear(DIRECT_TERM);
 
     return FOS_E_SUCCESS;
 }
 
 void gfx_direct_term_render(void) {
     // Black out the back buffer.
-    gfx_clear(BACK_BUFFER, direct_term_palette.colors[TC_BLACK]);
+    gfx_clear(BACK_BUFFER, BASIC_ANSI_PALETTE->colors[TC_BLACK]);
 
     const ascii_mono_font_t * const font = ASCII_MONO_8X16;
 
@@ -173,7 +156,7 @@ void gfx_direct_term_render(void) {
     const int32_t y = (FERNOS_GFX_HEIGHT - height) / 2;
 
     gfx_draw_term_buffer(BACK_BUFFER, NULL, NULL, 
-            DIRECT_TERM, font, &direct_term_palette, 
+            DIRECT_TERM, font, BASIC_ANSI_PALETTE, 
             x, y, w_scale, h_scale);
 
     const uint8_t rect_pad = 1;
@@ -182,7 +165,7 @@ void gfx_direct_term_render(void) {
     gfx_draw_rect(BACK_BUFFER, NULL, x - 1 - rect_pad, y - 1 - rect_pad, 
             width + (2 * (1 + rect_pad)), 
             height + (2 * (1 + rect_pad)), 
-            1, direct_term_palette.colors[TC_WHITE]);
+            1, BASIC_ANSI_PALETTE->colors[TC_WHITE]);
 
     // Finally render out the back buffer!
     gfx_render();

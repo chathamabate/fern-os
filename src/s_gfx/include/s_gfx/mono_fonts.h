@@ -88,6 +88,8 @@ typedef struct _gfx_ansi_palette_t {
     gfx_color_t colors[16];
 } gfx_ansi_palette_t;
 
+extern const gfx_ansi_palette_t * const BASIC_ANSI_PALETTE;
+
 /**
  * Render a terminal buffer's contents to the given buffer.
  *
