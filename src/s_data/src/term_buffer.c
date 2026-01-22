@@ -78,6 +78,24 @@ term_style_t ts_with_ansi_style_code(term_style_t ts, uint8_t ansi_style_code) {
     }
 }
 
+static void init_term_buffer(term_buffer_t *tb, allocator_t *al, term_cell_t *buf, term_cell_t default_cell, uint16_t rows, uint16_t cols) {
+    *(allocator_t **)&(tb->al) = al;
+    *(term_cell_t *)&(tb->default_cell) = default_cell;
+    tb->rows = rows;
+    tb->cols = cols;
+    tb->cursor_row = 0;
+    tb->cursor_col = 0;
+    tb->buf = buf;
+
+    // At this point the buffer is pretty much created, although
+    // the values inside `buf` may be invalid, let's reset them.
+    tb_default_clear(tb);
+}
+
+void init_static_term_buffer(term_buffer_t *tb, term_cell_t *buf, term_cell_t default_cell, uint16_t rows, uint16_t cols) {
+    init_term_buffer(tb, NULL, buf, default_cell, rows, cols);
+}
+
 term_buffer_t *new_term_buffer(allocator_t *al, term_cell_t default_cell, uint16_t rows, uint16_t cols) {
     term_buffer_t *tb = al_malloc(al, sizeof(term_buffer_t));
 
@@ -91,17 +109,7 @@ term_buffer_t *new_term_buffer(allocator_t *al, term_cell_t default_cell, uint16
     }
 
     // Success!
-    *(allocator_t **)&(tb->al) = al;
-    *(term_cell_t *)&(tb->default_cell) = default_cell;
-    tb->rows = rows;
-    tb->cols = cols;
-    tb->cursor_row = 0;
-    tb->cursor_col = 0;
-    tb->buf = buf;
-
-    // At this point the buffer is pretty much created, although
-    // the values inside `buf` may be invalid, let's reset them.
-    tb_default_clear(tb);
+    init_term_buffer(tb, al, buf, default_cell, rows, cols);
 
     return tb; 
 }

@@ -160,6 +160,12 @@ typedef struct _term_buffer_t {
 } term_buffer_t;
 
 /**
+ * Initialize a static terminal buffer.
+ * `buf` is expected to also be static with length at least `rows * cols`.
+ */
+void init_static_term_buffer(term_buffer_t *tb, term_cell_t *buf, term_cell_t default_cell, uint16_t rows, uint16_t cols);
+
+/**
  * Allocate a new terminal buffer!
  *
  * The full buffer is initialized to the default cell.

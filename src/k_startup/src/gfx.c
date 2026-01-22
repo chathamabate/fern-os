@@ -49,6 +49,25 @@ static gfx_buffer_t back_buffer = {
 
 gfx_buffer_t * const BACK_BUFFER = &back_buffer;
 
+#define DIRECT_TERM_ROWS (40U)
+#define DIRECT_TERM_COLS (30U)
+
+static term_cell_t direct_term_arr[DIRECT_TERM_ROWS][DIRECT_TERM_COLS];
+
+/**
+ * Unlike the gfx_buffer and screen above, this structure actually needs
+ * to be initialized!
+ */
+static term_buffer_t direct_term;
+
+term_buffer_t * const DIRECT_TERM = &direct_term;
+
+/**
+ * This will also be initialized with `init_screen`.
+ * (If this were CPP we could use some nice constexpr functions! Alas)
+ */
+static gfx_ansi_palette_t direct_term_palette;
+
 fernos_error_t init_screen(const m2_info_start_t *m2_info) {
     if (!m2_info) {
         return FOS_E_BAD_ARGS;
@@ -106,15 +125,307 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
         .buffer = (gfx_color_t *)(uint32_t)(fb_tag->addr)
     };
 
+    // init direct term, and its palette.
+    init_static_term_buffer(DIRECT_TERM, (term_cell_t *)direct_term_arr, 
+            (term_cell_t) {.c = ' ', .style = term_style(TC_WHITE, TC_BLACK)}, 
+            DIRECT_TERM_ROWS, DIRECT_TERM_COLS);
+
+    direct_term_palette = (gfx_ansi_palette_t) {
+        .colors = {
+            gfx_color(0, 0, 0), // Black
+            gfx_color(0, 0, 180), // Blue
+            gfx_color(0, 180, 0), // Green
+            gfx_color(0, 180, 180), // Cyan
+            gfx_color(180, 0, 0), // Red
+            gfx_color(180, 0, 180), // Magenta
+            gfx_color(180, 180, 0), // Brown
+            gfx_color(180, 180, 180), // Grey
+
+            // Brights
+            gfx_color(0, 0, 0), // Black
+            gfx_color(0, 0, 255), // Blue
+            gfx_color(0, 255, 0), // Green
+            gfx_color(0, 255, 255), // Cyan
+            gfx_color(255, 0, 0), // Red
+            gfx_color(255, 0, 255), // Magenta
+            gfx_color(255, 255, 0), // Brown
+            gfx_color(255, 255, 255), // Grey
+        }
+    };
+
     return FOS_E_SUCCESS;
 }
 
-void gfx_out_fatal(const char *msg) {
-    gfx_draw_ascii_mono_text(BACK_BUFFER, NULL,
-        msg, ASCII_MONO_8X16, 0, 0, 2, 2, 
-        gfx_color(255, 255, 255),
-        gfx_color(255, 0, 0)
-    );
+void gfx_direct_term_render(void) {
+    // Black out the back buffer.
+    gfx_clear(BACK_BUFFER, direct_term_palette.colors[TC_BLACK]);
+
+    const ascii_mono_font_t * const font = ASCII_MONO_8X16;
+
+    const uint8_t w_scale = 1;
+    const uint8_t h_scale = 1;
+
+    const int32_t width = (int32_t)w_scale * (int32_t)(font->char_width) * DIRECT_TERM_COLS;
+    const int32_t height = (int32_t)h_scale * (int32_t)(font->char_height) * DIRECT_TERM_ROWS;
+
+    // Let's center this bad boy.
+    const int32_t x = (FERNOS_GFX_WIDTH - width) / 2;
+    const int32_t y = (FERNOS_GFX_HEIGHT - height) / 2;
+
+    gfx_draw_term_buffer(BACK_BUFFER, NULL, NULL, 
+            DIRECT_TERM, font, &direct_term_palette, 
+            x, y, w_scale, h_scale);
+
+    const uint8_t rect_pad = 1;
+
+    // Now let's draw a nice lil' rectangle around this guy.
+    gfx_draw_rect(BACK_BUFFER, NULL, x - 1 - rect_pad, y - 1 - rect_pad, 
+            width + (2 * (1 + rect_pad)), 
+            height + (2 * (1 + rect_pad)), 
+            1, direct_term_palette.colors[TC_WHITE]);
+
+    // Finally render out the back buffer!
     gfx_render();
+}
+
+void gfx_direct_put_s(const char *s) {
+    tb_put_s(DIRECT_TERM, s);
+    gfx_direct_term_render();
+}
+
+void gfx_direct_fatal(const char *msg) {
+    gfx_direct_put_s(msg);
     lock_up();
+}
+
+/*
+ * OLD FUNCTIONS Adapted to new direct terminal!
+ */
+
+#include "s_util/ansi.h"
+
+#define _ESP_ID_FMT ANSI_GREEN_FG "%%esp" ANSI_RESET
+#define _ESP_INDEX_FMT ANSI_CYAN_FG "%2X" ANSI_RESET "(" _ESP_ID_FMT ")"
+
+#define _EVEN_ROW_FMT _ESP_INDEX_FMT " = " ANSI_LIGHT_GREY_FG "%08X" ANSI_RESET "\n"
+#define _ODD_ROW_FMT _ESP_INDEX_FMT " = " ANSI_BRIGHT_LIGHT_GREY_FG "%08X" ANSI_RESET "\n"
+
+#define _ESP_VAL_ROW_FMT "   " _ESP_ID_FMT "  = " ANSI_BRIGHT_LIGHT_GREY_FG "%08X" ANSI_RESET "\n"
+
+void gfx_direct_trace(uint32_t slots, uint32_t *esp) {
+    char buf[100];
+
+    for (size_t i = 0; i < slots; i++) {
+        size_t j = slots - 1 - i; 
+
+        if (j % 2 == 0) {
+            str_fmt(buf, _EVEN_ROW_FMT, j * sizeof(uint32_t), esp[j]);
+        } else {
+            str_fmt(buf, _ODD_ROW_FMT, j * sizeof(uint32_t), esp[j]);
+        }
+
+        gfx_direct_put_s(buf);
+    }
+
+    str_fmt(buf, _ESP_VAL_ROW_FMT, esp);
+    gfx_direct_put_s(buf);
+}
+
+static void gfx_direct_64bit(uint64_t v) {
+    gfx_direct_put_fmt_s(ANSI_CYAN_FG "[4] " ANSI_RESET "%08X" "\n", (uint32_t)(v >> 32));
+    gfx_direct_put_fmt_s(ANSI_CYAN_FG "[0] " ANSI_RESET "%08X" "\n", (uint32_t)v);
+}
+
+#define LABEL_SPACE 8
+static void gfx_direct_pair(const char *label, const char *val) {
+    char buf[LABEL_SPACE + 1];
+
+    str_la(buf, LABEL_SPACE, ' ', label);
+    gfx_direct_put_fmt_s(ANSI_LIGHT_GREY_FG "%s" ANSI_RESET ": %s\n", buf, val);
+}
+
+static void gfx_direct_cond(const char *label, uint8_t cond) {
+    gfx_direct_pair(label, cond 
+        ? ANSI_GREEN_FG "ON" ANSI_RESET 
+        : ANSI_RED_FG "OFF" ANSI_RESET
+    );
+}
+
+const char *privilege_as_literal(uint8_t privilege) {
+    if (privilege == 0) {
+        return ANSI_RED_FG "ROOT" ANSI_RESET;
+    } 
+    if (privilege == 3) {
+        return  ANSI_GREEN_FG "USER" ANSI_RESET;
+    } 
+
+    return ANSI_BROWN_FG "UNKNOWN" ANSI_RESET;
+}
+
+void gfx_direct_seg_selector(seg_selector_t ssr) {
+    char buf[128];
+
+    uint16_t ind = ssr_get_ind(ssr);
+    uint8_t rpl = ssr_get_rpl(ssr);
+    uint8_t ti = ssr_get_ti(ssr);
+
+    str_fmt(buf, "%u", ind);
+    gfx_direct_pair("Index", buf);
+
+    const char *priv_name = privilege_as_literal(rpl);
+    gfx_direct_pair("RPL", priv_name);
+
+    gfx_direct_pair("Table", ti 
+            ? ANSI_GREEN_FG "LOCAL" ANSI_RESET 
+            : ANSI_RED_FG "GLOBAL" ANSI_RESET);
+}
+
+void gfx_direct_seg_desc(seg_desc_t sd) {
+    gfx_direct_64bit(sd);
+
+    char buf[128];
+
+    uint8_t present = sd_get_present(sd);
+
+    gfx_direct_cond("Prsnt", present);
+
+    if (!present) {
+        return;
+    }
+
+    uint32_t base = sd_get_base(sd);
+    str_fmt(buf, "0x%8X", base);
+    gfx_direct_pair("Base", buf); 
+
+    uint32_t limit = sd_get_limit(sd);
+    str_fmt(buf, "0x%8X", limit);
+    gfx_direct_pair("Limit", buf);
+
+    uint8_t privilege = sd_get_privilege(sd);
+    const char *priv_name = privilege_as_literal(privilege);
+
+    gfx_direct_pair("Priv", priv_name);
+
+    gfx_direct_cond("4K Gran", sd_get_gran(sd));
+
+    // Now for type specific info.
+
+    uint8_t type = sd_get_type(sd);
+
+    const char *type_name = NULL;
+
+    if ((type & 0x18) == 0x10) {
+        type_name = ANSI_CYAN_FG "DATA" ANSI_RESET;
+        gfx_direct_pair("Type", type_name);
+
+        data_seg_desc_t dsd = (data_seg_desc_t)sd;
+
+        gfx_direct_cond("Write", dsd_get_writable(dsd));
+        gfx_direct_cond("Ex Down", dsd_get_ex_down(dsd));
+        gfx_direct_cond("Big", dsd_get_big(dsd));
+
+    } else if ((type & 0x18) == 0x18) {
+        type_name = ANSI_RED_FG "EXEC" ANSI_RESET;
+        gfx_direct_pair("Type", type_name);
+
+        exec_seg_desc_t esd = (exec_seg_desc_t)sd;
+
+        gfx_direct_cond("Read", esd_get_readable(esd));
+        gfx_direct_cond("Cnfrm", esd_get_conforming(esd));
+        gfx_direct_cond("Dflt", esd_get_def(esd));
+
+    } else {
+        type_name = ANSI_MAGENTA_FG "SYS" ANSI_RESET;
+        gfx_direct_pair("Type", type_name);
+
+        // I guess leave this empty?
+    }
+}
+
+void gfx_direct_gate_desc(gate_desc_t gd) {
+    gfx_direct_64bit(gd);
+
+    uint8_t present = gd_get_present(gd);
+    gfx_direct_cond("Prsnt", present);
+
+    if (!present) {
+        return;
+    }
+
+    char buf[128];
+
+    seg_selector_t ssr = gd_get_selector(gd);
+    str_fmt(buf, "0x%4X", ssr);
+    gfx_direct_pair("Sel", buf);
+
+    uint8_t dpl = gd_get_privilege(gd);
+    gfx_direct_pair("DPL", privilege_as_literal(dpl));
+
+    uint32_t offset;
+
+    uint8_t type = gd_get_type(gd);
+    switch (type) {
+    case GD_TASK_GATE_TYPE:
+        gfx_direct_pair("Type", ANSI_CYAN_FG "TASK" ANSI_RESET);
+        break;
+    case GD_INTR_GATE_TYPE:
+        gfx_direct_pair("Type", ANSI_RED_FG "INTR" ANSI_RESET);
+
+        offset = igd_get_base(gd);
+        str_fmt(buf, "0x%8X", offset);
+        gfx_direct_pair("Offset", buf);
+        break;
+    case GD_TRAP_GATE_TYPE:
+        gfx_direct_pair("Type", ANSI_GREEN_FG "TRAP" ANSI_RESET);
+
+        offset = trgd_get_base(gd);
+        str_fmt(buf, "0x%8X", offset);
+        gfx_direct_pair("Offset", buf);
+        break;
+    default:
+        gfx_direct_pair("Type", ANSI_BROWN_FG "UNKNOWN" ANSI_RESET);
+        break;
+    }
+}
+
+void gfx_direct_dtr(dtr_val_t dtv) {
+    char buf[128];
+
+    str_fmt(buf, "0x%8X", dtv_get_base(dtv));
+    gfx_direct_pair("Base", buf);
+
+    str_fmt(buf, "0x%8X", dtv_get_size(dtv));
+    gfx_direct_pair("Size", buf);
+
+    str_fmt(buf, "%u", dtv_get_num_entries(dtv));
+    gfx_direct_pair("Entries", buf);
+}
+
+void gfx_direct_pte(pt_entry_t pte) {
+    char buf[128];
+
+    uint8_t p = pte_get_present(pte);
+    gfx_direct_cond("Prsnt", p);
+
+    if (!p) {
+        return;
+    }
+
+    uint8_t wr = pte_get_writable(pte);
+    gfx_direct_cond("Write", wr);
+
+    uint8_t priv = pte_get_user(pte);
+    if (priv) {
+        gfx_direct_pair("Priv", ANSI_GREEN_FG "USER" ANSI_RESET);
+    } else {
+        gfx_direct_pair("Priv", ANSI_GREEN_FG "ROOT" ANSI_RESET);
+    }
+
+    uint8_t avail = pte_get_avail(pte);
+    str_fmt(buf, "0x%2X", avail);
+    gfx_direct_pair("Avail", buf);
+
+    phys_addr_t base = pte_get_base(pte);
+    str_fmt(buf, "0x%8X", base);
+    gfx_direct_pair("Base", buf);
 }
