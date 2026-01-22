@@ -87,3 +87,10 @@ void _dump_hex_pairs(void (*pf)(const char *fmt, ...), ...);
  */
 bool intervals_overlap(int32_t *pos, int32_t *len, int32_t window_len);
 
+/** 
+ * True if and only if `c` has a corresponding ascii printable character!
+ */
+static inline bool is_ascii_printable(unsigned char c) {
+    return 32 <= c && c < 127;
+}
+

@@ -23,10 +23,10 @@ typedef uint32_t gfx_color_t;
 
 /**
  * Create a color with 100% opacity.
+ *
+ * 0 <= r, g, b <= 255
  */
-static inline gfx_color_t gfx_color(uint8_t r, uint8_t g, uint8_t b) {
-    return (1 << 24) | (r << 16UL) | (g << 8UL) | (b << 0UL);
-}
+#define gfx_color(r, g, b) ((1 << 24) | ((uint8_t)(r) << 16UL) | ((uint8_t)(g) << 8UL) | ((uint8_t)(b) << 0UL))
 
 /**
  * Given two colors, determine if they are equal.

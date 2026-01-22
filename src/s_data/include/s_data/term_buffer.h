@@ -6,6 +6,7 @@
 #include <stdbool.h>
 
 #include "s_mem/allocator.h"
+#include "s_util/misc.h"
 
 /*
  * This is a newer version of the old "char_display_t" design.
@@ -49,9 +50,7 @@ typedef uint8_t term_color_t;
 #define TC_BRIGHT_BROWN           (TC_BRIGHT | 6)
 #define TC_WHITE                  (TC_BRIGHT | 7)
 
-static inline term_color_t tc_bright(term_color_t cdc) {
-    return cdc | (1U << TC_BRIGHT);
-}
+#define tc_bright(cdc) ((term_color_t)(cdc) | (1U << TC_BRIGHT))
 
 /**
  * A Terminal style has the following form:
@@ -69,29 +68,18 @@ typedef uint16_t term_style_t;
 #define TS_BOLD   (1U << 8)
 #define TS_ITALIC (1U << 9)
 
-static inline term_style_t term_style(term_color_t fg, term_color_t bg) {
-    return fg | (bg << 4);
-}
-
-static inline term_color_t ts_bg_color(term_style_t ts) {
-    return (term_color_t)(ts >> 4) & 0x0FU;
-}
-
-static inline term_style_t ts_with_bg_color(term_style_t ts, term_color_t bg) {
-    return (ts & 0xFF0F) | (bg << 4);
-}
-
-static inline term_color_t ts_fg_color(term_style_t ts) {
-    return (term_color_t)ts & 0x0FU;
-}
-
-static inline term_style_t ts_with_fg_color(term_style_t ts, term_color_t fg) {
-    return (ts & 0xFFF0) | fg;
-}
+#define term_style(fg, bg) ((term_color_t)(fg) | ((term_color_t)(bg) << 4))
+#define ts_bg_color(ts) ((term_color_t)((term_style_t)(ts) >> 4) & 0x000FU) 
+#define ts_with_bg_color(ts, bg) (((term_style_t)(ts) & 0xFF0F) | ((term_color_t)(bg) << 4))
+#define ts_fg_color(ts) (term_color_t)((term_style_t)(ts) & 0x000FU)
+#define ts_with_fg_color(ts, fg) (((term_style_t)(ts) & 0xFFF0) | (term_color_t)(fg))
 
 /**
  * Flip the background color and foreground color components of a style.
  * Keeps Other styles untouched.
+ *
+ * Keeping this a static inline because `ts` is used multiple times in the formula.
+ * As a macro, this could be dangerous.
  */
 static inline term_style_t ts_flip(term_style_t ts) {
     return term_style(ts_bg_color(ts), ts_fg_color(ts)) | (ts & 0xFF00); 
@@ -108,14 +96,27 @@ typedef struct _term_cell_t {
     term_style_t style;
 
     /**
-     * We can assume this value will always an ascii printable character.
-     *
-     * Undefined behavior if this is not the case.
+     * This can be any character value!
      */
     char c;
 } term_cell_t;
 
 static inline bool tc_equals(term_cell_t tc0, term_cell_t tc1) {
+    return tc0.style == tc1.style && tc0.c == tc1.c;
+}
+
+/**
+ * This equals functions treats all NON-ASCII-PRINTABLE characters as ' ''s.
+ */
+static inline bool tc_ascii_printable_equals(term_cell_t tc0, term_cell_t tc1) {
+    if (!is_ascii_printable(tc0.c)) {
+        tc0.c = ' ';
+    }
+
+    if (!is_ascii_printable(tc1.c)) {
+        tc1.c = ' ';
+    }
+
     return tc0.style == tc1.style && tc0.c == tc1.c;
 }
 
@@ -160,16 +161,11 @@ typedef struct _term_buffer_t {
 } term_buffer_t;
 
 /**
- * Initialize a static terminal buffer.
- * `buf` is expected to also be static with length at least `rows * cols`.
- */
-void init_static_term_buffer(term_buffer_t *tb, term_cell_t *buf, term_cell_t default_cell, uint16_t rows, uint16_t cols);
-
-/**
  * Allocate a new terminal buffer!
  *
- * The full buffer is initialized to the default cell.
- * cursor starts at (0, 0) with default style.
+ * Cursor starts at (0, 0).
+ *
+ * Terminal buffer is cleared with default style before being returned.
  *
  * Returns NULL on error.
  */
