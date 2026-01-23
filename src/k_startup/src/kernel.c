@@ -26,12 +26,14 @@
 #include "k_startup/plugin_fs.h"
 #include "k_startup/plugin_kb.h"
 #include "k_startup/plugin_pipe.h"
+#include "k_startup/plugin_gfx.h"
 
 #include "k_sys/m2.h"
 
 #include "k_startup/gfx.h"
+#include "s_gfx/window.h"
+#include "s_gfx/window_qgrid.h"
 
-#include "s_data/test/term_buffer.h"
 
 #include <stdint.h>
 
@@ -157,6 +159,18 @@ static void init_kernel_plugins(void) {
         gfx_direct_fatal("Failed to create Pipe plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_PIPE_ID, plg_pipe), "Failed to set Pipe Plugin in the kernel");
+
+    // Now for graphics plugin!
+    window_t *root_window = new_da_window_qgrid(FERNOS_GFX_WIDTH, FERNOS_GFX_HEIGHT);
+    if (!root_window) {
+        gfx_direct_fatal("Failed to allocate root window");
+    }
+
+    plugin_t *plg_gfx = new_plugin_gfx(kernel, root_window);
+    if (!plg_gfx) {
+        gfx_direct_fatal("Failed to create GFX plugin");
+    }
+    try_setup_step(ks_set_plugin(kernel, PLG_GRAPHICS_ID, plg_gfx), "Failed to set GFX Plugin in the kernel");
 }
 
 void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
@@ -196,9 +210,6 @@ void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
-
-    test_term_buffer();
-    lock_up();
 
     thread_t *first_thread = (thread_t *)(kernel->schedule.head);
     return_to_ctx(&(first_thread->ctx));

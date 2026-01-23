@@ -4,6 +4,8 @@
 #include "s_bridge/shared_defs.h"
 #include "k_startup/page_helpers.h"
 
+// DELETE ME SOON
+
 #define ANSI_CSI_LOOK_BACK (32U)
 
 #if HANDLE_CD_TX_MAX_LEN <= ANSI_CSI_LOOK_BACK

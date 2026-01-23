@@ -359,3 +359,15 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  */
 
 #define PLG_PIPE_PCID_OPEN      (0U)
+
+/*
+ * ***** Graphics Plugin *****
+ */
+
+#define PLG_GRAPHICS_ID (4U)
+
+/*
+ * Keyboard plugin KERNEL commands.
+ */
+
+#define PLG_GFX_KCID_KEY_EVENT     (0U)

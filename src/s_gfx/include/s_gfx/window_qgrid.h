@@ -128,3 +128,7 @@ static inline uint16_t win_qg_large_tile_height(window_qgrid_t *win_qg) {
  * Create a new Quad Grid Window.
  */
 window_t *new_window_qgrid(allocator_t *al, uint16_t width, uint16_t height);
+
+static inline window_t *new_da_window_qgrid(uint16_t width, uint16_t height) {
+    return new_window_qgrid(get_default_allocator(), width, height);
+}
