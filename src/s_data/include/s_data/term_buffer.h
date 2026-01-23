@@ -160,6 +160,8 @@ typedef struct _term_buffer_t {
     term_cell_t *buf;
 } term_buffer_t;
 
+#define TB_CELL(tb, r, c) ((tb)->buf[((r) * (tb)->cols) + (c)])
+
 /**
  * Allocate a new terminal buffer!
  *
@@ -223,7 +225,6 @@ void tb_scroll_up(term_buffer_t *tb, uint16_t shift);
  * Cursor position remains unchanged.
  */
 void tb_scroll_down(term_buffer_t *tb, uint16_t shift);
-
 
 /**
  * Write a character to the terminal buffer.

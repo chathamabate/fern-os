@@ -92,6 +92,7 @@ term_buffer_t *new_term_buffer(allocator_t *al, term_cell_t default_cell, uint16
 
     *(allocator_t **)&(tb->al) = al;
     *(term_cell_t *)&(tb->default_cell) = default_cell;
+    tb->curr_style = tb->default_cell.style;
     tb->rows = rows;
     tb->cols = cols;
     tb->cursor_row = 0;
@@ -154,6 +155,7 @@ void tb_scroll_up(term_buffer_t *tb, uint16_t shift) {
 
     if (shift >= tb->rows) {
         tb_default_clear(tb);
+        return;
     }
 
     const uint16_t left_over_rows = tb->rows - shift;
@@ -184,6 +186,7 @@ void tb_scroll_down(term_buffer_t *tb, uint16_t shift) {
 
     if (shift >= tb->rows) {
         tb_default_clear(tb);
+        return;
     }
 
     for (uint16_t r = tb->rows - 1; r >= shift; r--) {

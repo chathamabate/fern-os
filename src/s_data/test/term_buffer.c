@@ -150,7 +150,12 @@ static bool test_scroll(void) {
         // + For scroll down.
         // - For scroll up.
 
-        0
+        0,
+        1, -1,
+        2, -2,
+        5, -5,
+        10, -10,
+        50, -50
     };
     const size_t num_cases = sizeof(cases) / sizeof(cases[0]);
 
@@ -207,6 +212,107 @@ static bool test_scroll(void) {
     TEST_SUCCEED();
 }
 
+static bool test_term_put_c0(void) {
+    term_buffer_t *tb = new_da_term_buffer(
+        (term_cell_t) {
+            .style = term_style(TC_WHITE, TC_BLACK),
+            .c = ' ' 
+        },
+        10, 20
+    );
+    TEST_TRUE(tb != NULL);
+
+    // Maybe just print too many characters and see what happens?
+    // Here let's just test with no special codes.
+
+    const size_t shift = 4;
+    const size_t rows_to_print = (tb->rows - 1) + shift;
+
+    for (size_t row = 0; row < rows_to_print; row++) {
+        for (size_t col = 0; col < tb->cols; col++) {
+            tb_put_c(tb, 'a' + ((row + col) % 26));
+        }
+    }
+
+    // We printed out more rows than the display has, let's make sure all 
+    // characters make sense.
+
+    for (size_t row = 0; row < (size_t)(tb->rows - 1); row++) {
+        const size_t true_row = row + shift; // The first `shift` rows should've been scrolled
+                                             // off the screen.
+        for (size_t col = 0; col < tb->cols; col++) {
+            TEST_EQUAL_HEX('a' + ((true_row + col) % 26), (uint8_t)TB_CELL(tb, row, col).c);
+            TEST_EQUAL_HEX(tb->default_cell.style, TB_CELL(tb, row, col).style);
+        }
+    }
+
+    for (size_t col = 0; col < tb->cols; col++) {
+        TEST_EQUAL_HEX(' ', (uint8_t)TB_CELL(tb, tb->rows - 1, col).c);
+        TEST_EQUAL_HEX(tb->default_cell.style, TB_CELL(tb, tb->rows - 1, col).style);
+    }
+
+    delete_term_buffer(tb);
+
+    TEST_SUCCEED();
+}
+
+static bool test_term_put_c1(void) {
+    // Now try the two control sequences '\r', '\n', and '\b'
+
+    term_buffer_t *tb = new_da_term_buffer(
+        (term_cell_t) {
+            .style = term_style(TC_WHITE, TC_BLACK),
+            .c = ' ' 
+        },
+        10, 20
+    );
+    TEST_TRUE(tb != NULL);
+
+    const size_t cols_to_write = 10;
+    TEST_TRUE(cols_to_write < tb->cols); // Must have at least one space 
+                                          // at the end of the line.
+
+    // An initial backspace should do nothing.
+    tb_put_c(tb, '\b');
+
+    for (size_t iter = 0; iter < cols_to_write; iter++) {
+        for (size_t col = 0; col < cols_to_write - iter; col++) {
+            tb_put_c(tb, 'a' + iter);
+        }
+        tb_put_c(tb, '\r');
+    }
+
+    for (size_t col = 0; col < cols_to_write; col++) {
+        TEST_EQUAL_HEX('a' + (cols_to_write - 1 - col), (uint8_t)TB_CELL(tb, 0, col).c);
+    }
+
+    tb_put_c(tb, '\n');
+    tb_put_c(tb, 'B');
+    TEST_EQUAL_HEX('B', TB_CELL(tb, 1, 0).c);
+
+    // Try to force a single scroll up.
+    for (size_t i = 0; i < (size_t)(tb->rows - 1); i++) {
+        tb_put_c(tb, '\n');
+    }
+
+    TEST_EQUAL_HEX('B', TB_CELL(tb, 0, 0).c);
+
+    tb_put_c(tb, 'a');
+    tb_put_c(tb, '\b');
+    tb_put_c(tb, 'c');
+    tb_put_c(tb, '\b');
+
+    TEST_EQUAL_UINT('c', TB_CELL(tb, tb->rows - 1, 0).c);
+
+    tb_put_c(tb, '\b');
+    tb_put_c(tb, 'd');
+    TEST_EQUAL_UINT('d', TB_CELL(tb, tb->rows - 2, tb->cols - 1).c);
+
+    delete_term_buffer(tb);
+
+    TEST_SUCCEED();
+}
+
 
 bool test_term_buffer(void) {
     BEGIN_SUITE("Terminal Buffer");
@@ -214,92 +320,13 @@ bool test_term_buffer(void) {
     RUN_TEST(test_tb_clear);
     RUN_TEST(test_tb_resize);
     RUN_TEST(test_scroll);
+    RUN_TEST(test_term_put_c0);
+    RUN_TEST(test_term_put_c1);
     return END_SUITE();
 }
 
 
 /*
-static bool test_put_c0(void) {
-    // Here let's just test with no special codes.
-
-    const size_t shift = 4;
-    const size_t rows_to_print = (dcd->rows - 1) + shift;
-
-    for (size_t row = 0; row < rows_to_print; row++) {
-        for (size_t col = 0; col < dcd->cols; col++) {
-            cd_put_c(dcd, 'a' + ((row + col) % 26));
-        }
-    }
-
-    // We printed out more rows than the display has, let's make sure all 
-    // characters make sense.
-
-    for (size_t row = 0; row < dcd->rows - 1; row++) {
-        const size_t true_row = row + shift; // The first `shift` rows should've been scrolled
-                                             // off the screen.
-        for (size_t col = 0; col < dcd->cols; col++) {
-            TEST_EQUAL_HEX('a' + ((true_row + col) % 26), (uint8_t)(grid[row][col].c));
-            TEST_EQUAL_HEX(dcd->default_style, grid[row][col].style);
-        }
-    }
-
-    for (size_t col = 0; col < dcd->cols; col++) {
-        TEST_EQUAL_HEX(' ', (uint8_t)(grid[dcd->rows - 1][col].c));
-
-        const char_display_style_t exp_style = col == 0 
-            ? cds_flip(dcd->default_style) 
-            : dcd->default_style;
-
-        TEST_EQUAL_HEX(exp_style, grid[dcd->rows - 1][col].style);
-    }
-
-    TEST_SUCCEED();
-}
-
-static bool test_put_c1(void) {
-    // Now try the two control sequences '\r', '\n', and '\b'
-
-    const size_t cols_to_write = 10;
-    TEST_TRUE(cols_to_write < dcd->cols); // Must have at least one space 
-                                          // at the end of the line.
-
-    // An initial backspace should do nothing.
-    cd_put_c(dcd, '\b');
-    TEST_EQUAL_HEX(cds_flip(dcd->default_style), 
-            grid[0][0].style);
-
-    for (size_t iter = 0; iter < cols_to_write; iter++) {
-        for (size_t col = 0; col < cols_to_write - iter; col++) {
-            cd_put_c(dcd, 'a' + iter);
-        }
-        cd_put_c(dcd, '\r');
-    }
-
-    for (size_t col = 0; col < cols_to_write; col++) {
-        TEST_EQUAL_HEX('a' + (cols_to_write - 1 - col), (uint8_t)grid[0][col].c);
-    }
-
-    cd_put_c(dcd, '\n');
-    cd_put_c(dcd, 'B');
-    TEST_EQUAL_HEX('B', grid[1][0].c);
-
-    // Try to force a single scroll up.
-    for (size_t i = 0; i < dcd->rows - 1; i++) {
-        cd_put_c(dcd, '\n');
-    }
-
-    TEST_EQUAL_HEX('B', grid[0][0].c);
-
-    cd_put_c(dcd, '\b');
-    TEST_EQUAL_HEX(cds_flip(dcd->default_style), 
-            grid[dcd->rows - 2][dcd->cols - 1].style);
-
-    cd_put_c(dcd, '\b');
-    TEST_EQUAL_HEX(cds_flip(dcd->default_style), 
-            grid[dcd->rows - 2][dcd->cols - 2].style);
-
-    TEST_SUCCEED();
-}
 
 static bool test_simple_cursor_movements(void) {
     // We'll confirm the cursor moved by seeing if the color of the destination cell
