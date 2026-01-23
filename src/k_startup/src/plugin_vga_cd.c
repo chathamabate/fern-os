@@ -8,6 +8,10 @@
 #include "k_startup/vga_cd.h"
 #include "k_startup/page_helpers.h"
 
+/*
+ * DELETE THIS FILE SOON PLZ!
+ */
+
 static fernos_error_t vga_cd_plg_cmd(plugin_t *plg, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
 static const plugin_impl_t PLUGIN_VGA_CD_IMPL = {

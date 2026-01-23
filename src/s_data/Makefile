@@ -13,7 +13,7 @@ _SRCS 		?= id_table.c map.c list.c wait_queue.c ring.c term_buffer.c
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= id_table.c map.c list.c wait_queue.c ring.c
+_TEST_SRCS 	?= id_table.c map.c list.c wait_queue.c ring.c term_buffer.c
 
 -include ../mod_stub.mk
 

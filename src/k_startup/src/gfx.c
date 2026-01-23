@@ -50,7 +50,11 @@ static gfx_buffer_t back_buffer = {
 gfx_buffer_t * const BACK_BUFFER = &back_buffer;
 
 #define DIRECT_TERM_ROWS (40U)
-#define DIRECT_TERM_COLS (60U)
+#define DIRECT_TERM_COLS (80U)
+#define DIRECT_TERM_W_SCALE (1U)
+#define DIRECT_TERM_H_SCALE (1U)
+#define DIRECT_TERM_PAD (1U)
+#define DIRECT_TERM_FONT (ASCII_MONO_8X16)
 
 static term_cell_t direct_term_arr[DIRECT_TERM_ROWS][DIRECT_TERM_COLS];
 
@@ -143,28 +147,21 @@ void gfx_direct_term_render(void) {
     // Black out the back buffer.
     gfx_clear(BACK_BUFFER, BASIC_ANSI_PALETTE->colors[TC_BLACK]);
 
-    const ascii_mono_font_t * const font = ASCII_MONO_8X16;
-
-    const uint8_t w_scale = 1;
-    const uint8_t h_scale = 1;
-
-    const int32_t width = (int32_t)w_scale * (int32_t)(font->char_width) * DIRECT_TERM_COLS;
-    const int32_t height = (int32_t)h_scale * (int32_t)(font->char_height) * DIRECT_TERM_ROWS;
+    const int32_t width = DIRECT_TERM_W_SCALE * (int32_t)(DIRECT_TERM_FONT->char_width) * DIRECT_TERM_COLS;
+    const int32_t height = DIRECT_TERM_H_SCALE * (int32_t)(DIRECT_TERM_FONT->char_height) * DIRECT_TERM_ROWS;
 
     // Let's center this bad boy.
     const int32_t x = (FERNOS_GFX_WIDTH - width) / 2;
     const int32_t y = (FERNOS_GFX_HEIGHT - height) / 2;
 
     gfx_draw_term_buffer(BACK_BUFFER, NULL, NULL, 
-            DIRECT_TERM, font, BASIC_ANSI_PALETTE, 
-            x, y, w_scale, h_scale);
-
-    const uint8_t rect_pad = 1;
+            DIRECT_TERM, DIRECT_TERM_FONT, BASIC_ANSI_PALETTE, 
+            x, y, DIRECT_TERM_W_SCALE, DIRECT_TERM_H_SCALE);
 
     // Now let's draw a nice lil' rectangle around this guy.
-    gfx_draw_rect(BACK_BUFFER, NULL, x - 1 - rect_pad, y - 1 - rect_pad, 
-            width + (2 * (1 + rect_pad)), 
-            height + (2 * (1 + rect_pad)), 
+    gfx_draw_rect(BACK_BUFFER, NULL, x - 1 - DIRECT_TERM_PAD, y - 1 - DIRECT_TERM_PAD, 
+            width + (2 * (1 + DIRECT_TERM_PAD)), 
+            height + (2 * (1 + DIRECT_TERM_PAD)), 
             1, BASIC_ANSI_PALETTE->colors[TC_WHITE]);
 
     // Finally render out the back buffer!

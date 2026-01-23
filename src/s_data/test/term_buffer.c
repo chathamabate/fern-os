@@ -1,25 +1,18 @@
 
-#include "s_util/char_display.h"
 #include "s_util/ansi.h"
-#include "s_util/str.h"
 #include "s_util/rand.h"
 #include "k_startup/gfx.h"
 
-/*
- * THIS WILL BE DELETED SOON
- */
-
+static bool posttest(void);
 static bool pretest(void);
 
 #define PRETEST() pretest()
+#define POSTTEST() posttest()
 
 /*
  * WARNING THIS IS HIGHLY CYCLIC!
  *
- * The VGA terminal now itself uses a char_display_t under the hood.
- *
- * If there is an issue with the char display base implementation, it is likely the test
- * results won't even be printed out correctly.
+ * `gfx_direct_put_fmt_s` uses a terminal buffer for printing!
  *
  * If the tests pass though, we'd expect everything to be printed out correctly.
  */
@@ -28,152 +21,204 @@ static bool pretest(void);
 
 #include "s_util/test.h"
 
-/*
- * Testing a character display is kinda difficult, the best way is ultimately just to look
- * at the display (If it's visible that is)
- *
- * This test here DOES NOT generically test the virtual implementations of any character
- * display. IT INSTEAD just tests the helper logic found inside the char display base helper
- * functions. (Specifically, do ANSI codes and control characters work as expected)
- *
- * This test sets up a "dummy" character display which just writes all characters and styles
- * to a static 2D array `grid`. The following tests will inspect grid to confirm tests
- * are running correctly.
- */
-
-#define GRID_ROWS 40
-#define GRID_COLS 80
-
-static char_display_pair_t grid[GRID_ROWS][GRID_COLS];
-
-static void delete_dummy_char_display(char_display_t *dcd) { 
-    // Nothing to delete.
-    (void)dcd;
-}
-
-static void dcd_get_c(char_display_t *cd, size_t row, size_t col, char_display_style_t *style, char *c) {
-    if (row < cd->rows && col < cd->cols) {
-        if (style) {
-            *style = grid[row][col].style;
-        }
-        if (c) {
-            *c = grid[row][col].c;
-        }
-    }
-}
-
-static void dcd_set_c(char_display_t *cd, size_t row, size_t col, char_display_style_t style, char c) {
-    if (row < cd->rows && col < cd->cols) {
-        grid[row][col] = (char_display_pair_t) {
-            .style = style,
-            .c = c
-        };
-    }
-}
-
-static void dcd_scroll_up(char_display_t *cd, size_t shift) {
-    if (shift == 0) {
-        return;
-    }
-
-    if (shift > cd->rows) {
-        shift = cd->rows;
-    }
-
-    for (size_t row = 0; row < cd->rows - shift; row++) {
-        mem_cpy(grid[row], grid[row + shift], cd->cols * sizeof(char_display_pair_t));
-    }
-
-    for (size_t row = cd->rows - shift; row < cd->rows; row++) {
-        for (size_t col = 0; col < cd->cols; col++) {
-            grid[row][col] = (char_display_pair_t) {
-                .style = cd->default_style,
-                .c = ' '
-            };
-        }
-    }
-}
-
-static void dcd_scroll_down(char_display_t *cd, size_t shift) {
-    if (shift == 0) {
-        return;
-    }
-
-    if (shift > cd->rows) {
-        shift = cd->rows;
-    }
-
-    for (size_t row = cd->rows - 1; row != shift - 1; row--) {
-        mem_cpy(grid[row], grid[row - shift], cd->cols * sizeof(char_display_pair_t));
-    }
-
-    for (size_t row = 0; row < shift; row++) {
-        for (size_t col = 0; col < cd->cols; col++) {
-            grid[row][col] = (char_display_pair_t) {
-                .style = cd->default_style,
-                .c = ' '
-            };
-        }
-    }
-}
-
-static void dcd_set_row(char_display_t *cd, size_t row, char_display_style_t style, char c) {
-    if (row < cd->rows) {
-        for (size_t col = 0; col < cd->cols; col++) {
-            grid[row][col] = (char_display_pair_t) {
-                .style = style,
-                .c = c
-            };
-        }
-    }
-}
-
-static void dcd_set_grid(char_display_t *cd, char_display_style_t style, char c) {
-    for (size_t row = 0; row < cd->rows; row++) {
-        for (size_t col = 0; col < cd->cols; col++) {
-            grid[row][col] = (char_display_pair_t) {
-                .style = style,
-                .c = c
-            };
-        }
-    }
-}
-
-static const char_display_impl_t DUMMY_CHAR_DISPLAY_IMPL = {
-    .delete_char_display = delete_dummy_char_display,
-    .cd_set_c = dcd_set_c,
-    .cd_get_c = dcd_get_c,
-    .cd_scroll_up = dcd_scroll_up,
-    .cd_scroll_down = dcd_scroll_down,
-    .cd_set_row = dcd_set_row,
-    .cd_set_grid = dcd_set_grid
-};
-
-static char_display_t _dcd;
-static char_display_t * const dcd = &_dcd;
+static size_t num_al_blocks;
 
 static bool pretest(void) {
-    // The below few lines construct a fresh dummy display.
-    // We know that after calling the base constructor, the cursor will have value (0, 0).
-    // After we must clear the grid and flip the style at the cursor position.
+    num_al_blocks = al_num_user_blocks(get_default_allocator());
+    TEST_SUCCEED();
+}
 
-    init_char_display_base(dcd, &DUMMY_CHAR_DISPLAY_IMPL, GRID_ROWS, GRID_COLS, 
-            char_display_style(CDC_WHITE, CDC_BLACK)); 
+static bool posttest(void) {
+    TEST_EQUAL_UINT(num_al_blocks, al_num_user_blocks(get_default_allocator()));
+    TEST_SUCCEED();
+}
 
-    for (size_t row = 0; row < dcd->rows; row++) {
-        for (size_t col = 0; col < dcd->cols; col++) {
-            grid[row][col] = (char_display_pair_t) {
-                .style = dcd->default_style,
-                .c = ' '
-            };
-        }
+/*
+ * These tests assume direct access of the buf, cols, and rows fields is OK.
+ *
+ * (Which is intended!)
+ */
+
+static bool test_tb_new_and_delete(void) {
+    const term_cell_t dc = {
+        .style = term_style(TC_WHITE, TC_BLACK),
+        .c = ' '
+    };
+
+    const uint16_t rows = 10;
+    const uint16_t cols = 20;
+
+    term_buffer_t *tb = new_da_term_buffer(
+        dc, rows, cols
+    );
+
+    TEST_EQUAL_UINT(rows, tb->rows);
+    TEST_EQUAL_UINT(cols, tb->cols);
+
+    TEST_TRUE(tb != NULL);
+
+    // All cells should start as default!
+    const uint32_t buf_size = tb->rows * tb->cols;
+    for (uint32_t ci = 0; ci < buf_size; ci++) {
+        TEST_TRUE(tc_equals(dc, tb->buf[ci]));
     }
 
-    grid[0][0].style = cds_flip(grid[0][0].style);
+    delete_term_buffer(tb);
 
     TEST_SUCCEED();
 }
 
+static bool test_tb_clear(void) {
+    term_buffer_t *tb = new_da_term_buffer(
+        (term_cell_t) {
+            .style = term_style(TC_WHITE, TC_BLACK),
+            .c = ' ' 
+        },
+        10, 20
+    );
+
+    TEST_TRUE(tb != NULL);
+
+    const term_cell_t nc = {
+        .style = term_style(TC_RED, TC_BLACK),
+        .c = 'x'
+    };
+
+    tb_clear(tb, nc);
+    const uint32_t buf_size = tb->rows * tb->cols;
+    for (uint32_t ci = 0; ci < buf_size; ci++) {
+        TEST_TRUE(tc_equals(nc, tb->buf[ci]));
+    }
+
+    delete_term_buffer(tb);
+
+    TEST_SUCCEED();
+}
+
+static bool test_tb_resize(void) {
+    const term_cell_t dc = {
+        .style = term_style(TC_WHITE, TC_BLACK),
+        .c = ' '
+    };
+
+    term_buffer_t *tb = new_da_term_buffer(
+        dc,
+        10, 20
+    );
+
+    TEST_TRUE(tb != NULL);
+
+    tb_clear(tb, (term_cell_t) {
+        .style = term_style(TC_WHITE, TC_BLACK),
+        .c = 'x' 
+    });
+
+    const uint16_t new_rows = 20;
+    const uint16_t new_cols = 30;
+
+    TEST_SUCCESS(tb_resize(tb, new_rows, new_cols));
+
+    TEST_EQUAL_UINT(new_rows, tb->rows);
+    TEST_EQUAL_UINT(new_cols, tb->cols);
+
+    const uint32_t buf_size = tb->rows * tb->cols;
+    for (uint32_t ci = 0; ci < buf_size; ci++) {
+        TEST_TRUE(tc_equals(tb->default_cell, tb->buf[ci]));
+    }
+
+    delete_term_buffer(tb);
+
+    TEST_SUCCEED();
+}
+
+static bool test_scroll(void) {
+    // Pretty overkill test here, but whatever.
+    term_buffer_t *tb = new_da_term_buffer(
+        (term_cell_t) {
+            .style = term_style(TC_WHITE, TC_BLACK),
+            .c = ' ' 
+        },
+        10, 20
+    );
+
+    // We are going be using letters for this test.
+    TEST_TRUE(tb->rows <= 26);
+
+    TEST_TRUE(tb != NULL);
+
+    const int16_t cases[] = { 
+        // + For scroll down.
+        // - For scroll up.
+
+        0
+    };
+    const size_t num_cases = sizeof(cases) / sizeof(cases[0]);
+
+    for (size_t ci = 0; ci < num_cases; ci++) {
+        int16_t scroll = cases[ci];
+        TEST_TRUE(scroll != INT16_MIN); // invalid case!
+        
+        // First let's reset our buffer.
+        
+        for (uint16_t r = 0; r < tb->rows; r++) {
+            term_cell_t * const row = tb->buf + (r * tb->cols);
+            for (uint16_t c = 0; c < tb->cols; c++) {
+                row[c] = (term_cell_t) {
+                    .c = 'a' + r,
+                    .style = term_style(TC_WHITE, TC_BLACK)
+                };
+            }
+        }
+
+        if (scroll < 0) {
+            scroll *= -1;
+            tb_scroll_up(tb, scroll);
+            const uint16_t exp_scroll = MIN(tb->rows, scroll);
+
+            for (uint16_t r = 0; r < tb->rows; r++) {
+                term_cell_t * const row = tb->buf + (r * tb->cols);
+                for (uint16_t c = 0; c < tb->cols; c++) {
+                    if (r < tb->rows - exp_scroll) {
+                        TEST_EQUAL_UINT('a' + r + exp_scroll, row[c].c);
+                    } else {
+                        TEST_EQUAL_UINT(' ', row[c].c);
+                    }
+                }
+            }
+        } else {
+            tb_scroll_down(tb, scroll);
+            const uint16_t exp_scroll = MIN(tb->rows, scroll);
+
+            for (uint16_t r = 0; r < tb->rows; r++) {
+                term_cell_t * const row = tb->buf + (r * tb->cols);
+                for (uint16_t c = 0; c < tb->cols; c++) {
+                    if (r >= exp_scroll) {
+                        TEST_EQUAL_UINT('a' + r - exp_scroll, row[c].c);
+                    } else {
+                        TEST_EQUAL_UINT(' ', row[c].c);
+                    }
+                }
+            }
+        }
+    }
+
+    delete_term_buffer(tb);
+
+    TEST_SUCCEED();
+}
+
+
+bool test_term_buffer(void) {
+    BEGIN_SUITE("Terminal Buffer");
+    RUN_TEST(test_tb_new_and_delete);
+    RUN_TEST(test_tb_clear);
+    RUN_TEST(test_tb_resize);
+    RUN_TEST(test_scroll);
+    return END_SUITE();
+}
+
+
+/*
 static bool test_put_c0(void) {
     // Here let's just test with no special codes.
 
@@ -494,4 +539,5 @@ bool test_char_display(void) {
     RUN_TEST(test_bad_sequences);
     return END_SUITE();
 }
+*/
 
