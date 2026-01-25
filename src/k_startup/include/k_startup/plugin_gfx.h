@@ -25,6 +25,7 @@ struct _plugin_gfx_t {
  *
  * Upon creating the plugin, `root_window` will be forwarded a resize event with the screen
  * dimmensions.
+ * It will then be forwarded a focus event!
  *
  * Returns NULL on error.
  */
