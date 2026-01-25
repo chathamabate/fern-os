@@ -30,7 +30,7 @@ bool test_cached_block_device(void) {
  * It assumes the mem_block_device works.
  */
 
-#define LOGF_METHOD(...) gfx_direct_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s_rr(__VA_ARGS__)
 
 #include "s_util/test.h"
 

@@ -95,28 +95,39 @@ static inline void gfx_render(void) {
 void gfx_direct_term_render(void);
 
 /**
- * Put a string to the direct terminal with no formatting.
- * (Rerenders entire terminal)
+ * Write a string to the direct terminal.
+ * (Does not explicitly rerender!)
  */
 void gfx_direct_put_s(const char *s);
 
 /**
- * Print a message out to the direct terminal and re render it.
- * (This rerenders the entire direct terminal every print! Very slow)
- * Making this a macro so I don't need to deal with weird varargs forwarding.
+ * Write a string to the direct terminal, and then rerender!
  */
-#define gfx_direct_put_fmt_s(...) \
+static inline void gfx_direct_put_s_rr(const char *s) {
+    gfx_direct_put_s(s);
+    gfx_direct_term_render();
+}
+
+/**
+ * Write a formatted string to the direct terminal.
+ * (Does not explicitly rerender!)
+ */
+#define gfx_direct_put_fmt_s(...) tb_put_fmt_s(DIRECT_TERM, __VA_ARGS__)
+
+/**
+ * Write a formatted string to teh direct terminal,
+ * then rerender!
+ */
+#define gfx_direct_put_fmt_s_rr(...) \
     do { \
         tb_put_fmt_s(DIRECT_TERM, __VA_ARGS__); \
         gfx_direct_term_render(); \
     } while (0)
 
-
 /**
- * This function is meant to replace the old `out_bios_vga` function.
- * 
- * It prints a message to the direct terminal, and renders the terminal.
- * Finally, it locks up the CPU.
+ * Writes a message to the direct terminal.
+ * Rerenders direct terminal.
+ * Locks up.
  */
 void gfx_direct_fatal(const char *msg);
 
@@ -124,6 +135,8 @@ void gfx_direct_fatal(const char *msg);
  * The below functions I have updated to this new gfx terminal
  * design. They were used very early on in this project for
  * low-level debugging.
+ *
+ * None of them explicitly rerender the direct terminal!
  */
 
 #include "k_sys/dt.h"

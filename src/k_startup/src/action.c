@@ -112,7 +112,7 @@ void fos_timer_action(user_ctx_t *ctx) {
     
     fernos_error_t err = ks_tick(kernel);
     if (err != FOS_E_SUCCESS) {
-        gfx_direct_put_fmt_s("[Timer Error 0x%X]", err);
+        gfx_direct_put_fmt_s_rr("[Timer Error 0x%X]", err);
         ks_shutdown(kernel);
     }
 
@@ -289,7 +289,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     }
 
     if (err != FOS_E_SUCCESS) {
-        gfx_direct_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
+        gfx_direct_put_fmt_s_rr("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
         ks_shutdown(kernel);
     }
 
@@ -334,7 +334,7 @@ void fos_irq1_action(user_ctx_t *ctx) {
         if (plg_kb) {
             err = plg_kernel_cmd(plg_kb, PLG_KB_KCID_KEY_EVENT, sc, 0, 0, 0);
             if (err != FOS_E_SUCCESS) {
-                gfx_direct_put_fmt_s("[Keyboard Plugin KeyEvent Error 0x%X]\n", err);
+                gfx_direct_put_fmt_s_rr("[Keyboard Plugin KeyEvent Error 0x%X]\n", err);
                 ks_shutdown(kernel);
             }
         }
@@ -343,7 +343,7 @@ void fos_irq1_action(user_ctx_t *ctx) {
         if (plg_gfx) {
             err = plg_kernel_cmd(plg_gfx, PLG_GFX_KCID_KEY_EVENT, sc, 0, 0, 0);
             if (err != FOS_E_SUCCESS) {
-                gfx_direct_put_fmt_s("[Graphics Plugin KeyEvent Error 0x%X]\n", err);
+                gfx_direct_put_fmt_s_rr("[Graphics Plugin KeyEvent Error 0x%X]\n", err);
                 ks_shutdown(kernel);
             }
         }

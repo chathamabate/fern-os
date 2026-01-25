@@ -35,6 +35,7 @@
 #include "s_gfx/window_qgrid.h"
 
 
+#include "s_data/test/map.h"
 #include <stdint.h>
 
 static inline void try_setup_step(fernos_error_t err, const char *msg) {

@@ -14,14 +14,12 @@ void gfx_to_screen(gfx_screen_t *screen, gfx_buffer_t *frame) {
     int32_t rendered_width = MIN(screen->width, frame->width);
     int32_t rendered_height = MIN(screen->height, frame->height);
 
+    // Cannot do a full memcpy because the screen has pitch!
+
     for (int32_t r = 0; r < rendered_height; r++) {
         volatile gfx_color_t *screen_row = (volatile gfx_color_t *)((volatile uint8_t *)(screen->buffer) + (screen->pitch * r));
         gfx_color_t *frame_row = frame->buffer + (frame->width * r);
-
-        // It's possible a memcpy would be safe here, but I am not taking any chances with MMIO.
-        for (int32_t c = 0; c < rendered_width; c++) {
-            screen_row[c] = frame_row[c]; 
-        }
+        mem_cpy((void *)screen_row, frame_row, rendered_width * sizeof(gfx_color_t));
     }
 
     __sync_synchronize();
@@ -170,11 +168,11 @@ void gfx_direct_term_render(void) {
 
 void gfx_direct_put_s(const char *s) {
     tb_put_s(DIRECT_TERM, s);
-    gfx_direct_term_render();
 }
 
 void gfx_direct_fatal(const char *msg) {
     gfx_direct_put_s(msg);
+    gfx_direct_term_render();
     lock_up();
 }
 

@@ -4,7 +4,7 @@
 
 #include "k_startup/gfx.h"
 
-#define LOGF_METHOD(...) gfx_direct_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s_rr(__VA_ARGS__)
 
 #include "s_util/test.h"
 
