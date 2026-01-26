@@ -5,11 +5,11 @@
 #error "Focused border width must be <= border width!"
 #endif
 
-void delete_window_qgrid(window_t *w);
-void win_qg_render(window_t *w);
-fernos_error_t win_qg_on_event(window_t *w, window_event_t ev);
-fernos_error_t win_qg_register_child(window_t *w, window_t *sw);
-void win_qg_deregister_child(window_t *w, window_t *sw);
+static void delete_window_qgrid(window_t *w);
+static void win_qg_render(window_t *w);
+static fernos_error_t win_qg_on_event(window_t *w, window_event_t ev);
+static fernos_error_t win_qg_register_child(window_t *w, window_t *sw);
+static void win_qg_deregister_child(window_t *w, window_t *sw);
 
 static const window_impl_t QGRID_IMPL = {
     .delete_window = delete_window_qgrid,
@@ -68,7 +68,7 @@ window_t *new_window_qgrid(allocator_t *al, uint16_t width, uint16_t height) {
     return (window_t *)win_qg;
 }
 
-void delete_window_qgrid(window_t *w) {
+static void delete_window_qgrid(window_t *w) {
     window_qgrid_t *win_qg = (window_qgrid_t *)w;
 
     // First last deregister all children!
@@ -151,7 +151,7 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
     }
 }
 
-void win_qg_render(window_t *w) {
+static void win_qg_render(window_t *w) {
     window_qgrid_t * const win_qg = (window_qgrid_t *)w;
     gfx_buffer_t * const buf = win_qg->super.buf;
 
@@ -253,7 +253,7 @@ static void win_qg_set_focus_position(window_qgrid_t *win_qg, size_t r, size_t c
     win_qg->focused_col = c;
 }
 
-fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
+static fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
     fernos_error_t err;
     window_t *sw;
 
@@ -428,7 +428,7 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
     }
 }
 
-fernos_error_t win_qg_register_child(window_t *w, window_t *sw) {
+static fernos_error_t win_qg_register_child(window_t *w, window_t *sw) {
     fernos_error_t err;
     window_qgrid_t *win_qg = (window_qgrid_t *)w;
 
@@ -464,7 +464,7 @@ fernos_error_t win_qg_register_child(window_t *w, window_t *sw) {
     return FOS_E_NO_SPACE;
 }
 
-void win_qg_deregister_child(window_t *w, window_t *sw) {
+static void win_qg_deregister_child(window_t *w, window_t *sw) {
     window_qgrid_t *win_qg = (window_qgrid_t *)w;
 
     // Here we just search for `sw` in the grid, dereferencing it if found!

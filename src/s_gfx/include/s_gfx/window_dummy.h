@@ -11,12 +11,16 @@
 #define WIN_DUMMY_ROWS (20U)
 #define WIN_DUMMY_COLS (20U)
 
+#define WIN_DUMMY_GRID_WIDTH  (WIN_DUMMY_COLS * WIN_DUMMY_CELL_DIM)
+#define WIN_DUMMY_GRID_HEIGHT (WIN_DUMMY_ROWS * WIN_DUMMY_CELL_DIM)
+
 typedef uint8_t window_dummy_direction_t;
 
 #define WIN_DUMMY_EAST  (0U)
 #define WIN_DUMMY_NORTH (1U)
 #define WIN_DUMMY_WEST  (2U)
 #define WIN_DUMMY_SOUTH (3U)
+
 
 /**
  * A Dummy Window is just an example of a self managed window.
