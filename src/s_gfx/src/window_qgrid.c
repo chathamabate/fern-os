@@ -62,7 +62,7 @@ window_t *new_window_qgrid(allocator_t *al, uint16_t width, uint16_t height) {
     win_qg->focused_col = 0;
 
     win_qg->single_pane_mode = false;
-    win_qg->cntl_held = false;
+    win_qg->alt_held = false;
     win_qg->focused = false;
 
     return (window_t *)win_qg;
@@ -91,51 +91,54 @@ void delete_window_qgrid(window_t *w) {
  */
 static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x, uint16_t y, 
         uint16_t w, uint16_t h, bool focused) {
-    const gfx_color_t gap_fill_color = gfx_color(0, 0, 50);
+    const gfx_color_t gap_fill_color = WIN_QGRID_BG_COLOR;
 
-    if (!sw) {
+    if (sw) {
+        // With the new render virtual function design, it is the container's responsibility to call
+        // the render function of subwindows!
+        win_render(sw); // must do this before pasting into container buffer.
+
+        gfx_box_t clip = {
+            .x = x, .y = y, .width = w, .height = h
+        };
+        gfx_paste_buffer(win_qg->super.buf, &clip, sw->buf, x, y);
+
+        // I kinda go heavily out the way to not need to paint twice over the same pixel.
+
+        if (sw->buf->width < w) {
+            gfx_fill_rect(win_qg->super.buf, NULL,
+                x + sw->buf->width, y, 
+                w - sw->buf->width, sw->buf->height, 
+                gap_fill_color
+            ); 
+        }
+
+        if (sw->buf->height < h) {
+            gfx_fill_rect(win_qg->super.buf, NULL,
+                x, y + sw->buf->height,
+                sw->buf->width, h - sw->buf->height,
+                gap_fill_color
+            );
+        }
+
+        if (sw->buf->width < w && sw->buf->height < h) {
+            gfx_fill_rect(win_qg->super.buf, NULL,
+                x + sw->buf->width, y + sw->buf->height,
+                w - sw->buf->width, h - sw->buf->height, 
+                gap_fill_color
+            );
+        }
+    } else {
+        // Now window to render, just fill a nice big ol' rectangle.
         gfx_fill_rect(win_qg->super.buf, NULL, x, y, w, h, gap_fill_color);
-        return;
     }
 
-    // With the new render virtual function design, it is the container's responsibility to call
-    // the render function of subwindows!
-    win_render(sw); // must do this before pasting into container buffer.
-
-    gfx_box_t clip = {
-        .x = x, .y = y, .width = w, .height = h
-    };
-    gfx_paste_buffer(win_qg->super.buf, &clip, sw->buf, x, y);
-
-    // I kinda go heavily out the way to not need to paint twice over the same pixel.
-
-    if (sw->buf->width < w) {
-        gfx_fill_rect(win_qg->super.buf, NULL,
-            x + sw->buf->width, y, 
-            w - sw->buf->width, sw->buf->height, 
-            gap_fill_color
-        ); 
-    }
-
-    if (sw->buf->height < h) {
-        gfx_fill_rect(win_qg->super.buf, NULL,
-            x, y + sw->buf->height,
-            sw->buf->width, h - sw->buf->height,
-            gap_fill_color
-        );
-    }
-
-    if (sw->buf->width < w && sw->buf->height < h) {
-        gfx_fill_rect(win_qg->super.buf, NULL,
-            x + sw->buf->width, y + sw->buf->height,
-            w - sw->buf->width, h - sw->buf->height, 
-            gap_fill_color
-        );
-    }
-
+    // Draw focus border regardless of whether `sw` exists.
     if (focused) {
-        const gfx_color_t focus_border_color = 
-            win_qg->cntl_held ?  gfx_color(255, 0, 0) : gfx_color(255, 255, 255);
+        const gfx_color_t focus_border_color = win_qg->alt_held 
+            ? WIN_QGRID_FOCUS_ALT_BORDER_COLOR 
+            : WIN_QGRID_FOCUS_BORDER_COLOR;
+
         gfx_draw_rect(
            win_qg->super.buf, NULL,
            x - WIN_QGRID_FOCUS_BORDER_WIDTH,
@@ -152,7 +155,7 @@ void win_qg_render(window_t *w) {
     window_qgrid_t * const win_qg = (window_qgrid_t *)w;
     gfx_buffer_t * const buf = win_qg->super.buf;
 
-    const gfx_color_t border_color = gfx_color(150, 50, 50);
+    const gfx_color_t border_color = WIN_QGRID_BORDER_COLOR;
 
     // We are going to draw the exterior border 1 pixel thicker, this way, when we are in grid 
     // mode, there is no possibility of issues with divison by 2 round off.
@@ -322,12 +325,12 @@ fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
         const scs1_code_t make_code = scs1_as_make(kc);
         const bool is_make = scs1_is_make(kc);
 
-        if (make_code == SCS1_LCTRL || make_code == SCS1_E_RCTRL) {
-            win_qg->cntl_held = is_make;
+        if (make_code == SCS1_LALT || make_code == SCS1_E_RALT) {
+            win_qg->alt_held = is_make;
             return FOS_E_SUCCESS;
         }
 
-        if (!(win_qg->cntl_held)) { // arbitrary character forward!
+        if (!(win_qg->alt_held)) { // arbitrary character forward!
             sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
             if (sw) {
                 err = win_fwd_event(sw, (window_event_t) {

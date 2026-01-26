@@ -7,15 +7,27 @@
  * No tile will ever occupy a space smaller than MIN_TILE_DIM x MIN_TILE_DIM.
  */
 #define WIN_QGRID_MIN_TILE_DIM (100U)
-#define WIN_QGRID_BORDER_WIDTH (10U)
+#define WIN_QGRID_BORDER_WIDTH (2U)
 
 /**
  * The focused tile will have an extra thinner border.
  */
-#define WIN_QGRID_FOCUS_BORDER_WIDTH (3U)
+#define WIN_QGRID_FOCUS_BORDER_WIDTH (1U)
+
+/*
+ * The colors used by the quad grid window.
+ * (Consider having these be specifiable at runtime per window)
+ */
+
+#define WIN_QGRID_BG_COLOR               gfx_color(0, 0, 30)
+#define WIN_QGRID_BORDER_COLOR           gfx_color(0, 0, 80)
+#define WIN_QGRID_FOCUS_BORDER_COLOR     gfx_color(0, 40, 160)
+#define WIN_QGRID_FOCUS_ALT_BORDER_COLOR gfx_color(255, 255, 255)
 
 /**
  * The minimum height/width of the entire qgrid window.
+ *
+ * DON"T CHANGE!
  */
 #define WIN_QGRID_MIN_DIM ((2 * WIN_QGRID_MIN_TILE_DIM) + (3 * WIN_QGRID_BORDER_WIDTH))
 
@@ -49,11 +61,11 @@
  * its excess is clipped. If the window is smaller than the tile, the gap will be blacked out.
  *
  * Controls:
- * <CNTL> + Arrow Keys : Navigate around panes. (Works in both modes)
- * <CNTL> + F : Enter/Exit Single Pane mode with whatever tile is focused.
- * <CNTL> + X : Deregister the window in the focused tile.
+ * <ALT> + Arrow Keys : Navigate around panes. (Works in both modes)
+ * <ALT> + F : Enter/Exit Single Pane mode with whatever tile is focused.
+ * <ALT> + X : Deregister the window in the focused tile.
  *
- * (When <CNTL> is held, no key inputs are forwarded to subwindows)
+ * (When <ALT> is held, no key inputs are forwarded to subwindows)
  *
  * Finally, inactive subwindows are deregistered.
  */
@@ -85,9 +97,9 @@ typedef struct _window_qgrid_t {
     bool single_pane_mode;
 
     /**
-     * Is <CNTL> currently pressed?
+     * Is <ALT> currently pressed?
      */
-    bool cntl_held;
+    bool alt_held;
 
     /**
      * Is the qgrid window itself focused?
