@@ -110,7 +110,8 @@ static phys_addr_t _pop_free_page(void) {
 #define _R_IDENTITY  (1 << 0)
 #define _R_ALLOCATE  (1 << 1)
 #define _R_WRITEABLE (1 << 2)
-#define _R_USER (1 << 3)
+#define _R_USER      (1 << 3)
+#define _R_DONT_CACHE (1 << 4)
 
 /**
  * Make a certain range available within a page table.

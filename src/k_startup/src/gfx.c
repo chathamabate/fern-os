@@ -80,6 +80,15 @@ static term_buffer_t direct_term = {
 term_buffer_t * const DIRECT_TERM = &direct_term;
 
 fernos_error_t init_screen(const m2_info_start_t *m2_info) {
+    /*
+     * TODO: I think my graphics driver potentially has issues with cacheability.
+     * I may need to make updates to how PTEs for the frame buffer are constructed to confirm
+     * uncacheability and write combining.
+     *
+     * Additionally, some guys on stack overflow have introduced me to various strategies 
+     * useable for speeding up memcpy! I could consider making these changes!
+     */
+
     if (!m2_info) {
         return FOS_E_BAD_ARGS;
     }
