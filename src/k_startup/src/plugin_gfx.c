@@ -1,17 +1,20 @@
 
 #include "k_startup/plugin_gfx.h"
 #include "k_startup/gfx.h"
+#include "s_gfx/window_dummy.h"
 #include "os_defs.h"
 
 static fernos_error_t plg_gfx_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd, uint32_t arg0,
         uint32_t arg1, uint32_t arg2, uint32_t arg3);
+static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
+        uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
 static fernos_error_t plg_gfx_tick(plugin_t *plg);
 
 static const plugin_impl_t PLUGIN_GFX_IMPL = {
     .plg_on_shutdown = NULL,
     .plg_kernel_cmd = plg_gfx_kernel_cmd,
-    .plg_cmd = NULL,
+    .plg_cmd = plg_gfx_cmd,
     .plg_tick = plg_gfx_tick,
     .plg_on_fork_proc = NULL,
     .plg_on_reset_proc = NULL,
@@ -76,6 +79,57 @@ static fernos_error_t plg_gfx_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t k
 
     default: {
         return FOS_E_SUCCESS;
+    }
+
+    }
+}
+
+static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
+        uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    fernos_error_t err;
+
+    (void)arg0;
+    (void)arg1;
+    (void)arg2;
+    (void)arg3;
+
+    plugin_gfx_t *plg_gfx = (plugin_gfx_t *)plg;
+    kernel_state_t *ks = plg->ks;
+    thread_t *curr_thr = (thread_t *)(ks->schedule.head);
+
+    switch (cmd) {
+
+    /*
+     * Add a dummy window to the current root window!
+     * Propagates errors to user thread.
+     *
+     * Really meant for debug of the root window.
+     */
+    case PLG_GFX_PCID_NEW_DUMMY: {
+        window_t *dummy = new_window_dummy(ks->al);    
+        if (!dummy) {
+            DUAL_RET(curr_thr, FOS_E_NO_MEM, FOS_E_SUCCESS);
+        }
+
+        err = win_register_child(plg_gfx->root_window, dummy);
+        if (err == FOS_E_INACTIVE) {
+            return FOS_E_INACTIVE; // Major kernel error if root window goes 
+                                   // inactive. (Don't even worry about cleanup)
+        }
+
+        if (err != FOS_E_SUCCESS) { // Non-fatal error we clean up dummy.
+            delete_window(dummy); 
+            DUAL_RET(curr_thr, err, FOS_E_SUCCESS);
+        }
+
+        // dummy windows are self managed.
+        // The user doesn't get a reference back.
+
+        DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    default: {
+        DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
     }

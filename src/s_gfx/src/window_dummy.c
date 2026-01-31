@@ -47,8 +47,6 @@ window_t *new_window_dummy(allocator_t *al) {
 
     win_d->focused = false;
 
-    win_d->dir = WIN_DUMMY_NORTH;
-
     return (window_t *)win_d;
 }
 
@@ -71,11 +69,13 @@ static void win_d_render(window_t *w) {
     const gfx_color_t focused_grid_color = gfx_color(130, 130, 130);
     const gfx_color_t focused_cursor_color = gfx_color(200, 0, 0);
 
+    gfx_clear(w->buf, gfx_color(100, 0, 0));
+
     // Honestly, more to think about than you'd expect here..
     // Maybe I should take a break/go to bed, after all, my first day is tomorrow!
 
 }
 
 static fernos_error_t win_d_on_event(window_t *w, window_event_t ev) {
-    return FOS_E_NOT_IMPLEMENTED;
+    return FOS_E_SUCCESS;
 }

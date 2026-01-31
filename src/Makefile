@@ -181,7 +181,7 @@ clean.clangd: $(CLANGD_CLEAN_TARS)
 # Kernel Compilation
 
 OS_NAME := fernos
-C_COMPILER := i386-elf-gcc
+C_COMPILER := i686-elf-gcc
 
 LDSCRIPT := $(SRC_DIR)/linker.ld
 

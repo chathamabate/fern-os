@@ -33,8 +33,6 @@ typedef uint8_t window_dummy_direction_t;
  * when the window is unfocused, the cursor will be dull.
  *
  * On key press, arrow keys can be used to change the direction of the cursor.
- * Each tick, the cursor moves one tile in the current direction.
- * If an edge is reached, the cursor stops.
  *
  * The window can be resized, but will have a minimum size of 
  * `ROWS * CELL_DIM` X `COLS * CELL_DIM`.
@@ -61,11 +59,6 @@ typedef struct _window_dummy_t {
      * Is the dummy window focused.
      */
     bool focused;
-
-    /**
-     * The direction the cursor will move each tick.
-     */
-    window_dummy_direction_t dir;
 } window_dummy_t;
 
 /**

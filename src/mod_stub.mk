@@ -26,9 +26,9 @@ EXTRA_CFLAGS ?=
 
 # I think it's safe to say that for the entirety of this project I'll be using
 # the 386 tools.
-C_COMPILER := i386-elf-gcc
-ASSEMBLER  := i386-elf-as
-AR 		   := i386-elf-ar
+C_COMPILER := i686-elf-gcc
+ASSEMBLER  := i686-elf-as
+AR 		   := i686-elf-ar
 
 CFLAGS := -m32 -std=gnu99 -ffreestanding -Wall -Wextra -Wpedantic $(EXTRA_CFLAGS)
 
