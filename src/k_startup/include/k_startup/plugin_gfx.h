@@ -4,14 +4,14 @@
 #include "k_startup/plugin.h"
 #include "k_startup/handle.h"
 
+#include "s_data/map.h"
 #include "s_gfx/window.h"
 #include "s_gfx/mono_fonts.h"
 
 typedef struct _plugin_gfx_t plugin_gfx_t;
 
-typedef struct _window_char_display_attrs_t window_char_display_attrs_t;
-typedef struct _window_char_display_t window_char_display_t;
-typedef struct _handle_cd_state_t handle_cd_state_t;
+typedef struct _window_terminal_t window_terminal_t;
+typedef struct _handle_terminal_state_t handle_terminal_state_t;
 
 /**
  * The graphics plugin will manage the FernOS Desktop environment.
@@ -25,40 +25,62 @@ struct _plugin_gfx_t {
 };
 
 /**
- * The attributes of the character display.
- * (Intended for cosmetic customization)
- *
- * This structure shouldn't hold any pointers to allow for easy
- * copying from userspace to kernel space.
+ * A Terminal Window is a special window accessible via handle which just displays a grid of text.
  */
-struct _window_char_display_attrs_t {
-    /**
-     * Scale of the text to render.
-     */
-    uint8_t w_scale, h_scale;
+struct _window_terminal_t {
+    window_t super;
 
     /**
-     * Palette to use for text.
+     * This will map `handle_terminal_state_t *` -> `uint32_t`.
+     * The number value will not be used, only the keys will matter.
+     *
+     * This set will contain ever handle state which references this terminal.
+     * (We need to be able to notifiy handles when events arrive!)
      */
-    gfx_ansi_palette_t palette;
+    map_t * const handle_set;
+    
+    /**
+     * How the terminal buffer will be rendered on screen.
+     */
+    gfx_term_buffer_attrs_t tb_attrs;
+
+    /**
+     * The value of the terminal buffer which is currently rendered in super.buf.
+     */
+    term_buffer_t * const visible_tb;
+
+    /**
+     * When a terminal window is resized, it's buffer pixels are in an unknown state.
+     * When this is true, assume none of `visible_tb` is actually rendered yet.
+     */
+    bool dirty_buffer;
+
+    /**
+     * The true value of the terminal buffer which should be rendered out next frame!
+     */
+    term_buffer_t * const true_tb;
 };
 
 /**
- * A character display is a window which display only a grid of monospace text.
- * It will display as many font
+ * Create a new terminal window!
+ *
+ * The window will have dimmensions `rows` X `cols` IN CHARACTER CELLS! 
  */
-struct _window_char_display_t {
-    window_t super;
+window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
+        const gfx_term_buffer_attrs_t *attrs);
 
-
-};
-
-typedef struct _handle_cd_state_t {
+/**
+ * This is a handle state which references a Terminal Window!
+ *
+ * It is notified when pending events exist in the terminal window's buffer.
+ * It has the ability to fetch events which have occured and output text to the Terminal
+ * Window!
+ */
+struct _handle_terminal_state_t {
     handle_state_t super;
 
-    // Ok, and what does a handle state actually hold???
-    // A reference counted window???
-} handle_cd_state_t;
+    // TODO - FILL ME IN!
+};
 
 /**
  * Create a new graphics plugin!

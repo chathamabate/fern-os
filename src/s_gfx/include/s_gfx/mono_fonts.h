@@ -143,11 +143,11 @@ typedef struct _gfx_term_buffer_attrs_t {
      * What ASCII Monospace font we will be using.
      */
     ascii_mono_font_map_id_t fmi;
-} gfx_term_buffer_attrs;
+} gfx_term_buffer_attrs_t;
 
 static inline void gfx_draw_term_buffer_wa(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         const term_buffer_t *curr_tb, const term_buffer_t *next_tb, 
-        int32_t x, int32_t y, const gfx_term_buffer_attrs *attrs) {
+        int32_t x, int32_t y, const gfx_term_buffer_attrs_t *attrs) {
     gfx_draw_term_buffer(buf, clip_area, curr_tb, next_tb, 
             ASCII_MONO_FONT_MAP[attrs->fmi], &(attrs->palette), x, y, 
             attrs->w_scale, attrs->h_scale);
