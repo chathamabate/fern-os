@@ -169,6 +169,8 @@ typedef struct _term_buffer_t {
  *
  * Terminal buffer is cleared with default style before being returned.
  *
+ * Returns NULL if `rows` or `cols` is 0.
+ *
  * Returns NULL on error.
  */
 term_buffer_t *new_term_buffer(allocator_t *al, term_cell_t default_cell, uint16_t rows, uint16_t cols);
@@ -200,6 +202,7 @@ static inline void tb_default_clear(term_buffer_t *tb) {
  * After the resize, `tb_clear` is called with the default cell value.
  *
  * Returns FOS_E_STATE_MISMATCH if `tb` is a static buffer.
+ * Returns FOS_E_BAD_ARGS if `rows` or `cols` are 0.
  * Returns FOS_E_NO_MEM if the resize allocation fails.
  *
  * In case of error, the buffer's state is left unchanged.

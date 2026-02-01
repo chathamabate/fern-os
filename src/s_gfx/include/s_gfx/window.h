@@ -52,6 +52,14 @@ typedef struct _window_event_t {
          * Populated when `event_code == WINEC_KEY_INPUT`.
          */
         scs1_code_t key_code;
+
+        /**
+         * Populated when `event_code == WINEC_RESIZED`.
+         */
+        struct {
+            uint16_t width;
+            uint16_t height;
+        } dims;
     } d;
 } window_event_t;
 

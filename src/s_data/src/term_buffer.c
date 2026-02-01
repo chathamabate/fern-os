@@ -79,15 +79,18 @@ term_style_t ts_with_ansi_style_code(term_style_t ts, uint8_t ansi_style_code) {
 }
 
 term_buffer_t *new_term_buffer(allocator_t *al, term_cell_t default_cell, uint16_t rows, uint16_t cols) {
-    term_buffer_t *tb = al_malloc(al, sizeof(term_buffer_t));
+    if (!al || rows == 0 || cols == 0) {
+        return NULL;
+    }
 
-    term_cell_t *buf = NULL;
-    if (rows > 0 && cols > 0) {
-        buf = al_malloc(al, sizeof(term_cell_t) * rows * cols);
-        if (!buf) {
-            al_free(al, tb);
-            return NULL;
-        }
+    term_buffer_t *tb = al_malloc(al, sizeof(term_buffer_t));
+    term_cell_t *buf = al_malloc(al, sizeof(term_cell_t) * rows * cols);
+
+    if (!buf || !tb) {
+        al_free(al, buf);
+        al_free(al, tb);
+
+        return NULL;
     }
 
     *(allocator_t **)&(tb->al) = al;
@@ -130,10 +133,13 @@ fernos_error_t tb_resize(term_buffer_t *tb, uint16_t rows, uint16_t cols) {
         return FOS_E_STATE_MISMATCH;
     }
 
+    if (rows == 0 || cols == 0) {
+        return FOS_E_BAD_ARGS;
+    }
+
     size_t new_size = rows * cols * sizeof(term_cell_t);
     term_cell_t *new_buf = al_realloc(tb->al, tb->buf, new_size);
-
-    if (new_size > 0 && !new_buf) {
+    if (!new_buf) {
         return FOS_E_NO_MEM;
     }
 

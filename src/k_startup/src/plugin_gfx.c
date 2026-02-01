@@ -19,25 +19,163 @@ static const window_impl_t TERMINAL_WINDOW_IMPL = {
 };
 
 window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
-        const gfx_term_buffer_attrs_t *attrs) {
-    if (!al || !attrs) {
+        const gfx_term_buffer_attrs_t *attrs, ring_t *sch) {
+    if (!al || !attrs || !sch) {
         return NULL;
     }
 
+    const ascii_mono_font_t * const font = ASCII_MONO_FONT_MAP[attrs->fmi];
+    if (!font) {
+        return NULL;
+    }
 
-    return NULL;
+    // Calc initial width and height.
+    const uint16_t width = cols * font->char_width * attrs->w_scale;
+    const uint16_t height = rows * font->char_height * attrs->h_scale;
+
+    window_terminal_t *win_t = al_malloc(al, sizeof(window_terminal_t));
+    gfx_buffer_t *buf = new_gfx_buffer(al, width, height);
+    term_buffer_t *vis_tb = new_term_buffer(al, (term_cell_t) {
+        .c = ' ',
+        .style = term_style(TC_WHITE, TC_BLACK)
+    }, rows, cols);
+    term_buffer_t *true_tb = new_term_buffer(al, (term_cell_t) {
+        .c = ' ',
+        .style = term_style(TC_WHITE, TC_BLACK)
+    }, rows, cols);
+    fixed_queue_t *event_queue = new_fixed_queue(al, sizeof(window_event_t), 255);
+    basic_wait_queue_t *wq = new_basic_wait_queue(al);
+
+    if (!win_t || !buf || !vis_tb || !true_tb || !event_queue || !wq) {
+        delete_wait_queue((wait_queue_t *)wq);
+        delete_fixed_queue(event_queue);
+        delete_term_buffer(true_tb);
+        delete_term_buffer(vis_tb);
+        delete_gfx_buffer(buf);
+        al_free(al, win_t);
+
+        return NULL;
+    }
+
+    // Success!
+
+    const window_attrs_t win_attrs = (window_attrs_t) {
+        .min_width = 0,
+        .max_width = UINT16_MAX,
+        .min_height = 0,
+        .max_height = UINT16_MAX
+    };
+
+    init_window_base((window_t *)win_t, buf, &win_attrs, &TERMINAL_WINDOW_IMPL);
+    *(allocator_t **)&(win_t->al) = al;
+    win_t->references = 0;
+    *(gfx_term_buffer_attrs_t *)&(win_t->tb_attrs) = *attrs;
+    *(term_buffer_t **)&(win_t->visible_tb) = vis_tb;
+    win_t->dirty_buffer = true;
+    *(term_buffer_t **)&(win_t->true_tb) = true_tb;
+    *(fixed_queue_t **)&(win_t->event_queue) = event_queue;
+    *(basic_wait_queue_t **)&(win_t->wq) = wq;
+    *(ring_t **)&(win_t->schedule) = sch;
+
+    return win_t;
 }
 
+/**
+ * This deletes the terminal regardless of referece count and wait queue state!
+ * So be careful!
+ */
 static void delete_terminal_window(window_t *w) {
+    window_terminal_t *win_t = (window_terminal_t *)w;
 
+    delete_wait_queue((wait_queue_t *)(win_t->wq));
+    delete_fixed_queue(win_t->event_queue);
+    delete_term_buffer(win_t->true_tb);
+    delete_term_buffer(win_t->visible_tb);
+    deinit_window_base(w);
+
+    al_free(win_t->al, win_t);
 }
 
 static void tw_render(window_t *w) {
+    // Now what? We render stuff, what's even the deal with that??
 
+    // Rendering will be more unique I guess.
 }
 
+/**
+ * When a terminal window receives an event, the incoming event is placed in the event
+ * queue. If threads were waiting for the event-queue to be non-empty, then said threads are
+ * woken up.
+ *
+ * There are some special cases though.
+ *
+ * WINEC_RESIZED
+ * In this case the base window buffer has been resized. On this event, the terminal window
+ * must also attempt to resize its two terminal buffers. 
+ * The resize event which is then queued up is first modified such that `width` is the new
+ * number of columns in the terminal window, and `height` is the new number of rows in the terminal
+ * window.
+ * 
+ */
 static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
-    return FOS_E_NOT_IMPLEMENTED;
+    window_terminal_t *win_t = (window_terminal_t *)w;
+
+    fernos_error_t err;
+
+    const ascii_mono_font_t * const font = ASCII_MONO_FONT_MAP[win_t->tb_attrs.fmi];
+    const uint16_t font_width = font->char_width * win_t->tb_attrs.w_scale;
+    const uint16_t font_height = font->char_height * win_t->tb_attrs.h_scale;
+
+    if (ev.event_code == WINEC_RESIZED) {
+        // We CEIL the new rows and columns value as a terminal buffer must always have at least
+        // 1 cell.
+        uint16_t new_cols = ev.d.dims.width / font_width;
+        if (new_cols == 0) {
+            new_cols = 1;
+        }
+
+        uint16_t new_rows = ev.d.dims.height / font_height;     
+        if (new_rows == 0) {
+            new_rows = 1;
+        }
+
+        err = tb_resize(win_t->visible_tb, new_rows, new_cols);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        err = tb_resize(win_t->true_tb, new_rows, new_cols);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        // After a resize, it is important to note the the frame buffer of this
+        // window is in an undefined state!
+
+        win_t->dirty_buffer = true;
+
+        // Finally, overwrite the original event dimmensions.
+
+        ev.d.dims.width = new_cols;
+        ev.d.dims.height = new_rows;
+    }
+
+    // Regardless of event type, we always place on the queue!
+
+    // If the queue is currently empty, we must wake up all sleeping threads after enqueueing.
+    const bool wake_up = fq_is_empty(win_t->event_queue);
+    fq_enqueue(win_t->event_queue, &ev, true);
+
+    if (wake_up) {
+        err = bwq_wake_all_threads(win_t->wq, win_t->schedule, FOS_E_SUCCESS);
+        if (err != FOS_E_SUCCESS) {
+            return FOS_E_INACTIVE; // failure to wake threads is a catastrophic error for this
+                                   // window, unsure why `bwq_wake_all` even throws an error tbh.
+                                   // I dug into the impl, and this error will never happen.
+        }
+    }
+
+    return FOS_E_SUCCESS;
 }
 
 /*

@@ -31,7 +31,7 @@ struct _window_terminal_t {
     /**
      * How the terminal buffer will be rendered on screen.
      */
-    gfx_term_buffer_attrs_t tb_attrs;
+    const gfx_term_buffer_attrs_t tb_attrs;
 
     /**
      * The value of the terminal buffer which is currently rendered in super.buf.
@@ -58,6 +58,11 @@ struct _window_terminal_t {
      * Threads waiting for the event queue to be non-empty.
      */
     basic_wait_queue_t * const wq;
+
+    /**
+     * Woken threads are scheduled here.
+     */
+    ring_t * const schedule;
 };
 
 /**
@@ -66,7 +71,7 @@ struct _window_terminal_t {
  * The window will have dimmensions `rows` X `cols` IN CHARACTER CELLS! 
  */
 window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
-        const gfx_term_buffer_attrs_t *attrs);
+        const gfx_term_buffer_attrs_t *attrs, ring_t *sch);
 
 /**
  * This is a handle state which references a Terminal Window!

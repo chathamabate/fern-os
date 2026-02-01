@@ -33,7 +33,14 @@ fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height) {
         return FOS_E_NO_MEM; // regardless of error, return no mem.
     }
 
-    err = w->impl->win_on_event(w, (window_event_t) {.event_code = WINEC_RESIZED});
+    err = w->impl->win_on_event(w, (window_event_t) {
+        .event_code = WINEC_RESIZED,
+        .d.dims = {
+            .width = width,
+            .height = height
+        }
+    });
+
     if (err != FOS_E_SUCCESS) {
         w->is_active = false;
         return FOS_E_INACTIVE;
