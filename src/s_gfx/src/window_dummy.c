@@ -1,5 +1,6 @@
 
 #include "s_gfx/window_dummy.h"
+#include <stdatomic.h>
 
 static void delete_window_dummy(window_t *w);
 static void win_d_render(window_t *w);
@@ -58,22 +59,37 @@ static void delete_window_dummy(window_t *w) {
 }
 
 static void win_d_render(window_t *w) {
-    uint16_t grid_x = (w->buf->width - WIN_DUMMY_GRID_WIDTH) / 2;
-    uint16_t grid_y = (w->buf->height - WIN_DUMMY_GRID_HEIGHT) / 2;
+    const uint16_t grid_x = (w->buf->width - WIN_DUMMY_GRID_WIDTH) / 2;
+    const uint16_t grid_y = (w->buf->height - WIN_DUMMY_GRID_HEIGHT) / 2;
+
+    window_dummy_t *win_d = (window_dummy_t *)w;
 
     const gfx_color_t bg_color = gfx_color(0, 0, 0);
 
-    const gfx_color_t grid_color = gfx_color(100, 100, 100);
-    const gfx_color_t cursor_color = gfx_color(140, 140, 140);
+    gfx_clear(w->buf, bg_color);
 
-    const gfx_color_t focused_grid_color = gfx_color(130, 130, 130);
+    const gfx_color_t tile_colors[2] = {
+        gfx_color(100, 0, 0),
+        gfx_color(0, 0, 100)
+    }; 
+
+    const gfx_color_t cursor_color = gfx_color(140, 140, 140);
     const gfx_color_t focused_cursor_color = gfx_color(200, 0, 0);
 
-    gfx_clear(w->buf, gfx_color(100, 0, 0));
+    int32_t y = grid_y;
+    for (size_t r = 0; r < WIN_DUMMY_ROWS; r++, y += WIN_DUMMY_CELL_DIM) {
+        int32_t x = grid_x;
+        for (size_t c = 0; c < WIN_DUMMY_COLS; c++, x += WIN_DUMMY_CELL_DIM) {
+            gfx_color_t tile_color = tile_colors[(r + c) & 1];
+            if (r == win_d->cursor_row && c == win_d->cursor_col) {
+                tile_color = win_d->focused ? focused_cursor_color : cursor_color;
+            }
 
-    // Honestly, more to think about than you'd expect here..
-    // Maybe I should take a break/go to bed, after all, my first day is tomorrow!
-
+            gfx_fill_rect(w->buf, NULL, x, y, 
+                    WIN_DUMMY_CELL_DIM, WIN_DUMMY_CELL_DIM, tile_color
+            );
+        }
+    }
 }
 
 static fernos_error_t win_d_on_event(window_t *w, window_event_t ev) {

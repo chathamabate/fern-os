@@ -6,7 +6,7 @@
 /**
  * The side length of a single square cell in the dummy window.
  */
-#define WIN_DUMMY_CELL_DIM (20U)
+#define WIN_DUMMY_CELL_DIM (10U)
 
 #define WIN_DUMMY_ROWS (20U)
 #define WIN_DUMMY_COLS (20U)
