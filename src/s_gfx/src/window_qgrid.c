@@ -220,11 +220,13 @@ static void win_qg_set_focus_position(window_qgrid_t *win_qg, size_t r, size_t c
         return;
     }
 
+    window_t *init_focus = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
+    window_t *next_focus = win_qg->grid[r][c];
+
     // We are going to move!
 
     if (win_qg->single_pane_mode) {
         // In single pane mode, we always shrink current window back to correct tile size.        
-        window_t *init_focus = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
         if (init_focus) {
             err = win_resize(init_focus, 
                     win_qg_tile_width(win_qg),
@@ -235,7 +237,6 @@ static void win_qg_set_focus_position(window_qgrid_t *win_qg, size_t r, size_t c
             }
         }
 
-        window_t *next_focus = win_qg->grid[r][c];
         if (next_focus) {
             err = win_resize(next_focus, 
                     win_qg_large_tile_width(win_qg),
@@ -248,6 +249,22 @@ static void win_qg_set_focus_position(window_qgrid_t *win_qg, size_t r, size_t c
     }
 
     // In grid mode, all subwindows will have identical size, no need to resize anything.
+
+    // Now we always send focus/unfocus events to init/next.
+
+    if (init_focus) {
+        err = win_fwd_event(init_focus, (window_event_t) {.event_code = WINEC_UNFOCUSED});
+        if (err == FOS_E_INACTIVE) {
+            win_deregister(init_focus);
+        }
+    }
+
+    if (next_focus) {
+        err = win_fwd_event(next_focus, (window_event_t) {.event_code = WINEC_FOCUSED});
+        if (err == FOS_E_INACTIVE) {
+            win_deregister(next_focus);
+        }
+    }
 
     win_qg->focused_row = r;
     win_qg->focused_col = c;
@@ -437,6 +454,12 @@ static fernos_error_t win_qg_register_child(window_t *w, window_t *sw) {
     for (size_t r = 0; r < 2; r++) {
         for (size_t c = 0; c < 2; c++) {
             if (!(win_qg->grid[r][c])) { // We found a spot!
+                // Very important, `win_qg_set_focus_position` potentially deregisters the window
+                // at (r, c). `sw` is not in a valid state to be deregistered at this time!
+                // So, it's important we set the focus position, before referencing `sw` in
+                // the grid.
+                win_qg_set_focus_position(win_qg, r, c);
+
                 // Let's attempt a resize. 
                 const size_t new_width = win_qg->single_pane_mode 
                     ? win_qg_large_tile_width(win_qg) : win_qg_tile_width(win_qg);
@@ -446,12 +469,14 @@ static fernos_error_t win_qg_register_child(window_t *w, window_t *sw) {
 
                 err = win_resize(sw, new_width, new_height);
                 if (err == FOS_E_INACTIVE) {
-                    return FOS_E_UNKNWON_ERROR; // `sw` broke during register.
+                    return FOS_E_UNKNWON_ERROR; // `sw` broke during resize?
                 }
 
-                // VERY IMPORTANT, let's set the focus position BEFORE placing `sw` into the grid.
-                // THIS IS REQUIRED given how `win_qg_set_focus_position` works.
-                win_qg_set_focus_position(win_qg, r, c);
+                // Now we can focus!
+                err = win_fwd_event(sw, (window_event_t) {.event_code = WINEC_FOCUSED});
+                if (err == FOS_E_INACTIVE) {
+                    return FOS_E_UNKNWON_ERROR; // `sw` broke during focus?
+                }
 
                 // Success!
                 win_qg->grid[r][c] = sw;

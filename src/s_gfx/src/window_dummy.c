@@ -47,6 +47,7 @@ window_t *new_window_dummy(allocator_t *al) {
     win_d->cursor_col = WIN_DUMMY_COLS / 2;
 
     win_d->focused = false;
+    win_d->tick_num = 0;
 
     return (window_t *)win_d;
 }
@@ -69,12 +70,12 @@ static void win_d_render(window_t *w) {
     gfx_clear(w->buf, bg_color);
 
     const gfx_color_t tile_colors[2] = {
-        gfx_color(100, 0, 0),
-        gfx_color(0, 0, 100)
+        gfx_color(75, 0, 0),
+        gfx_color(25, 0, 25)
     }; 
 
-    const gfx_color_t cursor_color = gfx_color(140, 140, 140);
-    const gfx_color_t focused_cursor_color = gfx_color(200, 0, 0);
+    const gfx_color_t focused_cursor_color = gfx_color(150, 0, 0);
+    const gfx_color_t unfocused_cursor_color = gfx_color(50, 0, 50);
 
     int32_t y = grid_y;
     for (size_t r = 0; r < WIN_DUMMY_ROWS; r++, y += WIN_DUMMY_CELL_DIM) {
@@ -82,7 +83,7 @@ static void win_d_render(window_t *w) {
         for (size_t c = 0; c < WIN_DUMMY_COLS; c++, x += WIN_DUMMY_CELL_DIM) {
             gfx_color_t tile_color = tile_colors[(r + c) & 1];
             if (r == win_d->cursor_row && c == win_d->cursor_col) {
-                tile_color = win_d->focused ? focused_cursor_color : cursor_color;
+                tile_color = win_d->focused ? focused_cursor_color : unfocused_cursor_color;
             }
 
             gfx_fill_rect(w->buf, NULL, x, y, 
@@ -93,5 +94,73 @@ static void win_d_render(window_t *w) {
 }
 
 static fernos_error_t win_d_on_event(window_t *w, window_event_t ev) {
-    return FOS_E_SUCCESS;
+    window_dummy_t *win_d = (window_dummy_t *)w;
+
+    switch (ev.event_code) {
+
+    case WINEC_KEY_INPUT: {
+        switch (ev.d.key_code) {
+
+        case SCS1_E_UP: {
+            if (win_d->cursor_row > 0) {
+                win_d->cursor_row--;
+            }
+            return FOS_E_SUCCESS;
+        }
+
+        case SCS1_E_DOWN: {
+            if (win_d->cursor_row < WIN_DUMMY_ROWS - 1) {
+                win_d->cursor_row++;
+            }
+            return FOS_E_SUCCESS;
+        }
+
+        case SCS1_E_LEFT: {
+            if (win_d->cursor_col > 0) {
+                win_d->cursor_col--;
+            }
+            return FOS_E_SUCCESS;
+        }
+
+        case SCS1_E_RIGHT: {
+            if (win_d->cursor_col < WIN_DUMMY_COLS - 1) {
+                win_d->cursor_col++;
+            }
+            return FOS_E_SUCCESS;
+        }
+
+        default: {
+            return FOS_E_SUCCESS;
+        }
+
+        }
+    }
+
+    case WINEC_TICK: {
+        win_d->tick_num++;
+        return FOS_E_SUCCESS;
+    }
+
+    case WINEC_FOCUSED: {
+        win_d->focused = true;
+        return FOS_E_SUCCESS;
+    }
+
+    case WINEC_UNFOCUSED: {
+        win_d->focused = false;
+        return FOS_E_SUCCESS;
+    }
+
+    case WINEC_DEREGISTERED: {
+        // We are self managed!
+        // Delete here!
+        delete_window_dummy(w);
+        return FOS_E_SUCCESS;
+    }
+
+    default: {
+        return FOS_E_SUCCESS;
+    }
+
+    }
 }

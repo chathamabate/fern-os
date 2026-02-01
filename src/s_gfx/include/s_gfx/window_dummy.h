@@ -6,10 +6,10 @@
 /**
  * The side length of a single square cell in the dummy window.
  */
-#define WIN_DUMMY_CELL_DIM (10U)
+#define WIN_DUMMY_CELL_DIM (20U)
 
-#define WIN_DUMMY_ROWS (20U)
-#define WIN_DUMMY_COLS (20U)
+#define WIN_DUMMY_ROWS (10U)
+#define WIN_DUMMY_COLS (10U)
 
 #define WIN_DUMMY_GRID_WIDTH  (WIN_DUMMY_COLS * WIN_DUMMY_CELL_DIM)
 #define WIN_DUMMY_GRID_HEIGHT (WIN_DUMMY_ROWS * WIN_DUMMY_CELL_DIM)
@@ -20,7 +20,6 @@ typedef uint8_t window_dummy_direction_t;
 #define WIN_DUMMY_NORTH (1U)
 #define WIN_DUMMY_WEST  (2U)
 #define WIN_DUMMY_SOUTH (3U)
-
 
 /**
  * A Dummy Window is just an example of a self managed window.
@@ -59,6 +58,11 @@ typedef struct _window_dummy_t {
      * Is the dummy window focused.
      */
     bool focused;
+
+    /**
+     * Keep track of the number of ticks sent to this window always.
+     */
+    uint16_t tick_num;
 } window_dummy_t;
 
 /**
