@@ -326,6 +326,11 @@ static const ascii_mono_font_t ASCII_MONO_8X16_VAL = {
 
 const ascii_mono_font_t * const ASCII_MONO_8X16 = &ASCII_MONO_8X16_VAL;
 
+const ascii_mono_font_t * const ASCII_MONO_FONT_MAP[] = {
+    [ASCII_MONO_8X8_FMI] = ASCII_MONO_8X8,
+    [ASCII_MONO_8X16_FMI] = ASCII_MONO_8X16
+};
+
 void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         const char *str, 
         const ascii_mono_font_t *amf, 

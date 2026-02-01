@@ -48,6 +48,23 @@ typedef struct _ascii_mono_font_t {
 extern const ascii_mono_font_t * const ASCII_MONO_8X8;
 extern const ascii_mono_font_t * const ASCII_MONO_8X16;
 
+/*
+ * FMI stands for "font map index".
+ *
+ * These are used to reference a ascii monospace font when maybe a pointer
+ * isn't appropriate. For example, maybe a system call takes a font.
+ * In this case, a numeric ID would be better than a pointer to the font.
+ * (Even though a pointer may work fine given the font will be mapped in both
+ * user and kernel spaces)
+ */
+
+typedef uint8_t ascii_mono_font_map_id_t;
+
+#define ASCII_MONO_8X8_FMI  (0)
+#define ASCII_MONO_8X16_FMI (1)
+
+extern const ascii_mono_font_t * const ASCII_MONO_FONT_MAP[];
+
 /**
  * Draw a string to a buffer using an ascii monospace font.
  * If `str` contains a character with value >= 128, said character will be 
@@ -106,3 +123,34 @@ void gfx_draw_term_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         const ascii_mono_font_t *amf, const gfx_ansi_palette_t *palette,
         int32_t x, int32_t y,
         uint8_t w_scale, uint8_t h_scale);
+
+/**
+ * Here is a struct of attributes which helps with calling the above
+ * function in a brief manner.
+ */
+typedef struct _gfx_term_buffer_attrs_t {
+    /**
+     * Scale of the text to render.
+     */
+    uint8_t w_scale, h_scale;
+
+    /**
+     * Palette to use for text.
+     */
+    gfx_ansi_palette_t palette;
+
+    /**
+     * What ASCII Monospace font we will be using.
+     */
+    ascii_mono_font_map_id_t fmi;
+} gfx_term_buffer_attrs;
+
+static inline void gfx_draw_term_buffer_wa(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        const term_buffer_t *curr_tb, const term_buffer_t *next_tb, 
+        int32_t x, int32_t y, const gfx_term_buffer_attrs *attrs) {
+    gfx_draw_term_buffer(buf, clip_area, curr_tb, next_tb, 
+            ASCII_MONO_FONT_MAP[attrs->fmi], &(attrs->palette), x, y, 
+            attrs->w_scale, attrs->h_scale);
+}
+
+
