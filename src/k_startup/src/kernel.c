@@ -35,6 +35,7 @@
 #include "s_gfx/window_qgrid.h"
 
 
+#include "s_data/test/fixed_queue.h"
 #include "s_data/test/map.h"
 #include <stdint.h>
 
@@ -211,6 +212,9 @@ void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
     set_syscall_action(fos_syscall_action);
     set_timer_action(fos_timer_action);
     set_irq1_action(fos_irq1_action);
+
+    test_fixed_queue();
+    lock_up();
 
     thread_t *first_thread = (thread_t *)(kernel->schedule.head);
     return_to_ctx(&(first_thread->ctx));

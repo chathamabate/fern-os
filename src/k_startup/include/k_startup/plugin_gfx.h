@@ -5,24 +5,12 @@
 #include "k_startup/handle.h"
 
 #include "s_data/map.h"
+#include "s_data/fixed_queue.h"
 #include "s_gfx/window.h"
 #include "s_gfx/mono_fonts.h"
 
-typedef struct _plugin_gfx_t plugin_gfx_t;
-
 typedef struct _window_terminal_t window_terminal_t;
 typedef struct _handle_terminal_state_t handle_terminal_state_t;
-
-/**
- * The graphics plugin will manage the FernOS Desktop environment.
- *
- * It will also give userspace hooks for creating desktop windows!
- */
-struct _plugin_gfx_t {
-    plugin_t super;
-
-    window_t * const root_window;
-};
 
 /**
  * A Terminal Window is a special window accessible via handle which just displays a grid of text.
@@ -31,14 +19,15 @@ struct _window_terminal_t {
     window_t super;
 
     /**
-     * This will map `handle_terminal_state_t *` -> `uint32_t`.
-     * The number value will not be used, only the keys will matter.
-     *
-     * This set will contain ever handle state which references this terminal.
-     * (We need to be able to notifiy handles when events arrive!)
+     * Terminal windows will always be allocated dynamically.
      */
-    map_t * const handle_set;
-    
+    allocator_t * const al;
+
+    /**
+     * Number of open handles which reference this Terminal Window.
+     */
+    size_t references;
+
     /**
      * How the terminal buffer will be rendered on screen.
      */
@@ -59,6 +48,16 @@ struct _window_terminal_t {
      * The true value of the terminal buffer which should be rendered out next frame!
      */
     term_buffer_t * const true_tb;
+
+    /**
+     * Events forwarded to the terminal window will be 
+     */
+    fixed_queue_t * const event_queue;
+
+    /**
+     * Threads waiting for the event queue to be non-empty.
+     */
+    basic_wait_queue_t * const wq;
 };
 
 /**
@@ -80,6 +79,19 @@ struct _handle_terminal_state_t {
     handle_state_t super;
 
     // TODO - FILL ME IN!
+};
+
+typedef struct _plugin_gfx_t plugin_gfx_t;
+
+/**
+ * The graphics plugin will manage the FernOS Desktop environment.
+ *
+ * It will also give userspace hooks for creating desktop windows!
+ */
+struct _plugin_gfx_t {
+    plugin_t super;
+
+    window_t * const root_window;
 };
 
 /**

@@ -66,7 +66,6 @@ struct _window_attrs_t {
     uint16_t max_height;
 };
 
-
 struct _window_t {
     /**
      * Window implementation.

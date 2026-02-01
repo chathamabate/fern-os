@@ -4,6 +4,46 @@
 #include "s_gfx/window_dummy.h"
 #include "os_defs.h"
 
+static void delete_terminal_window(window_t *w);
+static void tw_render(window_t *w);
+static fernos_error_t tw_on_event(window_t *w, window_event_t ev);
+
+static const window_impl_t TERMINAL_WINDOW_IMPL = {
+    .delete_window = delete_terminal_window,
+    .win_render = tw_render,
+    .win_on_event = tw_on_event,
+
+    // Terminal windows never contain subwindows.
+    .win_register_child = NULL,
+    .win_deregister_child = NULL
+};
+
+window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
+        const gfx_term_buffer_attrs_t *attrs) {
+    if (!al || !attrs) {
+        return NULL;
+    }
+
+
+    return NULL;
+}
+
+static void delete_terminal_window(window_t *w) {
+
+}
+
+static void tw_render(window_t *w) {
+
+}
+
+static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+
+/*
+ * Graphics Plugin Stuff.
+ */
+
 static fernos_error_t plg_gfx_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd, uint32_t arg0,
         uint32_t arg1, uint32_t arg2, uint32_t arg3);
 static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
