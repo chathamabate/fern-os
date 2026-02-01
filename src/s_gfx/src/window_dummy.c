@@ -1,6 +1,7 @@
 
 #include "s_gfx/window_dummy.h"
-#include <stdatomic.h>
+#include "s_util/str.h"
+#include "s_gfx/mono_fonts.h"
 
 static void delete_window_dummy(window_t *w);
 static void win_d_render(window_t *w);
@@ -74,8 +75,8 @@ static void win_d_render(window_t *w) {
         gfx_color(25, 0, 25)
     }; 
 
-    const gfx_color_t focused_cursor_color = gfx_color(150, 0, 0);
-    const gfx_color_t unfocused_cursor_color = gfx_color(50, 0, 50);
+    const gfx_color_t focused_cursor_color = gfx_color(175, 0, 0);
+    const gfx_color_t unfocused_cursor_color = gfx_color(100, 0, 0);
 
     int32_t y = grid_y;
     for (size_t r = 0; r < WIN_DUMMY_ROWS; r++, y += WIN_DUMMY_CELL_DIM) {
@@ -91,6 +92,18 @@ static void win_d_render(window_t *w) {
             );
         }
     }
+
+    // Maybe we also render a tick counter?
+    char msg_buf[50];
+    str_fmt(msg_buf, "Tick: %u", win_d->tick_num);
+
+    const ascii_mono_font_t * const font = ASCII_MONO_8X16;
+
+    gfx_draw_ascii_mono_text(
+        w->buf, NULL, msg_buf, font, grid_x, (int32_t)grid_y - font->char_height, 1, 1, 
+        win_d->focused ? focused_cursor_color : unfocused_cursor_color,
+        GFX_COLOR_CLEAR
+    );
 }
 
 static fernos_error_t win_d_on_event(window_t *w, window_event_t ev) {
