@@ -24,6 +24,10 @@ window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t 
         return NULL;
     }
 
+    if (rows == 0 || cols == 0) {
+        return NULL;
+    }
+
     const ascii_mono_font_t * const font = ASCII_MONO_FONT_MAP[attrs->fmi];
     if (!font) {
         return NULL;
@@ -74,6 +78,8 @@ window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t 
     win_t->dirty_buffer = true;
     *(term_buffer_t **)&(win_t->true_tb) = true_tb;
     *(fixed_queue_t **)&(win_t->event_queue) = event_queue;
+    win_t->focused = false;
+    win_t->tick = 0;
     *(basic_wait_queue_t **)&(win_t->wq) = wq;
     *(ring_t **)&(win_t->schedule) = sch;
 
@@ -96,10 +102,67 @@ static void delete_terminal_window(window_t *w) {
     al_free(win_t->al, win_t);
 }
 
-static void tw_render(window_t *w) {
-    // Now what? We render stuff, what's even the deal with that??
+/**
+ * Rate at which cursor flashes.
+ */
+#define TW_CURSOR_FLASH_RATE (16U)
 
-    // Rendering will be more unique I guess.
+/**
+ * The height of the flashing cursor bar will be (cell_height / this value)
+ */
+#define TW_CURSOR_HEIGHT_FRACTION (4U)
+
+static void tw_render(window_t *w) {
+    window_terminal_t *win_t = (window_terminal_t *)w;
+
+    const ascii_mono_font_t * const font = ASCII_MONO_FONT_MAP[win_t->tb_attrs.fmi];
+
+    const uint32_t cell_width = win_t->tb_attrs.w_scale * font->char_width;
+    const uint32_t cell_height = win_t->tb_attrs.h_scale * font->char_height;
+    const uint32_t cursor_height = cell_height / TW_CURSOR_HEIGHT_FRACTION;
+
+    const uint32_t tb_width = cell_width * win_t->visible_tb->cols;
+    const uint32_t tb_height = cell_height * win_t->visible_tb->rows;
+
+    // The actual character grid will always be centered!
+    const uint32_t tb_x = tb_width < win_t->super.buf->width ? (win_t->super.buf->width - tb_width) / 2 : 0;
+    const uint32_t tb_y = tb_height < win_t->super.buf->height ? (win_t->super.buf->height - tb_height) / 2 : 0;
+
+    const uint32_t true_cursor_x = tb_x + (win_t->true_tb->cursor_col * cell_width);
+    const uint32_t true_cursor_y = tb_y + (win_t->true_tb->cursor_row * cell_height);
+
+    if (win_t->dirty_buffer) {
+        // In case of a dirty buffer, we have to redraw everything!
+
+        gfx_clear(win_t->super.buf, win_t->tb_attrs.palette.colors[TC_LIGHT_GREY]);
+        gfx_draw_term_buffer_wa(win_t->super.buf, NULL, NULL, win_t->true_tb, tb_x, tb_y, 
+                &(win_t->tb_attrs));
+
+        win_t->dirty_buffer = false;
+    } else {
+        // Here we just redraw cells which have changed! 
+        // (This redraws the visible cursor cell everytime!)
+        gfx_draw_term_buffer_wa(win_t->super.buf, NULL, win_t->visible_tb, win_t->true_tb, 
+                tb_x, tb_y, &(win_t->tb_attrs));
+    }
+
+    // Now actual cursor drawing logic!
+
+    gfx_color_t cursor_color;
+
+    if (win_t->focused) {
+        cursor_color = (win_t->tick / TW_CURSOR_FLASH_RATE) & 1 
+            ? win_t->tb_attrs.palette.colors[TC_WHITE] 
+            : win_t->tb_attrs.palette.colors[TC_BRIGHT_BROWN];
+    } else {
+        // No flash when unfocused.
+        cursor_color = win_t->tb_attrs.palette.colors[TC_LIGHT_GREY];
+    }
+
+    gfx_fill_rect(win_t->super.buf, NULL, true_cursor_x, true_cursor_y + (cell_height - cursor_height),
+            cell_width, cursor_height, cursor_color);
+
+    tb_copy(win_t->visible_tb, win_t->true_tb);
 }
 
 /**
@@ -126,7 +189,9 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
     const uint16_t font_width = font->char_width * win_t->tb_attrs.w_scale;
     const uint16_t font_height = font->char_height * win_t->tb_attrs.h_scale;
 
-    if (ev.event_code == WINEC_RESIZED) {
+    switch (ev.event_code) {
+
+    case WINEC_RESIZED: {
         // We CEIL the new rows and columns value as a terminal buffer must always have at least
         // 1 cell.
         uint16_t new_cols = ev.d.dims.width / font_width;
@@ -158,6 +223,29 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
 
         ev.d.dims.width = new_cols;
         ev.d.dims.height = new_rows;
+
+        break;
+    }
+
+    case WINEC_FOCUSED: {
+        win_t->focused = true;
+        break;
+    }
+
+    case WINEC_UNFOCUSED: {
+        win_t->focused = false;
+        break;
+    }
+
+    case WINEC_TICK: {
+        win_t->tick++;
+        break;
+    }
+
+    default: {
+        break;
+    }
+
     }
 
     // Regardless of event type, we always place on the queue!

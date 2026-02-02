@@ -463,7 +463,8 @@ void gfx_draw_term_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
                 tc.c = ' ';
             }
 
-            if (!curr_tb || !tc_ascii_printable_equals(curr_tb->buf[cell_ind], tc)) {
+            if (!curr_tb || !tc_ascii_printable_equals(curr_tb->buf[cell_ind], tc) 
+                    || (r == curr_tb->cursor_row && c == curr_tb->cursor_col)) {
                 // Render time baby!
                 gfx_fill_bitmap(buf, &render_area,
                         x + (c * char_width), 

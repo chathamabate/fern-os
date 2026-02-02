@@ -50,6 +50,16 @@ struct _window_terminal_t {
     term_buffer_t * const true_tb;
 
     /**
+     * Is this window focused?
+     */
+    bool focused;
+
+    /**
+     * The tick number. (used for cursor flashing)
+     */
+    uint32_t tick;
+
+    /**
      * Events forwarded to the terminal window will be 
      */
     fixed_queue_t * const event_queue;

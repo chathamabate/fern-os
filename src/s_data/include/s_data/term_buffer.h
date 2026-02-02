@@ -185,6 +185,16 @@ static inline term_buffer_t *new_da_term_buffer(term_cell_t default_cell, uint16
 void delete_term_buffer(term_buffer_t *tb);
 
 /**
+ * The destination terminal buffer has its grid entirely written over
+ * with the contents of the source terminal buffer.
+ *
+ * Additionally, `dest_tb` has it cursor position set to that of `src_tb`.
+ *
+ * NOTE: UNDEFINED BEHAVIOR if `dest_tb` and `src_tb` don't have the same dimmensions!
+ */
+void tb_copy(term_buffer_t *dest_tb, term_buffer_t *src_tb);
+
+/**
  * Set all cells within the buffer to a single value.
  *
  * Cursor is set to (0, 0) 

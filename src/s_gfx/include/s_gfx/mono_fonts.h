@@ -117,6 +117,9 @@ extern const gfx_ansi_palette_t * const BASIC_ANSI_PALETTE;
  * dimmensions of `next_tb` this function does nothing)
  *
  * If `curr_tb` is NULL, all of `next_tb` is rendered.
+ *
+ * No matter what, the cell at `curr_tb->cursor_row, curr_tb->cursor_col` is redrawn!
+ * This helps overwrite custom cursor animations/glyphs drawn manually after this function.
  */
 void gfx_draw_term_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         const term_buffer_t *curr_tb, const term_buffer_t *next_tb, 
