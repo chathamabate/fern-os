@@ -137,8 +137,8 @@ fernos_error_t sc_handle_wait_read_ready(handle_t h) {
     return sc_handle_cmd(h, HCID_WAIT_READ_READY, 0, 0, 0, 0);
 }
 
-bool sc_handle_is_cd(handle_t h) {
-    return sc_handle_cmd(h, HCID_IS_CD, 0, 0, 0, 0) == FOS_E_SUCCESS;
+bool sc_handle_is_terminal(handle_t h) {
+    return sc_handle_cmd(h, HCID_IS_TERM, 0, 0, 0, 0) == FOS_E_SUCCESS;
 }
 
 fernos_error_t sc_plg_cmd(plugin_id_t plg_id, plugin_cmd_id_t cmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {

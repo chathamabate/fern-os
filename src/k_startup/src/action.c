@@ -256,8 +256,8 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
                     err = hs_wait_read_ready(hs);
                     break;
 
-                case HCID_IS_CD:
-                    thr->ctx.eax = (uint32_t)(hs->is_cd) ? FOS_E_SUCCESS : FOS_E_UNKNWON_ERROR;
+                case HCID_IS_TERM:
+                    thr->ctx.eax = (uint32_t)(hs->is_terminal) ? FOS_E_SUCCESS : FOS_E_UNKNWON_ERROR;
                     err = FOS_E_SUCCESS;
                     break;
 

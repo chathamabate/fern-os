@@ -365,11 +365,13 @@ fernos_error_t sc_handle_wait_read_ready(handle_t h);
  */
 fernos_error_t sc_handle_read(handle_t h, void *dest, size_t len, size_t *readden);
 
-
 /**
- * Is this a character display handle?
+ * Does this handle support terminal commands?
+ *
+ * "supporting terminal commands" mean it must at least support ANSI codes being written.
+ * Also, the get dimmensions handle command must be implemented.
  */
-bool sc_handle_is_cd(handle_t h);
+bool sc_handle_is_terminal(handle_t h);
 
 /**
  * Execute some plugin specific command.

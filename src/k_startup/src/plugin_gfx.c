@@ -4,6 +4,8 @@
 #include "s_gfx/window_dummy.h"
 #include "os_defs.h"
 
+static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
+        const gfx_term_buffer_attrs_t *attrs, ring_t *sch);
 static void delete_terminal_window(window_t *w);
 static void tw_render(window_t *w);
 static fernos_error_t tw_on_event(window_t *w, window_event_t ev);
@@ -18,7 +20,7 @@ static const window_impl_t TERMINAL_WINDOW_IMPL = {
     .win_deregister_child = NULL
 };
 
-window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
+static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
         const gfx_term_buffer_attrs_t *attrs, ring_t *sch) {
     if (!al || !attrs || !sch) {
         return NULL;
@@ -265,6 +267,53 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
 
     return FOS_E_SUCCESS;
 }
+
+static handle_state_t *new_handle_terminal_state(void);
+
+static fernos_error_t copy_handle_terminal_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
+static fernos_error_t delete_handle_terminal_state(handle_state_t *hs);
+static fernos_error_t term_hs_wait_write_ready(handle_state_t *hs);
+static fernos_error_t term_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written);
+static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+
+static const handle_state_impl_t HS_TERM_IMPL = {
+    .copy_handle_state = copy_handle_terminal_state,
+    .delete_handle_state = delete_handle_terminal_state,
+
+    .hs_wait_write_ready = term_hs_wait_write_ready,
+    .hs_write = term_hs_write,
+
+    .hs_wait_read_ready = NULL,
+    .hs_read = NULL,
+
+    .hs_cmd = term_hs_cmd
+};
+
+static handle_state_t *new_handle_terminal_state(void) {
+
+    return NULL;
+}
+
+static fernos_error_t copy_handle_terminal_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t delete_handle_terminal_state(handle_state_t *hs) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t term_hs_wait_write_ready(handle_state_t *hs) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t term_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+
+static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+
 
 /*
  * Graphics Plugin Stuff.

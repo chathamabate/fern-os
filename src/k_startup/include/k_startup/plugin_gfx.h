@@ -76,14 +76,6 @@ struct _window_terminal_t {
 };
 
 /**
- * Create a new terminal window!
- *
- * The window will have dimmensions `rows` X `cols` IN CHARACTER CELLS! 
- */
-window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
-        const gfx_term_buffer_attrs_t *attrs, ring_t *sch);
-
-/**
  * This is a handle state which references a Terminal Window!
  *
  * It is notified when pending events exist in the terminal window's buffer.
@@ -93,7 +85,7 @@ window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t 
 struct _handle_terminal_state_t {
     handle_state_t super;
 
-    // TODO - FILL ME IN!
+    window_terminal_t * const win_t;
 };
 
 typedef struct _plugin_gfx_t plugin_gfx_t;
