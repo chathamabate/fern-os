@@ -23,6 +23,7 @@
 #define WIN_QGRID_BORDER_COLOR           gfx_color(0, 0, 80)
 #define WIN_QGRID_FOCUS_BORDER_COLOR     gfx_color(0, 40, 160)
 #define WIN_QGRID_FOCUS_ALT_BORDER_COLOR gfx_color(255, 255, 255)
+#define WIN_QGRID_FOCUS_MOV_BORDER_COLOR gfx_color(0, 255, 0)
 
 /**
  * The minimum height/width of the entire qgrid window.
@@ -62,6 +63,7 @@
  *
  * Controls:
  * <ALT> + Arrow Keys : Navigate around panes. (Works in both modes)
+ * <ALT> + <SHIFT> + Arrow Keys : Switch position of panes (Works in both modes)
  * <ALT> + F : Enter/Exit Single Pane mode with whatever tile is focused.
  * <ALT> + X : Deregister the window in the focused tile.
  *
@@ -99,12 +101,12 @@ typedef struct _window_qgrid_t {
     /**
      * Is <ALT> currently pressed?
      */
-    bool alt_held;
+    bool lalt_held, ralt_held;
 
     /**
-     * Is the qgrid window itself focused?
+     * Is <SHIFT> currently pressed?
      */
-    bool focused;
+    bool lshift_held, rshift_held;
 } window_qgrid_t;
 
 /*

@@ -60,7 +60,7 @@ struct _window_terminal_t {
     uint32_t tick;
 
     /**
-     * Events forwarded to the terminal window will be 
+     * Events forwarded to the terminal window will be here.
      */
     fixed_queue_t * const event_queue;
 

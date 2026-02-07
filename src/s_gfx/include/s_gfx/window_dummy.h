@@ -53,16 +53,6 @@ typedef struct _window_dummy_t {
      * The column of the selected cell in the grid.
      */
     uint16_t cursor_col;
-
-    /**
-     * Is the dummy window focused.
-     */
-    bool focused;
-
-    /**
-     * Keep track of the number of ticks sent to this window always.
-     */
-    uint16_t tick_num;
 } window_dummy_t;
 
 /**

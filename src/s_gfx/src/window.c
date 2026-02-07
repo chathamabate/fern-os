@@ -7,6 +7,10 @@ void init_window_base(window_t *w, gfx_buffer_t *buf, const window_attrs_t *attr
     *(gfx_buffer_t **)&(w->buf) = buf;
     w->is_active = true;
     w->container = NULL;
+
+    w->focused = false;
+    w->hidden = true;
+    w->tick = 0;
 }
 
 void deinit_window_base(window_t *w) {
@@ -56,14 +60,53 @@ fernos_error_t win_fwd_event(window_t *w, window_event_t ev) {
         return FOS_E_INACTIVE;
     }
 
-    err = w->impl->win_on_event(w, ev);
+    switch (ev.event_code) {
 
-    if (err == FOS_E_INACTIVE) {
-        w->is_active = false;
-        return FOS_E_INACTIVE;
+    case WINEC_TICK:
+        w->tick++;
+        break;
+
+    case WINEC_RESIZED:
+        return FOS_E_NOT_PERMITTED;
+
+    case WINEC_DEREGISTERED:
+        return FOS_E_NOT_PERMITTED;
+
+    case WINEC_FOCUSED:
+        w->focused = true;
+        break;
+
+    case WINEC_UNFOCUSED:
+        w->focused = false;
+        break;
+
+    case WINEC_HIDDEN:
+        w->hidden = true;
+        break;
+
+    case WINEC_UNHIDDEN:
+        w->hidden = false;
+        break;
+
+    default:
+        break;
+
     }
 
-    return err;
+    err = w->impl->win_on_event(w, ev);
+
+
+    if (err != FOS_E_SUCCESS) {
+        if (err == FOS_E_INACTIVE) {
+            w->is_active = false;
+            return FOS_E_INACTIVE;
+        }
+
+        // Still active in this case!
+        return FOS_E_UNKNWON_ERROR;
+    }
+
+    return FOS_E_SUCCESS;
 }
 
 

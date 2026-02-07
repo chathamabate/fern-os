@@ -47,9 +47,6 @@ window_t *new_window_dummy(allocator_t *al) {
     win_d->cursor_row = WIN_DUMMY_ROWS / 2;
     win_d->cursor_col = WIN_DUMMY_COLS / 2;
 
-    win_d->focused = false;
-    win_d->tick_num = 0;
-
     return (window_t *)win_d;
 }
 
@@ -84,7 +81,7 @@ static void win_d_render(window_t *w) {
         for (size_t c = 0; c < WIN_DUMMY_COLS; c++, x += WIN_DUMMY_CELL_DIM) {
             gfx_color_t tile_color = tile_colors[(r + c) & 1];
             if (r == win_d->cursor_row && c == win_d->cursor_col) {
-                tile_color = win_d->focused ? focused_cursor_color : unfocused_cursor_color;
+                tile_color = win_d->super.focused ? focused_cursor_color : unfocused_cursor_color;
             }
 
             gfx_fill_rect(w->buf, NULL, x, y, 
@@ -95,13 +92,13 @@ static void win_d_render(window_t *w) {
 
     // Maybe we also render a tick counter?
     char msg_buf[50];
-    str_fmt(msg_buf, "Tick: %u", win_d->tick_num);
+    str_fmt(msg_buf, "Tick: %u", win_d->super.tick);
 
     const ascii_mono_font_t * const font = ASCII_MONO_8X16;
 
     gfx_draw_ascii_mono_text(
         w->buf, NULL, msg_buf, font, grid_x, (int32_t)grid_y - font->char_height, 1, 1, 
-        win_d->focused ? focused_cursor_color : unfocused_cursor_color,
+        win_d->super.focused ? focused_cursor_color : unfocused_cursor_color,
         GFX_COLOR_CLEAR
     );
 }
@@ -147,21 +144,6 @@ static fernos_error_t win_d_on_event(window_t *w, window_event_t ev) {
         }
 
         }
-    }
-
-    case WINEC_TICK: {
-        win_d->tick_num++;
-        return FOS_E_SUCCESS;
-    }
-
-    case WINEC_FOCUSED: {
-        win_d->focused = true;
-        return FOS_E_SUCCESS;
-    }
-
-    case WINEC_UNFOCUSED: {
-        win_d->focused = false;
-        return FOS_E_SUCCESS;
     }
 
     case WINEC_DEREGISTERED: {

@@ -7,7 +7,6 @@ MOD_NAME 	?= u_startup
 _SRCS 		?= main.c \
 			   syscall.c \
 			   syscall_fut.c \
-			   syscall_cd.c \
 			   syscall_fs.c \
 			   syscall_pipe.c \
 			   syscall_kb.c \

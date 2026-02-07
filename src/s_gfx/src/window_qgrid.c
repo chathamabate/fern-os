@@ -62,8 +62,12 @@ window_t *new_window_qgrid(allocator_t *al, uint16_t width, uint16_t height) {
     win_qg->focused_col = 0;
 
     win_qg->single_pane_mode = false;
-    win_qg->alt_held = false;
-    win_qg->focused = false;
+
+    win_qg->lalt_held = false;
+    win_qg->ralt_held = false;
+
+    win_qg->lshift_held = false;
+    win_qg->rshift_held = false;
 
     return (window_t *)win_qg;
 }
@@ -135,10 +139,18 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
 
     // Draw focus border regardless of whether `sw` exists.
     if (focused) {
-        const gfx_color_t focus_border_color = win_qg->alt_held 
-            ? WIN_QGRID_FOCUS_ALT_BORDER_COLOR 
-            : WIN_QGRID_FOCUS_BORDER_COLOR;
+        gfx_color_t focus_border_color;
 
+        if (win_qg->lalt_held || win_qg->ralt_held) {
+            if (win_qg->lshift_held || win_qg->rshift_held) {
+                focus_border_color = WIN_QGRID_FOCUS_MOV_BORDER_COLOR;
+            } else {
+                focus_border_color = WIN_QGRID_FOCUS_ALT_BORDER_COLOR;
+            }
+        } else {
+            focus_border_color = WIN_QGRID_FOCUS_BORDER_COLOR;
+        }
+ 
         gfx_draw_rect(
            win_qg->super.buf, NULL,
            x - WIN_QGRID_FOCUS_BORDER_WIDTH,
@@ -169,7 +181,7 @@ static void win_qg_render(window_t *w) {
             WIN_QGRID_BORDER_WIDTH, WIN_QGRID_BORDER_WIDTH, 
             win_qg_large_tile_width(win_qg),
             win_qg_large_tile_height(win_qg),
-            win_qg->focused
+            win_qg->super.focused
         ); 
     } else {
         const uint16_t tile_width = win_qg_tile_width(win_qg);
@@ -195,12 +207,42 @@ static void win_qg_render(window_t *w) {
                     WIN_QGRID_BORDER_WIDTH + (c * (tile_width + WIN_QGRID_BORDER_WIDTH)), 
                     WIN_QGRID_BORDER_WIDTH + (r * (tile_height + WIN_QGRID_BORDER_WIDTH)),
                     tile_width, tile_height, 
-                    win_qg->focused && r == win_qg->focused_row && c == win_qg->focused_col
+                    win_qg->super.focused && r == win_qg->focused_row && c == win_qg->focused_col
                 );
             }
         }
     }
 }
+
+/**
+ * Move the focused pane to position (r, c).
+ * Does nothing if (r, c) is invalid!
+ *
+ * NOTE: This doesn't send any events at all, IT DOESN"T NEED TO!
+ */
+static void win_qg_move_focused_pane(window_qgrid_t *win_qg, size_t r, size_t c) {
+    if (r >= 2 || c >= 2) { // Invalid position.
+        return;
+    }
+
+    if (r == win_qg->focused_row && c == win_qg->focused_col) { // Nothing needs to be done here.
+        return;
+    }
+
+    window_t *temp = win_qg->grid[r][c];
+    win_qg->grid[r][c] = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
+    win_qg->grid[win_qg->focused_row][win_qg->focused_col] = temp;
+
+    win_qg->focused_row = r;
+    win_qg->focused_col = c;
+
+    // Realize this doesn't need to send any events!
+    // The focused window remains focused. 
+    //
+    // No new windows become hidden/unhidden!
+}
+
+#include "k_startup/gfx.h"
 
 /**
  * Set the focus position of the window.
@@ -232,8 +274,16 @@ static void win_qg_set_focus_position(window_qgrid_t *win_qg, size_t r, size_t c
                     win_qg_tile_width(win_qg),
                     win_qg_tile_height(win_qg)
             );
+
+            // This initally focused window is now off screen.
+            if (err != FOS_E_INACTIVE) {
+                err = win_fwd_event(init_focus, (window_event_t) { .event_code = WINEC_HIDDEN });
+            }
+
             if (err == FOS_E_INACTIVE) {
                 win_deregister(init_focus);
+                init_focus = NULL; // something went wrong with the initally focused window.
+                                   // remove all references.
             }
         }
 
@@ -242,8 +292,16 @@ static void win_qg_set_focus_position(window_qgrid_t *win_qg, size_t r, size_t c
                     win_qg_large_tile_width(win_qg),
                     win_qg_large_tile_height(win_qg)
             );
+
+            // The next focused window is now on screen!
+            if (err != FOS_E_INACTIVE) {
+                err = win_fwd_event(next_focus, (window_event_t) { .event_code = WINEC_UNHIDDEN });
+            }
+
             if (err == FOS_E_INACTIVE) {
                 win_deregister(next_focus);
+                next_focus = NULL; // something went wrong with the next focused window.
+                                   // remove all references!
             }
         }
     }
@@ -253,9 +311,13 @@ static void win_qg_set_focus_position(window_qgrid_t *win_qg, size_t r, size_t c
     // Now we always send focus/unfocus events to init/next.
 
     if (init_focus) {
+        // Realize, that here `init_focus` will be forwarded an unfocus event AFTER it may have
+        // been hidden. This is OK! Window implementations should not expect an ordering to
+        // focused/unfocused/hidden/unhidden events!
         err = win_fwd_event(init_focus, (window_event_t) {.event_code = WINEC_UNFOCUSED});
         if (err == FOS_E_INACTIVE) {
             win_deregister(init_focus);
+            init_focus = NULL;
         }
     }
 
@@ -263,6 +325,7 @@ static void win_qg_set_focus_position(window_qgrid_t *win_qg, size_t r, size_t c
         err = win_fwd_event(next_focus, (window_event_t) {.event_code = WINEC_FOCUSED});
         if (err == FOS_E_INACTIVE) {
             win_deregister(next_focus);
+            next_focus = NULL;
         }
     }
 
@@ -342,12 +405,28 @@ static fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
         const scs1_code_t make_code = scs1_as_make(kc);
         const bool is_make = scs1_is_make(kc);
 
-        if (make_code == SCS1_LALT || make_code == SCS1_E_RALT) {
-            win_qg->alt_held = is_make;
+        switch (make_code) {
+        case SCS1_LALT:
+            win_qg->lalt_held = is_make;
             return FOS_E_SUCCESS;
+
+        case SCS1_E_RALT:
+            win_qg->ralt_held = is_make;
+            return FOS_E_SUCCESS;
+
+        case SCS1_LSHIFT:
+            win_qg->lshift_held = is_make;
+            return FOS_E_SUCCESS;
+
+        case SCS1_RSHIFT:
+            win_qg->lshift_held = is_make;
+            return FOS_E_SUCCESS;
+
+        default:
+            break;
         }
 
-        if (!(win_qg->alt_held)) { // arbitrary character forward!
+        if (!(win_qg->lalt_held || win_qg->ralt_held)) { // arbitrary character forward!
             sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col];
             if (sw) {
                 err = win_fwd_event(sw, (window_event_t) {
@@ -367,22 +446,38 @@ static fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
         switch (kc) { // we use the raw key code here because we only care about key presses.
 
         case SCS1_E_UP: {
-            win_qg_set_focus_position(win_qg, win_qg->focused_row - 1, win_qg->focused_col);
+            if (win_qg->lshift_held || win_qg->rshift_held) {
+                win_qg_move_focused_pane(win_qg, win_qg->focused_row - 1, win_qg->focused_col);
+            } else {
+                win_qg_set_focus_position(win_qg, win_qg->focused_row - 1, win_qg->focused_col);
+            }
             return FOS_E_SUCCESS;
         }
 
         case SCS1_E_DOWN: {
-            win_qg_set_focus_position(win_qg, win_qg->focused_row + 1, win_qg->focused_col);
+            if (win_qg->lshift_held || win_qg->rshift_held) {
+                win_qg_move_focused_pane(win_qg, win_qg->focused_row + 1, win_qg->focused_col);
+            } else {
+                win_qg_set_focus_position(win_qg, win_qg->focused_row + 1, win_qg->focused_col);
+            }
             return FOS_E_SUCCESS;
         }
 
         case SCS1_E_LEFT: {
-            win_qg_set_focus_position(win_qg, win_qg->focused_row, win_qg->focused_col - 1);
+            if (win_qg->lshift_held || win_qg->rshift_held) {
+                win_qg_move_focused_pane(win_qg, win_qg->focused_row, win_qg->focused_col - 1);
+            } else {
+                win_qg_set_focus_position(win_qg, win_qg->focused_row, win_qg->focused_col - 1);
+            }
             return FOS_E_SUCCESS;
         }
 
         case SCS1_E_RIGHT: {
-            win_qg_set_focus_position(win_qg, win_qg->focused_row, win_qg->focused_col + 1);
+            if (win_qg->lshift_held || win_qg->rshift_held) {
+                win_qg_move_focused_pane(win_qg, win_qg->focused_row, win_qg->focused_col + 1);
+            } else {
+                win_qg_set_focus_position(win_qg, win_qg->focused_row, win_qg->focused_col + 1);
+            }
             return FOS_E_SUCCESS;
         }
 
@@ -428,16 +523,6 @@ static fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
         return FOS_E_SUCCESS;
     }
 
-    case WINEC_FOCUSED: {
-        win_qg->focused = true;
-        return FOS_E_SUCCESS;
-    }
-
-    case WINEC_UNFOCUSED: {
-        win_qg->focused = false;
-        return FOS_E_SUCCESS;
-    }
-
     default: {
         return FOS_E_SUCCESS;
     }
@@ -468,12 +553,17 @@ static fernos_error_t win_qg_register_child(window_t *w, window_t *sw) {
                     ? win_qg_large_tile_height(win_qg) : win_qg_tile_height(win_qg);
 
                 err = win_resize(sw, new_width, new_height);
-                if (err == FOS_E_INACTIVE) {
-                    return FOS_E_UNKNWON_ERROR; // `sw` broke during resize?
+
+                // When a window is registered, it always become the focused pane, which for
+                // a qgrid window means it is also unhidden!
+                if (err != FOS_E_INACTIVE) {
+                    err = win_fwd_event(sw, (window_event_t) {.event_code = WINEC_UNHIDDEN});
                 }
 
-                // Now we can focus!
-                err = win_fwd_event(sw, (window_event_t) {.event_code = WINEC_FOCUSED});
+                if (err != FOS_E_INACTIVE) {
+                    err = win_fwd_event(sw, (window_event_t) {.event_code = WINEC_FOCUSED});
+                }
+
                 if (err == FOS_E_INACTIVE) {
                     return FOS_E_UNKNWON_ERROR; // `sw` broke during focus?
                 }

@@ -34,15 +34,32 @@ typedef uint32_t window_event_code_t;
  */
 #define WINEC_DEREGISTERED (3U)
 
+/*
+ * Hidden/Unhidden and focused/unfocused don't really have exact definitions.
+ * It is up to whatever is managing your window to determine how to use these.
+ *
+ * NOTE: Technically a window can both be hidden and focused!
+ */
+
 /**
- * The window has been focused. (What this means is kinda up to you)
+ * The window has been focused.
  */
 #define WINEC_FOCUSED (4U)
 
 /**
- * The window has been unfocused. (Again, kinda up to you)
+ * The window has been unfocused.
  */
 #define WINEC_UNFOCUSED (5U)
+
+/**
+ * The window has been hidden. 
+ */
+#define WINEC_HIDDEN (6U)
+
+/**
+ * The window has been unhidden.
+ */
+#define WINEC_UNHIDDEN (7U)
 
 typedef struct _window_event_t {
     window_event_code_t event_code;
@@ -106,6 +123,21 @@ struct _window_t {
      * window. Otherwise, this is NULL.
      */
     window_t *container;
+
+    /**
+     * Is this window hidden?
+     */
+    bool hidden;
+
+    /**
+     * Is this window focused?
+     */
+    bool focused;
+
+    /**
+     * Counter of tick events received by this window.
+     */
+    uint32_t tick;
 };
 
 struct _window_impl_t {
@@ -120,6 +152,10 @@ struct _window_impl_t {
     /**
      * All writing to a window's buffer should happen within this function!
      * NOWHERE ELSE!
+     *
+     * Also, this shouldn't need to really check if a window is hidden or not.
+     * We can assume that if a container sets this window as hidden, it will not
+     * call this function.
      */
     void (*win_render)(window_t *w);
 
@@ -139,6 +175,9 @@ struct _window_impl_t {
      * 
      * SPECIAL EVENTS:
      *
+     * WINEC_TICK
+     * Will increment the tick counter before calling this handler.
+     *
      * WINEC_RESIZED
      * This event should only be sent to a window from inside the `win_resize` function below.
      * It is only forwarded AFTER the window's buffer has successfully been resized.
@@ -152,14 +191,18 @@ struct _window_impl_t {
      * VERY IMPORTANT: Even if a window is inactive, it may still have this event forwarded!
      * (This way a container window can safely deregister an inactive child window)
      * The return value of this handler is ignored.
+     *
+     * WINEC_FOCUSED/WINEC_UNFOCUSED
+     * Will set `focused` field before calling this handler.
+     *
+     * WINEC_HIDDEN/WINEC_UNHIDDEN
+     * Will set `hidden` field before calling this handler.
      */
     fernos_error_t (*win_on_event)(window_t *w, window_event_t ev);
 
     /*
      * For container windows, the below two functions must both be defined.
-     * Otherwise, both should be NULL.
-     */
-
+     * Otherwise, both should be NULL. */
     /*
      * The below two endpoints have some automatic checking before being called.
      * I usually don't do this type of thing, but I am making an exception.
@@ -199,6 +242,8 @@ struct _window_impl_t {
  * `buf` becomes OWNED by `w`!
  * The pointer for `impl` is stored within `w`.
  * The value pointed to by `attrs` is copied into `w`.
+ *
+ * `w` starts as hidden and unfocused!
  */
 void init_window_base(window_t *w, gfx_buffer_t *buf, const window_attrs_t *attrs, const window_impl_t *impl);
 
@@ -243,11 +288,10 @@ fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height);
  * Forward an event to a window!
  *
  * FOS_E_SUCCESS means the event succeeded.
- * FOS_E_INACTIVE means this window is inactive.
- * Other errors mean the event failed, but the window is still active.
- *
- * UNDEFINED BEHAVIOR if the given event is a RESIZE or DEREGISTER event.
- * (These should never be sent using this function)
+ * FOS_E_NOT_PERMITTED if the given event is a RESIZE or DEREGISTER, these should never
+ * be forwarded manually!
+ * FOS_E_INACTIVE means this window was already or has become inactive.
+ * FOS_E_UNKNOWN_ERROR means some other error occured, but the window is still active.
  */
 fernos_error_t win_fwd_event(window_t *w, window_event_t ev);
 
