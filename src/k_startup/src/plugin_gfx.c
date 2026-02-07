@@ -323,24 +323,26 @@ static fernos_error_t delete_handle_terminal_state(handle_state_t *hs) {
 
 static fernos_error_t term_hs_wait_write_ready(handle_state_t *hs) {
     handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
+    thread_t *thr = (thread_t *)(hs_t->super.ks->schedule.head);
 
     // Inactive terminal windows never accept more data!
     if (!(hs_t->win_t->super.is_active)) {
-        return FOS_E_EMPTY;
+        DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
     }
 
-    return FOS_E_SUCCESS;
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
 static fernos_error_t term_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
     handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
+    thread_t *thr = (thread_t *)(hs_t->super.ks->schedule.head);
 
     if (!(hs_t->win_t->super.is_active)) {
-        return FOS_E_EMPTY;
+        DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
     }
 
     if (!u_src || len == 0) {
-        return FOS_E_BAD_ARGS;
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
     // Ok, now what though... IDK
