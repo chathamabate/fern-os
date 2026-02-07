@@ -132,12 +132,12 @@ fernos_error_t win_register_child(window_t *w, window_t *sw) {
         return FOS_E_INACTIVE;
     }
 
-    if (err == FOS_E_SUCCESS) {
-        sw->container = w;
-        return FOS_E_SUCCESS;
+    if (err != FOS_E_SUCCESS) {
+        return FOS_E_UNKNWON_ERROR;
     }
 
-    return err;
+    sw->container = w;
+    return FOS_E_SUCCESS;
 }
 
 void win_deregister(window_t *w) {

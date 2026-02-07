@@ -499,6 +499,29 @@ static fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
                 }
             }
 
+            // Now, for all sub windows which are NOT in the focus position.
+            // They either become hidden or unhidden!
+
+            for (size_t r = 0; r < 2; r++) {
+                for (size_t c = 0; c < 2; c++) {
+                    if (r == win_qg->focused_row && c == win_qg->focused_col) {
+                        continue;
+                    }
+
+                    sw = win_qg->grid[r][c];
+                    if (sw) {
+                        err = win_fwd_event(sw, (window_event_t) {
+                            .event_code = win_qg->single_pane_mode 
+                                ? WINEC_HIDDEN      // We are entering single pane mode, everyone hide!
+                                : WINEC_UNHIDDEN    // We are exiting single pane mode, everyone come out!
+                        });
+                        if (err == FOS_E_INACTIVE) {
+                            win_deregister(sw);
+                        }
+                    }
+                }
+            }
+
             return FOS_E_SUCCESS;
         }
 
@@ -520,6 +543,55 @@ static fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
     }
 
     case WINEC_DEREGISTERED: {
+        return FOS_E_SUCCESS;
+    }
+
+    /*
+     * When the entire window is focused, a focus event is sent to the internally focused 
+     * subwindow. (Same goes for unfocused)
+     */
+    case WINEC_FOCUSED: 
+    case WINEC_UNFOCUSED: {
+        sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col]; 
+        if (sw) {
+            err = win_fwd_event(sw, (window_event_t) { .event_code = ev.event_code });
+            if (err == FOS_E_INACTIVE) {
+                win_deregister(sw);
+            }
+        }
+
+        return FOS_E_SUCCESS;
+    }
+
+    case WINEC_HIDDEN: 
+    case WINEC_UNHIDDEN: {
+        // In single pane mode, only the internally focused window's state will change on
+        // hide/unhide. 
+        if (win_qg->single_pane_mode) {
+            sw = win_qg->grid[win_qg->focused_row][win_qg->focused_col]; 
+            if (sw) {
+                err = win_fwd_event(sw, (window_event_t) { .event_code = ev.event_code });
+                if (err == FOS_E_INACTIVE) {
+                    win_deregister(sw);
+                }
+            }
+
+            return FOS_E_SUCCESS;
+        }
+
+        // Otherwise, all panes are affected!
+        for (size_t r = 0; r < 2; r++) {
+            for (size_t c = 0; c < 2; c++) {
+                sw = win_qg->grid[r][c];
+                if (sw) {
+                    err = win_fwd_event(sw, (window_event_t) { .event_code = ev.event_code });
+                    if (err == FOS_E_INACTIVE) {
+                        win_deregister(sw);
+                    }
+                }
+            }
+        }
+
         return FOS_E_SUCCESS;
     }
 

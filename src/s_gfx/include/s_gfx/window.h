@@ -306,7 +306,8 @@ fernos_error_t win_fwd_event(window_t *w, window_event_t ev);
  * FOS_E_STATE_MISMATCH if `sw` already belongs to a container or `sw` is inactive.
  * FOS_E_SUCCESS if the subwindow was successfully registered.
  * FOS_E_INACTIVE if `w` is no longer useable.
- * Other errors mean the register failed, but the window is still useable.
+ * FOS_E_UNKNOWN_ERROR if `sw` failed to be registered for some other reason.
+ * In this case, `w` is still active.
  *
  * VERY IMPORTANT, On Success, this automatically set's `sw->container` to `w`.
  */

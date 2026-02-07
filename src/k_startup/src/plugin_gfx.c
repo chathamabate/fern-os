@@ -80,8 +80,6 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
     win_t->dirty_buffer = true;
     *(term_buffer_t **)&(win_t->true_tb) = true_tb;
     *(fixed_queue_t **)&(win_t->event_queue) = event_queue;
-    win_t->focused = false;
-    win_t->tick = 0;
     *(basic_wait_queue_t **)&(win_t->wq) = wq;
     *(ring_t **)&(win_t->schedule) = sch;
 
@@ -152,8 +150,8 @@ static void tw_render(window_t *w) {
 
     gfx_color_t cursor_color;
 
-    if (win_t->focused) {
-        cursor_color = (win_t->tick / TW_CURSOR_FLASH_RATE) & 1 
+    if (win_t->super.focused) {
+        cursor_color = (win_t->super.tick / TW_CURSOR_FLASH_RATE) & 1 
             ? win_t->tb_attrs.palette.colors[TC_WHITE] 
             : win_t->tb_attrs.palette.colors[TC_BRIGHT_BROWN];
     } else {
@@ -229,21 +227,6 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
         break;
     }
 
-    case WINEC_FOCUSED: {
-        win_t->focused = true;
-        break;
-    }
-
-    case WINEC_UNFOCUSED: {
-        win_t->focused = false;
-        break;
-    }
-
-    case WINEC_TICK: {
-        win_t->tick++;
-        break;
-    }
-
     default: {
         break;
     }
@@ -288,10 +271,6 @@ static const handle_state_impl_t HS_TERM_IMPL = {
 
     .hs_cmd = term_hs_cmd
 };
-
-static handle_state_t *new_handle_terminal_state(void) {
-    return NULL;
-}
 
 static fernos_error_t copy_handle_terminal_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
     return FOS_E_NOT_IMPLEMENTED;
@@ -346,6 +325,13 @@ plugin_t *new_plugin_gfx(kernel_state_t *ks, window_t *root_window) {
     // We actually allow the `root_window` resize to fail.
     // As long as the window is still active, we are good!
     err = win_resize(root_window, FERNOS_GFX_WIDTH, FERNOS_GFX_HEIGHT);
+
+    if (err != FOS_E_INACTIVE) {
+        err = win_fwd_event(root_window, (window_event_t) {
+            .event_code = WINEC_UNHIDDEN,
+        });
+    }
+
     if (err != FOS_E_INACTIVE) {
         err = win_fwd_event(root_window, (window_event_t) {
             .event_code = WINEC_FOCUSED,
