@@ -290,7 +290,6 @@ static const handle_state_impl_t HS_TERM_IMPL = {
 };
 
 static handle_state_t *new_handle_terminal_state(void) {
-
     return NULL;
 }
 

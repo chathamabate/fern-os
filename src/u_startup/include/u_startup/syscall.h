@@ -368,8 +368,7 @@ fernos_error_t sc_handle_read(handle_t h, void *dest, size_t len, size_t *readde
 /**
  * Does this handle support terminal commands?
  *
- * "supporting terminal commands" mean it must at least support ANSI codes being written.
- * Also, the get dimmensions handle command must be implemented.
+ * See `u_startup/syscall_term.h`.
  */
 bool sc_handle_is_terminal(handle_t h);
 

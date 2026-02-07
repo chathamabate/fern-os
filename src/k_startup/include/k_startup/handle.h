@@ -48,7 +48,10 @@ struct _handle_state_t {
     const handle_t handle;
 
     /**
-     * Whether or not this is handle supports terminal commands.
+     * Whether or not this handle is a terminal.
+     *
+     * A Terminal is a special handle which is gauranteed to support a series of commands.
+     * See `s_bridge/shared_defs.h`.
      */
     const bool is_terminal;
 };

@@ -228,10 +228,15 @@ static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cm
 /*
  * ***** Terminal Handle Commands *****
  *
- * A handle which writes to a terminal MUST support this handle command.
+ * A Terminal handle is special!
+ * It is meant to represent some abstract grid of text. 
+ *
+ * See `u_startup/syscall_term.h` to see what these command do.
  */
 
-#define TERM_HCID_GET_DIMS (NUM_DEFAULT_HCIDS + 0) // SOON TO BE REFACTORED!
+#define TERM_HCID_GET_DIMS      (NUM_DEFAULT_HCIDS + 0) 
+#define TERM_HCID_WAIT_EVENT    (NUM_DEFAULT_HCIDS + 1) 
+#define TERM_HCID_READ_EVENTS   (NUM_DEFAULT_HCIDS + 2)
 
 /*
  * Plugin Command syntax
