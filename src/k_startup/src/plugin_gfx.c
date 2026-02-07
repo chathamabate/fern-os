@@ -178,7 +178,10 @@ static void tw_render(window_t *w) {
  * The resize event which is then queued up is first modified such that `width` is the new
  * number of columns in the terminal window, and `height` is the new number of rows in the terminal
  * window.
- * 
+ *
+ * WINEC_DEREGISTERED
+ * In case of a deregister event, i.e., this window is no longer visible.
+ * This window becomes inactive. If there are no open references, this window will delete itself!
  */
 static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
     window_terminal_t *win_t = (window_terminal_t *)w;
@@ -227,6 +230,18 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
         break;
     }
 
+    case WINEC_DEREGISTERED: {
+        win_t->super.is_active = false;
+
+        // This window will delete itself on deregister ONLY if there are no open handles!
+        if (win_t->references == 0) {
+            delete_window((window_t *)win_t);
+            return FOS_E_SUCCESS;
+        }
+
+        break;
+    }
+
     default: {
         break;
     }
@@ -251,8 +266,6 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
     return FOS_E_SUCCESS;
 }
 
-static handle_state_t *new_handle_terminal_state(void);
-
 static fernos_error_t copy_handle_terminal_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
 static fernos_error_t delete_handle_terminal_state(handle_state_t *hs);
 static fernos_error_t term_hs_wait_write_ready(handle_state_t *hs);
@@ -273,18 +286,66 @@ static const handle_state_impl_t HS_TERM_IMPL = {
 };
 
 static fernos_error_t copy_handle_terminal_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
-    return FOS_E_NOT_IMPLEMENTED;
+    handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
+    handle_terminal_state_t *hs_t_copy = al_malloc(hs_t->super.ks->al, sizeof(handle_terminal_state_t));
+
+    if (!hs_t_copy) {
+        return FOS_E_NO_MEM;
+    }
+
+    init_base_handle((handle_state_t *)hs_t_copy, &HS_TERM_IMPL, hs_t->super.ks, proc, hs_t->super.handle, true);
+    *(window_terminal_t **)&(hs_t_copy->win_t) = hs_t->win_t;
+
+    hs_t_copy->win_t->references++;
+
+    *out = (handle_state_t *)hs_t_copy;
+
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t delete_handle_terminal_state(handle_state_t *hs) {
-    return FOS_E_NOT_IMPLEMENTED;
+    handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
+
+    hs_t->win_t->references--;
+    if (hs_t->win_t->references == 0 && !(hs_t->win_t->super.is_active)) {
+        // If the underlying terminal window no longer has any references AND is inactive,
+        // we can delete the window here too!
+        
+        delete_window((window_t *)(hs_t->win_t));
+    }
+
+    // Always delete the handle state itself.
+
+    al_free(hs_t->super.ks->al, hs_t);
+
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t term_hs_wait_write_ready(handle_state_t *hs) {
-    return FOS_E_NOT_IMPLEMENTED;
+    handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
+
+    // Inactive terminal windows never accept more data!
+    if (!(hs_t->win_t->super.is_active)) {
+        return FOS_E_EMPTY;
+    }
+
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t term_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
+    handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
+
+    if (!(hs_t->win_t->super.is_active)) {
+        return FOS_E_EMPTY;
+    }
+
+    if (!u_src || len == 0) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    // Ok, now what though... IDK
+    // I think we need to do that ansi look back thing...
+
     return FOS_E_NOT_IMPLEMENTED;
 }
 
