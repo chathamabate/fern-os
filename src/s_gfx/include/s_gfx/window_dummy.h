@@ -2,42 +2,17 @@
 #pragma once
 
 #include "s_gfx/window.h"
+#include "s_data/term_buffer.h"
+#include "s_gfx/mono_fonts.h"
 
-/**
- * The side length of a single square cell in the dummy window.
- */
-#define WIN_DUMMY_CELL_DIM (20U)
-
-#define WIN_DUMMY_ROWS (10U)
-#define WIN_DUMMY_COLS (10U)
-
-#define WIN_DUMMY_GRID_WIDTH  (WIN_DUMMY_COLS * WIN_DUMMY_CELL_DIM)
-#define WIN_DUMMY_GRID_HEIGHT (WIN_DUMMY_ROWS * WIN_DUMMY_CELL_DIM)
-
-typedef uint8_t window_dummy_direction_t;
-
-#define WIN_DUMMY_EAST  (0U)
-#define WIN_DUMMY_NORTH (1U)
-#define WIN_DUMMY_WEST  (2U)
-#define WIN_DUMMY_SOUTH (3U)
+#define WINDOW_DUMMY_FONT (ASCII_MONO_8X16)
+#define WINDOW_DUMMY_PALETTE (BASIC_ANSI_PALETTE)
 
 /**
  * A Dummy Window is just an example of a self managed window.
  * It's purpose is for testing.
  *
- * On render, it displays a centered grid with square cells.
- *
- * The cursor tile will be filled with a unique color.
- * When the window is focused, the cursor will be bright, whereas
- * when the window is unfocused, the cursor will be dull.
- *
- * On key press, arrow keys can be used to change the direction of the cursor.
- *
- * The window can be resized, but will have a minimum size of 
- * `ROWS * CELL_DIM` X `COLS * CELL_DIM`.
- *
- * As the window is self-managed, deregistering this window will call the 
- * destructor!
+ * All it does is log events to a terminal buffer! (Which is rendered!)
  */
 typedef struct _window_dummy_t {
     window_t super;
@@ -45,14 +20,19 @@ typedef struct _window_dummy_t {
     allocator_t * const al;
 
     /**
-     * The row of the selected cell in the grid.
+     * This terminal buffer reflects the current contents of this window's buffer.
      */
-    uint16_t cursor_row;
+    term_buffer_t * const visible_tb;
 
     /**
-     * The column of the selected cell in the grid.
+     * When this is true, the contents of this window's buffer are unknown.
      */
-    uint16_t cursor_col;
+    bool dirty_buffer;
+
+    /**
+     * The "true" value of the this window's terminal buffer which should be rendered next frame!
+     */
+    term_buffer_t * const real_tb;
 } window_dummy_t;
 
 /**

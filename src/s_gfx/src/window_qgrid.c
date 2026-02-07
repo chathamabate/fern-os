@@ -242,8 +242,6 @@ static void win_qg_move_focused_pane(window_qgrid_t *win_qg, size_t r, size_t c)
     // No new windows become hidden/unhidden!
 }
 
-#include "k_startup/gfx.h"
-
 /**
  * Set the focus position of the window.
  *
@@ -419,7 +417,7 @@ static fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
             return FOS_E_SUCCESS;
 
         case SCS1_RSHIFT:
-            win_qg->lshift_held = is_make;
+            win_qg->rshift_held = is_make;
             return FOS_E_SUCCESS;
 
         default:

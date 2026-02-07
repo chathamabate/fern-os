@@ -1,6 +1,17 @@
 
 #include "s_gfx/window.h"
 
+const char * const WINEC_NAME_MAP[] = {
+    [WINEC_TICK] = "TICK",
+    [WINEC_RESIZED] = "RESIZED",
+    [WINEC_KEY_INPUT] = "KEY_INPUT",
+    [WINEC_DEREGISTERED] = "DEREGISTERED",
+    [WINEC_FOCUSED] = "FOCUSED",
+    [WINEC_UNFOCUSED] = "UNFOCUSED",
+    [WINEC_HIDDEN] = "HIDDEN",
+    [WINEC_UNHIDDEN] = "UNHIDDEN",
+};
+
 void init_window_base(window_t *w, gfx_buffer_t *buf, const window_attrs_t *attrs, const window_impl_t *impl) {
     *(const window_impl_t **)&(w->impl) = impl;
     *(window_attrs_t *)&(w->attrs) = *attrs;

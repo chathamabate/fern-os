@@ -61,6 +61,11 @@ typedef uint32_t window_event_code_t;
  */
 #define WINEC_UNHIDDEN (7U)
 
+/**
+ * All window event codes will have an entry in this map to a string literal!
+ */
+extern const char * const WINEC_NAME_MAP[];
+
 typedef struct _window_event_t {
     window_event_code_t event_code;
 

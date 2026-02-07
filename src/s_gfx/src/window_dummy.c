@@ -1,7 +1,7 @@
 
 #include "s_gfx/window_dummy.h"
-#include "s_util/str.h"
 #include "s_gfx/mono_fonts.h"
+#include "s_util/ansi.h"
 
 static void delete_window_dummy(window_t *w);
 static void win_d_render(window_t *w);
@@ -20,10 +20,21 @@ window_t *new_window_dummy(allocator_t *al) {
         return NULL;
     }
 
-    window_dummy_t *win_d = al_malloc(al, sizeof(window_dummy_t));
-    gfx_buffer_t *buf = new_gfx_buffer(al, WIN_DUMMY_GRID_WIDTH, WIN_DUMMY_GRID_HEIGHT);
+    const uint16_t init_rows = 20;
+    const uint16_t init_cols = 50;
 
-    if (!win_d || !buf) {
+    window_dummy_t *win_d = al_malloc(al, sizeof(window_dummy_t));
+    gfx_buffer_t *buf = new_gfx_buffer(al, init_cols * WINDOW_DUMMY_FONT->char_width, init_rows * WINDOW_DUMMY_FONT->char_height);
+    term_buffer_t *vtb = new_term_buffer(al, 
+            (term_cell_t) {.c = ' ', .style = term_style(TC_WHITE, TC_BLACK)},
+            init_rows, init_cols);
+    term_buffer_t *rtb = new_term_buffer(al, 
+            (term_cell_t) {.c = ' ', .style = term_style(TC_WHITE, TC_BLACK)},
+            init_rows, init_cols);
+
+    if (!win_d || !buf || !vtb || !rtb) {
+        delete_term_buffer(rtb);
+        delete_term_buffer(vtb);
         delete_gfx_buffer(buf);
         al_free(al, win_d);
 
@@ -33,19 +44,19 @@ window_t *new_window_dummy(allocator_t *al) {
     // SUCCESS!
 
     window_attrs_t d_attrs = {
-        .min_width = WIN_DUMMY_GRID_WIDTH,
+        .min_width = 0,
         .max_width = UINT16_MAX,
 
-        .min_height = WIN_DUMMY_GRID_HEIGHT,
+        .min_height = 0,
         .max_height = UINT16_MAX,
     };
 
     init_window_base((window_t *)win_d, buf, &d_attrs, &D_IMPL);
 
     *(allocator_t **)&(win_d->al) = al;
-
-    win_d->cursor_row = WIN_DUMMY_ROWS / 2;
-    win_d->cursor_col = WIN_DUMMY_COLS / 2;
+    *(term_buffer_t **)&(win_d->visible_tb) = vtb;
+    win_d->dirty_buffer = true;
+    *(term_buffer_t **)&(win_d->real_tb) = rtb;
 
     return (window_t *)win_d;
 }
@@ -53,109 +64,117 @@ window_t *new_window_dummy(allocator_t *al) {
 static void delete_window_dummy(window_t *w) {
     window_dummy_t *win_d = (window_dummy_t *)w;
 
+    delete_term_buffer(win_d->real_tb);
+    delete_term_buffer(win_d->visible_tb);
     deinit_window_base(w);
     al_free(win_d->al, win_d);
 }
 
 static void win_d_render(window_t *w) {
-    const uint16_t grid_x = (w->buf->width - WIN_DUMMY_GRID_WIDTH) / 2;
-    const uint16_t grid_y = (w->buf->height - WIN_DUMMY_GRID_HEIGHT) / 2;
-
     window_dummy_t *win_d = (window_dummy_t *)w;
 
-    const gfx_color_t bg_color = gfx_color(0, 0, 0);
-
-    gfx_clear(w->buf, bg_color);
-
-    const gfx_color_t tile_colors[2] = {
-        gfx_color(75, 0, 0),
-        gfx_color(25, 0, 25)
-    }; 
-
-    const gfx_color_t focused_cursor_color = gfx_color(175, 0, 0);
-    const gfx_color_t unfocused_cursor_color = gfx_color(100, 0, 0);
-
-    int32_t y = grid_y;
-    for (size_t r = 0; r < WIN_DUMMY_ROWS; r++, y += WIN_DUMMY_CELL_DIM) {
-        int32_t x = grid_x;
-        for (size_t c = 0; c < WIN_DUMMY_COLS; c++, x += WIN_DUMMY_CELL_DIM) {
-            gfx_color_t tile_color = tile_colors[(r + c) & 1];
-            if (r == win_d->cursor_row && c == win_d->cursor_col) {
-                tile_color = win_d->super.focused ? focused_cursor_color : unfocused_cursor_color;
-            }
-
-            gfx_fill_rect(w->buf, NULL, x, y, 
-                    WIN_DUMMY_CELL_DIM, WIN_DUMMY_CELL_DIM, tile_color
-            );
-        }
+    if (win_d->dirty_buffer) {
+        gfx_clear(w->buf, gfx_color(0, 0, 0));
     }
 
-    // Maybe we also render a tick counter?
-    char msg_buf[50];
-    str_fmt(msg_buf, "Tick: %u", win_d->super.tick);
-
-    const ascii_mono_font_t * const font = ASCII_MONO_8X16;
-
-    gfx_draw_ascii_mono_text(
-        w->buf, NULL, msg_buf, font, grid_x, (int32_t)grid_y - font->char_height, 1, 1, 
-        win_d->super.focused ? focused_cursor_color : unfocused_cursor_color,
-        GFX_COLOR_CLEAR
+    gfx_draw_term_buffer(
+        w->buf, 
+        NULL, 
+        win_d->dirty_buffer ? NULL : win_d->visible_tb, win_d->real_tb, 
+        WINDOW_DUMMY_FONT, WINDOW_DUMMY_PALETTE, 
+        0, 0, 1, 1
     );
+
+    const uint16_t cursor_x = WINDOW_DUMMY_FONT->char_width * win_d->real_tb->cursor_col;
+    const uint16_t cursor_y = WINDOW_DUMMY_FONT->char_height * win_d->real_tb->cursor_row;
+
+    gfx_fill_rect(
+        w->buf, NULL, cursor_x, cursor_y, 
+        WINDOW_DUMMY_FONT->char_width, WINDOW_DUMMY_FONT->char_height, 
+        WINDOW_DUMMY_PALETTE->colors[w->focused ? TC_WHITE : TC_LIGHT_GREY]
+    );
+
+    tb_copy(win_d->visible_tb, win_d->real_tb);
+    win_d->dirty_buffer = false;
 }
 
+#define EVENT_PREFIX ANSI_BRIGHT_GREEN_FG "[" ANSI_RESET "%s" ANSI_BRIGHT_GREEN_FG "]" ANSI_RESET
+
 static fernos_error_t win_d_on_event(window_t *w, window_event_t ev) {
+    fernos_error_t err;
+
     window_dummy_t *win_d = (window_dummy_t *)w;
 
-    switch (ev.event_code) {
-
-    case WINEC_KEY_INPUT: {
-        switch (ev.d.key_code) {
-
-        case SCS1_E_UP: {
-            if (win_d->cursor_row > 0) {
-                win_d->cursor_row--;
-            }
-            return FOS_E_SUCCESS;
-        }
-
-        case SCS1_E_DOWN: {
-            if (win_d->cursor_row < WIN_DUMMY_ROWS - 1) {
-                win_d->cursor_row++;
-            }
-            return FOS_E_SUCCESS;
-        }
-
-        case SCS1_E_LEFT: {
-            if (win_d->cursor_col > 0) {
-                win_d->cursor_col--;
-            }
-            return FOS_E_SUCCESS;
-        }
-
-        case SCS1_E_RIGHT: {
-            if (win_d->cursor_col < WIN_DUMMY_COLS - 1) {
-                win_d->cursor_col++;
-            }
-            return FOS_E_SUCCESS;
-        }
-
-        default: {
-            return FOS_E_SUCCESS;
-        }
-
-        }
-    }
-
-    case WINEC_DEREGISTERED: {
+    if (ev.event_code == WINEC_DEREGISTERED) {
         // We are self managed!
         // Delete here!
         delete_window_dummy(w);
         return FOS_E_SUCCESS;
     }
 
-    default: {
-        return FOS_E_SUCCESS;
+    if (ev.event_code == WINEC_RESIZED) {
+        uint16_t new_cols = ev.d.dims.width / WINDOW_DUMMY_FONT->char_width;
+        if (new_cols == 0) {
+            new_cols = 1;
+        }
+
+        uint16_t new_rows = ev.d.dims.height / WINDOW_DUMMY_FONT->char_height;
+        if (new_rows == 0) {
+            new_rows = 1;
+        }
+
+        err = tb_resize(win_d->visible_tb, new_rows, new_cols);
+        if (err == FOS_E_SUCCESS) {
+            err = tb_resize(win_d->real_tb, new_rows, new_cols);
+        }
+
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        win_d->dirty_buffer = true;
     }
 
+    // Ticks will be special, because they happen so often, only print every now and then.
+    if (ev.event_code == WINEC_TICK) {
+        if (w->tick % 32 == 0) {
+            tb_put_fmt_s(win_d->real_tb, EVENT_PREFIX " %u\n",
+                    WINEC_NAME_MAP[ev.event_code], w->tick);
+        }
+        return FOS_E_SUCCESS; // Early exit for Ticks.
     }
+
+    tb_put_fmt_s(win_d->real_tb, EVENT_PREFIX, WINEC_NAME_MAP[ev.event_code]);
+
+    // Ok, now, for all events (Other than deregister) we print to the terminal!
+    switch (ev.event_code) {
+
+    case WINEC_RESIZED:
+        tb_put_fmt_s(win_d->real_tb, " %u %u", 
+                ev.d.dims.width, ev.d.dims.height);
+        break;
+
+    case WINEC_KEY_INPUT: {
+        if (scs1_is_make(ev.d.key_code)) {
+            tb_put_fmt_s(win_d->real_tb, ANSI_BRIGHT_GREEN_FG " %04X" ANSI_RESET, ev.d.key_code); 
+        } else {
+            tb_put_fmt_s(win_d->real_tb, ANSI_BRIGHT_RED_FG " %04X" ANSI_RESET, ev.d.key_code); 
+        }
+
+        char pc = scs1_to_ascii_lc(scs1_as_make(ev.d.key_code));
+        if (pc) {
+            char s[2]  = { pc, '\0' };
+            tb_put_fmt_s(win_d->real_tb, " \"%s\"", s);
+        }
+
+        break;
+    }
+
+    default:
+        break;
+    }
+
+    tb_put_fmt_s(win_d->real_tb, "\n");
+
+    return FOS_E_SUCCESS;
 }
