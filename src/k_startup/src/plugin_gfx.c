@@ -2,6 +2,8 @@
 #include "k_startup/plugin_gfx.h"
 #include "k_startup/gfx.h"
 #include "s_gfx/window_dummy.h"
+#include "k_startup/page_helpers.h"
+#include "s_util/ansi.h"
 #include "os_defs.h"
 
 static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
@@ -231,11 +233,16 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
     }
 
     case WINEC_DEREGISTERED: {
+        // We'll say that a terminal window is inactive once deregistered.
+        // It'll have to wait until all references go down to zero to cleanup though.
         win_t->super.is_active = false;
 
         // This window will delete itself on deregister ONLY if there are no open handles!
         if (win_t->references == 0) {
             delete_window((window_t *)win_t);
+
+            // It's ok to return here because 0 references gaurantees no threads in the wait queue!
+            // No one to wake up!
             return FOS_E_SUCCESS;
         }
 
@@ -333,7 +340,13 @@ static fernos_error_t term_hs_wait_write_ready(handle_state_t *hs) {
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
+/**
+ * Maximum number of characters writeable in one go!
+ */
+#define TERM_MAX_SINGLE_TX_LEN (511U)
+
 static fernos_error_t term_hs_write(handle_state_t *hs, const void *u_src, size_t len, size_t *u_written) {
+    fernos_error_t err;
     handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
     thread_t *thr = (thread_t *)(hs_t->super.ks->schedule.head);
 
@@ -345,16 +358,168 @@ static fernos_error_t term_hs_write(handle_state_t *hs, const void *u_src, size_
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
-    // Ok, now what though... IDK
-    // I think we need to do that ansi look back thing...
+    char buf[TERM_MAX_SINGLE_TX_LEN + 1]; // +1 for the NT!
 
-    return FOS_E_NOT_IMPLEMENTED;
+    const size_t bytes_to_cpy = MIN(len, TERM_MAX_SINGLE_TX_LEN);
+    err = mem_cpy_from_user(buf, thr->proc->pd, u_src, bytes_to_cpy, NULL);
+    if (err != FOS_E_SUCCESS) { // We'll only continue if there is a full success during the copy.
+        DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+    }
+
+    buf[bytes_to_cpy] = '\0';
+
+    size_t bytes_to_write;
+
+    // NOTE: We only call ansi_trim when we copied less bytes than were requested.
+    // This is the only case where we care about potentially slicing an ansi sequence.
+    if (bytes_to_cpy < len) { 
+        bytes_to_write = ansi_trim(buf);
+    } else {
+        bytes_to_write = bytes_to_cpy;
+    }
+
+    // Finally write to our buffer!
+
+    tb_put_s(hs_t->win_t->true_tb, buf);
+
+    if (u_written) {
+        err = mem_cpy_to_user(thr->proc->pd, u_written, &bytes_to_write, sizeof(size_t), NULL);
+        if (err != FOS_E_SUCCESS) { 
+            DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+        }
+    }
+
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
+
+/**
+ * The maximum number of events we can read in a single read!
+ */
+#define TERM_WIN_HS_MAX_EVS_PER_READ (16U)
 
 static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
-    return FOS_E_NOT_IMPLEMENTED;
-}
+    fernos_error_t err;
+    handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
+    thread_t *thr = (thread_t *)(hs_t->super.ks->schedule.head);
 
+    switch (cmd) {
+
+    case TERM_HCID_GET_DIMS: {
+        size_t *u_rows = (size_t *)arg0;
+        size_t *u_cols = (size_t *)arg1;
+
+        if (u_rows) {
+            const size_t rows = hs_t->win_t->true_tb->rows;
+            err = mem_cpy_to_user(thr->proc->pd, u_rows, &rows, sizeof(size_t), NULL);
+            if (err != FOS_E_SUCCESS) {
+                DUAL_RET(thr, err, FOS_E_SUCCESS);
+            }
+        }
+        
+        if (u_cols) {
+            const size_t cols = hs_t->win_t->true_tb->cols;
+            err = mem_cpy_to_user(thr->proc->pd, u_cols, &cols, sizeof(size_t), NULL);
+            if (err != FOS_E_SUCCESS) {
+                DUAL_RET(thr, err, FOS_E_SUCCESS);
+            }
+        }
+
+        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    case TERM_HCID_WAIT_EVENT: {
+        // Already stuff in the wait queue!
+        if (!fq_is_empty(hs_t->win_t->event_queue)) {
+            DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+        }
+
+        // When the terminal window is inactive, we'll allow the user to read
+        // DEREGISTERED Events infinitely.
+        if (!(hs_t->win_t->super.is_active)) {
+            DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+        }
+
+        // Active with empty event queue!
+        // Wait!
+    
+        basic_wait_queue_t *bwq = hs_t->win_t->wq;
+        err = bwq_enqueue(bwq, thr);
+        if (err != FOS_E_SUCCESS) {
+            DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+        }
+
+        // Enqueue succeeded, we are in the clear!
+        thread_detach(thr);
+        thr->wq = (wait_queue_t *)bwq;
+        thr->state = THREAD_STATE_WAITING;
+
+        return FOS_E_SUCCESS;
+    }
+
+    case TERM_HCID_READ_EVENTS: {
+        window_event_t *u_ev_buf = (window_event_t *)arg0;
+        const size_t num_buf_cells = (size_t)arg1;
+        size_t *u_cells_readden = (size_t *)arg2;
+
+        // If we are requesting a non-zero number of requests,
+        // the buffer must be non-null.
+        if (num_buf_cells > 0 && !u_ev_buf) {
+            DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        // NOTE: The user is allowed to request 0 events. This is a 
+        // non-blocking way of being able to see if there are pending events or not.
+
+        size_t events_polled = 0; // how many cells we end up filling in the `events` buffer.
+        window_event_t events[TERM_WIN_HS_MAX_EVS_PER_READ];
+
+        if (fq_is_empty(hs_t->win_t->event_queue)) {
+            // If the window is active and the event queue is empty, we just return empty!
+            if (hs_t->win_t->super.is_active) {
+                DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
+            } 
+
+            // If the window is inactive and there are no more events which were explicitly
+            // forwarded to the terminal window, no big deal!
+            // We'll allow the user to inifinitely read deregistered events!
+
+            if (num_buf_cells > 0) {
+                events[events_polled++] = (window_event_t) {
+                    .event_code = WINEC_DEREGISTERED
+                };
+            }
+        } else {
+            // If the event queue is populated, we can always read from it!
+            for (events_polled = 0; 
+                    !fq_is_empty(hs_t->win_t->event_queue) && 
+                    events_polled < MIN(num_buf_cells, TERM_WIN_HS_MAX_EVS_PER_READ);
+                    events_polled++) {
+                fq_poll(hs_t->win_t->event_queue, events + events_polled);
+            }
+        }
+
+        // Ok, finally, now we do the copy!
+        if (events_polled > 0) {
+            err = mem_cpy_to_user(thr->proc->pd, u_ev_buf, events, 
+                    sizeof(window_event_t) * events_polled, NULL);
+            DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+        }
+
+        if (u_cells_readden) {
+            err = mem_cpy_to_user(thr->proc->pd, u_cells_readden, &events_polled, sizeof(size_t), NULL);
+            DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+        }
+        
+        // Success!
+        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    default: {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    }
+}
 
 /*
  * Graphics Plugin Stuff.

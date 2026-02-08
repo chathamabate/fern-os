@@ -218,6 +218,11 @@ struct _window_impl_t {
      * AND `sw->container` is NULL AND `sw` is active.
      *
      * Afterwards, the wrapper will set `sw->container` to `w`.
+     *
+     * NOTE: While it is gauranteed `sw` is active, there is no gaurantees on `sw`'s internal 
+     * state variables (`focused` and `hidden`). The only way to gaurantee `sw`'s state is
+     * to forward the necessary events explicitly!
+     * For example, forwarding `WINEC_FOCUSED` and `WINEC_UNHIDDEN` on register.
      */
     fernos_error_t (*win_register_child)(window_t *w, window_t *sw);
 
