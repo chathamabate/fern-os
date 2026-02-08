@@ -656,6 +656,95 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
         DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
+    /*
+     * Create a new terminal window!
+     */
+    case PLG_GFX_PCID_NEW_TERM: {
+        handle_t *u_handle = (handle_t *)arg0;
+        gfx_term_buffer_attrs_t *u_attrs = (gfx_term_buffer_attrs_t *)arg1;
+
+        if (!u_handle) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        // We gotta create the window, then register it? You are correct, that is what we need
+        // to do!
+
+        const handle_t NULL_HANDLE = idtb_null_id(curr_thr->proc->handle_table);
+
+        err = FOS_E_SUCCESS;
+        handle_t h = NULL_HANDLE;
+        handle_terminal_state_t *hs_t = NULL;
+        window_terminal_t *win_t = NULL;
+        gfx_term_buffer_attrs_t attrs;
+
+        // First let's pop a handle.
+        if (err == FOS_E_SUCCESS) {
+            h = idtb_pop_id(curr_thr->proc->handle_table);
+            if (h == NULL_HANDLE) {
+                err = FOS_E_NO_MEM;
+            }
+        }
+
+        // Next let's leave space for the handle state.
+        if (err == FOS_E_SUCCESS) {
+            hs_t = al_malloc(plg_gfx->super.ks->al, sizeof(handle_terminal_state_t));
+            if (!hs_t) {
+                err = FOS_E_NO_MEM;
+            }
+        }
+
+        // Next get the attributes for the terminal window we are going to create.
+        if (err == FOS_E_SUCCESS) {
+            if (u_attrs) {
+                err = mem_cpy_from_user(&attrs, curr_thr->proc->pd, u_attrs, sizeof(gfx_term_buffer_attrs_t), NULL);
+            } else {
+                // Choose a default if no attributes are given.
+                attrs = (gfx_term_buffer_attrs_t) {
+                    .fmi = ASCII_MONO_8X16_FMI,
+                    .palette = *BASIC_ANSI_PALETTE,
+                    .w_scale = 1, .h_scale = 1
+                };
+            }
+        }
+
+        // Next let's create the terminal window
+        if (err == FOS_E_SUCCESS) {
+            win_t = new_window_terminal(plg->ks->al, 20, 40, &attrs, &(plg_gfx->super.ks->schedule)); 
+            if (!win_t) {
+                err = FOS_E_NO_MEM;
+            }
+        }
+
+        // Attempt to register the window.
+        if (err == FOS_E_SUCCESS) {
+            err = win_register_child(plg_gfx->root_window, (window_t *)win_t);
+        }
+
+        // Finally copy out the handle to user space.
+        if (err == FOS_E_SUCCESS) {
+            err = mem_cpy_to_user(curr_thr->proc->pd, u_handle, &h, sizeof(handle_t), NULL);
+        }
+
+        // I think that's it? clean up step plz!
+        if (err != FOS_E_SUCCESS) {
+            win_deregister((window_t *)win_t);
+            delete_window((window_t *)win_t);
+            al_free(plg_gfx->super.ks->al, hs_t);
+            idtb_push_id(curr_thr->proc->handle_table, h);
+
+            DUAL_RET(curr_thr, err, FOS_E_SUCCESS);
+        }
+
+        // Success!
+        init_base_handle((handle_state_t *)hs_t, &HS_TERM_IMPL, plg_gfx->super.ks, curr_thr->proc, h, true);
+        *(window_terminal_t **)&(hs_t->win_t) = win_t;
+        win_t->references = 1; // Reference by just this handle we have returned!
+        idtb_set(curr_thr->proc->handle_table, h, hs_t);
+
+        DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
     default: {
         DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }

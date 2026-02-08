@@ -381,4 +381,5 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  */
 
 #define PLG_GFX_PCID_NEW_DUMMY (0U)
+#define PLG_GFX_PCID_NEW_TERM  (1U)
 
