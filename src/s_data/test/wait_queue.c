@@ -2,7 +2,7 @@
 #include "s_data/wait_queue.h"
 #include "s_data/test/wait_queue.h"
 
-#include "k_startup/vga_cd.h"
+#include "k_startup/gfx.h"
 #include "s_util/err.h"
 #include <stdint.h>
 
@@ -13,7 +13,7 @@ static bool posttest(void);
 #define PRETEST() pretest()
 #define POSTTEST() posttest()
 
-#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s_rr(__VA_ARGS__)
 
 #include "s_util/test.h"
 

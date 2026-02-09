@@ -181,3 +181,18 @@ static inline char *ansi_scroll_down_n(char *buf, size_t n) {
 #define ANSI_BRIGHT_BROWN_BG      ANSI_CSI "106m"
 #define ANSI_BRIGHT_LIGHT_GREY_BG ANSI_CSI "107m"
 
+/**
+ * We'll assume no ansi control sequence ever exceeds this length.
+ */
+#define MAX_ANSI_SEQ_LEN (20U)
+
+/**
+ * The intention is to use this function when a string may contain an incomplete ANSI sequence at
+ * the very end. (Imagine reading from a file, you may accidently slice a control sequence)
+ *
+ * '\x1B' appears in the final `MAX_ANSI_SEQ_LEN` characters of `str` (excluding NT), 
+ * Said character will be replaced with '\0'. The new length of the `str` is returned.
+ *
+ * If '\x1B' is not found, `str` remains as is. It's original length is returned.
+ */
+size_t ansi_trim(char *str);

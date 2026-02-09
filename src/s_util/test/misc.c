@@ -1,8 +1,8 @@
 
-#include "k_startup/vga_cd.h"
+#include "k_startup/gfx.h"
 
 // NOTE: This is a cyclic dependency, but we'll allow it.
-#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s_rr(__VA_ARGS__)
 
 #include "s_util/test.h"
 #include "s_util/test/misc.h"

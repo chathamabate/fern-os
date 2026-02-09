@@ -86,7 +86,7 @@ static bool test_simple_rw(void) {
     err = sc_fs_open("./a.txt", &fh);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    TEST_FALSE(sc_handle_is_cd(fh));
+    TEST_FALSE(sc_handle_is_terminal(fh));
 
     const char *msg = "Hello FS";
     const size_t msg_size = str_len(msg) + 1;

@@ -3,4 +3,4 @@
 
 #include <stdbool.h>
 
-bool test_char_display(void);
+bool test_fixed_queue(void);

@@ -3,7 +3,7 @@
 #include "s_util/str.h"
 #include "s_mem/test/allocator.h"
 #include "s_mem/allocator.h"
-#include "k_startup/vga_cd.h"
+#include "k_startup/gfx.h"
 
 
 static bool pretest(void);
@@ -116,7 +116,7 @@ static bool test_failed_realloc(void) {
 
     // Should be able to see here that our block is still allocated
     // and the original size.
-    // al_dump(al, term_put_fmt_s);
+    // al_dump(al, gfx_direct_put_fmt_s);
 
     al_free(al, block);
 

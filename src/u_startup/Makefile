@@ -7,11 +7,11 @@ MOD_NAME 	?= u_startup
 _SRCS 		?= main.c \
 			   syscall.c \
 			   syscall_fut.c \
-			   syscall_cd.c \
 			   syscall_fs.c \
-			   syscall_vga_cd.c \
 			   syscall_pipe.c \
-			   syscall_kb.c
+			   syscall_kb.c \
+			   syscall_gfx.c \
+			   syscall_term.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= main.s syscall.s
@@ -21,10 +21,12 @@ _TEST_SRCS 	?= syscall.c \
 			   syscall_fut.c \
 			   syscall_fs.c \
 			   syscall_exec.c \
-			   syscall_cd.c \
 			   syscall_default_io.c \
 			   syscall_kb.c \
-			   syscall_pipe.c
+			   syscall_pipe.c \
+			   syscall_term.c
+
+# TODO: Add back testing for terminal/cd.
 
 -include ../mod_stub.mk
 

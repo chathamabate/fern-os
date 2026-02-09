@@ -27,6 +27,20 @@ typedef uint32_t pt_entry_t;
 #define PTE_USER_WID_MASK TO_MASK64(PTE_USER_WID)
 #define PTE_USER_MASK (PTE_USER_WID_MASK << PTE_USER_OFF)       
 
+/*
+ * Page write through and cache disable are nice for memory mapped IO!
+ */
+
+#define PTE_PWT_OFF (3)      
+#define PTE_PWT_WID (1)  
+#define PTE_PWT_WID_MASK TO_MASK64(PTE_PWT_WID)
+#define PTE_PWT_MASK (PTE_PWT_WID_MASK << PTE_PWT_OFF)       
+
+#define PTE_PCD_OFF (3)      
+#define PTE_PCD_WID (1)  
+#define PTE_PCD_WID_MASK TO_MASK64(PTE_PCD_WID)
+#define PTE_PCD_MASK (PTE_PCD_WID_MASK << PTE_PCD_OFF)       
+
 #define PTE_AVAIL_OFF (9)      
 #define PTE_AVAIL_WID (3)  
 #define PTE_AVAIL_WID_MASK TO_MASK64(PTE_AVAIL_WID)
@@ -78,6 +92,32 @@ static inline void pte_set_user(pt_entry_t *pte, uint8_t usr) {
 
 static inline uint8_t pte_get_user(pt_entry_t pte) {
     return (pte & PTE_USER_MASK) >> PTE_USER_OFF;
+}
+
+static inline void pte_set_pwt(pt_entry_t *pte, uint8_t pwt) {
+    pt_entry_t te = *pte;
+
+    te &= ~(PTE_PWT_MASK);
+    te |= (pwt & PTE_PWT_WID_MASK) << PTE_PWT_OFF;
+
+    *pte = te;
+}
+
+static inline uint8_t pte_get_pwt(pt_entry_t pte) {
+    return (pte & PTE_PWT_MASK) >> PTE_PWT_OFF;
+}
+
+static inline void pte_set_pcd(pt_entry_t *pte, uint8_t pcd) {
+    pt_entry_t te = *pte;
+
+    te &= ~(PTE_PCD_MASK);
+    te |= (pcd & PTE_PCD_WID_MASK) << PTE_PCD_OFF;
+
+    *pte = te;
+}
+
+static inline uint8_t pte_get_pcd(pt_entry_t pte) {
+    return (pte & PTE_PCD_MASK) >> PTE_PCD_OFF;
 }
 
 static inline void pte_set_avail(pt_entry_t *pte, uint8_t av) {

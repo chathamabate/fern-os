@@ -210,9 +210,9 @@ static inline bool scid_is_handle_cmd(syscall_id_t scid) {
 #define HCID_WRITE            (0x2U)
 #define HCID_WAIT_READ_READY  (0x3U)
 #define HCID_READ             (0x4U)
-#define HCID_IS_CD            (0x5U)
+#define HCID_IS_TERM          (0x5U) 
 
-#define NUM_DEFAULT_HCIDS (HCID_IS_CD + 1)
+#define NUM_DEFAULT_HCIDS (HCID_IS_TERM + 1)
 
 // All other handle commands are custom/implementation specific!
 
@@ -226,13 +226,17 @@ static inline void handle_scid_extract(syscall_id_t scid, handle_t *h, handle_cm
 }
 
 /*
- * ***** Character Display Handle *****
+ * ***** Terminal Handle Commands *****
  *
- * A handle which references a character display will support the following command IDs.
+ * A Terminal handle is special!
+ * It is meant to represent some abstract grid of text. 
+ *
+ * See `u_startup/syscall_term.h` to see what these command do.
  */
 
-#define CD_HCID_GET_DIMS (NUM_DEFAULT_HCIDS + 0)
-
+#define TERM_HCID_GET_DIMS      (NUM_DEFAULT_HCIDS + 0) 
+#define TERM_HCID_WAIT_EVENT    (NUM_DEFAULT_HCIDS + 1) 
+#define TERM_HCID_READ_EVENTS   (NUM_DEFAULT_HCIDS + 2)
 
 /*
  * Plugin Command syntax
@@ -349,25 +353,33 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 #define PLG_KB_HCID_SKIP_FWD      (NUM_DEFAULT_HCIDS + 0U)
 
 /*
- * ***** VGA Character Display Plugin *****
- */
-
-#define PLG_VGA_CD_ID         (3U)
-
-/*
- * VGA Character Display Plugin commands.
- */
-
-#define PLG_VGA_CD_PCID_OPEN      (0U)
-
-/*
  * ***** Pipe Plugin *****
  */
 
-#define PLG_PIPE_ID         (4U)
+#define PLG_PIPE_ID         (3U)
 
 /*
  * Pipe Plugin Commands.
  */
 
 #define PLG_PIPE_PCID_OPEN      (0U)
+
+/*
+ * ***** Graphics Plugin *****
+ */
+
+#define PLG_GRAPHICS_ID (4U)
+
+/*
+ * Keyboard plugin KERNEL commands.
+ */
+
+#define PLG_GFX_KCID_KEY_EVENT     (0U)
+
+/*
+ * Graphics Plugin commands.
+ */
+
+#define PLG_GFX_PCID_NEW_DUMMY (0U)
+#define PLG_GFX_PCID_NEW_TERM  (1U)
+

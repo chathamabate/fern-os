@@ -2,7 +2,6 @@
 #include "u_startup/test/syscall_default_io.h"
 
 #include "u_startup/syscall.h"
-#include "u_startup/syscall_vga_cd.h"
 #include "u_startup/syscall_fs.h"
 
 #include "s_bridge/shared_defs.h"

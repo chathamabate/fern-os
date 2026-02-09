@@ -1,11 +1,6 @@
 
 #include "s_bridge/ctx.h"
 
-#include "k_sys/page.h"
-#include "k_sys/intr.h"
-#include "k_startup/vga_cd.h"
-
-
 intr_action_t gpf_action = NULL;
 
 void set_gpf_action(intr_action_t ia) {

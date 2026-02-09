@@ -7,13 +7,15 @@
 MOD_NAME 	?= s_data
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
-_SRCS 		?= id_table.c map.c list.c wait_queue.c ring.c
+_SRCS 		?= id_table.c map.c list.c wait_queue.c ring.c term_buffer.c \
+			   fixed_queue.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
-_TEST_SRCS 	?= id_table.c map.c list.c wait_queue.c ring.c
+_TEST_SRCS 	?= id_table.c map.c list.c wait_queue.c ring.c term_buffer.c \
+			   fixed_queue.c
 
 -include ../mod_stub.mk
 

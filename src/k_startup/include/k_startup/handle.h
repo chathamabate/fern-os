@@ -48,18 +48,21 @@ struct _handle_state_t {
     const handle_t handle;
 
     /**
-     * Whether or not this is a character display handle.
+     * Whether or not this handle is a terminal.
+     *
+     * A Terminal is a special handle which is gauranteed to support a series of commands.
+     * See `s_bridge/shared_defs.h`.
      */
-    const bool is_cd;
+    const bool is_terminal;
 };
 
 static inline void init_base_handle(handle_state_t *hs, const handle_state_impl_t *impl, kernel_state_t *ks,
-        process_t *proc, handle_t handle, bool is_cd) {
+        process_t *proc, handle_t handle, bool is_term) {
     *(const handle_state_impl_t **)&(hs->impl) = impl;
     *(kernel_state_t **)&(hs->ks) = ks;
     *(process_t **)&(hs->proc) = proc;
     *(handle_t *)&(hs->handle) = handle;
-    *(bool *)&(hs->is_cd) = is_cd;
+    *(bool *)&(hs->is_terminal) = is_term;
 }
 
 /**

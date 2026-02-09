@@ -326,6 +326,11 @@ static const ascii_mono_font_t ASCII_MONO_8X16_VAL = {
 
 const ascii_mono_font_t * const ASCII_MONO_8X16 = &ASCII_MONO_8X16_VAL;
 
+const ascii_mono_font_t * const ASCII_MONO_FONT_MAP[] = {
+    [ASCII_MONO_8X8_FMI] = ASCII_MONO_8X8,
+    [ASCII_MONO_8X16_FMI] = ASCII_MONO_8X16
+};
+
 void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         const char *str, 
         const ascii_mono_font_t *amf, 
@@ -389,6 +394,114 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const gfx_box_t *clip_area,
                 amf->bitmaps + (c * amf_bytes_per_char), 
                 amf->char_height, 
                 amf->char_width, fg_color, bg_color);
+    }
+}
+
+static const gfx_ansi_palette_t BASIC_ANSI_PALETTE_VAL = {
+    .colors = {
+        gfx_color(0, 0, 0), // Black
+        gfx_color(0, 0, 180), // Blue
+        gfx_color(0, 180, 0), // Green
+        gfx_color(0, 180, 180), // Cyan
+        gfx_color(180, 0, 0), // Red
+        gfx_color(180, 0, 180), // Magenta
+        gfx_color(180, 180, 0), // Brown
+        gfx_color(180, 180, 180), // Grey
+
+        // Brights
+        gfx_color(0, 0, 0), // Black
+        gfx_color(0, 0, 255), // Blue
+        gfx_color(0, 255, 0), // Green
+        gfx_color(0, 255, 255), // Cyan
+        gfx_color(255, 0, 0), // Red
+        gfx_color(255, 0, 255), // Magenta
+        gfx_color(255, 255, 0), // Brown
+        gfx_color(255, 255, 255), // Grey
+    }
+};
+
+const gfx_ansi_palette_t * const BASIC_ANSI_PALETTE = &BASIC_ANSI_PALETTE_VAL;
+
+const gfx_ansi_palette_t APPRENTICE_ANSI_PALETTE_VAL = {
+    .colors = {
+        gfx_color_hex(0x1C1C1C), // Black
+        gfx_color_hex(0x5F87AF), // Blue
+        gfx_color_hex(0x5F875F), // Green
+        gfx_color_hex(0x5F8787), // Cyan
+        gfx_color_hex(0xAF5F5F), // Red
+        gfx_color_hex(0x5F5F87), // Magenta
+        gfx_color_hex(0x87875F), // Brown
+        gfx_color_hex(0x6C6C6C), // Grey
+
+        // Brights
+        gfx_color_hex(0x444444), // Black
+        gfx_color_hex(0x8FAFD7), // Blue
+        gfx_color_hex(0x87AF87), // Green
+        gfx_color_hex(0x5FAFAF), // Cyan
+        gfx_color_hex(0xFF8700), // Red
+        gfx_color_hex(0x8787AF), // Magenta
+        gfx_color_hex(0xFFFFAF), // Brown
+        gfx_color_hex(0xFFFFFF), // Grey
+    }
+};
+
+const gfx_ansi_palette_t * const APPRENTICE_ANSI_PALETTE = &APPRENTICE_ANSI_PALETTE_VAL;
+
+void gfx_draw_term_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        const term_buffer_t *curr_tb, const term_buffer_t *next_tb, 
+        const ascii_mono_font_t *amf, const gfx_ansi_palette_t *palette,
+        int32_t x, int32_t y, uint8_t w_scale, uint8_t h_scale) {
+
+    // Dims much match if `curr_tb` is given.
+    if (curr_tb && !(curr_tb->rows == next_tb->rows && curr_tb->cols == next_tb->cols)) {
+        return;
+    }
+
+    const size_t amf_bytes_per_row = ((amf->char_width - 1) / 8) + 1;
+    const size_t amf_bytes_per_char = amf_bytes_per_row * amf->char_height;
+
+    const uint16_t char_width = w_scale * amf->char_width;
+    const uint16_t char_height = h_scale * amf->char_height;
+
+    gfx_box_t render_area = {
+        .x = x, .y = y,
+        .width = char_width * next_tb->cols,
+        .height = char_height * next_tb->rows
+    };
+
+    if (!gfx_clip_with_buffer(buf, clip_area, &render_area)) {
+        return;
+    }
+
+    // So, what (r, c) must we start and end at with rendering? 
+    const uint16_t start_col = (render_area.x - x) / char_width;
+    const uint16_t end_col = (render_area.x + render_area.width - 1 - x) / char_width;
+
+    const uint16_t start_row = (render_area.y - y) / char_height;
+    const uint16_t end_row = (render_area.y + render_area.height - 1 - y) / char_height;
+
+    uint32_t cell_ind = (start_row * next_tb->cols) + start_col;
+    for (uint16_t r = start_row; r <= end_row; r++) {
+        for (uint16_t c = start_col; c <= end_col; c++, cell_ind++) {
+            term_cell_t tc = next_tb->buf[cell_ind];
+            if (!is_ascii_printable(tc.c)) {
+                tc.c = ' ';
+            }
+
+            if (!curr_tb || !tc_ascii_printable_equals(curr_tb->buf[cell_ind], tc) 
+                    || (r == curr_tb->cursor_row && c == curr_tb->cursor_col)) {
+                // Render time baby!
+                gfx_fill_bitmap(buf, &render_area,
+                        x + (c * char_width), 
+                        y + (r * char_height), 
+                        w_scale, h_scale, 
+                        amf->bitmaps + (tc.c * amf_bytes_per_char), 
+                        amf->char_height, 
+                        amf->char_width, 
+                        palette->colors[ts_fg_color(tc.style)], 
+                        palette->colors[ts_bg_color(tc.style)]);
+            }
+        }
     }
 }
 

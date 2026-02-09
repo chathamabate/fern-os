@@ -42,7 +42,7 @@ bool test_fat32_file_sys(void) {
     return test_file_sys("FAT32 File Sys", gen_fat32_fs);
 }
 
-#include "k_startup/vga_cd.h"
+#include "k_startup/gfx.h"
 
 static bool pretest(void);
 static bool posttest(void);
@@ -50,7 +50,7 @@ static bool posttest(void);
 #define PRETEST() pretest()
 #define POSTTEST() posttest()
 
-#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s_rr(__VA_ARGS__)
 
 #include "s_util/test.h"
 

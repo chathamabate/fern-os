@@ -6,7 +6,6 @@
 #include "k_sys/intr.h"
 #include "s_util/err.h"
 #include "k_sys/debug.h"
-#include "k_startup/vga_cd.h"
 #include "k_startup/gdt.h"
 #include "s_bridge/ctx.h"
 

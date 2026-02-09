@@ -2,7 +2,7 @@
 #include "s_block_device/test/block_device.h"
 
 #include <stdbool.h>
-#include "k_startup/vga_cd.h"
+#include "k_startup/gfx.h"
 #include "s_block_device/block_device.h"
 #include "s_mem/allocator.h"
 #include "s_util/str.h"
@@ -13,7 +13,7 @@ static bool posttest(void);
 #define PRETEST() pretest()
 #define POSTTEST() posttest()
 
-#define LOGF_METHOD(...) term_put_fmt_s(__VA_ARGS__)
+#define LOGF_METHOD(...) gfx_direct_put_fmt_s_rr(__VA_ARGS__)
 
 #include "s_util/test.h"
 

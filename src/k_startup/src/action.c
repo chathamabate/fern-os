@@ -2,7 +2,6 @@
 
 #include "k_sys/debug.h"
 #include "s_bridge/ctx.h"
-#include "k_startup/vga_cd.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
 #include "s_mem/allocator.h"
@@ -74,12 +73,12 @@ static void return_to_curr_thread(void) {
 
 void fos_lock_up_action(user_ctx_t *ctx) {
     (void)ctx;
-    gfx_out_fatal("Lock Up Triggered");
+    gfx_direct_fatal("Lock Up Triggered");
 }
 
 void fos_gpf_action(user_ctx_t *ctx) {
     if (ctx->cr3 == get_kernel_pd()) { // Are we currently in the kernel?
-        gfx_out_fatal("Kernel Locking up in GPF Action");
+        gfx_direct_fatal("Kernel Locking up in GPF Action");
     }
 
     ks_exit_proc(kernel, PROC_ES_GPF);
@@ -92,7 +91,7 @@ void fos_pf_action(user_ctx_t *ctx) {
     // handler with some special stack.
 
     if (ctx->cr3 == get_kernel_pd()) {
-        gfx_out_fatal("Kernel Locking up in PF Action");
+        gfx_direct_fatal("Kernel Locking up in PF Action");
     }
 
     ks_save_ctx(kernel, ctx);
@@ -113,7 +112,7 @@ void fos_timer_action(user_ctx_t *ctx) {
     
     fernos_error_t err = ks_tick(kernel);
     if (err != FOS_E_SUCCESS) {
-        term_put_fmt_s("[Timer Error 0x%X]", err);
+        gfx_direct_put_fmt_s_rr("[Timer Error 0x%X]", err);
         ks_shutdown(kernel);
     }
 
@@ -257,8 +256,8 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
                     err = hs_wait_read_ready(hs);
                     break;
 
-                case HCID_IS_CD:
-                    thr->ctx.eax = (uint32_t)(hs->is_cd) ? FOS_E_SUCCESS : FOS_E_UNKNWON_ERROR;
+                case HCID_IS_TERM:
+                    thr->ctx.eax = (uint32_t)(hs->is_terminal) ? FOS_E_SUCCESS : FOS_E_UNKNWON_ERROR;
                     err = FOS_E_SUCCESS;
                     break;
 
@@ -290,7 +289,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
     }
 
     if (err != FOS_E_SUCCESS) {
-        term_put_fmt_s("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
+        gfx_direct_put_fmt_s_rr("[Syscall Error (Syscall: 0x%X, Error: 0x%X)]", id, err);
         ks_shutdown(kernel);
     }
 
@@ -325,12 +324,26 @@ void fos_irq1_action(user_ctx_t *ctx) {
             sc |= recv_byte;
         }
 
-        plugin_t *plg_kb = kernel->plugins[PLG_KEYBOARD_ID];
+        // All key events get forwarded to both the graphics and keyboard plugins.
+        // I may change this in the future.
+        //
+        // The keyboard plugin is now for recording ALL KEY EVENTS.
+        // Whereas the graphics plugin has the right to filter/interpret events accordingly.
 
+        plugin_t *plg_kb = kernel->plugins[PLG_KEYBOARD_ID];
         if (plg_kb) {
             err = plg_kernel_cmd(plg_kb, PLG_KB_KCID_KEY_EVENT, sc, 0, 0, 0);
             if (err != FOS_E_SUCCESS) {
-                term_put_fmt_s("[KeyEvent Error 0x%X]\n", err);
+                gfx_direct_put_fmt_s_rr("[Keyboard Plugin KeyEvent Error 0x%X]\n", err);
+                ks_shutdown(kernel);
+            }
+        }
+
+        plugin_t *plg_gfx = kernel->plugins[PLG_GRAPHICS_ID];
+        if (plg_gfx) {
+            err = plg_kernel_cmd(plg_gfx, PLG_GFX_KCID_KEY_EVENT, sc, 0, 0, 0);
+            if (err != FOS_E_SUCCESS) {
+                gfx_direct_put_fmt_s_rr("[Graphics Plugin KeyEvent Error 0x%X]\n", err);
                 ks_shutdown(kernel);
             }
         }

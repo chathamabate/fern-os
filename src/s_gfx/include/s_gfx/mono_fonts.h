@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "s_gfx/gfx.h"
+#include "s_data/term_buffer.h"
 
 /**
  * An ascii monofont describes how to render the first 128
@@ -47,6 +48,23 @@ typedef struct _ascii_mono_font_t {
 extern const ascii_mono_font_t * const ASCII_MONO_8X8;
 extern const ascii_mono_font_t * const ASCII_MONO_8X16;
 
+/*
+ * FMI stands for "font map index".
+ *
+ * These are used to reference a ascii monospace font when maybe a pointer
+ * isn't appropriate. For example, maybe a system call takes a font.
+ * In this case, a numeric ID would be better than a pointer to the font.
+ * (Even though a pointer may work fine given the font will be mapped in both
+ * user and kernel spaces)
+ */
+
+typedef uint8_t ascii_mono_font_map_id_t;
+
+#define ASCII_MONO_8X8_FMI  (0)
+#define ASCII_MONO_8X16_FMI (1)
+
+extern const ascii_mono_font_t * const ASCII_MONO_FONT_MAP[];
+
 /**
  * Draw a string to a buffer using an ascii monospace font.
  * If `str` contains a character with value >= 128, said character will be 
@@ -62,3 +80,81 @@ void gfx_draw_ascii_mono_text(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         int32_t x, int32_t y, 
         uint8_t w_scale, uint8_t h_scale,
         gfx_color_t fg_color, gfx_color_t bg_color);
+
+/**
+ * A palette is just 16 colors which are meant be used for the following colors in order:
+ *
+ * 0 BLACK           
+ * 1 BLUE            
+ * 2 GREEN           
+ * 3 CYAN            
+ * 4 RED             
+ * 5 MAGENTA         
+ * 6 BROWN           
+ * 7 LIGHT_GREY      
+ * 8 BRIGHT_BLACK           
+ * 9 BRIGHT_BLUE            
+ * 10 BRIGHT_GREEN           
+ * 11 BRIGHT_CYAN            
+ * 12 BRIGHT_RED             
+ * 13 BRIGHT_MAGENTA         
+ * 14 BRIGHT_BROWN           
+ * 15 WHITE                  
+ */
+typedef struct _gfx_ansi_palette_t {
+    gfx_color_t colors[16];
+} gfx_ansi_palette_t;
+
+extern const gfx_ansi_palette_t * const BASIC_ANSI_PALETTE;
+extern const gfx_ansi_palette_t * const APPRENTICE_ANSI_PALETTE;
+
+/**
+ * Render a terminal buffer's contents to the given buffer.
+ *
+ * `curr_tb` is optional.
+ *
+ * If `curr_tb` is given, only cells in `next_tb` which differ from those in 
+ * `curr_tb` are rendered. (If the dimmensions of `curr_tb` don't match the
+ * dimmensions of `next_tb` this function does nothing)
+ *
+ * If `curr_tb` is NULL, all of `next_tb` is rendered.
+ *
+ * No matter what, the cell at `curr_tb->cursor_row, curr_tb->cursor_col` is redrawn!
+ * This helps overwrite custom cursor animations/glyphs drawn manually after this function.
+ */
+void gfx_draw_term_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        const term_buffer_t *curr_tb, const term_buffer_t *next_tb, 
+        const ascii_mono_font_t *amf, const gfx_ansi_palette_t *palette,
+        int32_t x, int32_t y,
+        uint8_t w_scale, uint8_t h_scale);
+
+/**
+ * Here is a struct of attributes which helps with calling the above
+ * function in a brief manner.
+ */
+typedef struct _gfx_term_buffer_attrs_t {
+    /**
+     * Scale of the text to render.
+     */
+    uint8_t w_scale, h_scale;
+
+    /**
+     * Palette to use for text.
+     */
+    gfx_ansi_palette_t palette;
+
+    /**
+     * What ASCII Monospace font we will be using.
+     */
+    ascii_mono_font_map_id_t fmi;
+} gfx_term_buffer_attrs_t;
+
+static inline void gfx_draw_term_buffer_wa(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        const term_buffer_t *curr_tb, const term_buffer_t *next_tb, 
+        int32_t x, int32_t y, const gfx_term_buffer_attrs_t *attrs) {
+    gfx_draw_term_buffer(buf, clip_area, curr_tb, next_tb, 
+            ASCII_MONO_FONT_MAP[attrs->fmi], &(attrs->palette), x, y, 
+            attrs->w_scale, attrs->h_scale);
+}
+
+

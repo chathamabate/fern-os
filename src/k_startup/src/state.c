@@ -9,8 +9,8 @@
 #include "k_startup/handle.h"
 #include "k_startup/plugin.h"
 
-#include "k_startup/vga_cd.h"
 #include "s_util/str.h"
+#include "k_startup/gfx.h"
 
 /**
  * Creates a new kernel state with basically no fleshed out details.
@@ -318,11 +318,11 @@ static fernos_error_t ks_exit_proc_p(kernel_state_t *ks, process_t *proc,
 
     if (ks->root_proc == proc) {
         // Used for debugging sometimes!
-        //term_put_fmt_s("AL Blocks: %u Free Pages: 0x%X\n", 
-        //        al_num_user_blocks(get_default_allocator()),
-        //        get_num_free_pages());
-
-        term_put_fmt_s("[System Exit with Status 0x%X]", status);
+        gfx_direct_put_fmt_s("AL Blocks: %u Free Pages: 0x%X\n", 
+                al_num_user_blocks(get_default_allocator()),
+                get_num_free_pages());
+        gfx_direct_put_fmt_s("[System Exit with Status 0x%X]", status);
+        gfx_direct_term_render();
         ks_shutdown(ks);
     }
 

@@ -107,10 +107,36 @@ static phys_addr_t _pop_free_page(void) {
     return popped;
 }
 
+/*
+ * The below flags are used for `_place_range` ONLY!
+ */
+
+/**
+ * The given range will be identity mapped.
+ */
 #define _R_IDENTITY  (1 << 0)
+
+/**
+ * The given range will have need to have pages assigned.
+ * (CANNOT BE _R_IDENTITY TOO)
+ */
 #define _R_ALLOCATE  (1 << 1)
+
+/**
+ * Should the user be able to write to the page?
+ */
 #define _R_WRITEABLE (1 << 2)
-#define _R_USER (1 << 3)
+
+/**
+ * Should the user have any access at all to this page?
+ */
+#define _R_USER      (1 << 3)
+
+/**
+ * This page should not be cached!
+ * (MUST BE PAIRED WITH _R_IDENTITY)
+ */
+#define _R_DONT_CACHE (1 << 4)
 
 /**
  * Make a certain range available within a page table.
@@ -119,6 +145,10 @@ static phys_addr_t _pop_free_page(void) {
  */
 static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e, uint8_t flags) {
     if ((flags & _R_IDENTITY) && (flags & _R_ALLOCATE)) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if ((flags & _R_DONT_CACHE) && !(flags & _R_IDENTITY)) {
         return FOS_E_BAD_ARGS;
     }
 
@@ -140,7 +170,7 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
     uint32_t curr_pdi = 1024;
     pt_entry_t *pt = NULL;
 
-    for (uint8_t *i = s; i < e; i+= M_4K) {
+    for (uint8_t *i = s; i < e; i += M_4K) {
         uint32_t pi = (uint32_t)i / M_4K;
 
         uint32_t pdi = pi / 1024;
@@ -192,9 +222,18 @@ static fernos_error_t _place_range(pt_entry_t *pd, uint8_t *s, const uint8_t *e,
             }
         }
 
-        pt[pti] = (flags & _R_IDENTITY) 
-            ? fos_identity_pt_entry(page_addr, user, writeable) 
-            : fos_unique_pt_entry(page_addr, user, writeable);
+        pt_entry_t pte;
+
+        if (flags & _R_IDENTITY) {
+            pte = fos_identity_pt_entry(page_addr, user, writeable);
+            if (flags & _R_DONT_CACHE) {
+                pte_set_pcd(&pte, 1);
+            }
+        } else {
+            pte = fos_unique_pt_entry(page_addr, user, writeable);
+        }
+
+        pt[pti] = pte;
     }
 
     return FOS_E_SUCCESS;
@@ -216,7 +255,14 @@ static fernos_error_t _init_kernel_pd(void) {
     pt_entry_t *pd = (pt_entry_t *)kpd;
     clear_page_table(pd);
 
-    PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_IDENTITY | _R_WRITEABLE));    
+    /*
+     * Quick note, both the prologue and epilogue area will be marked "don't cache".
+     * I think after init time, these areas will only really ever be used for MMIO.
+     * (Which must have caching turned off to be safe)
+     */
+
+    PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), 
+                _R_IDENTITY | _R_WRITEABLE | _R_DONT_CACHE));    
 
     PROP_ERR(_place_range(pd, _sys_tables_start, _sys_tables_end, _R_WRITEABLE | _R_IDENTITY));
 
@@ -239,7 +285,7 @@ static fernos_error_t _init_kernel_pd(void) {
     // The epilogue is being mapped into the kernel space so we have access to the framebuffer
     // and potentially other structures set up by grub.
     PROP_ERR(_place_range(pd, (uint8_t *)EPILOGUE_START, (const uint8_t *)ALIGN(EPILOGUE_END, M_4K),
-                _R_WRITEABLE | _R_IDENTITY));
+                _R_WRITEABLE | _R_IDENTITY | _R_DONT_CACHE));
 
     // Now setup up the free kernel pages!
     // THIS IS VERY CONFUSING SADLY!

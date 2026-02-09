@@ -36,7 +36,7 @@ proc_exit_status_t app_main(const char * const *args, size_t num_args) {
     // Probably will redo all of this tbh...
     // Maybe not right now though...
     handle_t h = sc_get_out_handle();
-    if (h == FOS_MAX_HANDLES_PER_PROC || !sc_handle_is_cd(h)) {
+    if (h == FOS_MAX_HANDLES_PER_PROC || !sc_handle_is_terminal(h)) {
         return PROC_ES_FAILURE;
     }
 

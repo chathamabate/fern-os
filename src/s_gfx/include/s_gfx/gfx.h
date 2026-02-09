@@ -23,10 +23,15 @@ typedef uint32_t gfx_color_t;
 
 /**
  * Create a color with 100% opacity.
+ *
+ * 0 <= r, g, b <= 255
  */
-static inline gfx_color_t gfx_color(uint8_t r, uint8_t g, uint8_t b) {
-    return (1 << 24) | (r << 16UL) | (g << 8UL) | (b << 0UL);
-}
+#define gfx_color(r, g, b) ((1UL << 24UL) | ((uint8_t)(r) << 16UL) | ((uint8_t)(g) << 8UL) | ((uint8_t)(b) << 0UL))
+
+/**
+ * Create a color with 100% opacity, using a hex code!
+ */
+#define gfx_color_hex(hex) ((1UL << 24UL) | (hex & 0x00FFFFFFUL))
 
 /**
  * Given two colors, determine if they are equal.
@@ -72,13 +77,44 @@ typedef struct _gfx_buffer_t {
     /**
      * Dimmensions of the buffer in pixels.
      */
-    const uint16_t width, height;
+    uint16_t width, height;
 
     /**
      * The buffer itself with size `width * height * sizeof(gfx_color_t)`.
      */
-    gfx_color_t * const buffer;
+    gfx_color_t *buffer;
 } gfx_buffer_t;
+
+/**
+ * Create a new dynamically allocated gfx buffer with dimmensions w x h.
+ *
+ * Returns NULL on error.
+ */
+gfx_buffer_t *new_gfx_buffer(allocator_t *al, uint16_t w, uint16_t h);
+
+static inline gfx_buffer_t *new_da_gfx_buffer(uint16_t w, uint16_t h) {
+    return new_gfx_buffer(get_default_allocator(), w, h);
+}
+
+/**
+ * Delete a gfx buffer. 
+ * (This does nothing if the allocator of `buf` is NULL)
+ */
+void delete_gfx_buffer(gfx_buffer_t *buf);
+
+/**
+ * Attempt to resize `buf`.
+ * 
+ * If `shrink` is false, then resizing to a smaller cumulative size will do nothing memory wise.
+ * If `shrink` is true, resizing to a smaller cumulative size may shrink the buffer in memory.
+ *
+ * If `buf` has no allocator, this always fails.
+ * Otherwise, this fails if there are insufficient resources.
+ *
+ * On success, the contents of the buffer or undefined.
+ * On failure, the buffer is left unmodified.
+ */
+fernos_error_t gfx_resize_buffer(gfx_buffer_t *buf, uint16_t w, uint16_t h, bool shrink);
 
 /**
  * Set all pixels in the given buffer to `color`.
@@ -154,6 +190,35 @@ static inline void gfx_fill_rect(gfx_buffer_t *buf, const gfx_box_t *clip_area,
 }
 
 /**
+ * This will draw the outline of a box, where each edge has a specific thickness.
+ *
+ * `clip_area` is optional.
+ *
+ * Undefined behavior if `thickness` is larger than half the width or height of box.
+ */
+void gfx_draw_box(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        const gfx_box_t *box, uint16_t thickness, gfx_color_t color);
+
+/**
+ * Draw the outline of a rectangle.
+ *
+ * `(x, y)` is the top left corner of the rectangle relative to the buffer origin.
+ * `w` and `h` are the dimmensions of the rectangle being outlined.
+ * `x + w <= INT32_MAX` and `y + h <= INT32_MAX` or else undefined behavior!
+ * `thickness` is the thickness of each line.
+ * `color` is the color to fill the rectangle with.
+ *
+ * Undefined behavior if `thickness` is larger than half `w` or `h`.
+ */
+static inline void gfx_draw_rect(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+        int32_t x, int32_t y, uint16_t w, uint16_t h, uint16_t thickness, gfx_color_t color) {
+    gfx_box_t box = {
+        .x = x, .y = y, .width = w, .height = h
+    };
+    gfx_draw_box(buf, clip_area, &box, thickness, color);
+}
+
+/**
  * Fill a monochrome bitmap on the screen.
  *
  * `(x, y)` will be where the top left corner of the bitmap will begin on screen.
@@ -173,5 +238,13 @@ static inline void gfx_fill_rect(gfx_buffer_t *buf, const gfx_box_t *clip_area,
 void gfx_fill_bitmap(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         int32_t x, int32_t y, uint8_t w_scale, uint8_t h_scale,
         const uint8_t *bitmap, uint8_t bitmap_rows, uint8_t bitmap_cols, gfx_color_t fg_color, gfx_color_t bg_color);
+
+/**
+ * Paste the contents of one buffer into another.
+ *
+ * This is a straight copy/paste, no notion of "clear" pixels.
+ */
+void gfx_paste_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
+    const gfx_buffer_t *sub_buf, int32_t x, int32_t y);
 
 
