@@ -13,6 +13,8 @@ fernos_error_t test_userspace_dummy_term(handle_t h_t) {
     size_t rows;
     size_t cols;
 
+    char buf[100];
+
     // How should we do this?
     
     sc_term_get_dimmensions(h_t, &rows, &cols);
@@ -29,44 +31,34 @@ fernos_error_t test_userspace_dummy_term(handle_t h_t) {
 
         for (size_t i = 0; i < num_evs; i++) {
             window_event_t ev = evs[i];
-            const char *ev_name = WINEC_NAME_MAP[ev.event_code];
 
-            switch (ev.event_code) {
-            case WINEC_DEREGISTERED:
+            if (ev.event_code == WINEC_DEREGISTERED) {
                 return FOS_E_SUCCESS;
-
-            case WINEC_RESIZED:
-                PROP_ERR(sc_handle_write_fmt_s(h_t, "[%s] %u %u\n", 
-                            ev_name, ev.d.dims.width, ev.d.dims.height));
-                break;
-
-            case WINEC_TICK:
-                if (tick_num % 64 == 0) {
-                    PROP_ERR(sc_handle_write_fmt_s(h_t, "[%s] %u\n",
-                                ev_name, tick_num));
-                }
-                tick_num++;
-                break; 
-
-            case WINEC_KEY_INPUT:
-                PROP_ERR(sc_handle_write_fmt_s(h_t, "[%s] 0x04%X\n",
-                            ev_name, ev.d.key_code));
-                break;
-
-            default: 
-                if (!ev_name) {
-                    PROP_ERR(sc_handle_write_s(h_t, 
-                                ANSI_BRIGHT_RED_FG "Unknown Event Received!\n" ANSI_RESET));
-                    return FOS_E_UNKNWON_ERROR;
-                }
-                PROP_ERR(sc_handle_write_fmt_s(h_t, "[%s]\n",
-                            ev_name));
-                break;
             }
+
+            if (ev.event_code == WINEC_TICK && (tick_num++ % 64)) {
+                continue;
+            }
+
+            win_ev_to_str(buf, ev, true); 
+            PROP_ERR(sc_handle_write_fmt_s(h_t, "%s\n", buf));
         }
     }
 }
 
 fernos_error_t test_terminal_fork0(handle_t h_t) {
+
+    sig_vector_t old_sv = sc_signal_allow(1UL << FSIG_CHLD);
+
+    fernos_error_t err;
+    proc_id_t cpid;
+
+    PROP_ERR(sc_proc_fork(&cpid));
+
+
+
+
+    sc_signal_allow(old_sv);
+
     return FOS_E_NOT_IMPLEMENTED;
 }

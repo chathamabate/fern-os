@@ -18,7 +18,11 @@ fernos_error_t test_userspace_dummy_term(handle_t h_t);
  * This tests forking and using the same terminal from two different 
  * user processes.
  *
- * Both processes will exit when a deregistered event is received.
+ * When a deregistered event is received, the child process will exit
+ * and the parent process will return FOS_E_SUCCESS.
+ *
+ * This is really testing that reading events behaves correctly when 
+ * done my multiple copied terminal handles.
  */
 fernos_error_t test_terminal_fork0(handle_t h_t);
 

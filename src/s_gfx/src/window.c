@@ -1,5 +1,6 @@
 
 #include "s_gfx/window.h"
+#include "s_util/ansi.h"
 
 const char * const WINEC_NAME_MAP[] = {
     [WINEC_TICK] = "TICK",
@@ -11,6 +12,50 @@ const char * const WINEC_NAME_MAP[] = {
     [WINEC_HIDDEN] = "HIDDEN",
     [WINEC_UNHIDDEN] = "UNHIDDEN",
 };
+
+size_t win_ev_to_str(char *buf, window_event_t ev, bool with_ansi) {
+    size_t written = 0;
+
+    const char *prefix = with_ansi 
+        ? ANSI_BRIGHT_GREEN_FG "[" ANSI_RESET "%s" ANSI_BRIGHT_GREEN_FG "]" ANSI_RESET 
+        : "[%s]";
+
+    const char *ev_name = WINEC_NAME_MAP[ev.event_code];
+    if (!ev_name) {
+        ev_name = "UNKNOWN";
+    }
+
+    written += str_fmt(buf + written, prefix, ev_name);
+
+    switch (ev.event_code) {
+    case WINEC_RESIZED:
+        written += str_fmt(buf + written, " %u %u", ev.d.dims.width, ev.d.dims.height);
+        break;
+
+    case WINEC_KEY_INPUT:
+        if (with_ansi) {
+            const char *kc_fmt = scs1_is_make(ev.d.key_code) 
+                ? ANSI_BRIGHT_GREEN_FG " 0x%04X" ANSI_RESET 
+                : ANSI_BRIGHT_RED_FG " 0x%04X" ANSI_RESET;
+            written += str_fmt(buf + written, kc_fmt, ev.d.key_code);
+        } else {
+            written += str_fmt(buf + written, " 0x%04X", ev.d.key_code);
+        }
+
+        char c = scs1_to_ascii_lc(scs1_as_make(ev.d.key_code));
+        if (c) {
+            const char key_s[] = {c, '\0'};
+            written += str_fmt(buf + written, " \"%s\"", key_s);
+        }
+
+        break;
+
+    default:
+        break;
+    }
+
+    return written;
+}
 
 void init_window_base(window_t *w, gfx_buffer_t *buf, const window_attrs_t *attrs, const window_impl_t *impl) {
     *(const window_impl_t **)&(w->impl) = impl;

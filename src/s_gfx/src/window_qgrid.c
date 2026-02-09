@@ -414,11 +414,11 @@ static fernos_error_t win_qg_on_event(window_t *w, window_event_t ev) {
 
         case SCS1_LSHIFT:
             win_qg->lshift_held = is_make;
-            return FOS_E_SUCCESS;
+            break;
 
         case SCS1_RSHIFT:
             win_qg->rshift_held = is_make;
-            return FOS_E_SUCCESS;
+            break;
 
         default:
             break;

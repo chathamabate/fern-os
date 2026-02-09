@@ -1,5 +1,6 @@
 
 #include "s_gfx/window_dummy.h"
+#include "s_data/term_buffer.h"
 #include "s_gfx/mono_fonts.h"
 #include "s_util/ansi.h"
 
@@ -98,8 +99,6 @@ static void win_d_render(window_t *w) {
     win_d->dirty_buffer = false;
 }
 
-#define EVENT_PREFIX ANSI_BRIGHT_GREEN_FG "[" ANSI_RESET "%s" ANSI_BRIGHT_GREEN_FG "]" ANSI_RESET
-
 static fernos_error_t win_d_on_event(window_t *w, window_event_t ev) {
     fernos_error_t err;
 
@@ -133,48 +132,21 @@ static fernos_error_t win_d_on_event(window_t *w, window_event_t ev) {
         }
 
         win_d->dirty_buffer = true;
+
+        ev.d.dims.width = new_cols;
+        ev.d.dims.height = new_rows;
     }
 
     // Ticks will be special, because they happen so often, only print every now and then.
-    if (ev.event_code == WINEC_TICK) {
-        if (w->tick % 32 == 0) {
-            tb_put_fmt_s(win_d->real_tb, EVENT_PREFIX " %u\n",
-                    WINEC_NAME_MAP[ev.event_code], w->tick);
-        }
+    if (ev.event_code == WINEC_TICK && (w->tick % 64)) {
         return FOS_E_SUCCESS; // Early exit for Ticks.
     }
 
-    tb_put_fmt_s(win_d->real_tb, EVENT_PREFIX, WINEC_NAME_MAP[ev.event_code]);
+    char log_buf[100]; 
+    win_ev_to_str(log_buf, ev, true);
 
-    // Ok, now, for all events (Other than deregister) we print to the terminal!
-    switch (ev.event_code) {
-
-    case WINEC_RESIZED:
-        tb_put_fmt_s(win_d->real_tb, " %u %u", 
-                ev.d.dims.width, ev.d.dims.height);
-        break;
-
-    case WINEC_KEY_INPUT: {
-        if (scs1_is_make(ev.d.key_code)) {
-            tb_put_fmt_s(win_d->real_tb, ANSI_BRIGHT_GREEN_FG " %04X" ANSI_RESET, ev.d.key_code); 
-        } else {
-            tb_put_fmt_s(win_d->real_tb, ANSI_BRIGHT_RED_FG " %04X" ANSI_RESET, ev.d.key_code); 
-        }
-
-        char pc = scs1_to_ascii_lc(scs1_as_make(ev.d.key_code));
-        if (pc) {
-            char s[2]  = { pc, '\0' };
-            tb_put_fmt_s(win_d->real_tb, " \"%s\"", s);
-        }
-
-        break;
-    }
-
-    default:
-        break;
-    }
-
-    tb_put_fmt_s(win_d->real_tb, "\n");
+    tb_put_s(win_d->real_tb, log_buf);
+    tb_put_c(win_d->real_tb, '\n');
 
     return FOS_E_SUCCESS;
 }

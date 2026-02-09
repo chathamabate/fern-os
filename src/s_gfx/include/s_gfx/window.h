@@ -4,6 +4,7 @@
 #include "s_mem/allocator.h"
 #include "s_gfx/gfx.h"
 #include "s_util/ps2_scancodes.h"
+#include <stdbool.h>
 
 /**
  * Windows will support an event driven design.
@@ -84,6 +85,17 @@ typedef struct _window_event_t {
         } dims;
     } d;
 } window_event_t;
+
+/**
+ * Write an event as a string to the given buffer.
+ *
+ * `with_ansi` will add ANSI escape codes for colors.
+ * 
+ * Make sure `buf` has at least maybe 30 or 40 cells.
+ *
+ * Returns number of characters written (not including NT at the end)
+ */
+size_t win_ev_to_str(char *buf, window_event_t ev, bool with_ansi);
 
 typedef struct _window_attrs_t window_attrs_t;
 typedef struct _window_t window_t;
