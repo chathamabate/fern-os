@@ -31,26 +31,17 @@ proc_exit_status_t user_main(void) {
         .w_scale = 1, .h_scale = 1
     };
 
-    sc_gfx_new_dummy();
-
     err = sc_gfx_new_terminal(&h_t, &attrs);
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
 
-    err = test_userspace_dummy_term(h_t);
+    err = test_terminal_fork0(h_t);
     if (err != FOS_E_SUCCESS) {
         return PROC_ES_FAILURE;
     }
 
-    // So, what are some other tests we could do here?
-    // Multi threaded tests? Fork tests?
-    // Multi threaded is kinda gauranteed to no be a problem, forking is
-    // a little more dicey imo...
     sc_handle_close(h_t);
-
-
-    while (1);
 
     return PROC_ES_SUCCESS;
 }
