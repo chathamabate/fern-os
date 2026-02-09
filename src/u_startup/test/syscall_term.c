@@ -80,6 +80,7 @@ fernos_error_t test_terminal_fork0(handle_t h_t) {
             window_event_t ev;
             while ((err = sc_term_read_events(h_t, &ev, 1, NULL)) == FOS_E_SUCCESS) {
                 if (ev.event_code == WINEC_DEREGISTERED) {
+                    sc_handle_close(h_t);
                     sc_proc_exit(PROC_ES_SUCCESS);
                 }
 
