@@ -5,7 +5,11 @@
 
 #include "u_startup/test/syscall.h"
 #include "u_startup/test/syscall_fs.h"
+#include "u_startup/test/syscall_pipe.h"
 #include "s_mem/simple_heap.h"
+#include "s_util/constraints.h"
+
+#include "u_startup/test/syscall_term.h"
 
 proc_exit_status_t user_main(void) {
 
@@ -17,6 +21,33 @@ proc_exit_status_t user_main(void) {
      *
      * The user has no ability to render anything to the screen at this commit.
      */
+
+    fernos_error_t err;
+
+    handle_t h_t;
+    gfx_term_buffer_attrs_t attrs = {
+        .palette = *BASIC_ANSI_PALETTE,
+        .fmi = ASCII_MONO_8X16_FMI,
+        .w_scale = 1, .h_scale = 1
+    };
+
+    err = sc_gfx_new_terminal(&h_t, &attrs);
+    if (err != FOS_E_SUCCESS) {
+        return PROC_ES_FAILURE;
+    }
+
+    err = test_userspace_dummy_term(h_t);
+    if (err != FOS_E_SUCCESS) {
+        return PROC_ES_FAILURE;
+    }
+
+    // So, what are some other tests we could do here?
+    // Multi threaded tests? Fork tests?
+    // Multi threaded is kinda gauranteed to no be a problem, forking is
+    // a little more dicey imo...
+    sc_handle_close(h_t);
+
+    while (1);
 
     return PROC_ES_SUCCESS;
 }

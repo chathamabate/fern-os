@@ -317,7 +317,6 @@ static fernos_error_t delete_handle_terminal_state(handle_state_t *hs) {
     if (hs_t->win_t->references == 0 && !(hs_t->win_t->super.is_active)) {
         // If the underlying terminal window no longer has any references AND is inactive,
         // we can delete the window here too!
-        
         delete_window((window_t *)(hs_t->win_t));
     }
 
@@ -395,12 +394,14 @@ static fernos_error_t term_hs_write(handle_state_t *hs, const void *u_src, size_
 /**
  * The maximum number of events we can read in a single read!
  */
-#define TERM_WIN_HS_MAX_EVS_PER_READ (16U)
+#define TERM_WIN_HS_MAX_EVS_PER_READ (32U)
 
 static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     fernos_error_t err;
     handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
     thread_t *thr = (thread_t *)(hs_t->super.ks->schedule.head);
+
+    (void)arg3;
 
     switch (cmd) {
 

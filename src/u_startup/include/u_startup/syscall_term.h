@@ -37,7 +37,7 @@ fernos_error_t sc_term_wait_event(handle_t h);
  * Design Note: You may think that `sc_term_wait_event` and `sc_term_read_events` couldn've just
  * been implementations of the `handle_read` and `handle_wait_read_ready` functions. I decided
  * against this though because `handle_read` is intended to be bytewise.
- * The user should not be able to read *part* of an event! This design ensures the usure can
+ * The user should not be able to read *part* of an event! This design ensures the user can
  * only read full events!
  *
  * `ev_buf` is a buffer to be filled with events.
@@ -53,5 +53,20 @@ fernos_error_t sc_term_wait_event(handle_t h);
  *  2) `num_buf_cells > 0` AND at least 1 event was read into `ev_buf`.
  *
  * Can return FOS_E_UNKNOWN_ERROR in other error cases.
+ *
+ * SPECIAL EVENTS:
+ *
+ * WINEC_RESIZED
+ * This means the terminal has changed dimmensions. `width` should be interpreted as columns of 
+ * text. `height` should be interprets as rows of text. (For window's, these fields are 
+ * in pixels, not here!)
+ *
+ * WINEC_DEREGISTERED
+ * The terminal you are communicating with may never send this. It's meaning is less clear for
+ * non-windows. However, if it is sent, the user can assume that the underlying terminal is 
+ * no longer useable. From this point on, no further events will be received by the terminal.
+ * Further calls to this function will return single WINEC_DEREGISTERED events inifinitely!
+ *
+ * (The meaning of other events may depend on what terminal you are speaking with!)
  */
 fernos_error_t sc_term_read_events(handle_t h, window_event_t *ev_buf, size_t num_buf_cells, size_t *cells_readden);

@@ -422,6 +422,31 @@ static const gfx_ansi_palette_t BASIC_ANSI_PALETTE_VAL = {
 
 const gfx_ansi_palette_t * const BASIC_ANSI_PALETTE = &BASIC_ANSI_PALETTE_VAL;
 
+const gfx_ansi_palette_t APPRENTICE_ANSI_PALETTE_VAL = {
+    .colors = {
+        gfx_color_hex(0x1C1C1C), // Black
+        gfx_color_hex(0x5F87AF), // Blue
+        gfx_color_hex(0x5F875F), // Green
+        gfx_color_hex(0x5F8787), // Cyan
+        gfx_color_hex(0xAF5F5F), // Red
+        gfx_color_hex(0x5F5F87), // Magenta
+        gfx_color_hex(0x87875F), // Brown
+        gfx_color_hex(0x6C6C6C), // Grey
+
+        // Brights
+        gfx_color_hex(0x444444), // Black
+        gfx_color_hex(0x8FAFD7), // Blue
+        gfx_color_hex(0x87AF87), // Green
+        gfx_color_hex(0x5FAFAF), // Cyan
+        gfx_color_hex(0xFF8700), // Red
+        gfx_color_hex(0x8787AF), // Magenta
+        gfx_color_hex(0xFFFFAF), // Brown
+        gfx_color_hex(0xFFFFFF), // Grey
+    }
+};
+
+const gfx_ansi_palette_t * const APPRENTICE_ANSI_PALETTE = &APPRENTICE_ANSI_PALETTE_VAL;
+
 void gfx_draw_term_buffer(gfx_buffer_t *buf, const gfx_box_t *clip_area,
         const term_buffer_t *curr_tb, const term_buffer_t *next_tb, 
         const ascii_mono_font_t *amf, const gfx_ansi_palette_t *palette,

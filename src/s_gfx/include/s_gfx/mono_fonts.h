@@ -106,6 +106,7 @@ typedef struct _gfx_ansi_palette_t {
 } gfx_ansi_palette_t;
 
 extern const gfx_ansi_palette_t * const BASIC_ANSI_PALETTE;
+extern const gfx_ansi_palette_t * const APPRENTICE_ANSI_PALETTE;
 
 /**
  * Render a terminal buffer's contents to the given buffer.

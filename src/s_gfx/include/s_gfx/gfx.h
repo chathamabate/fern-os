@@ -26,7 +26,12 @@ typedef uint32_t gfx_color_t;
  *
  * 0 <= r, g, b <= 255
  */
-#define gfx_color(r, g, b) ((1 << 24) | ((uint8_t)(r) << 16UL) | ((uint8_t)(g) << 8UL) | ((uint8_t)(b) << 0UL))
+#define gfx_color(r, g, b) ((1UL << 24UL) | ((uint8_t)(r) << 16UL) | ((uint8_t)(g) << 8UL) | ((uint8_t)(b) << 0UL))
+
+/**
+ * Create a color with 100% opacity, using a hex code!
+ */
+#define gfx_color_hex(hex) ((1UL << 24UL) | (hex & 0x00FFFFFFUL))
 
 /**
  * Given two colors, determine if they are equal.
