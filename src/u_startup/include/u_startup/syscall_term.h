@@ -67,6 +67,9 @@ fernos_error_t sc_term_wait_event(handle_t h);
  * no longer useable. From this point on, no further events will be received by the terminal.
  * Further calls to this function will return single WINEC_DEREGISTERED events inifinitely!
  *
+ * WINEC_TICK
+ * Very important, a terminal handle will NEVER forward a tick event.
+ *
  * (The meaning of other events may depend on what terminal you are speaking with!)
  */
 fernos_error_t sc_term_read_events(handle_t h, window_event_t *ev_buf, size_t num_buf_cells, size_t *cells_readden);

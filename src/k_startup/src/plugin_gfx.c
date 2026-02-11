@@ -249,6 +249,11 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
         break;
     }
 
+    case WINEC_TICK: {
+        // Ignore tick events!
+        return FOS_E_SUCCESS;
+    }
+
     default: {
         break;
     }
