@@ -8,9 +8,6 @@
 #include "s_util/constraints.h"
 
 fernos_error_t test_userspace_dummy_term(handle_t h_t) {
-    // Number of the next tick to be received.
-    uint32_t tick_num = 0;
-
     size_t rows;
     size_t cols;
 
@@ -35,10 +32,6 @@ fernos_error_t test_userspace_dummy_term(handle_t h_t) {
 
             if (ev.event_code == WINEC_DEREGISTERED) {
                 return FOS_E_SUCCESS;
-            }
-
-            if (ev.event_code == WINEC_TICK && (tick_num++ % 64)) {
-                continue;
             }
 
             win_ev_to_str(buf, ev, true); 
@@ -82,10 +75,6 @@ fernos_error_t test_terminal_fork0(handle_t h_t) {
                 if (ev.event_code == WINEC_DEREGISTERED) {
                     sc_handle_close(h_t);
                     sc_proc_exit(PROC_ES_SUCCESS);
-                }
-
-                if (ev.event_code == WINEC_TICK) {
-                    continue; // Won't even bother logging ticks here.
                 }
 
                 win_ev_to_str(log_buf, ev, true);
