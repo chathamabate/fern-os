@@ -5,6 +5,23 @@
 #include <stdbool.h>
 #include "s_util/str.h"
 
+/*
+ * NOTE: you may find it strange there is an equator and comparator type.
+ * You can determine if two values are equal using a comparator, why have an
+ * equator?
+ *
+ * Well, you may have a set of values which has a notion of equality, but no
+ * notion of order. If you only care about equality, you should always use
+ * an equator to broaden what values are accepted.
+ */
+
+/**
+ * A Comparator returns 0 iff `k0` and `k1` point to equal emantically values.
+ * Returns a negative number iff `k0`'s value is "less than" `k1`'s value.
+ * Returns a positive number iff `k0`'s value is "greater than" `k1`'s value.
+ */
+typedef int32_t (*comparator_ft)(const void *k0, const void *k1);
+
 /**
  * An equator should return true iff `k0` and `k1` point to semantically equal
  * values.
