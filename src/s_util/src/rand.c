@@ -40,3 +40,13 @@ uint32_t next_rand_u32(rand_t *r) {
     }
     return val;
 }
+
+uint64_t next_rand_u64(rand_t *r) {
+    uint64_t val = 0;
+    for (uint8_t i = 0; i < 64; i++) {
+        val <<= 1;
+        val |= next_rand_u1(r);
+    }
+    return val;
+}
+

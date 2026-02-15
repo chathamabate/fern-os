@@ -112,17 +112,14 @@ static inline void gfx_direct_put_s_rr(const char *s) {
  * Write a formatted string to the direct terminal.
  * (Does not explicitly rerender!)
  */
-#define gfx_direct_put_fmt_s(...) tb_put_fmt_s(DIRECT_TERM, __VA_ARGS__)
+void gfx_direct_put_fmt_s(const char *fmt, ...);
+
 
 /**
  * Write a formatted string to teh direct terminal,
  * then rerender!
  */
-#define gfx_direct_put_fmt_s_rr(...) \
-    do { \
-        tb_put_fmt_s(DIRECT_TERM, __VA_ARGS__); \
-        gfx_direct_term_render(); \
-    } while (0)
+void gfx_direct_put_fmt_s_rr(const char *fmt, ...);
 
 /**
  * Writes a message to the direct terminal.

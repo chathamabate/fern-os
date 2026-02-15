@@ -6,6 +6,7 @@
 #include "k_sys/debug.h"
 #include "s_util/str.h"
 #include "s_gfx/mono_fonts.h"
+#include "s_util/str.h"
 
 void gfx_to_screen(gfx_screen_t *screen, gfx_buffer_t *frame) {
     // We'll put a memory barrier both before and after cause why not.
@@ -177,6 +178,29 @@ void gfx_direct_term_render(void) {
 
 void gfx_direct_put_s(const char *s) {
     tb_put_s(DIRECT_TERM, s);
+}
+
+void gfx_direct_put_fmt_s(const char *fmt, ...) {
+    char buf[1024];
+
+    va_list va;
+    va_start(va, fmt);
+    str_vfmt(buf, fmt, va); 
+    va_end(va);
+
+    tb_put_s(DIRECT_TERM, buf);
+}
+
+void gfx_direct_put_fmt_s_rr(const char *fmt, ...) {
+    char buf[1024];
+
+    va_list va;
+    va_start(va, fmt);
+    str_vfmt(buf, fmt, va); 
+    va_end(va);
+
+    tb_put_s(DIRECT_TERM, buf);
+    gfx_direct_term_render();
 }
 
 void gfx_direct_fatal(const char *msg) {
