@@ -12,7 +12,7 @@ _ASMS		?=
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= id_table.c map.c list.c wait_queue.c ring.c term_buffer.c \
-			   fixed_queue.c heap.c
+			   fixed_queue.c heap.c binary_search_tree.c
 
 -include ../mod_stub.mk
 

@@ -26,7 +26,7 @@ static const binary_search_tree_impl_t SBST_IMPL = {
     .bst_parent = sbst_parent
 };
 
-simple_bst_t *new_simple_bst(allocator_t *al, comparator_ft cmp, size_t cs) {
+binary_search_tree_t *new_simple_bst(allocator_t *al, comparator_ft cmp, size_t cs) {
     if (!al || !cmp || cs == 0) {
         return NULL;
     }
@@ -40,7 +40,7 @@ simple_bst_t *new_simple_bst(allocator_t *al, comparator_ft cmp, size_t cs) {
     *(allocator_t **)&(sbst->al) = al;
     sbst->root = NULL;
 
-    return sbst;
+    return (binary_search_tree_t *)sbst;
 }
 
 static void *sbst_hdr_to_val(const simple_bst_header_t *hdr) {

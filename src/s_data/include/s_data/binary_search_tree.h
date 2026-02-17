@@ -158,9 +158,9 @@ struct _simple_bst_header_t {
  *
  * Returns NULL on error.
  */
-simple_bst_t *new_simple_bst(allocator_t *al, comparator_ft cmp, size_t cs);
+binary_search_tree_t *new_simple_bst(allocator_t *al, comparator_ft cmp, size_t cs);
 
-static inline simple_bst_t *new_da_simple_bst(comparator_ft cmp, size_t cs) {
+static inline binary_search_tree_t *new_da_simple_bst(comparator_ft cmp, size_t cs) {
     return new_simple_bst(get_default_allocator(), cmp, cs);
 }
 
