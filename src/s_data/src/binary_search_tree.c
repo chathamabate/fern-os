@@ -59,20 +59,22 @@ static void delete_sbst(binary_search_tree_t *bst) {
     simple_bst_header_t *iter = sbst->root;
 
     while (iter) {
+        simple_bst_header_t * const parent = iter->parent;
+
         if (!(iter->left) && !(iter->right)) { // Leaf, delete!
-            if (iter->parent) {
-                if (iter->parent->left == iter) {
-                    iter->parent->left = NULL;
+            if (parent) {
+                if (parent->left == iter) {
+                    parent->left = NULL;
                 } else {
-                    iter->parent->right = NULL;
+                    parent->right = NULL;
                 }
             } else {
                 sbst->root = NULL;
             }
 
-            iter = iter->parent;
-            
             al_free(sbst->al, iter);
+
+            iter = parent;
         } else if (iter->left) { // left or right, just go left.
             iter = iter->left;
         } else { // just right, go right.
@@ -127,7 +129,7 @@ static fernos_error_t new_sbst_leaf_node(simple_bst_t *sbst, const void *val, si
             p->right = hdr;
         }
     } else {
-        sbst->root = p;
+        sbst->root = hdr;
     }
 
     return FOS_E_SUCCESS;

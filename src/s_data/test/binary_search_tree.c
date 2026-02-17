@@ -33,26 +33,35 @@ static bool posttest(void) {
 
 /**
  * Return true if `node` is the root of a valid binary search tree!
+ * `node` must be non-NULL.
  *
  * If `lb` is given, all nodes must be greater than `lb`.
  * If `ub` is given, all nodes must be less than `ub`.
  * (i.e. lower bound and upper bound)
+ *
+ * If `eles` is given, adds 1 for each element traversed.
  */
-static bool test_confirm_bst(binary_search_tree_t *bst, const void *node, const void *lb, const void *ub) {
-    if (node) {
-        if (lb) {
-            TEST_TRUE(bst->cmp(lb, node) < 0);
-        }
+static bool test_confirm_bst(binary_search_tree_t *bst, const void *node, const void *lb, const void *ub, size_t *eles) {
+    if (lb) {
+        TEST_TRUE(bst->cmp(lb, node) < 0);
+    }
 
-        if (ub) {
-            TEST_TRUE(bst->cmp(node, ub) < 0);
-        }
+    if (ub) {
+        TEST_TRUE(bst->cmp(node, ub) < 0);
+    }
 
-        // Left.
-        TEST_TRUE(test_confirm_bst(bst, bst_left(bst, node), lb, node));
+    if (bst_left(bst, node)) {
+        TEST_EQUAL_HEX(node, bst_parent(bst, bst_left(bst, node)));
+        TEST_TRUE(test_confirm_bst(bst, bst_left(bst, node), lb, node, eles));
+    }
 
-        // Right.
-        TEST_TRUE(test_confirm_bst(bst, bst_right(bst, node), node, ub));
+    if (bst_right(bst, node)) {
+        TEST_EQUAL_HEX(node, bst_parent(bst, bst_right(bst, node)));
+        TEST_TRUE(test_confirm_bst(bst, bst_right(bst, node), node, ub, eles));
+    }
+
+    if (eles) {
+        *eles += 1;
     }
 
     TEST_SUCCEED();
@@ -96,10 +105,38 @@ static bool test_new_and_delete(void) {
     TEST_SUCCEED();
 }
 
+static bool test_int_bst_simple(void) {
+    binary_search_tree_t *bst = _bst_generator(test_cmp_int32, sizeof(int32_t));
+    TEST_TRUE(bst != NULL);
+
+    // Here we'll just test adding to a tree and confirming it's valid.
+
+    const int32_t eles[] = {
+        1, 6, 2, -1, 0 ,10, 5, 3, 11, 7, -3, -4,
+        -50, -45, -44, 33
+    };
+    const size_t num_eles = sizeof(eles) / sizeof(eles[0]);
+
+    for (size_t i = 0; i < num_eles; i++) {
+        TEST_SUCCESS(bst_add(bst, eles + i));
+    }
+
+    TEST_TRUE(bst_root(bst) != NULL);
+
+    size_t act_eles = 0;
+    TEST_TRUE(test_confirm_bst(bst, bst_root(bst), NULL, NULL, &act_eles));
+    TEST_EQUAL_UINT(num_eles, act_eles);
+
+    delete_binary_search_tree(bst);
+
+    TEST_SUCCEED();
+}
+
 static bool test_generic_bst(const char *suite_name, bst_gen_ft gen) {
     _bst_generator = gen;
     BEGIN_SUITE(suite_name);
     RUN_TEST(test_new_and_delete);
+    RUN_TEST(test_int_bst_simple);
     return END_SUITE();
 }
 
