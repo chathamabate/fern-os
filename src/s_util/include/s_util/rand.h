@@ -14,5 +14,6 @@ uint8_t next_rand_u1(rand_t *r);
 uint8_t next_rand_u8(rand_t *r);
 uint16_t next_rand_u16(rand_t *r);
 uint32_t next_rand_u32(rand_t *r);
+uint64_t next_rand_u64(rand_t *r);
 
 
