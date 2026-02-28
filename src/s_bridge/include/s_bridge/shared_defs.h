@@ -371,7 +371,7 @@ typedef int32_t futex_t;
 #define PLG_GRAPHICS_ID (4U)
 
 /*
- * Keyboard plugin KERNEL commands.
+ * Graphics plugin KERNEL commands.
  */
 
 #define PLG_GFX_KCID_KEY_EVENT     (0U)
@@ -382,4 +382,21 @@ typedef int32_t futex_t;
 
 #define PLG_GFX_PCID_NEW_DUMMY (0U)
 #define PLG_GFX_PCID_NEW_TERM  (1U)
+
+/*
+ * ***** Shared Memory Plugin *****
+ */
+
+#define PLG_SHARED_MEM_ID (5U)
+
+/*
+ * Shared mem plugin KERNEL commands.
+ */
+
+/*
+ * Shared mem plugin commands.
+ */
+
+#define PLG_SHM_PCID_ALLOC   (0U)
+#define PLG_SHM_PCID_RELEASE (1U)
 

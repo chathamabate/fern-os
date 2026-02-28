@@ -24,6 +24,7 @@ _TEST_SRCS 	?= syscall.c \
 			   syscall_default_io.c \
 			   syscall_kb.c \
 			   syscall_pipe.c \
+			   syscall_shm.c \
 			   syscall_term.c
 
 # TODO: Add back testing for terminal/cd.

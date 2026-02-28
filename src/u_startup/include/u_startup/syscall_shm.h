@@ -6,24 +6,27 @@
 
 /**
  * Create a shared memory region of at least `bytes` bytes.
- * Returns NULL if allocation fails for some reason.
  *
- * Shared memory regions are mapped in the kernel.
- * AND, when forking, shared memory regions are mapped in child processes.
+ * A "shared memory region" is a piece of memory that is mapped at the same position
+ * in both kernel and userspace. Additionally, while mapped, forked child process will also
+ * inherit this region. Its purpose is to allow for faster communication across memory spaces.
  *
- * Shared memory regions are reference counted. 
+ * If `out` is NULL or `bytes` is 0, FOS_E_BAD_ARGS is returned.
+ * If there is an error with allocation FOS_E_NO_MEM is returned.
+ *
+ * On success, FOS_E_SUCCESS is returned, the start of the region is written to `*out`.
  */
-void *sc_shm_alloc(size_t bytes);
+fernos_error_t sc_shm_alloc(void **out, size_t bytes);
 
 /**
  * If `shm` points to any byte within a shared memory region mapped in this process, 
  * the entire referenced shared memory region is unmapped in the process.
  *
- * If no other process's reference the region, it will be freed.
+ * Said region has its reference count decremented. When the count reaches zero, the kernel
+ * will free the region's underlying pages.
  *
- * NOTE: When a process exits, it frees all of its mapped shared memory regions.
+ * NOTE: When a process exits, it releases all of its mapped shared memory regions.
  */
 void sc_shm_release(void *shm);
 
-// Now semaphor stuff too I gues??
 
