@@ -104,11 +104,6 @@ typedef struct _thread_join_ret_t {
 } thread_join_ret_t;
 
 /**
- * A futex is just a 32-bit integer.
- */
-typedef int32_t futex_t;
-
-/**
  * Exit statuses of a process.
  */
 typedef uint32_t proc_exit_status_t;
@@ -290,6 +285,11 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 /*
  * ***** Futex Plugin *****
  */
+
+/**
+ * A futex is just a 32-bit integer.
+ */
+typedef int32_t futex_t;
 
 #define PLG_FUTEX_ID (0U)
 
