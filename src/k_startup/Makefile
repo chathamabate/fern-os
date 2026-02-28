@@ -13,6 +13,7 @@ _SRCS 		?= kernel.c \
 			   plugin_kb.c \
 			   plugin_pipe.c \
 			   plugin_gfx.c \
+			   plugin_shm.c \
 			   action.c \
 			   tss.c \
 			   gfx.c \

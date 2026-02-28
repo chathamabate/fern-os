@@ -516,22 +516,22 @@ phys_addr_t new_page_table(void) {
     return pt;
 }
 
-void delete_page_table(phys_addr_t pt) {
+void delete_page_table_force(phys_addr_t pt, bool return_shared) {
     if (pt != NULL_PHYS_ADDR) {
-        pt_free_range(pt, 0, 1024); 
+        pt_free_range(pt, return_shared, 0, 1024); 
         push_free_page(pt);
     }
 }
 
+void delete_page_table(phys_addr_t pt) {
+    delete_page_table_force(pt, false);
+}
 
-fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e, uint32_t *true_e) {
+
+fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, bool shared, uint32_t s, uint32_t e, uint32_t *true_e) {
     CHECK_ALIGN(pt, M_4K);
 
-    if (!true_e) {
-        return FOS_E_BAD_ARGS;
-    }
-
-    if (s > 1023 || e > 1024 || e < s) {
+    if (s >= 1024 || e > 1024 || e < s) {
         return FOS_E_INVALID_RANGE;
     }
 
@@ -561,17 +561,21 @@ fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e,
             break;
         }
 
-        *pte = fos_unique_pt_entry(new_page, user, true);
+        *pte = shared 
+            ? fos_shared_pt_entry(new_page, user, true) 
+            : fos_unique_pt_entry(new_page, user, true);
     }
 
     assign_free_page(0, old);
 
-    *true_e = i;
+    if (true_e) {
+        *true_e = i;
+    }
 
     return err;
 }
 
-void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e) {
+void pt_free_range(phys_addr_t pt, bool return_shared, uint32_t s, uint32_t e) {
     if (!IS_ALIGNED(pt, M_4K)) {
         return;
     }
@@ -591,8 +595,12 @@ void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e) {
     for (uint32_t i = s; i < e; i++) {
         pt_entry_t *pte = &(ptes[i]);
 
-        if (pte_get_present(*pte) && pte_get_avail(*pte) == UNIQUE_ENTRY) {
-            phys_addr_t base = pte_get_base(*pte);
+        const bool present = pte_get_present(*pte);
+        const uint8_t type = pte_get_avail(*pte);
+        const phys_addr_t base = pte_get_base(*pte);
+
+        // Always return unique, only return shared when `return_shared` is true.
+        if (present && (type == UNIQUE_ENTRY || (type == SHARED_ENTRY && return_shared))) {
             push_free_page(base);
         }
 
@@ -606,44 +614,27 @@ phys_addr_t new_page_directory(void) {
     return new_page_table();
 }
 
-fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e, const void **true_e) {
-    CHECK_ALIGN(pd, M_4K);
-    CHECK_ALIGN(s, M_4K);
-    CHECK_ALIGN(e, M_4K);
+fernos_error_t pd_alloc_pages_p(phys_addr_t pd, bool user, bool shared, uint32_t pi_s, uint32_t pi_e, uint32_t *true_e) {
+    fernos_error_t err;
 
-    if (!true_e) {
-        return FOS_E_BAD_ARGS;
-    }
-
-    if (s == e) {
-        *true_e = e;
-        return FOS_E_SUCCESS;
-    }
-
-    if ((uint32_t)e < (uint32_t)s) {
-        *true_e = NULL;
+    if (pi_e < pi_s || pi_s >= (1024 * 1024) || pi_e > (1024 * 1024)) {
         return FOS_E_INVALID_RANGE;
     }
 
-    fernos_error_t err = FOS_E_SUCCESS;
-
-    uint32_t pi_s = (uint32_t)s / M_4K;
-    uint32_t pi_e = (uint32_t)e / M_4K;
-    uint32_t pi = pi_s;
-
     phys_addr_t old = assign_free_page(0, pd);
-
     pt_entry_t *pdes = (pt_entry_t *)(free_kernel_pages[0]);
 
-    while (err == FOS_E_SUCCESS && pi < pi_e) {
-        uint32_t nb = ALIGN(pi + 1024, 1024);
-        if (nb > pi_e) {
-            nb = pi_e;
-        }
-        
-        uint32_t pdi = pi / 1024;
-        pt_entry_t *pde = &(pdes[pdi]);
+    uint32_t pi;
+    err = FOS_E_SUCCESS;
 
+    for (pi = pi_s; err == FOS_E_SUCCESS && pi < pi_e;) {
+        const uint32_t pdi = pi / 1024;
+        const uint32_t nb_pi = (pdi + 1) * 1024; // Next "boundary"
+
+        const uint32_t pti_s = pi % 1024;
+        const uint32_t pti_e = nb_pi > pi_e ? pi_e % 1024 : 1024;
+
+        pt_entry_t *pde = pdes + pdi;
         if (!pte_get_present(*pde)) {
             phys_addr_t new_pt = new_page_table();
             if (new_pt == NULL_PHYS_ADDR) {
@@ -656,71 +647,68 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e,
 
         phys_addr_t pt = pte_get_base(*pde);
 
-        uint32_t pti   = pi % 1024;
-
-        // If we make it here, we know pi_s and pi_e span a non-empty range.
-        // It is impossible for nb to be 0. If nb is on a boundary, set pti_e
-        // to 1024!
-        uint32_t pti_e = nb % 1024;
-        if (pti_e == 0) {
-            pti_e = 1024;
-        }
-
         uint32_t true_pti_e;
-        err = pt_alloc_range(pt, user, pti, pti_e, &true_pti_e);
-
-        pi += (true_pti_e - pti);
+        err = pt_alloc_range(pt, user, shared, pti_s, pti_e, &true_pti_e);
+        pi += (true_pti_e - pti_s);
     }
 
     assign_free_page(0, old);
 
-    *true_e = (void *)(pi * M_4K);
+    if (true_e) {
+        *true_e = pi;
+    }
 
     return err;
 }
 
-void pd_free_pages(phys_addr_t pd, void *s, const void *e) {
-    if (!IS_ALIGNED(pd, M_4K) || !IS_ALIGNED(s, M_4K) || !IS_ALIGNED(e, M_4K)) {
+fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, bool shared, void *s, const void *e, const void **true_e) {
+    fernos_error_t err;
+
+    CHECK_ALIGN(pd, M_4K);
+    CHECK_ALIGN(s, M_4K);
+    CHECK_ALIGN(e, M_4K);
+
+    uint32_t pi_true_e;
+    err = pd_alloc_pages_p(pd, user, shared, (uint32_t)s / M_4K, (uint32_t)e / M_4K, &pi_true_e);
+
+    if (true_e) {
+        *true_e = (void *)(pi_true_e * M_4K);
+    }
+
+    return err;
+}
+
+void pd_free_pages_p(phys_addr_t pd, bool return_shared, uint32_t pi_s, uint32_t pi_e) {
+    if (pd == NULL_PHYS_ADDR) {
         return;
     }
 
-    if (s == e) {
-        return;
+    if (pi_e > (1024 * 1024)) { // make pi_e valid.
+        pi_e = (1024 * 1024);
     }
 
-    if (e < s) {
+    if (pi_e <= pi_s) { // invalid or empty range => do nothing.
         return;
     }
-
-    uint32_t pi_s = (uint32_t)s / M_4K;
-    uint32_t pi_e = (uint32_t)e / M_4K;
-    uint32_t pi = pi_s;
 
     phys_addr_t old = assign_free_page(0, pd);
     pt_entry_t *pdes = (pt_entry_t *)(free_kernel_pages[0]);
 
-    while (pi < pi_e) {
-        uint32_t nb = ALIGN(pi + 1024, 1024);
-        if (nb > pi_e) {
-            nb = pi_e;
-        }
+    uint32_t pi, next_pi;
 
-        uint32_t pdi = pi / 1024; 
-        pt_entry_t *pde = &(pdes[pdi]);
+    for (pi = pi_s; pi < pi_e; pi = next_pi) {
+        const uint32_t pdi = pi / 1024;
+        const uint32_t nb_pi = (pdi + 1) * 1024; // Next "boundary"
 
-        // Ok are we working with a present page table?
+        const uint32_t pti_s = pi % 1024;
+        const uint32_t pti_e = nb_pi > pi_e ? pi_e % 1024 : 1024;
+
+        next_pi = pi + (pti_e - pti_s);
+
+        pt_entry_t *pde = pdes + pdi;
         if (pte_get_present(*pde)) {
             phys_addr_t pt = pte_get_base(*pde);
-
-            // Remeber pi < nb always here!
-
-            uint32_t fs = pi % 1024;
-            uint32_t fe = nb % 1024;
-            if (fe == 0) {
-                fe = 1024;
-            }
-
-            pt_free_range(pt, fs, fe);
+            pt_free_range(pt, return_shared, pti_s, pti_e);
 
             /*
              * NOTE: When we all entries in the page table, we know we can push the page table back
@@ -737,41 +725,32 @@ void pd_free_pages(phys_addr_t pd, void *s, const void *e) {
              * TODO: Consider improving.
              */
 
-            // Did we free a whole page table?
-            if (fs == 0 && fe == 1024) {
+            if (pti_s == 0 && pti_e == 1024) {
                 push_free_page(pt);
                 *pde = not_present_pt_entry();
             }
         }
-
-        pi = nb;
     }
 
     assign_free_page(0, old);
 }
 
-void delete_page_directory(phys_addr_t pd) {
-    if (pd == NULL_PHYS_ADDR) {
+void pd_free_pages(phys_addr_t pd, bool return_shared, void *s, const void *e) {
+    if (!IS_ALIGNED(pd, M_4K) || !IS_ALIGNED(s, M_4K) || !IS_ALIGNED(e, M_4K)) {
         return;
     }
 
-    phys_addr_t old = assign_free_page(0, pd);
-    pt_entry_t *pdes = (pt_entry_t *)(free_kernel_pages[0]);
+    pd_free_pages_p(pd, return_shared, (uint32_t)s / M_4K, (uint32_t)e / M_4K);
+}
 
-    for (uint32_t pdi = 0; pdi < 1024; pdi++) {
-        pt_entry_t pde = pdes[pdi]; 
-
-        // Is there a page table in this slot?
-        if (pte_get_present(pde)) {
-            phys_addr_t pt = pte_get_base(pde);
-
-            // Remember, page tables are NEVER shared.
-            delete_page_table(pt);
-        }
+void delete_page_directory_force(phys_addr_t pd, bool return_shared) {
+    if (pd != NULL_PHYS_ADDR) {
+        pd_free_pages_p(pd, return_shared, 0, (1024 * 1024));
+        push_free_page(pd);
     }
+}
 
-    assign_free_page(0, old);
-
-    push_free_page(pd);
+void delete_page_directory(phys_addr_t pd) {
+    delete_page_directory_force(pd, false);
 }
 

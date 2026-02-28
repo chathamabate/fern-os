@@ -104,11 +104,6 @@ typedef struct _thread_join_ret_t {
 } thread_join_ret_t;
 
 /**
- * A futex is just a 32-bit integer.
- */
-typedef int32_t futex_t;
-
-/**
  * Exit statuses of a process.
  */
 typedef uint32_t proc_exit_status_t;
@@ -291,6 +286,11 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
  * ***** Futex Plugin *****
  */
 
+/**
+ * A futex is just a 32-bit integer.
+ */
+typedef int32_t futex_t;
+
 #define PLG_FUTEX_ID (0U)
 
 #define PLG_FUT_PCID_REGISTER   (0x0U)
@@ -371,7 +371,7 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 #define PLG_GRAPHICS_ID (4U)
 
 /*
- * Keyboard plugin KERNEL commands.
+ * Graphics plugin KERNEL commands.
  */
 
 #define PLG_GFX_KCID_KEY_EVENT     (0U)
@@ -382,4 +382,21 @@ static inline void plugin_scid_extract(uint32_t plg_scid, plugin_id_t *plg_id, p
 
 #define PLG_GFX_PCID_NEW_DUMMY (0U)
 #define PLG_GFX_PCID_NEW_TERM  (1U)
+
+/*
+ * ***** Shared Memory Plugin *****
+ */
+
+#define PLG_SHARED_MEM_ID (5U)
+
+/*
+ * Shared mem plugin KERNEL commands.
+ */
+
+/*
+ * Shared mem plugin commands.
+ */
+
+#define PLG_SHM_PCID_ALLOC   (0U)
+#define PLG_SHM_PCID_RELEASE (1U)
 

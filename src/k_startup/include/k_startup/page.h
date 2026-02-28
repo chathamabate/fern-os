@@ -67,11 +67,6 @@ extern uint8_t _static_area_end[];
 #define UNIQUE_ENTRY   (1)
 #define SHARED_ENTRY   (2)
 
-/**
- * Later we may want to introduce a concept of shared memory, not now tho!
- * (This is one page which is referenced by multiple page tables)
- */
-
 static inline pt_entry_t fos_present_pt_entry(phys_addr_t base, bool user, bool writeable) {
     pt_entry_t pte = not_present_pt_entry();
 
@@ -181,11 +176,28 @@ phys_addr_t new_page_table(void);
  * Delete a page table.
  *
  * This returns all UNIQUE pages pointed to by the table to the free list.
+ *
+ * Only returns SHARED pages if `return_shared` is true.
+ */
+void delete_page_table_force(phys_addr_t pt, bool return_shared);
+
+/**
+ * Delete a page table.
+ *
+ * This returns all UNIQUE pages pointed to by the table to the free list.
+ *
+ * THIS DOES NOT RETURN SHARED PAGES!
+ *
+ * If you know a shared range exists in `pt` and you want it returned, make sure to 
+ * free said range before this call!
  */
 void delete_page_table(phys_addr_t pt);
 
 /**
  * Allocate a range within a page table.
+ *
+ * NOTE: if shared is `true` all entries added will be "shared" entries.
+ * When `pd` is deleted, such entries will NOT be deleted! (Extra management is required!)
  *
  * Returns FOS_E_ALREADY_ALLOCATED if we hit an entry which is already allocated.
  * Returns FOS_E_NO_MEM if we run out of physical pages.
@@ -193,15 +205,22 @@ void delete_page_table(phys_addr_t pt);
  * e is the exlusive end of the range. (0 <= s < 1024), (0 <= e <= 1024)
  * The final index reached during allocation is always written to *true_e.
  * On success, *true_e will always equal e.
+ *
+ * `true_e` is optional.
  */
-fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e, uint32_t *true_e);
+fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, bool shared, uint32_t s, uint32_t e, uint32_t *true_e);
 
 /**
  * Free a range within a page table.
- * Pages marked UNIQUE are returned to the free list.
+ * Pages marked UNIQUE are ALWAYS returned to the free list.
+ *
+ * If `return_shared` is `true`, pages marked `SHARED` are also returned to the free list.
+ * This should only be done when the user can gauranteed these underlying pages aren't mapped
+ * in any other page tables!
+ *
  * s and e follow the same rules as described in pt_alloc_range.
  */
-void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e);
+void pt_free_range(phys_addr_t pt, bool return_shared, uint32_t s, uint32_t e);
 
 /**
  * Create a new page directory. Returns NULL_PHYS_ADDR on error.
@@ -211,47 +230,72 @@ void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e);
 phys_addr_t new_page_directory(void);
 
 /**
- * Add pages (and page table if necessary) to a page directory.
+ * Add pages (and page tables if necessary) to a page directory.
  * The pages will always be marked as writeable. 
  *
- * FOS_E_ALIGN_ERROR if `pd`, `s`, or `e` aren't 4K aligned.
- * FOS_E_BAD_ARGS if `true_e` is NULL.
- * FOS_E_INVALID_RANGE if `e` < `s`.
+ * FOS_E_INVALID_RANGE if [pi_s, pi_e) is invalid.
+ *
+ * NOTE: if shared is `true` all entries added will be "shared" entries.
+ * When `pd` is deleted, such entries will NOT be deleted! (Extra management is required!)
  *
  * Otherwise, pages are attempted to be allocated.
  * If all pages are allocated, FOS_E_SUCCESS is returned.
  * If we run out of memory, FOS_E_NO_MEM is returned.
- * If we run into an already page, FOS_E_ALREADY_ALLOCATED is returned.
+ * If we run into an already allocated page, FOS_E_ALREADY_ALLOCATED is returned.
  * In these three cases, the true end of the allocated section is written to `*true_e`.
+ * `true_e` is optional.
  */
-fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e, const void **true_e);
-
-/*
- * NOTE neither pd_free_pages nor delete_page_directory clean up shared pages.
- *
- * If you want your kernel to support pages shared between spaces you must write your own deletion
- * logic before calling these functions.
- */
+fernos_error_t pd_alloc_pages_p(phys_addr_t pd, bool user, bool shared, uint32_t pi_s, uint32_t pi_e, uint32_t *true_e);
 
 /**
- * Remove all removeable pages from s to e in the given page directory.
+ * Add pages (and page table if necessary) to a page directory.
+ * The pages will always be marked as writeable. 
  *
- * NOTE: Given addresses must ALWAYS be 4K aligned (This is the case for all functions in the 
- * header file, but still)
+ * FOS_E_ALIGN_ERROR if `pd`, `s`, or `e` aren't 4K aligned.
+ * FOS_E_INVALID_RANGE if [s, e) is an invalid range.
+ *
+ * This is a wrapper around `pd_alloc_pages_p`.
  */
-void pd_free_pages(phys_addr_t pd, void *s, const void *e);
+fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, bool shared, void *s, const void *e, const void **true_e);
+
+/**
+ * Remove all pages from s to e in the given page directory.
+ *
+ * (Shared pages are returned if and only if `return_shared` is `true`)
+ *
+ * NOTE: `pi_e` will be rounded down to become valid!
+ * (i.e. if pi_e == (1024 * 1024) + 100, it'll be rounded down to (1024 * 1024))
+ * If pi_s >= (1024 * 1024), this does nothing!
+ */
+void pd_free_pages_p(phys_addr_t pd, bool return_shared, uint32_t pi_s, uint32_t pi_e);
+
+/**
+ * Remove all ble pages from s to e in the given page directory.
+ *
+ * Wrapper around `pd_free_pages_p`.
+ */
+void pd_free_pages(phys_addr_t pd, bool return_shared, void *s, const void *e);
+
+/**
+ * Return *all* pages under `pd` to the free list.
+ *
+ * Shared pages are only returned if `return_shared` is true.
+ */
+void delete_page_directory_force(phys_addr_t pd, bool return_shared);
 
 /**
  * Take the physical address of a page directory and clean up all of it's pages, page tables, and
  * finally, the page directory itself!
+ *
+ * THIS DOES NOT RETURN SHARED PAGES!
  */
 void delete_page_directory(phys_addr_t pd);
 
 static inline fernos_error_t alloc_pages(void *s, const void *e, const void **true_e) {
-    return pd_alloc_pages(get_kernel_pd(), false, s, e, true_e); 
+    return pd_alloc_pages(get_kernel_pd(), false, false, s, e, true_e); 
 }
 
 static inline void free_pages(void *s, const void *e) {
-    pd_free_pages(get_kernel_pd(), s, e);
+    pd_free_pages(get_kernel_pd(), false, s, e);
 }
 

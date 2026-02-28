@@ -163,6 +163,10 @@ static chm_node_header_t *chm_get_node(chained_hash_map_t *chm, const void *key)
 static fernos_error_t chm_get_kvp(map_t *mp, const void *key, const void **key_out, void **val_out) {
     chained_hash_map_t *chm = (chained_hash_map_t *)mp;
 
+    if (val_out && chm->super.val_size == 0) {
+        return FOS_E_BAD_ARGS;
+    }
+
     chm_node_header_t *node = chm_get_node(chm, key);
 
     if (!node) {
@@ -183,15 +187,22 @@ static fernos_error_t chm_get_kvp(map_t *mp, const void *key, const void **key_o
 static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {
     chained_hash_map_t *chm = (chained_hash_map_t *)mp;
 
+    if (chm->super.val_size == 0 && value) {
+        return FOS_E_BAD_ARGS; // map is a set, and thus cannot have values placed!
+    }
+
     chm_node_header_t *node = chm_get_node(chm, key);
 
     if (node) {
         // Easy overwrite!
 
-        const void *key_ptr = node + 1;
-        uint8_t *val_ptr = (uint8_t *)key_ptr + chm->super.key_size;
-        
-        mem_cpy(val_ptr, value, chm->super.val_size);
+        if (value) {
+            const void *key_ptr = node + 1;
+            uint8_t *val_ptr = (uint8_t *)key_ptr + chm->super.key_size;
+            
+            // Even if value size is 0, this shouldn't cause any problems!
+            mem_cpy(val_ptr, value, chm->super.val_size);
+        }
 
         return FOS_E_SUCCESS;
     }
@@ -213,7 +224,10 @@ static fernos_error_t chm_put(map_t *mp, const void *key, const void *value) {
 
     new_node->hash = hash;
     mem_cpy((void *)new_key_ptr, key, chm->super.key_size);
-    mem_cpy(new_val_ptr, value, chm->super.val_size);
+
+    if (value) { // Value can be NULL!
+        mem_cpy(new_val_ptr, value, chm->super.val_size);
+    }
 
     uint32_t index = hash % chm->cap;
 
@@ -309,6 +323,10 @@ static void chm_reset_iter(map_t *mp) {
 static fernos_error_t chm_get_iter(map_t *mp, const void **key, void **value) {
     chained_hash_map_t *chm = (chained_hash_map_t *)mp;
 
+    if (chm->super.val_size == 0 && value) {
+        return FOS_E_BAD_ARGS;
+    }
+
     fernos_error_t err = FOS_E_EMPTY;
 
     const void *key_ptr = NULL;
@@ -334,6 +352,10 @@ static fernos_error_t chm_get_iter(map_t *mp, const void **key, void **value) {
 
 static fernos_error_t chm_next_iter(map_t *mp, const void **key, void **value) {
     chained_hash_map_t *chm = (chained_hash_map_t *)mp;
+
+    if (chm->super.val_size == 0 && value) {
+        return FOS_E_BAD_ARGS;
+    }
 
     // Advance iter, than just call normal get.
 

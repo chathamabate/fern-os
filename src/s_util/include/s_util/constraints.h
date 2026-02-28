@@ -73,6 +73,13 @@
 #define FOS_FREE_AREA_SIZE  (FOS_FREE_AREA_END - FOS_FREE_AREA_START)
 
 /**
+ * Where the shared memory pages will be mapped.
+ */
+#define FOS_SHARED_AREA_START (FERNOS_SHARED_START)
+#define FOS_SHARED_AREA_END   (FERNOS_SHARED_END + 1)
+#define FOS_SHARED_AREA_SIZE  (FOS_SHARED_AREA_END - FOS_SHARED_AREA_START)
+
+/**
  * Where the stacks will live.
  */
 #define FOS_STACK_AREA_START (FERNOS_STACK_START)

@@ -38,6 +38,8 @@ struct _map_t {
 
     /**
      * Size of a single value.
+     *
+     * CAN BE 0
      */
     const size_t val_size;
 };
@@ -71,6 +73,8 @@ static inline void delete_map(map_t *mp) {
  * to the key's cell in the map is written to `*key_out`. If `val_out` is given, a pointer to
  * the value's cell is written to `*val_out`.
  *
+ * If `mp`'s `value_size` is 0 and `val_out` is non-NULL, FOS_E_BAD_ARGS is returned.
+ *
  * If the given key is not mapped. FOS_E_EMPTY is returned.
  */
 static inline fernos_error_t mp_get_kvp(map_t *mp, const void *key, const void **key_out, void **val_out) {
@@ -80,12 +84,17 @@ static inline fernos_error_t mp_get_kvp(map_t *mp, const void *key, const void *
 /**
  * Get a pointer to a key's corresponding value.
  *
+ * Returns NULL if `mp`'s value size is 0.
  * Returns NULL if the given key is not present in the map, or if key is NULL.
  *
  * (This used to be a function the implementor would need write, however, this has been replaced
  * with the more powerful endpoint above)
  */
 static inline void *mp_get(map_t *mp, const void *key) {
+    if (mp->val_size == 0) {
+        return NULL;
+    }
+
     void *val;
     fernos_error_t err = mp_get_kvp(mp, key, NULL, &val);
     return err == FOS_E_SUCCESS ? val : NULL;
@@ -95,6 +104,12 @@ static inline void *mp_get(map_t *mp, const void *key) {
  * Place a key value pair in the map. (value can be NULL)
  *
  * If the key is already present, this should overwrite the original value!
+ * If the key is already present, and `value` is NULL, this should NOT overwrite the original
+ * value in anyway!
+ *
+ * If `value` is NULL, the mapped value will be exist uninitialized. (If value size > 0)
+ *
+ * If this map's value size is 0, and `value` is non-null, FOS_E_BAD_ARGS is returned.
  *
  * Returns an error if key is NULL, or if there are insufficient resources.
  */
@@ -154,6 +169,7 @@ static inline void mp_reset_iter(map_t *mp) {
  * The address of the value is written to *value.
  * (Either/both pointers are allowed to be NULL)
  *
+ * Returns FOS_E_BAD_ARGS if `mp->value_size == 0` and `value != NULL`
  * Returns FOS_E_EMPTY if we've reached the end of iteration.
  */
 static inline fernos_error_t mp_get_iter(map_t *mp, const void **key, void **value) {
