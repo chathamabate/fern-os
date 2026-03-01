@@ -48,8 +48,15 @@ struct _plugin_shm_t {
     binary_search_tree_t * const range_tree;
 
     /**
+     * This table maps each `pid` to a `map<void *, NULL>`.
+     * Essentially, each map is really just a set holding the starting position of every range
+     * mapped in the corresponding process. This is needed so that when a process exits
+     * or resets, we know what ranges to dereference!
+     *
+     * This will also be lazy initialized. `range_maps[pid]` is NULL until 
+     * a process first requests shared memory. (Or is forked from a process with shared memory)
      */
-    map_t *range_maps[FOS_MAX_PROCS];
+    map_t *range_sets[FOS_MAX_PROCS];
 };
 
 plugin_t *new_plugin_shm(kernel_state_t *ks);

@@ -524,7 +524,7 @@ void delete_page_table(phys_addr_t pt) {
 }
 
 
-fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e, uint32_t *true_e) {
+fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, bool shared, uint32_t s, uint32_t e, uint32_t *true_e) {
     CHECK_ALIGN(pt, M_4K);
 
     if (!true_e) {
@@ -561,7 +561,9 @@ fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, uint32_t s, uint32_t e,
             break;
         }
 
-        *pte = fos_unique_pt_entry(new_page, user, true);
+        *pte = shared 
+            ? fos_shared_pt_entry(new_page, user, true) 
+            : fos_unique_pt_entry(new_page, user, true);
     }
 
     assign_free_page(0, old);
@@ -606,7 +608,7 @@ phys_addr_t new_page_directory(void) {
     return new_page_table();
 }
 
-fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e, const void **true_e) {
+fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, bool shared, void *s, const void *e, const void **true_e) {
     CHECK_ALIGN(pd, M_4K);
     CHECK_ALIGN(s, M_4K);
     CHECK_ALIGN(e, M_4K);
@@ -667,7 +669,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, void *s, const void *e,
         }
 
         uint32_t true_pti_e;
-        err = pt_alloc_range(pt, user, pti, pti_e, &true_pti_e);
+        err = pt_alloc_range(pt, user, shared, pti, pti_e, &true_pti_e);
 
         pi += (true_pti_e - pti);
     }

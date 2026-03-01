@@ -353,7 +353,7 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
         }
 
         const void *true_e;
-        err = pd_alloc_pages(new_pd, true, (void *)FOS_APP_ARGS_AREA_START, 
+        err = pd_alloc_pages(new_pd, true, false, (void *)FOS_APP_ARGS_AREA_START, 
                 (void *)(FOS_APP_ARGS_AREA_START + abs_ab_alloc_size), &true_e);
 
 
@@ -388,7 +388,7 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
         }
         
         const void *true_e;
-        err = pd_alloc_pages(new_pd, true, uaa->load_position, 
+        err = pd_alloc_pages(new_pd, true, false, uaa->load_position, 
                 (uint8_t *)(uaa->load_position) + area_size, &true_e);
 
         if (err == FOS_E_SUCCESS && uaa->given_size > 0) {

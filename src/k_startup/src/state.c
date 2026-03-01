@@ -89,7 +89,7 @@ fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base) {
     }
 
     const void *true_e;
-    err = pd_alloc_pages(thr->proc->pd, true, new_base, thr->stack_base, &true_e);
+    err = pd_alloc_pages(thr->proc->pd, true, false, new_base, thr->stack_base, &true_e);
 
     if (err != FOS_E_SUCCESS && err != FOS_E_ALREADY_ALLOCATED) {
         return err;
@@ -826,7 +826,7 @@ KS_SYSCALL fernos_error_t ks_request_mem(kernel_state_t *ks, void *s, const void
     // All other errors should be handled in `pd_alloc_pages`.
 
     const void *true_e = NULL;
-    err = pd_alloc_pages(pd, true, s, e, &true_e);
+    err = pd_alloc_pages(pd, true, false, s, e, &true_e);
 
     // Sadly we are not going to error check here, but this should really always succeed
     // unless the user gives a bad address, in which case it doesn't matter anyway.

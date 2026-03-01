@@ -28,6 +28,8 @@ static bool posttest(void);
  * NOTE: These tests assume that virtual addresses after _static_area_end are available.
  * 
  * Basically, we are testing just basic paging setup operations.
+ *
+ * This also switches the page directory!
  */
 
 /**
@@ -104,7 +106,7 @@ static void randomize_page(phys_addr_t p, uint32_t seed) {
  */
 static bool pt_randomize_alloc(phys_addr_t pt, bool user, uint32_t s, uint32_t e) {
     uint32_t true_e;
-    TEST_EQUAL_HEX(FOS_E_SUCCESS, pt_alloc_range(pt, user, s, e, &true_e));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, pt_alloc_range(pt, user, false, s, e, &true_e));
 
     phys_addr_t old0 = assign_free_page(0, pt);
     
@@ -344,7 +346,7 @@ static bool test_mem_cpy_user(void) {
 
     phys_addr_t kpd = get_page_directory();
     TEST_EQUAL_HEX(FOS_E_SUCCESS, 
-            pd_alloc_pages(kpd, true, MEM_TEST_AREA_START, MEM_TEST_AREA_END, &true_e));
+            pd_alloc_pages(kpd, true, false, MEM_TEST_AREA_START, MEM_TEST_AREA_END, &true_e));
 
     phys_addr_t upd = copy_page_directory(kpd);
     TEST_TRUE(upd != NULL_PHYS_ADDR);
@@ -465,7 +467,7 @@ static bool test_bad_mem_cpy(void) {
 
     phys_addr_t kpd = get_page_directory();
     TEST_EQUAL_HEX(FOS_E_SUCCESS, 
-            pd_alloc_pages(kpd, true, MEM_TEST_AREA_START, MEM_TEST_AREA_END, &true_e));
+            pd_alloc_pages(kpd, true, false, MEM_TEST_AREA_START, MEM_TEST_AREA_END, &true_e));
 
     phys_addr_t upd = copy_page_directory(kpd);
     TEST_TRUE(upd != NULL_PHYS_ADDR);
@@ -569,7 +571,7 @@ static bool test_mem_set_user(void) {
     phys_addr_t upd = copy_page_directory(kpd);
     TEST_TRUE(upd != NULL_PHYS_ADDR);
 
-    TEST_SUCCESS(pd_alloc_pages(upd, true, (void *)MEM_TEST_AREA_START, (const void *)MEM_TEST_AREA_END,
+    TEST_SUCCESS(pd_alloc_pages(upd, true, false, (void *)MEM_TEST_AREA_START, (const void *)MEM_TEST_AREA_END,
                 &true_e));
 
 
@@ -643,7 +645,7 @@ static bool test_bad_mem_set(void) {
     TEST_TRUE(upd != NULL_PHYS_ADDR);
 
     const void *true_e;
-    TEST_SUCCESS(pd_alloc_pages(upd, true, (void *)MEM_TEST_AREA_START, (const void *)MEM_TEST_AREA_END,
+    TEST_SUCCESS(pd_alloc_pages(upd, true, false, (void *)MEM_TEST_AREA_START, (const void *)MEM_TEST_AREA_END,
                 &true_e));
 
     for (size_t i = 0; i < NUM_CASES; i++) {
