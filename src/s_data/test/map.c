@@ -219,6 +219,39 @@ static bool test_map_simple_iter(void) {
     TEST_SUCCEED();
 }
 
+static bool test_map_put_null(void) {
+    map_t *mp = gen_map(sizeof(uint32_t), sizeof(uint64_t));
+    TEST_TRUE(mp != NULL);
+
+    // Maps should be able to handle being given NULL as the value pointer.
+
+    const uint32_t k = 10;
+    TEST_SUCCESS(mp_put(mp, &k, NULL));
+
+    const uint32_t *kp;
+    uint64_t *vp;
+    TEST_SUCCESS(mp_get_kvp(mp, &k, (const void **)&kp, (void **)&vp));
+
+    TEST_EQUAL_UINT(k, *kp);
+
+    TEST_TRUE(vp != NULL);
+    *vp = 13; // Writing to the value pointer should work!
+    vp = NULL; // we are going to modify the map, we will assume the kvp's address changes.
+
+    // Now let's overwrite twice, once with a real value, and then again with NULL!
+    const uint32_t t = 12;
+    uint64_t val = 100;
+    TEST_SUCCESS(mp_put(mp, &t, &val));
+    TEST_SUCCESS(mp_put(mp, &t, NULL));
+
+    TEST_SUCCESS(mp_get_kvp(mp, &t, NULL, (void **)&vp));
+    TEST_EQUAL_UINT(val, *vp);
+
+    delete_map(mp);
+
+    TEST_SUCCEED();
+}
+
 static bool test_map_complex0(void) {
     // Keys will be strings with 4 significant characters.
     map_t *mp = gen_map(sizeof(char) * 5, sizeof(uint64_t));
@@ -350,6 +383,47 @@ static bool test_map_complex1(void) {
     TEST_SUCCEED();
 }
 
+static bool test_set(void) {
+    // A map with value size 0 is essentially a set.
+    // It should still work fine, with certain functions returns special errors.
+    
+    fernos_error_t err;
+
+    map_t *mp = gen_map(sizeof(uint32_t), 0);
+    TEST_TRUE(mp != NULL);
+
+    uint32_t i;
+
+    i = 0;
+    TEST_EQUAL_HEX(FOS_E_BAD_ARGS, mp_put(mp, &i, &i));
+
+    for (i = 0; i < 10; i++) {
+        TEST_SUCCESS(mp_put(mp, &i, NULL));
+    }
+
+    mp_reset_iter(mp);
+    TEST_EQUAL_HEX(FOS_E_BAD_ARGS, mp_get_iter(mp, NULL, (void **)&i));
+    TEST_EQUAL_HEX(FOS_E_BAD_ARGS, mp_next_iter(mp, NULL, (void **)&i));
+
+    mp_reset_iter(mp);
+    uint32_t found = 0;
+    const uint32_t *k;
+    for (err = mp_get_iter(mp, (const void **)&k, NULL); err == FOS_E_SUCCESS;
+            err = mp_next_iter(mp, (const void **)&k, NULL)) {
+        uint32_t key = *k;
+        TEST_TRUE(key < 10);
+        TEST_TRUE((found & (1U << key)) == 0);
+        found |= (1U << key);
+    }
+
+    TEST_EQUAL_HEX(FOS_E_EMPTY, err);
+    TEST_EQUAL_UINT(10, mp_len(mp));
+
+    delete_map(mp);
+
+    TEST_SUCCEED();
+}
+
 bool test_map(const char *name, map_t *(*gen)(size_t ks, size_t vs)) {
     gen_map = gen;
 
@@ -359,8 +433,10 @@ bool test_map(const char *name, map_t *(*gen)(size_t ks, size_t vs)) {
     RUN_TEST(test_map_simple_remove);
     RUN_TEST(test_map_clear);
     RUN_TEST(test_map_simple_iter);
+    RUN_TEST(test_map_put_null);
     RUN_TEST(test_map_complex0);
     RUN_TEST(test_map_complex1);
+    RUN_TEST(test_set);
     return END_SUITE();
 }
 

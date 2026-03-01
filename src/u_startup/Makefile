@@ -11,6 +11,7 @@ _SRCS 		?= main.c \
 			   syscall_pipe.c \
 			   syscall_kb.c \
 			   syscall_gfx.c \
+			   syscall_shm.c \
 			   syscall_term.c
 
 # REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
@@ -24,7 +25,6 @@ _TEST_SRCS 	?= syscall.c \
 			   syscall_default_io.c \
 			   syscall_kb.c \
 			   syscall_pipe.c \
-			   syscall_shm.c \
 			   syscall_term.c
 
 # TODO: Add back testing for terminal/cd.
