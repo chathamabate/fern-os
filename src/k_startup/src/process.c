@@ -85,7 +85,7 @@ fernos_error_t new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid, 
             const void *e = (const void *)FOS_THREAD_STACK_END(tid);
 
             // Free all stacks which aren't being used in the new process.
-            pd_free_pages(new_pd, s, e);
+            pd_free_pages(new_pd, false, s, e);
         }
     }
 
@@ -332,7 +332,7 @@ void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack) {
         const void *tstack_end = (void *)FOS_THREAD_STACK_END(tid);
 
         // Free the whole stack.
-        pd_free_pages(proc->pd, tstack_start, tstack_end);
+        pd_free_pages(proc->pd, false, tstack_start, tstack_end);
     }
 
     // detaches.

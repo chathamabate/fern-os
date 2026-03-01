@@ -518,7 +518,7 @@ phys_addr_t new_page_table(void) {
 
 void delete_page_table(phys_addr_t pt) {
     if (pt != NULL_PHYS_ADDR) {
-        pt_free_range(pt, 0, 1024); 
+        pt_free_range(pt, false, 0, 1024); 
         push_free_page(pt);
     }
 }
@@ -573,7 +573,7 @@ fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, bool shared, uint32_t s
     return err;
 }
 
-void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e) {
+void pt_free_range(phys_addr_t pt, bool return_shared, uint32_t s, uint32_t e) {
     if (!IS_ALIGNED(pt, M_4K)) {
         return;
     }
@@ -593,8 +593,12 @@ void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e) {
     for (uint32_t i = s; i < e; i++) {
         pt_entry_t *pte = &(ptes[i]);
 
-        if (pte_get_present(*pte) && pte_get_avail(*pte) == UNIQUE_ENTRY) {
-            phys_addr_t base = pte_get_base(*pte);
+        const bool present = pte_get_present(*pte);
+        const uint8_t type = pte_get_avail(*pte);
+        const phys_addr_t base = pte_get_base(*pte);
+
+        // Always return unique, only return shared when `return_shared` is true.
+        if (present && (type == UNIQUE_ENTRY || (type == SHARED_ENTRY && return_shared))) {
             push_free_page(base);
         }
 
@@ -681,7 +685,7 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, bool shared, void *s, c
     return err;
 }
 
-void pd_free_pages(phys_addr_t pd, void *s, const void *e) {
+void pd_free_pages(phys_addr_t pd, bool return_shared, void *s, const void *e) {
     if (!IS_ALIGNED(pd, M_4K) || !IS_ALIGNED(s, M_4K) || !IS_ALIGNED(e, M_4K)) {
         return;
     }
@@ -722,7 +726,7 @@ void pd_free_pages(phys_addr_t pd, void *s, const void *e) {
                 fe = 1024;
             }
 
-            pt_free_range(pt, fs, fe);
+            pt_free_range(pt, return_shared, fs, fe);
 
             /*
              * NOTE: When we all entries in the page table, we know we can push the page table back

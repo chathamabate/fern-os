@@ -450,7 +450,7 @@ static bool test_mem_cpy_user(void) {
         }
     }
 
-    pd_free_pages(kpd, MEM_TEST_AREA_START, MEM_TEST_AREA_END);
+    pd_free_pages(kpd, false, MEM_TEST_AREA_START, MEM_TEST_AREA_END);
     delete_page_directory(upd);
 
     TEST_SUCCEED();
@@ -509,7 +509,7 @@ static bool test_bad_mem_cpy(void) {
     }
 
     delete_page_directory(upd);
-    pd_free_pages(kpd, MEM_TEST_AREA_START, MEM_TEST_AREA_END);
+    pd_free_pages(kpd, false, MEM_TEST_AREA_START, MEM_TEST_AREA_END);
 
     TEST_SUCCEED();
 }

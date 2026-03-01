@@ -185,7 +185,7 @@ static bool test_pt_alloc(void) {
     TEST_EQUAL_UINT(100, true_e);
     check_pt_range(vpt, 0, 100, true, true);
 
-    pt_free_range(pt, 10, 20);
+    pt_free_range(pt, false, 10, 20);
     check_pt_range(vpt, 0, 10, true, true);
     check_pt_range(vpt, 10, 20, false, false);
     check_pt_range(vpt, 20, 100, true, true);
@@ -260,7 +260,7 @@ static bool test_pd_alloc(void) {
 
         init_pages = get_num_free_pages();
         // Finally, free the range!
-        pd_free_pages(pd, c.s, c.e);
+        pd_free_pages(pd, false, c.s, c.e);
 
         // We know at least num_range_pages were added back to the free list.
         TEST_TRUE(get_num_free_pages() >= init_pages + num_range_pages);
@@ -280,7 +280,7 @@ static bool test_pd_overlapping_alloc(void) {
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_HEX(S + (8*M_4K), true_e);
 
-    pd_free_pages(pd, S, S + (6*M_4K));
+    pd_free_pages(pd, false, S, S + (6*M_4K));
 
     err = pd_alloc_pages(pd, false, false, S, S + (3*M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
@@ -295,7 +295,7 @@ static bool test_pd_overlapping_alloc(void) {
     TEST_EQUAL_HEX(FOS_E_ALREADY_ALLOCATED, err);
     TEST_EQUAL_HEX(S + (3*M_4K), true_e);
 
-    pd_free_pages(pd, S, S + (8*M_4K));
+    pd_free_pages(pd, false, S, S + (8*M_4K));
 
     TEST_SUCCEED();
 }
@@ -316,7 +316,7 @@ static bool test_pd_free(void) {
 
     num_fps = get_num_free_pages();
 
-    pd_free_pages(pd, S, S + (5 * M_4K));
+    pd_free_pages(pd, false, S, S + (5 * M_4K));
     TEST_TRUE(get_num_free_pages() >= num_fps + 5);
 
     /* Test a larger and weirder range */
@@ -326,7 +326,7 @@ static bool test_pd_free(void) {
 
     num_fps = get_num_free_pages();
 
-    pd_free_pages(pd, S + (7 * M_4K), S + (3012 * M_4K));
+    pd_free_pages(pd, false, S + (7 * M_4K), S + (3012 * M_4K));
     TEST_TRUE(get_num_free_pages() >= num_fps + (3012 - 7));
 
     TEST_SUCCEED();
@@ -351,7 +351,7 @@ static bool test_pd_free_dangerous(void) {
     *(uint32_t *)S = 1234;
     LOGF_PREFIXED("We have written to S\n");
 
-    pd_free_pages(pd, S, S + (2 * M_4K));
+    pd_free_pages(pd, false, S, S + (2 * M_4K));
     *(uint32_t *)S = 1234;
     LOGF_PREFIXED("We have written again to S\n");
 

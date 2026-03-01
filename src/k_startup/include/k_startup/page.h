@@ -176,6 +176,11 @@ phys_addr_t new_page_table(void);
  * Delete a page table.
  *
  * This returns all UNIQUE pages pointed to by the table to the free list.
+ *
+ * THIS DOES NOT RETURN SHARED PAGES!
+ *
+ * If you know a shared range exists in `pt` and you want it returned, make sure to 
+ * free said range before this call!
  */
 void delete_page_table(phys_addr_t pt);
 
@@ -196,10 +201,15 @@ fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, bool shared, uint32_t s
 
 /**
  * Free a range within a page table.
- * Pages marked UNIQUE are returned to the free list.
+ * Pages marked UNIQUE are ALWAYS returned to the free list.
+ *
+ * If `return_shared` is `true`, pages marked `SHARED` are also returned to the free list.
+ * This should only be done when the user can gauranteed these underlying pages aren't mapped
+ * in any other page tables!
+ *
  * s and e follow the same rules as described in pt_alloc_range.
  */
-void pt_free_range(phys_addr_t pt, uint32_t s, uint32_t e);
+void pt_free_range(phys_addr_t pt, bool return_shared, uint32_t s, uint32_t e);
 
 /**
  * Create a new page directory. Returns NULL_PHYS_ADDR on error.
@@ -237,14 +247,18 @@ fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, bool shared, void *s, c
 /**
  * Remove all removeable pages from s to e in the given page directory.
  *
+ * (Shared pages are returned if and only if `return_shared` is `true`)
+ *
  * NOTE: Given addresses must ALWAYS be 4K aligned (This is the case for all functions in the 
  * header file, but still)
  */
-void pd_free_pages(phys_addr_t pd, void *s, const void *e);
+void pd_free_pages(phys_addr_t pd, bool return_shared, void *s, const void *e);
 
 /**
  * Take the physical address of a page directory and clean up all of it's pages, page tables, and
  * finally, the page directory itself!
+ *
+ * THIS DOES NOT RETURN SHARED PAGES!
  */
 void delete_page_directory(phys_addr_t pd);
 
@@ -253,6 +267,6 @@ static inline fernos_error_t alloc_pages(void *s, const void *e, const void **tr
 }
 
 static inline void free_pages(void *s, const void *e) {
-    pd_free_pages(get_kernel_pd(), s, e);
+    pd_free_pages(get_kernel_pd(), false, s, e);
 }
 

@@ -852,7 +852,7 @@ KS_SYSCALL fernos_error_t ks_return_mem(kernel_state_t *ks, void *s, const void 
     }
 
     // All other error cases are checked inside `pd_free_pages`.
-    pd_free_pages(pd, s, e);
+    pd_free_pages(pd, false, s, e);
 
     return FOS_E_SUCCESS;
 }
