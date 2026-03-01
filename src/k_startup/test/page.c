@@ -147,14 +147,16 @@ static bool test_new_pt(void) {
  *
  * present - The range must contain all present and allocated entries.
  * user - if present, the range must contain all user entries.
+ * range_type - if present, this is checked against the available bits. (i.e. UNIQUE, SHARED, or IDENTITY)
  */
-static bool check_pt_range(pt_entry_t *pt, uint32_t s, uint32_t e, bool present, bool user) {
+static bool check_pt_range(pt_entry_t *pt, uint32_t s, uint32_t e, bool present, bool user, uint8_t range_type) {
     for (uint32_t i = s; i < e; i++) {
         pt_entry_t pte = pt[i];
         
         if (present) {
             TEST_EQUAL_UINT(1, pte_get_present(pte));
             TEST_EQUAL_UINT(user ? 1 : 0, pte_get_user(pte));
+            TEST_EQUAL_UINT(range_type, pte_get_avail(pte));
             TEST_TRUE(NULL_PHYS_ADDR != pte_get_base(pte));
         } else {
             TEST_EQUAL_UINT(0, pte_get_present(pte));
@@ -179,27 +181,36 @@ static bool test_pt_alloc(void) {
     pt_entry_t *vpt = (pt_entry_t *)(free_kernel_pages[0]);
 
     // Should start as all free.
-    check_pt_range(vpt, 0, 1024, false, false);
+    TEST_TRUE(check_pt_range(vpt, 0, 1024, false, false, 0));
 
     TEST_EQUAL_HEX(FOS_E_SUCCESS, pt_alloc_range(pt, true, false, 0, 100, &true_e));
     TEST_EQUAL_UINT(100, true_e);
-    check_pt_range(vpt, 0, 100, true, true);
+    TEST_TRUE(check_pt_range(vpt, 0, 100, true, true, UNIQUE_ENTRY));
 
     pt_free_range(pt, false, 10, 20);
-    check_pt_range(vpt, 0, 10, true, true);
-    check_pt_range(vpt, 10, 20, false, false);
-    check_pt_range(vpt, 20, 100, true, true);
+    TEST_TRUE(check_pt_range(vpt, 0, 10, true, true, UNIQUE_ENTRY));
+    TEST_TRUE(check_pt_range(vpt, 10, 20, false, false, 0));
+    TEST_TRUE(check_pt_range(vpt, 20, 100, true, true, UNIQUE_ENTRY));
 
     // Overlapping alloc.
     TEST_EQUAL_HEX(FOS_E_ALREADY_ALLOCATED, pt_alloc_range(pt, false, false, 15, 25, &true_e));
     TEST_EQUAL_UINT(20, true_e);
-    check_pt_range(vpt, 15, 20, true, false);
-    check_pt_range(vpt, 20, 100, true, true);
+    TEST_TRUE(check_pt_range(vpt, 15, 20, true, false, UNIQUE_ENTRY));
+    TEST_TRUE(check_pt_range(vpt, 20, 100, true, true, UNIQUE_ENTRY));
 
     // Test some bad ranges.
     TEST_TRUE(FOS_E_SUCCESS != pt_alloc_range(pt, false, false, 200, 1025, &true_e));
     TEST_TRUE(FOS_E_SUCCESS != pt_alloc_range(pt, false, false, 1024, 1024, &true_e));
     TEST_TRUE(FOS_E_SUCCESS != pt_alloc_range(pt, false, false, 1020, 1000, &true_e));
+
+    // Test putting in some shared entires.
+    TEST_SUCCESS(pt_alloc_range(pt, true, true, 100, 200, &true_e));
+    TEST_EQUAL_UINT(200, true_e);
+    TEST_TRUE(check_pt_range(vpt, 100, 200, true, true, SHARED_ENTRY));
+
+    // Without this, there would be a memory leak! Right now, deleting the pt by default doesn't
+    // return shared pages!
+    pt_free_range(pt, true, 100, 200);
 
     assign_free_page(0, old);
 
@@ -214,17 +225,22 @@ static bool test_pd_alloc(void) {
     typedef struct {
         uint8_t *s;
         uint8_t *e;
+
+        /**
+         * Whether or not the range should be allocated as shared!
+         */
+        bool shared;
     } case_t;
 
     const case_t CASES[] = {
-        {.s = S, .e = S + M_4K},
-        {.s = S, .e = S + (4 * M_4K)},
-        {.s = S, .e = S + M_4M},
-        {.s = S + (13 * M_4K), .e = S + M_4M},
-        {.s = S + (132 * M_4K), .e = S + M_4M - (12 * M_4K)},
-        {.s = S, .e = S + (3 * M_4M)},
-        {.s = S + (13 * M_4K), .e = S + (6 * M_4M)},
-        {.s = S + (132 * M_4K), .e = S + (4 * M_4M) - (12 * M_4K)},
+        {.s = S, .e = S + M_4K, .shared = false},
+        {.s = S, .e = S + (4 * M_4K), .shared = true},
+        {.s = S, .e = S + M_4M, .shared = true},
+        {.s = S + (13 * M_4K), .e = S + M_4M, .shared = false},
+        {.s = S + (132 * M_4K), .e = S + M_4M - (12 * M_4K), .shared = false},
+        {.s = S, .e = S + (3 * M_4M), .shared = false},
+        {.s = S + (13 * M_4K), .e = S + (6 * M_4M), .shared = false},
+        {.s = S + (132 * M_4K), .e = S + (4 * M_4M) - (12 * M_4K), .shared = true},
     };
     const size_t NUM_CASES = sizeof(CASES) / sizeof(CASES[0]);
 
@@ -240,7 +256,7 @@ static bool test_pd_alloc(void) {
         init_pages = get_num_free_pages();
 
         const void *true_e;
-        fernos_error_t err = pd_alloc_pages(pd, false, false, c.s, c.e, &true_e);
+        fernos_error_t err = pd_alloc_pages(pd, false, c.shared, c.s, c.e, &true_e);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         // Always assume a full allocation.
@@ -259,8 +275,8 @@ static bool test_pd_alloc(void) {
         }
 
         init_pages = get_num_free_pages();
-        // Finally, free the range!
-        pd_free_pages(pd, false, c.s, c.e);
+        // Finally, free the range! (We'll just always return shared)
+        pd_free_pages(pd, true, c.s, c.e);
 
         // We know at least num_range_pages were added back to the free list.
         TEST_TRUE(get_num_free_pages() >= init_pages + num_range_pages);
