@@ -137,24 +137,110 @@ phys_addr_t copy_page_table(phys_addr_t pt) {
     return pt_copy;
 }
 
-fernos_error_t copy_page_directory_range(phys_addr_t dest_pd, phys_addr_t src_pd, void *s, const void *e) {
+static fernos_error_t copy_page_directory_range_abs(phys_addr_t dest_pd, phys_addr_t src_pd, uint32_t s_pi, uint32_t e_pi) {
+    fernos_error_t err;
+
+    // This is kinda like the pd_alloc implementation which is a little annoying IMO.
+
     CHECK_ALIGN(dest_pd, M_4K);
     CHECK_ALIGN(src_pd, M_4K);
-    CHECK_ALIGN(s, M_4K);
-    CHECK_ALIGN(e, M_4K);
 
     if (dest_pd == NULL_PHYS_ADDR || src_pd == NULL_PHYS_ADDR) {
         return FOS_E_BAD_ARGS;
     }
 
-    if (s > e) {
+    if (s_pi > e_pi || e_pi > (1024 * 1024)) {
         return FOS_E_INVALID_RANGE;
     }
 
-    return FOS_E_NOT_IMPLEMENTED;
+    phys_addr_t old0 = assign_free_page(0, dest_pd);
+    pt_entry_t *dest_pdv = (pt_entry_t *)(free_kernel_pages[0]);
+
+    phys_addr_t old1 = assign_free_page(1, src_pd);
+    pt_entry_t *src_pdv = (pt_entry_t *)(free_kernel_pages[1]);
+
+    uint32_t pi;
+    uint32_t next_pi;
+    err = FOS_E_SUCCESS;
+
+    // When this loop exits, [si, pi) will have been copied!
+    for (pi = s_pi; err == FOS_E_SUCCESS && pi < e_pi; pi = next_pi) {
+        // Each iteration of this loop is for one "Page Directory Entry", which corresponds to
+        // one page table (i.e. 4MB in memory)
+        
+        // The index into the page directory of page directory entry for this iteration.
+        const uint32_t pdi = pi / 1024;
+
+        pt_entry_t *dest_pde = dest_pdv + pdi;
+        pt_entry_t src_pde = src_pdv[pdi];
+
+        // "nb" for next boundary (absolute page index of the next 4MB chunk)
+        const uint32_t nb_pi = ((pdi + 1) * 1024);
+
+        // Indeces into the page table for this iteration!
+        const uint32_t s_pti = pi % 1024;
+
+        // THIS CANNOT BE `>=`!!!!
+        const uint32_t e_pti = nb_pi > e_pi ? e_pi % 1024 : 1024;
+
+        next_pi = pi + (e_pti - s_pti);
+
+        if (pte_get_present(src_pde)) {
+            // With a present source entry, we must copy from source into dest!
+            phys_addr_t dest_pt;
+
+            if (pte_get_present(*dest_pde)) {
+                dest_pt = pte_get_base(*dest_pde);
+            } else {
+                dest_pt = new_page_table();
+                if (dest_pt == NULL_PHYS_ADDR) {
+                    err = FOS_E_NO_MEM; 
+                } else {
+                    *dest_pde = fos_unique_pt_entry(dest_pt, true, true);
+                }
+            }
+
+            if (err == FOS_E_SUCCESS) {
+                err = copy_page_table_range(dest_pt, pte_get_base(src_pde), s_pti, e_pti);
+            }
+        } else if (pte_get_present(*dest_pde)) {
+            // In this situaion:
+            // the source page directory is not mapped here, but the dest page directory has
+            // a page table! This is only ok, if the ENTIRE page table is empty!
+
+            phys_addr_t tmp = assign_free_page(0, pte_get_base(*dest_pde));
+            pt_entry_t *dest_ptv = (pt_entry_t *)(free_kernel_pages[0]);
+            for (uint32_t i = 0; err == FOS_E_SUCCESS && i < 1024; i++) {
+                if (pte_get_present(dest_ptv[i])) {
+                    err = FOS_E_ALREADY_ALLOCATED;
+                }
+            }
+            assign_free_page(0, tmp);
+        } // NOTE: if both dest_pde and src_pde are not present, no big deal!
+    }
+
+    assign_free_page(1, old1);
+    assign_free_page(0, old0);
+
+    if (err != FOS_E_SUCCESS) {
+        // Only free what we copied! (NOT RETURNING SHARED!)
+        pd_free_pages(dest_pd, false, (void *)(s_pi * M_4K), (const void *)(pi * M_4K));
+        return err;
+    }
+
+    return FOS_E_SUCCESS;
+}
+
+fernos_error_t copy_page_directory_range(phys_addr_t dest_pd, phys_addr_t src_pd, void *s, const void *e) {
+    CHECK_ALIGN(s, M_4K);
+    CHECK_ALIGN(e, M_4K);
+
+    return copy_page_directory_range_abs(dest_pd, src_pd, (uint32_t)s / M_4K, (uint32_t)e / M_4K);
 }
 
 phys_addr_t copy_page_directory(phys_addr_t pd) {
+    fernos_error_t err;
+
     CHECK_ALIGN(pd, M_4K);
 
     if (pd == NULL_PHYS_ADDR) {
@@ -167,39 +253,10 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
         return NULL_PHYS_ADDR;
     }
 
-    fernos_error_t status = FOS_E_SUCCESS;
-
-    phys_addr_t old0 = assign_free_page(0, pd);
-    phys_addr_t old1 = assign_free_page(1, pd_copy);
-
-    pt_entry_t *og_pd = (pt_entry_t *)(free_kernel_pages[0]);
-    pt_entry_t *new_pd = (pt_entry_t *)(free_kernel_pages[1]);
-
-    for (uint32_t i = 0; status == FOS_E_SUCCESS && i < 1024; i++) {
-        pt_entry_t pte = og_pd[i];
-
-        // Skip empty entries.
-        if (!pte_get_present(pte)) {
-            continue;
-        }
-
-        phys_addr_t og_pt = pte_get_base(pte);
-
-        phys_addr_t pt_copy = copy_page_table(og_pt);
-        if (pt_copy == NULL_PHYS_ADDR) {
-            status = FOS_E_NO_MEM; // We failed :(
-        } else {
-            // Page tables are always unique and writeable. 
-            new_pd[i] = fos_unique_pt_entry(pt_copy, true, true);
-        }
-    }
-
-    assign_free_page(1, old1);
-    assign_free_page(0, old0);
-
-    if (status != FOS_E_SUCCESS) {
+    err = copy_page_directory_range_abs(pd_copy, pd, 0, 1024 * 1024);
+    if (err != FOS_E_SUCCESS) {
         delete_page_directory(pd_copy);
-        pd_copy = NULL_PHYS_ADDR;
+        return NULL_PHYS_ADDR;
     }
 
     return pd_copy;
