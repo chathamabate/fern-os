@@ -24,6 +24,27 @@ void page_copy(phys_addr_t dest, phys_addr_t src);
 phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr);
 
 /**
+ * Given the physical address of two page tables, copy page table entries with in range [s, e)
+ * from `src_pt` to `dest_pt`. 
+ *
+ * If a page table entry is shared, just a shallow copy of the entry is performed.
+ * If a page table entry is unique, a new page will be allocated and mapped in `dest_pt`.
+ * (A deep copy)
+ *
+ * FOS_E_BAD_ARGS is returned if `dest_pt` is NULL_PHYS_ADDR or `src_pt` is NULL_PHYS_ADDR.
+ * FOS_E_BAD_ARGS is returned if `s` and `e` form an invalid range.
+ * FOS_E_NO_MEM is returned if a deep copy of a unique page fails due to lack of pages in the
+ * free list.
+ * FOS_E_ALREADY_ALLOCATED is returned if an entry within the given range is marked present in
+ * `dest_pt`.
+ *
+ * On failure, `dest_pt` is returned to its initial state before return.
+ *
+ * On success, FOS_E_SUCCESS is returned.
+ */
+fernos_error_t copy_page_table_range(phys_addr_t dest_pt, phys_addr_t src_pt, uint32_t s, uint32_t e);
+
+/**
  * Create a deep copy of a page table.
  *
  * Returns NULL_PHYS_ADDR if there is insufficient memory.

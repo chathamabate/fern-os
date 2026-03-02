@@ -104,9 +104,9 @@ static void randomize_page(phys_addr_t p, uint32_t seed) {
  * Allocate a range of pages within a page table, randomize the contents of all
  * allocated pages.
  */
-static bool pt_randomize_alloc(phys_addr_t pt, bool user, uint32_t s, uint32_t e) {
+static bool pt_randomize_alloc(phys_addr_t pt, bool user, bool shared, uint32_t s, uint32_t e) {
     uint32_t true_e;
-    TEST_EQUAL_HEX(FOS_E_SUCCESS, pt_alloc_range(pt, user, false, s, e, &true_e));
+    TEST_EQUAL_HEX(FOS_E_SUCCESS, pt_alloc_range(pt, user, shared, s, e, &true_e));
 
     phys_addr_t old0 = assign_free_page(0, pt);
     
@@ -141,19 +141,19 @@ static bool check_equal_page(phys_addr_t p0, phys_addr_t p1) {
 }
 
 /**
- * This function confirms that the two page tables are more or less equal.
+ * This function confirms that the two page tables are more or less equal in range [s, e)
  *
  * I say more or less, because if two page table have unique entries in the same slot,
  * those entries should both point to different physical pages!
  */
-static bool check_equiv_pt(phys_addr_t pt0, phys_addr_t pt1) {
+static bool check_equiv_pt(phys_addr_t pt0, phys_addr_t pt1, uint32_t s, uint32_t e) {
     phys_addr_t old0 = assign_free_page(0, pt0);
     phys_addr_t old1 = assign_free_page(1, pt1);
 
     pt_entry_t *vpt0 = (pt_entry_t *)(free_kernel_pages[0]);
     pt_entry_t *vpt1 = (pt_entry_t *)(free_kernel_pages[1]);
 
-    for (uint32_t i = 0; i < 1024; i++) {
+    for (uint32_t i = s; i < e; i++) {
         pt_entry_t pte0 = vpt0[i];
         pt_entry_t pte1 = vpt1[i];
 
@@ -183,44 +183,57 @@ static bool check_equiv_pt(phys_addr_t pt0, phys_addr_t pt1) {
 }
 
 /**
- * Pretty simple test, just make a funky page table, copy it, make sure the
- * copy and the original are equivelant.
+ * Here we are going to test copying some ranges, and confirming equivelance!
  */
-static bool test_copy_page_table(void) {
+static bool test_copy_page_table_range(void) {
     enable_loss_check();
 
-    phys_addr_t pt = new_page_table();
-    TEST_TRUE(NULL_PHYS_ADDR != pt);
+    // used for checking unallocated areas.
+    phys_addr_t empty_pt = new_page_table();
+    TEST_TRUE(NULL_PHYS_ADDR != empty_pt);
 
-    pt_randomize_alloc(pt, true, 0, 10);
-    pt_randomize_alloc(pt, false, 10, 20);
+    phys_addr_t src_pt = new_page_table();
+    TEST_TRUE(NULL_PHYS_ADDR != src_pt);
 
-    // Now manually place some shared pages.
-    phys_addr_t old0 = assign_free_page(0, pt);
+    TEST_TRUE(pt_randomize_alloc(src_pt, true, false, 0, 10));
+    TEST_TRUE(pt_randomize_alloc(src_pt, false, false, 10, 20));
+    TEST_TRUE(pt_randomize_alloc(src_pt, true, true, 100, 200));
+    TEST_TRUE(pt_randomize_alloc(src_pt, true, false, 250, 300));
 
-    pt_entry_t *vpt = (pt_entry_t *)(free_kernel_pages[0]);
-    for (uint32_t i = 20; i < 100; i++) {
-        vpt[i] = fos_identity_pt_entry(i, false, false);
+    // Manually put in some fake identity pages.
+    phys_addr_t old0 = assign_free_page(0, src_pt);
+    pt_entry_t *src_ptv = (pt_entry_t *)(free_kernel_pages[0]);
+    for (uint32_t i = 300; i < 350; i++) {
+        src_ptv[i] = fos_identity_pt_entry(i, false, false);
     }
-
-    for (uint32_t i = 200; i < 250; i++) {
-        vpt[i] = fos_identity_pt_entry(i, true, true);
-    }
-
     assign_free_page(0, old0);
 
-    // Finally some big alloc at the end.
-    pt_randomize_alloc(pt, true, 400, 500);
 
-    // Now copy and compare.
+    phys_addr_t dest_pt = new_page_table();
+    TEST_TRUE(NULL_PHYS_ADDR != src_pt);
 
-    phys_addr_t pt_copy = copy_page_table(pt);
-    TEST_TRUE(NULL_PHYS_ADDR != pt_copy);
+    TEST_SUCCESS(copy_page_table_range(dest_pt, src_pt, 5, 20));
 
-    TEST_TRUE(check_equiv_pt(pt, pt_copy));
+    TEST_TRUE(check_equiv_pt(dest_pt, empty_pt, 0, 5));
+    TEST_TRUE(check_equiv_pt(dest_pt, src_pt, 5, 20));
+    TEST_TRUE(check_equiv_pt(dest_pt, empty_pt, 20, 1024));
 
-    delete_page_table(pt);
-    delete_page_table(pt_copy);
+    // Now the identity pages.
+    TEST_SUCCESS(copy_page_table_range(dest_pt, src_pt, 325, 350));
+    TEST_EQUAL_HEX(FOS_E_ALREADY_ALLOCATED, copy_page_table_range(dest_pt, src_pt, 250, 350)); 
+
+    // Here we confirm copied pages are disposed of when an error occured!
+    TEST_TRUE(check_equiv_pt(dest_pt, empty_pt, 250, 325));
+    TEST_TRUE(check_equiv_pt(dest_pt, src_pt, 325, 400));
+
+    // Finally, cleanup!
+
+    delete_page_table(dest_pt);
+
+    // src owns some allocated shared pages! Must be explicitly returned!
+    pt_free_range(src_pt, true, 100, 200);
+    delete_page_table(src_pt);
+    delete_page_table(empty_pt);
 
     TEST_SUCCEED();
 }
@@ -254,7 +267,7 @@ static bool check_equiv_pd(phys_addr_t pd0, phys_addr_t pd1) {
 
             TEST_TRUE(base0 != base1);
 
-            TEST_TRUE(check_equiv_pt(base0, base1));
+            TEST_TRUE(check_equiv_pt(base0, base1, 0, 1024));
         }
     }
 
@@ -293,11 +306,11 @@ static bool test_copy_page_directory(void) {
 
     phys_addr_t pt_a = new_page_table();
     TEST_TRUE(pt_a != NULL_PHYS_ADDR);
-    pt_randomize_alloc(pt_a, true, 0, 1);
+    pt_randomize_alloc(pt_a, true, false, 0, 1);
 
     phys_addr_t pt_b = new_page_table();
     TEST_TRUE(pt_b != NULL_PHYS_ADDR);
-    pt_randomize_alloc(pt_b, true, 0, 1);
+    pt_randomize_alloc(pt_b, true, false, 0, 1);
 
     vpd[0] = copy_pt_entry(pt_a);
     vpd[1] = copy_pt_entry(pt_b);
@@ -901,7 +914,7 @@ bool test_page_helpers(void) {
     BEGIN_SUITE("Page Helpers");
 
     RUN_TEST(test_page_copy);
-    RUN_TEST(test_copy_page_table);
+    RUN_TEST(test_copy_page_table_range);
     RUN_TEST(test_copy_page_directory);
     RUN_TEST(test_mem_cpy_user);
     RUN_TEST(test_bad_mem_cpy);

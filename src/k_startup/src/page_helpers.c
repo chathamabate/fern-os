@@ -46,10 +46,75 @@ phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr) {
     return ret;
 }
 
-/**
- * Returns NULL_PHYS_ADDR on error.
- */
+fernos_error_t copy_page_table_range(phys_addr_t dest_pt, phys_addr_t src_pt, uint32_t s, uint32_t e) {
+    fernos_error_t err;
+
+    if (dest_pt == NULL_PHYS_ADDR || src_pt == NULL_PHYS_ADDR) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (s >= 1024 || e > 1024 || s > e) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    phys_addr_t old0 = assign_free_page(0, dest_pt);
+    pt_entry_t *dest_ptv = (pt_entry_t *)(free_kernel_pages[0]);
+
+    phys_addr_t old1 = assign_free_page(1, src_pt);
+    pt_entry_t *src_ptv = (pt_entry_t *)(free_kernel_pages[1]);
+
+    err = FOS_E_SUCCESS;
+    uint32_t i;
+
+    // When this loop exits [s, i) will have been mapped into dest_pt,
+    // this range will need to be freed in error case.
+    for (i = s; i < e; i++) {
+        pt_entry_t *dest_pte = dest_ptv + i;
+        if (pte_get_present(*dest_pte)) {
+            err = FOS_E_ALREADY_ALLOCATED;
+            break;
+        }
+
+        pt_entry_t src_pte = src_ptv[i];
+        if (!pte_get_present(src_pte)) {
+            continue; // We know the destination pte isn't present, so this
+                      // continue is safe!
+        }
+
+        uint8_t avail = pte_get_avail(src_pte);
+        if (avail == UNIQUE_ENTRY) {
+            phys_addr_t src_base  = pte_get_base(src_pte);
+            phys_addr_t dest_base =  pop_free_page();
+
+            if (dest_base == NULL_PHYS_ADDR) {
+                err = FOS_E_NO_MEM;
+                break;
+            }
+
+            page_copy(dest_base, src_base); 
+
+            *dest_pte = fos_unique_pt_entry(dest_base, 
+                    pte_get_user(src_pte) == 1,
+                    pte_get_writable(src_pte) == 1);
+        } else {
+            *dest_pte = src_pte; // shallow copy for SHARED or IDENTITY
+        }
+    }
+
+    assign_free_page(1, old1);
+    assign_free_page(0, old0);
+
+    if (err != FOS_E_SUCCESS) { // cleanup on error case!
+        pt_free_range(dest_pt, false, s, i);
+        return err;
+    }
+
+    return FOS_E_SUCCESS;
+}
+
 phys_addr_t copy_page_table(phys_addr_t pt) {
+    fernos_error_t err;
+
     if (pt == NULL_PHYS_ADDR) {
         return NULL_PHYS_ADDR; // Can't copy the NULL page.
     }
@@ -60,50 +125,10 @@ phys_addr_t copy_page_table(phys_addr_t pt) {
         return NULL_PHYS_ADDR;
     }
 
-    fernos_error_t status = FOS_E_SUCCESS;
-    
-    phys_addr_t old0 = assign_free_page(0, pt);
-    phys_addr_t old1 = assign_free_page(1, pt_copy);
-
-    pt_entry_t *og_pt = (pt_entry_t *)(free_kernel_pages[0]);
-    pt_entry_t *new_pt = (pt_entry_t *)(free_kernel_pages[1]);
-
-    for (uint32_t i = 0; status == FOS_E_SUCCESS && i < 1024; i++) {
-        pt_entry_t pte = og_pt[i];
-
-        // Skip all empty entries.
-        if (!pte_get_present(pte)) {
-            continue;  
-        }
-
-        uint8_t avail = pte_get_avail(pte);
-
-        if (avail == UNIQUE_ENTRY) {
-            // deep copy required!
-            phys_addr_t og_base  = pte_get_base(pte);
-            phys_addr_t new_base =  pop_free_page();
-
-            if (new_base == NULL_PHYS_ADDR) {
-                status = FOS_E_NO_MEM; // We failed :(
-            } else {
-                page_copy(new_base, og_base); 
-
-                new_pt[i] = fos_unique_pt_entry(new_base, 
-                        pte_get_user(pte) == 1,
-                        pte_get_writable(pte) == 1);
-            }
-        } else {
-            // shallow copy just fine.
-            new_pt[i] = pte;
-        }
-    }
-
-    assign_free_page(1, old1);
-    assign_free_page(0, old0);
-
-    if (status != FOS_E_SUCCESS) {
-        delete_page_table(pt_copy);
-        pt_copy = NULL_PHYS_ADDR;
+    err = copy_page_table_range(pt_copy, pt, 0, 1024);
+    if (err != FOS_E_SUCCESS) {
+        push_free_page(pt_copy);
+        return NULL_PHYS_ADDR;
     }
 
     return pt_copy;
