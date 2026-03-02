@@ -208,7 +208,6 @@ static bool test_copy_page_table_range(void) {
     }
     assign_free_page(0, old0);
 
-
     phys_addr_t dest_pt = new_page_table();
     TEST_TRUE(NULL_PHYS_ADDR != src_pt);
 
@@ -234,6 +233,39 @@ static bool test_copy_page_table_range(void) {
     pt_free_range(src_pt, true, 100, 200);
     delete_page_table(src_pt);
     delete_page_table(empty_pt);
+
+    TEST_SUCCEED();
+}
+
+static bool test_copy_page_table(void) {
+    enable_loss_check();
+
+    // Kinda just a simpler version of the above test.
+
+    phys_addr_t og_pt = new_page_table();
+    TEST_TRUE(og_pt != NULL_PHYS_ADDR);
+
+    TEST_TRUE(pt_randomize_alloc(og_pt, true, true, 0, 100));
+    TEST_TRUE(pt_randomize_alloc(og_pt, false, false, 100, 150));
+    TEST_TRUE(pt_randomize_alloc(og_pt, true, false, 225, 250));
+
+    phys_addr_t old0 = assign_free_page(0, og_pt);
+    pt_entry_t *og_ptv = (pt_entry_t *)(free_kernel_pages[0]);
+    for (uint32_t i = 900; i < 1024; i++) {
+        // some dummy identity pages.
+        og_ptv[i] = fos_identity_pt_entry((phys_addr_t)i, false, false);
+    }
+    assign_free_page(0, old0);
+
+    phys_addr_t copy_pt = copy_page_table(og_pt);
+    TEST_TRUE(copy_pt != NULL_PHYS_ADDR);
+
+    TEST_TRUE(check_equiv_pt(copy_pt, og_pt, 0, 1024));
+
+    delete_page_table(copy_pt);
+
+    pt_free_range(og_pt, true, 0, 100);
+    delete_page_table(og_pt);
 
     TEST_SUCCEED();
 }
@@ -915,6 +947,7 @@ bool test_page_helpers(void) {
 
     RUN_TEST(test_page_copy);
     RUN_TEST(test_copy_page_table_range);
+    RUN_TEST(test_copy_page_table);
     RUN_TEST(test_copy_page_directory);
     RUN_TEST(test_mem_cpy_user);
     RUN_TEST(test_bad_mem_cpy);

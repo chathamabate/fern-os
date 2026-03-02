@@ -49,12 +49,15 @@ phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr) {
 fernos_error_t copy_page_table_range(phys_addr_t dest_pt, phys_addr_t src_pt, uint32_t s, uint32_t e) {
     fernos_error_t err;
 
+    CHECK_ALIGN(dest_pt, M_4K);
+    CHECK_ALIGN(src_pt, M_4K);
+
     if (dest_pt == NULL_PHYS_ADDR || src_pt == NULL_PHYS_ADDR) {
         return FOS_E_BAD_ARGS;
     }
 
     if (s >= 1024 || e > 1024 || s > e) {
-        return FOS_E_BAD_ARGS;
+        return FOS_E_INVALID_RANGE;
     }
 
     phys_addr_t old0 = assign_free_page(0, dest_pt);
@@ -134,7 +137,26 @@ phys_addr_t copy_page_table(phys_addr_t pt) {
     return pt_copy;
 }
 
+fernos_error_t copy_page_directory_range(phys_addr_t dest_pd, phys_addr_t src_pd, void *s, const void *e) {
+    CHECK_ALIGN(dest_pd, M_4K);
+    CHECK_ALIGN(src_pd, M_4K);
+    CHECK_ALIGN(s, M_4K);
+    CHECK_ALIGN(e, M_4K);
+
+    if (dest_pd == NULL_PHYS_ADDR || src_pd == NULL_PHYS_ADDR) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (s > e) {
+        return FOS_E_INVALID_RANGE;
+    }
+
+    return FOS_E_NOT_IMPLEMENTED;
+}
+
 phys_addr_t copy_page_directory(phys_addr_t pd) {
+    CHECK_ALIGN(pd, M_4K);
+
     if (pd == NULL_PHYS_ADDR) {
         return NULL_PHYS_ADDR;
     }
@@ -181,7 +203,6 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
     }
 
     return pd_copy;
-
 }
 
 /**
