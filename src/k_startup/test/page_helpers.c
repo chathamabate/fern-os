@@ -20,7 +20,6 @@ static bool posttest(void);
 #define POSTTEST() posttest()
 
 #define LOGF_METHOD(...) gfx_direct_put_fmt_s_rr(__VA_ARGS__)
-#define FAILURE_ACTION() lock_up()
 
 #include "s_util/test.h"
 
@@ -343,6 +342,9 @@ static bool check_equiv_pd(phys_addr_t pd0, phys_addr_t pd1, uint32_t pi_s, uint
         } else if (pte_get_present(pde0)) {
             TEST_TRUE(check_empty_pt(pte_get_base(pde0), pti_s, pti_e));
         } else if (pte_get_present(pde1)) {
+            if (!check_empty_pt(pte_get_base(pde1), pti_s, pti_e)) {
+                LOGF_PREFIXED("PI: %u Next PI: %u\n", pi, next_pi);
+            }
             TEST_TRUE(check_empty_pt(pte_get_base(pde1), pti_s, pti_e));
         } // Both not present, who cares!
     }
@@ -353,6 +355,7 @@ static bool check_equiv_pd(phys_addr_t pd0, phys_addr_t pd1, uint32_t pi_s, uint
     TEST_SUCCEED();
 }
 
+// What's the point of this function???
 static pt_entry_t copy_pt_entry(phys_addr_t pt) {
     phys_addr_t pt_copy = copy_page_table(pt);
 
@@ -364,8 +367,50 @@ static pt_entry_t copy_pt_entry(phys_addr_t pt) {
 }
 
 static bool test_copy_page_directory_range(void) {
+    enable_loss_check();
 
-    // Ok, and how do we do this well exactly?
+    phys_addr_t pds[4];
+    const size_t num_pds = sizeof(pds) / sizeof(pds[0]);
+
+    for (size_t i = 0; i < num_pds; i++) {
+        pds[i] = new_page_directory();
+        TEST_TRUE(pds[i] != NULL_PHYS_ADDR);
+    }
+
+    TEST_TRUE(pd_randomize_alloc(pds[0], true, false, (void *)0x0, (void *)(M_4K * 10)));
+    // PD[0] <= [0, 10)
+
+    TEST_SUCCESS(copy_page_directory_range(pds[1], pds[0], (void *)(M_4K * 5), (void *)(M_4K * 13)));
+    // PD[1] <= [5, 10)
+
+    TEST_TRUE(check_equiv_pd(pds[0], pds[1], 5, 20));
+
+    TEST_TRUE(pd_randomize_alloc(pds[1], false, true, (void *)(M_4K * 5000), (void *)(M_4K * 15000)));
+    // PD[1] <= [5, 10) [S 5000, 15000)
+
+    TEST_TRUE(pd_randomize_alloc(pds[1], true, false, (void *)(M_4K * 1024 * 40), (void *)(M_4K * 1024 * 80)));
+    // PD[1] <= [5, 10) [S 5000, 15000) [1024 * 40, 1024 * 80)
+    
+    TEST_SUCCESS(copy_page_directory_range(pds[2], pds[1], (void *)(M_4K * 1024), (void *)(M_4K * 1024 * 64)));
+    // PD[2] <= [S 1024, 15000) [1024 * 40, 1024 * 64)
+
+    TEST_TRUE(check_equiv_pd(pds[1], pds[2], 1024, 1024 * 64));
+
+    TEST_TRUE(pd_randomize_alloc(pds[0], true, false, (void *)(M_4K * 1024 * 43), (void *)(M_4K * 1024 * 44)));
+    // PD[0] <= [0, 10) [1024 * 43, 1024 * 44)
+
+    TEST_SUCCESS(copy_page_directory_range(pds[3], pds[0], (void *)0, (void *)(M_4K * 1024 * 44)));
+    // PD[3] <= [0, 10) [1024 * 43, 1024 * 44)
+
+    TEST_EQUAL_HEX(FOS_E_ALREADY_ALLOCATED, copy_page_directory_range(pds[0], pds[2], (void *)(M_4K * (1024 * 38 + 1)), (void *)(M_4K * 1024 * 70)));
+
+    // In case of already allocated error, pds[0] should be returned to original state!
+    TEST_TRUE(check_equiv_pd(pds[0], pds[3], 0, 1024 * 1024));
+
+
+    for (size_t i = 0; i < num_pds; i++) {
+        delete_page_directory(pds[i]);
+    }
 
     TEST_SUCCEED();
 }
