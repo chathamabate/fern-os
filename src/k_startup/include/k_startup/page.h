@@ -196,6 +196,8 @@ void delete_page_table(phys_addr_t pt);
  * e is the exlusive end of the range. (0 <= s < 1024), (0 <= e <= 1024)
  * The final index reached during allocation is always written to *true_e.
  * On success, *true_e will always equal e.
+ *
+ * `true_e` is optional.
  */
 fernos_error_t pt_alloc_range(phys_addr_t pt, bool user, bool shared, uint32_t s, uint32_t e, uint32_t *true_e);
 
@@ -219,12 +221,10 @@ void pt_free_range(phys_addr_t pt, bool return_shared, uint32_t s, uint32_t e);
 phys_addr_t new_page_directory(void);
 
 /**
- * Add pages (and page table if necessary) to a page directory.
+ * Add pages (and page tables if necessary) to a page directory.
  * The pages will always be marked as writeable. 
  *
- * FOS_E_ALIGN_ERROR if `pd`, `s`, or `e` aren't 4K aligned.
- * FOS_E_BAD_ARGS if `true_e` is NULL.
- * FOS_E_INVALID_RANGE if `e` < `s`.
+ * FOS_E_INVALID_RANGE if [pi_s, pi_e) is invalid.
  *
  * NOTE: if shared is `true` all entries added will be "shared" entries.
  * When `pd` is deleted, such entries will NOT be deleted! (Extra management is required!)
@@ -232,27 +232,47 @@ phys_addr_t new_page_directory(void);
  * Otherwise, pages are attempted to be allocated.
  * If all pages are allocated, FOS_E_SUCCESS is returned.
  * If we run out of memory, FOS_E_NO_MEM is returned.
- * If we run into an already page, FOS_E_ALREADY_ALLOCATED is returned.
+ * If we run into an already allocated page, FOS_E_ALREADY_ALLOCATED is returned.
  * In these three cases, the true end of the allocated section is written to `*true_e`.
+ * `true_e` is optional.
+ */
+fernos_error_t pd_alloc_pages_p(phys_addr_t pd, bool user, bool shared, uint32_t pi_s, uint32_t pi_e, uint32_t *true_e);
+
+/**
+ * Add pages (and page table if necessary) to a page directory.
+ * The pages will always be marked as writeable. 
+ *
+ * FOS_E_ALIGN_ERROR if `pd`, `s`, or `e` aren't 4K aligned.
+ * FOS_E_INVALID_RANGE if [s, e) is an invalid range.
+ *
+ * This is a wrapper around `pd_alloc_pages_p`.
  */
 fernos_error_t pd_alloc_pages(phys_addr_t pd, bool user, bool shared, void *s, const void *e, const void **true_e);
 
-/*
- * NOTE neither pd_free_pages nor delete_page_directory clean up shared pages.
- *
- * If you want your kernel to support pages shared between spaces you must write your own deletion
- * logic before calling these functions.
- */
-
 /**
- * Remove all removeable pages from s to e in the given page directory.
+ * Remove all pages from s to e in the given page directory.
  *
  * (Shared pages are returned if and only if `return_shared` is `true`)
  *
- * NOTE: Given addresses must ALWAYS be 4K aligned (This is the case for all functions in the 
- * header file, but still)
+ * NOTE: `pi_e` will be rounded down to become valid!
+ * (i.e. if pi_e == (1024 * 1024) + 100, it'll be rounded down to (1024 * 1024))
+ * If pi_s >= (1024 * 1024), this does nothing!
+ */
+void pd_free_pages_p(phys_addr_t pd, bool return_shared, uint32_t pi_s, uint32_t pi_e);
+
+/**
+ * Remove all ble pages from s to e in the given page directory.
+ *
+ * Wrapper around `pd_free_pages_p`.
  */
 void pd_free_pages(phys_addr_t pd, bool return_shared, void *s, const void *e);
+
+/**
+ * Return *all* pages under `pd` to the free list.
+ *
+ * Shared pages are only returned if `return_shared` is true.
+ */
+void delete_page_directory_force(phys_addr_t pd, bool return_shared);
 
 /**
  * Take the physical address of a page directory and clean up all of it's pages, page tables, and
