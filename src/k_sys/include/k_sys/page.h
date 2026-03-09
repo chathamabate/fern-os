@@ -36,7 +36,7 @@ typedef uint32_t pt_entry_t;
 #define PTE_PWT_WID_MASK TO_MASK64(PTE_PWT_WID)
 #define PTE_PWT_MASK (PTE_PWT_WID_MASK << PTE_PWT_OFF)       
 
-#define PTE_PCD_OFF (3)      
+#define PTE_PCD_OFF (4)      
 #define PTE_PCD_WID (1)  
 #define PTE_PCD_WID_MASK TO_MASK64(PTE_PCD_WID)
 #define PTE_PCD_MASK (PTE_PCD_WID_MASK << PTE_PCD_OFF)       

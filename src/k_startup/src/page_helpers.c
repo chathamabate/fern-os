@@ -17,10 +17,9 @@ void page_copy(phys_addr_t dest, phys_addr_t src) {
     assign_free_page(1, old1);
 }
 
-phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr) {
+phys_addr_t pd_get_underlying_p(phys_addr_t pd, uint32_t pi) {
     phys_addr_t old0 = assign_free_page(0, pd);
 
-    uint32_t pi = (uint32_t)ptr / M_4K;
     uint32_t pdi = pi / 1024;
     uint32_t pti = pi % 1024;
 
@@ -46,10 +45,82 @@ phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr) {
     return ret;
 }
 
-/**
- * Returns NULL_PHYS_ADDR on error.
- */
+phys_addr_t pd_get_underlying(phys_addr_t pd, const void *ptr) {
+    return pd_get_underlying_p(pd, (uint32_t)ptr / M_4K);
+}
+
+fernos_error_t pt_copy_range(phys_addr_t dest_pt, phys_addr_t src_pt, uint32_t s, uint32_t e) {
+    fernos_error_t err;
+
+    CHECK_ALIGN(dest_pt, M_4K);
+    CHECK_ALIGN(src_pt, M_4K);
+
+    if (dest_pt == NULL_PHYS_ADDR || src_pt == NULL_PHYS_ADDR) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    if (s >= 1024 || e > 1024 || s > e) {
+        return FOS_E_INVALID_RANGE;
+    }
+
+    phys_addr_t old0 = assign_free_page(0, dest_pt);
+    pt_entry_t *dest_ptv = (pt_entry_t *)(free_kernel_pages[0]);
+
+    phys_addr_t old1 = assign_free_page(1, src_pt);
+    pt_entry_t *src_ptv = (pt_entry_t *)(free_kernel_pages[1]);
+
+    err = FOS_E_SUCCESS;
+    uint32_t i;
+
+    // When this loop exits [s, i) will have been mapped into dest_pt,
+    // this range will need to be freed in error case.
+    for (i = s; i < e; i++) {
+        pt_entry_t *dest_pte = dest_ptv + i;
+        if (pte_get_present(*dest_pte)) {
+            err = FOS_E_ALREADY_ALLOCATED;
+            break;
+        }
+
+        pt_entry_t src_pte = src_ptv[i];
+        if (!pte_get_present(src_pte)) {
+            continue; // We know the destination pte isn't present, so this
+                      // continue is safe!
+        }
+
+        uint8_t avail = pte_get_avail(src_pte);
+        if (avail == UNIQUE_ENTRY) {
+            phys_addr_t src_base  = pte_get_base(src_pte);
+            phys_addr_t dest_base =  pop_free_page();
+
+            if (dest_base == NULL_PHYS_ADDR) {
+                err = FOS_E_NO_MEM;
+                break;
+            }
+
+            page_copy(dest_base, src_base); 
+
+            *dest_pte = fos_unique_pt_entry(dest_base, 
+                    pte_get_user(src_pte),
+                    pte_get_writable(src_pte));
+        } else {
+            *dest_pte = src_pte; // shallow copy for SHARED or IDENTITY
+        }
+    }
+
+    assign_free_page(1, old1);
+    assign_free_page(0, old0);
+
+    if (err != FOS_E_SUCCESS) { // cleanup on error case!
+        pt_free_range(dest_pt, false, s, i);
+        return err;
+    }
+
+    return FOS_E_SUCCESS;
+}
+
 phys_addr_t copy_page_table(phys_addr_t pt) {
+    fernos_error_t err;
+
     if (pt == NULL_PHYS_ADDR) {
         return NULL_PHYS_ADDR; // Can't copy the NULL page.
     }
@@ -60,56 +131,131 @@ phys_addr_t copy_page_table(phys_addr_t pt) {
         return NULL_PHYS_ADDR;
     }
 
-    fernos_error_t status = FOS_E_SUCCESS;
-    
-    phys_addr_t old0 = assign_free_page(0, pt);
-    phys_addr_t old1 = assign_free_page(1, pt_copy);
+    err = pt_copy_range(pt_copy, pt, 0, 1024);
+    if (err != FOS_E_SUCCESS) {
+        push_free_page(pt_copy);
+        return NULL_PHYS_ADDR;
+    }
 
-    pt_entry_t *og_pt = (pt_entry_t *)(free_kernel_pages[0]);
-    pt_entry_t *new_pt = (pt_entry_t *)(free_kernel_pages[1]);
+    return pt_copy;
+}
 
-    for (uint32_t i = 0; status == FOS_E_SUCCESS && i < 1024; i++) {
-        pt_entry_t pte = og_pt[i];
+fernos_error_t pd_copy_range_p(phys_addr_t dest_pd, phys_addr_t src_pd, uint32_t pi_s, uint32_t pi_e) {
+    fernos_error_t err;
 
-        // Skip all empty entries.
-        if (!pte_get_present(pte)) {
-            continue;  
-        }
+    // This is kinda like the pd_alloc implementation which is a little annoying IMO.
 
-        uint8_t avail = pte_get_avail(pte);
+    CHECK_ALIGN(dest_pd, M_4K);
+    CHECK_ALIGN(src_pd, M_4K);
 
-        if (avail == UNIQUE_ENTRY) {
-            // deep copy required!
-            phys_addr_t og_base  = pte_get_base(pte);
-            phys_addr_t new_base =  pop_free_page();
+    if (dest_pd == NULL_PHYS_ADDR || src_pd == NULL_PHYS_ADDR) {
+        return FOS_E_BAD_ARGS;
+    }
 
-            if (new_base == NULL_PHYS_ADDR) {
-                status = FOS_E_NO_MEM; // We failed :(
+    if (pi_s > pi_e || pi_s >= (1024 * 1024) || pi_e > (1024 * 1024)) {
+        return FOS_E_INVALID_RANGE;
+    }
+
+    phys_addr_t old0 = assign_free_page(0, dest_pd);
+    pt_entry_t *dest_pdv = (pt_entry_t *)(free_kernel_pages[0]);
+
+    phys_addr_t old1 = assign_free_page(1, src_pd);
+    pt_entry_t *src_pdv = (pt_entry_t *)(free_kernel_pages[1]);
+
+    uint32_t pi;
+    uint32_t next_pi;
+
+    err = FOS_E_SUCCESS;
+
+    // When this loop exits, [si, pi) will have been copied! 
+    for (pi = pi_s; pi < pi_e; pi = next_pi) {
+        // Each iteration of this loop is for one "Page Directory Entry", which corresponds to
+        // one page table (i.e. 4MB in memory)
+        
+        // The index into the page directory of page directory entry for this iteration.
+        const uint32_t pdi = pi / 1024;
+
+        pt_entry_t *dest_pde = dest_pdv + pdi;
+        pt_entry_t src_pde = src_pdv[pdi];
+
+        // "nb" for next boundary (absolute page index of the next 4MB chunk)
+        const uint32_t nb_pi = ((pdi + 1) * 1024);
+
+        // Indeces into the page table for this iteration!
+        const uint32_t s_pti = pi % 1024;
+
+        // THIS CANNOT BE `>=`!!!!
+        const uint32_t e_pti = nb_pi > pi_e ? pi_e % 1024 : 1024;
+
+        next_pi = pi + (e_pti - s_pti);
+
+        if (pte_get_present(src_pde)) {
+            // With a present source entry, we must copy from source into dest!
+            phys_addr_t dest_pt;
+
+            if (pte_get_present(*dest_pde)) {
+                dest_pt = pte_get_base(*dest_pde);
             } else {
-                page_copy(new_base, og_base); 
-
-                new_pt[i] = fos_unique_pt_entry(new_base, 
-                        pte_get_user(pte) == 1,
-                        pte_get_writable(pte) == 1);
+                dest_pt = new_page_table();
+                if (dest_pt == NULL_PHYS_ADDR) {
+                    err = FOS_E_NO_MEM; 
+                } else {
+                    *dest_pde = fos_unique_pt_entry(dest_pt, true, true);
+                }
             }
-        } else {
-            // shallow copy just fine.
-            new_pt[i] = pte;
+
+            if (err == FOS_E_SUCCESS) {
+                // Note, that if this fails, `[s_pti, e_pti)` will be left untouched in `dest_pt`.
+                // So, we don't need to worry about freeing those pages below in the final error case
+                // of this funciton.
+                err = pt_copy_range(dest_pt, pte_get_base(src_pde), s_pti, e_pti);
+            }
+        } else if (pte_get_present(*dest_pde)) {
+            // In this situaion:
+            // the source page directory is not mapped here, but the dest page directory has
+            // a page table! This is only ok, if the ENTIRE page table is empty!
+
+            phys_addr_t tmp = assign_free_page(0, pte_get_base(*dest_pde));
+            pt_entry_t *dest_ptv = (pt_entry_t *)(free_kernel_pages[0]);
+            for (uint32_t i = 0; err == FOS_E_SUCCESS && i < 1024; i++) {
+                if (pte_get_present(dest_ptv[i])) {
+                    err = FOS_E_ALREADY_ALLOCATED;
+                }
+            }
+            assign_free_page(0, tmp);
+        } // NOTE: if both dest_pde and src_pde are not present, no big deal!
+
+        // It's important that this is not in the loop condition because, on
+        // failure, we want to preserve `pi`. 
+        if (err != FOS_E_SUCCESS) {
+            break;
         }
     }
 
     assign_free_page(1, old1);
     assign_free_page(0, old0);
 
-    if (status != FOS_E_SUCCESS) {
-        delete_page_table(pt_copy);
-        pt_copy = NULL_PHYS_ADDR;
+    if (err != FOS_E_SUCCESS) {
+        // Only free what we copied! (NOT RETURNING SHARED!)
+        pd_free_pages_p(dest_pd, false, pi_s, pi);
+        return err;
     }
 
-    return pt_copy;
+    return FOS_E_SUCCESS;
+}
+
+fernos_error_t pd_copy_range(phys_addr_t dest_pd, phys_addr_t src_pd, void *s, const void *e) {
+    CHECK_ALIGN(s, M_4K);
+    CHECK_ALIGN(e, M_4K);
+
+    return pd_copy_range_p(dest_pd, src_pd, (uint32_t)s / M_4K, (uint32_t)e / M_4K);
 }
 
 phys_addr_t copy_page_directory(phys_addr_t pd) {
+    fernos_error_t err;
+
+    CHECK_ALIGN(pd, M_4K);
+
     if (pd == NULL_PHYS_ADDR) {
         return NULL_PHYS_ADDR;
     }
@@ -120,43 +266,13 @@ phys_addr_t copy_page_directory(phys_addr_t pd) {
         return NULL_PHYS_ADDR;
     }
 
-    fernos_error_t status = FOS_E_SUCCESS;
-
-    phys_addr_t old0 = assign_free_page(0, pd);
-    phys_addr_t old1 = assign_free_page(1, pd_copy);
-
-    pt_entry_t *og_pd = (pt_entry_t *)(free_kernel_pages[0]);
-    pt_entry_t *new_pd = (pt_entry_t *)(free_kernel_pages[1]);
-
-    for (uint32_t i = 0; status == FOS_E_SUCCESS && i < 1024; i++) {
-        pt_entry_t pte = og_pd[i];
-
-        // Skip empty entries.
-        if (!pte_get_present(pte)) {
-            continue;
-        }
-
-        phys_addr_t og_pt = pte_get_base(pte);
-
-        phys_addr_t pt_copy = copy_page_table(og_pt);
-        if (pt_copy == NULL_PHYS_ADDR) {
-            status = FOS_E_NO_MEM; // We failed :(
-        } else {
-            // Page tables are always unique and writeable. 
-            new_pd[i] = fos_unique_pt_entry(pt_copy, true, true);
-        }
-    }
-
-    assign_free_page(1, old1);
-    assign_free_page(0, old0);
-
-    if (status != FOS_E_SUCCESS) {
+    err = pd_copy_range_p(pd_copy, pd, 0, 1024 * 1024);
+    if (err != FOS_E_SUCCESS) {
         delete_page_directory(pd_copy);
-        pd_copy = NULL_PHYS_ADDR;
+        return NULL_PHYS_ADDR;
     }
 
     return pd_copy;
-
 }
 
 /**
@@ -181,7 +297,7 @@ static fernos_error_t mem_cpy_user(void *kbuf, phys_addr_t user_pd, void *ubuf,
 
     while (bytes_copied < bytes) {
         const uint8_t *tbuf = (uint8_t *)ubuf + bytes_copied;
-        phys_addr_t upage = get_underlying_page(user_pd, tbuf);
+        phys_addr_t upage = pd_get_underlying(user_pd, tbuf);
         if (upage == NULL_PHYS_ADDR) {
             break;
         }
@@ -237,7 +353,7 @@ fernos_error_t mem_set_to_user(phys_addr_t user_pd, void *user_dest, uint8_t val
     uint32_t bytes_left = bytes;
 
     while (bytes_left > 0) {
-        phys_addr_t underlying = get_underlying_page(user_pd, iter);
+        phys_addr_t underlying = pd_get_underlying(user_pd, iter);
         if (underlying == NULL_PHYS_ADDR) {
             err = FOS_E_NO_MEM;
             break;
@@ -353,7 +469,7 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
         }
 
         const void *true_e;
-        err = pd_alloc_pages(new_pd, true, (void *)FOS_APP_ARGS_AREA_START, 
+        err = pd_alloc_pages(new_pd, true, false, (void *)FOS_APP_ARGS_AREA_START, 
                 (void *)(FOS_APP_ARGS_AREA_START + abs_ab_alloc_size), &true_e);
 
 
@@ -388,7 +504,7 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
         }
         
         const void *true_e;
-        err = pd_alloc_pages(new_pd, true, uaa->load_position, 
+        err = pd_alloc_pages(new_pd, true, false, uaa->load_position, 
                 (uint8_t *)(uaa->load_position) + area_size, &true_e);
 
         if (err == FOS_E_SUCCESS && uaa->given_size > 0) {

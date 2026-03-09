@@ -15,13 +15,41 @@
 void page_copy(phys_addr_t dest, phys_addr_t src);
 
 /**
+ * Get the physical page mapped at index pi!
+ *
+ * NULL_PHYS_ADDR if not mapped!
+ */
+phys_addr_t pd_get_underlying_p(phys_addr_t pd, uint32_t pi);
+
+/**
  * ptr is an address into a memory space described by pd.
  *
  * This returns the physical address of the page referenced by pointer.
  *
  * NOTE: If ptr is not allocated in the memory space, NULL_PHYS_ADDR is returned.
  */
-phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr);
+phys_addr_t pd_get_underlying(phys_addr_t pd, const void *ptr);
+
+/**
+ * Given the physical address of two page tables, copy page table entries with in range [s, e)
+ * from `src_pt` to `dest_pt`. 
+ *
+ * If a page table entry is shared or identity, just a shallow copy of the entry is performed.
+ * If a page table entry is unique, a new page will be allocated and mapped in `dest_pt`.
+ * (A deep copy)
+ *
+ * FOS_E_BAD_ARGS is returned if `dest_pt` is NULL_PHYS_ADDR or `src_pt` is NULL_PHYS_ADDR.
+ * FOS_E_INVALID_RANGE is returned if `s` and `e` form an invalid range.
+ * FOS_E_NO_MEM is returned if a deep copy of a unique page fails due to lack of pages in the
+ * free list.
+ * FOS_E_ALREADY_ALLOCATED is returned if an entry within the given range is marked present in
+ * `dest_pt`.
+ *
+ * On failure, `dest_pt` is returned to its initial state before return.
+ *
+ * On success, FOS_E_SUCCESS is returned.
+ */
+fernos_error_t pt_copy_range(phys_addr_t dest_pt, phys_addr_t src_pt, uint32_t s, uint32_t e);
 
 /**
  * Create a deep copy of a page table.
@@ -29,6 +57,28 @@ phys_addr_t get_underlying_page(phys_addr_t pd, const void *ptr);
  * Returns NULL_PHYS_ADDR if there is insufficient memory.
  */
 phys_addr_t copy_page_table(phys_addr_t pt);
+
+/**
+ * Deep copy a range of addresses from one page directory to another.
+ * (Remember, this means unique pages are given deep copies in the dest_pd, whereas
+ * shared and identity pages just have their entries copied over)
+ *
+ * FOS_E_INVALID_RANGE if `[pi_s, pi_e)` is an invalid range.
+ * FOS_E_ALREADY_ALLOCATED if we run into a present entry within `dest_pd`.
+ * FOS_E_NO_MEM if we run out of memory during the copy.
+ * FOS_E_SUCCESS if the entire range was successfully copied from `src_pd` to `dest_pd`.
+ *
+ * If this fails, `dest_pd` will be returned to its original state before return.
+ */
+fernos_error_t pd_copy_range_p(phys_addr_t dest_pd, phys_addr_t src_pd, uint32_t pi_s, uint32_t pi_e);
+
+/**
+ * Wrapper around `pd_copy_range_p`.
+ *
+ * FOS_E_ALIGN_ERROR if `pd`, `s`, or `e` aren't 4K aligned.
+ * FOS_E_INVALID_RANGE if `e` < `s`.
+ */
+fernos_error_t pd_copy_range(phys_addr_t dest_pd, phys_addr_t src_pd, void *s, const void *e);
 
 /**
  * Create a deep copy of a page directory.

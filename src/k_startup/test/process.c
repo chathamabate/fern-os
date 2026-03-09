@@ -163,7 +163,7 @@ static bool test_complex_process(void) {
     TEST_TRUE(pd != NULL_PHYS_ADDR);
 
     const void *true_e;
-    err = pd_alloc_pages(pd, true, (void *)M_4K, (const void *)(M_4K + M_4K), &true_e);
+    err = pd_alloc_pages(pd, true, false, (void *)M_4K, (const void *)(M_4K + M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     process_t *proc = new_da_process(0, pd, NULL);

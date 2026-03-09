@@ -34,12 +34,7 @@
 #include "s_gfx/window.h"
 #include "s_gfx/window_qgrid.h"
 
-
-#include "s_data/test/fixed_queue.h"
-#include "s_data/test/term_buffer.h"
-#include "s_data/test/map.h"
 #include <stdint.h>
-#include "s_util/test/ansi.h"
 
 static inline void try_setup_step(fernos_error_t err, const char *msg) {
     if (err != FOS_E_SUCCESS) {
