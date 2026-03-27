@@ -397,6 +397,19 @@ typedef int32_t futex_t;
  * Shared mem plugin commands.
  */
 
-#define PLG_SHM_PCID_ALLOC   (0U)
-#define PLG_SHM_PCID_RELEASE (1U)
+typedef id_t sem_id_t;
+
+#define PLG_SHM_PCID_NEW_SEM     (0U)
+#define PLG_SHM_PCID_RELEASE_SEM (1U)
+#define PLG_SHM_PCID_SEM_WAIT    (2U)
+#define PLG_SHM_PCID_SEM_RETURN  (3U)
+
+// IDK, maybe just a linked list of all semaphore referenced by this guy??
+// Similar to the shared memory strategy???
+// Kinda difficult without using the handle paradigm...?
+// The handle paradigm wouldn't be so bad IMO???
+// You could use the handle to do stuff???
+
+#define PLG_SHM_PCID_ALLOC   (4U)
+#define PLG_SHM_PCID_RELEASE (5U)
 

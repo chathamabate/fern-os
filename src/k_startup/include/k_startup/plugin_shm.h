@@ -3,10 +3,34 @@
 
 #include "k_startup/plugin.h"
 #include "s_data/binary_search_tree.h"
+#include "s_data/wait_queue.h"
+#include "s_data/id_table.h"
 #include "s_util/constraints.h"
 
 typedef struct _plugin_shm_t plugin_shm_t;
 typedef struct _plugin_shm_range_t plugin_shm_range_t;
+typedef struct _plugin_shm_sem_t plugin_shm_sem_t;
+
+struct _plugin_shm_sem_t {
+    /**
+     * The number of passes which can still be lent out.
+     *
+     * When this is 0, threads must wait!
+     */
+    uint32_t passes;
+
+    /**
+     * Threads waiting for a pass.
+     */
+    basic_wait_queue_t * const bwq;
+
+    /**
+     * The number of processes which reference this semaphore.
+     *
+     * A process NEVER references a semaphore twice.
+     */
+    uint32_t references;
+};
 
 /**
  * When a range structure exists like this it corresponds to an allocated area of
@@ -40,6 +64,17 @@ struct _plugin_shm_range_t {
 
 struct _plugin_shm_t {
     plugin_t super;
+
+    /**
+     * A global ID table of all semaphores!
+     */
+    id_table_t * const sem_table;
+    // Could we just make semaphore max 64??
+    // Or maybe just a bit wise set would be nice IMO!
+    // I personally like bitwise map IMO.
+    // Much easier way to do all this IMO.
+
+
 
     /**
      * Each node in this tree will hold a `plugin_shm_range_t` which corresponds to a real
