@@ -346,22 +346,76 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
 }
 
 static fernos_error_t plg_shm_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
-    (void)plg;
-    (void)cpid;
+    kernel_state_t * const ks = plg->ks;
+    plugin_shm_t * const plg_shm = (plugin_shm_t *)plg;
 
-    return FOS_E_NOT_IMPLEMENTED;
+    process_t * const child_proc = idtb_get(ks->proc_table, cpid);
+    if (!child_proc) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    process_t * const parent_proc = child_proc->parent;
+    if (!parent_proc) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    // Copy the reference vector of the parent, into the child!
+    mem_cpy(plg_shm->sem_vectors[child_proc->pid], plg_shm->sem_vectors[parent_proc->pid], 
+            sizeof(plg_shm->sem_vectors[child_proc->pid]));
+
+    // Here we are looping over every semaphore in the system, increment the reference count
+    // of every semaphore which is reference by the new child process!
+    idtb_reset_iterator(plg_shm->sem_table);
+    const sem_id_t NULL_SEM_ID = idtb_null_id(plg_shm->sem_table);
+    for (sem_id_t sem_id = idtb_get_iter(plg_shm->sem_table); sem_id != NULL_SEM_ID;
+            sem_id = idtb_next(plg_shm->sem_table)) {
+        if (plg_shm->sem_vectors[child_proc->pid][sem_id / 8] & (1 << (sem_id % 8))) {
+            plugin_shm_sem_t *sem = idtb_get(plg_shm->sem_table, sem_id); 
+            if (!sem) {
+                return FOS_E_STATE_MISMATCH;
+            }
+
+            sem->references++;
+        }
+    }
+
+    return FOS_E_SUCCESS;
+}
+
+static fernos_error_t plg_shm_on_reset_or_reap_proc(plugin_t *plg, proc_id_t pid) {
+    kernel_state_t * const ks = plg->ks;
+    plugin_shm_t * const plg_shm = (plugin_shm_t *)plg;
+
+    // Since we will potentially modifying the semaphore table, we will not use
+    // the idtb iterator functions!
+
+    for (sem_id_t sem_id = 0; sem_id < KS_SEM_MAX_SEMS; sem_id++) {
+        if (plg_shm->sem_vectors[pid][sem_id / 8] & (1 << (sem_id % 8))) {
+            plugin_shm_sem_t *sem = idtb_get(plg_shm->sem_table, sem_id); 
+            if (!sem) {
+                return FOS_E_STATE_MISMATCH;
+            }
+
+            // Dereference our semaphore once, deleting if needed!
+            // We won't need to worry about threads of the calling process, they will not 
+            // execute again.
+            if (--(sem->references) == 0) {
+                delete_wait_queue((wait_queue_t *)(sem->bwq));
+                al_free(ks->al, sem);
+                idtb_push_id(plg_shm->sem_table, sem_id);
+            }
+        }
+    }
+
+    mem_set(plg_shm->sem_vectors[pid], 0, sizeof(plg_shm->sem_vectors[pid]));
+
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t plg_shm_on_reset_proc(plugin_t *plg, proc_id_t pid) {
-    (void)plg;
-    (void)pid;
-
-    return FOS_E_NOT_IMPLEMENTED;
+    return plg_shm_on_reset_or_reap_proc(plg, pid);
 }
 
 static fernos_error_t plg_shm_on_reap_proc(plugin_t *plg, proc_id_t rpid) {
-    (void)plg;
-    (void)rpid;
-
-    return FOS_E_NOT_IMPLEMENTED;
+    return plg_shm_on_reset_or_reap_proc(plg, rpid);
 }
