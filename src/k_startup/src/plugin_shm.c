@@ -71,10 +71,11 @@ plugin_t *new_plugin_shm(kernel_state_t *ks) {
 static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     fernos_error_t err;
 
-    kernel_state_t *ks = plg->ks;
-    plugin_shm_t *plg_shm = (plugin_shm_t *)plg;
+    kernel_state_t * const ks = plg->ks;
+    plugin_shm_t * const plg_shm = (plugin_shm_t *)plg;
 
-    thread_t *curr_thr = (thread_t *)(ks->schedule.head);
+    thread_t * const curr_thr = (thread_t *)(ks->schedule.head);
+    process_t * const curr_proc = curr_proc;
 
     (void)arg1;
     (void)arg2;
@@ -136,7 +137,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
             // If we've made it here, all allocations have succeeded!
             // As long as we successfully write back the allocated ID, we are in the clear!
 
-            err = mem_cpy_to_user(curr_thr->proc->pd, u_sem_id, &sem_id, sizeof(sem_id_t), NULL);
+            err = mem_cpy_to_user(curr_proc->pd, u_sem_id, &sem_id, sizeof(sem_id_t), NULL);
             if (err != FOS_E_SUCCESS) {
                 err = FOS_E_BAD_ARGS;
             }
@@ -158,7 +159,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         sem->references = 1;
 
         idtb_set(plg_shm->sem_table, sem_id, sem);
-        plg_shm->sem_vectors[curr_thr->proc->pid][sem_id / 8] |= 1 << (sem_id % 8);
+        plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] |= 1 << (sem_id % 8);
 
         DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
@@ -184,7 +185,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         }
 
         // Does this proccess even have access `sem_id` though?
-        if (!(plg_shm->sem_vectors[curr_thr->proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
+        if (!(plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
             DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 
@@ -232,7 +233,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         }
 
         // Does this proccess even have access `sem_id` though?
-        if (!(plg_shm->sem_vectors[curr_thr->proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
+        if (!(plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
             return FOS_E_SUCCESS;
         }
 
@@ -279,8 +280,62 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         return FOS_E_SUCCESS;
     }
 
+    /**
+     * Close a semaphore!
+     *
+     * This is a destructor style call, and thus returns nothing.
+     *
+     * `arg0` - the ID of the semaphore to close.
+     *
+     * NOTE: The underlying semaphore is only actually deleted if its reference count reaches 0.
+     * NOTE: If the calling process has threads which are currently in the given semaphore's 
+     * wait queue, said threads are woken up with return code `FOS_E_STATE_MISMATCH`.
+     */
     case PLG_SHM_PCID_SEM_CLOSE: {
+        const sem_id_t sem_id = (sem_id_t)arg0;
 
+        if (sem_id >= KS_SEM_MAX_SEMS) {
+            return FOS_E_SUCCESS;
+        }
+
+        // Do we even have access to this semaphore?
+        if (!(plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
+            return FOS_E_SUCCESS;
+        }
+
+        plugin_shm_sem_t *sem = (plugin_shm_sem_t *)(idtb_get(plg_shm->sem_table, sem_id));
+        if (!sem) {
+            return FOS_E_STATE_MISMATCH;
+        }
+
+        // When we close a semaphore, we first detach all of the calling process's current threads
+        // from the semaphore with return code FOS_E_STATE_MISMATCH.
+
+        const thread_id_t NULL_TID = idtb_null_id(curr_proc->thread_table);
+        idtb_reset_iterator(curr_proc->thread_table);
+        for (thread_id_t tid = idtb_get_iter(curr_proc->thread_table); tid != NULL_TID; 
+                tid = idtb_next(curr_proc->thread_table)) {
+            thread_t *thr = (thread_t *)idtb_get(curr_proc->thread_table, tid);
+
+            if (thr->state == THREAD_STATE_WAITING && thr->wq == (wait_queue_t *)(sem->bwq)) {
+                thread_schedule(thr, &(ks->schedule));
+                thr->ctx.eax = FOS_E_STATE_MISMATCH;
+            }
+        }
+
+        // Now we remove semaphore from reference vector.
+        
+        plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] &= ~(1 << (sem_id % 8));
+
+        // Finally decrement semaphore counter! (And potentially delete)
+        
+        if (--(sem->references) == 0) {
+            delete_wait_queue((wait_queue_t *)(sem->bwq));
+            al_free(ks->al, sem);
+            idtb_push_id(plg_shm->sem_table, sem_id);
+        }
+
+        return FOS_E_SUCCESS;
     }
 
     default: {
