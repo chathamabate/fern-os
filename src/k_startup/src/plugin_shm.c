@@ -152,6 +152,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
 
         // Success! setup our semaphore structure!
         *(sem_id_t *)&(sem->id) = sem_id;
+        *(uint32_t *)&(sem->max_passes) = sem_passes;
         sem->passes = sem_passes;
         *(basic_wait_queue_t **)&(sem->bwq) = bwq;
         sem->references = 1;
@@ -162,12 +163,120 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
-    case PLG_SHM_PCID_SEM_ACQUIRE: {
+    /**
+     * This attempts to decrement the sempahore's internal pass counter!
+     *
+     * If the pass counter is 0, this call blocks the current thread until pass counter becomes
+     * non-zero.
+     *
+     * Returns FOS_E_BAD_ARGS if the given semaphore id doesn't reference a semaphore available to 
+     * the calling process.
+     * Returns FOS_E_SUCCESS when the semaphore has been successfully decremented.
+     * Returns FOS_E_NO_MEM if we fail to add our thread to the wait queue in the waiting case.
+     *
+     * `arg0` - The id of the semaphore we are trying to acquire.
+     */
+    case PLG_SHM_PCID_SEM_DEC: {
+        const sem_id_t sem_id = (sem_id_t)arg0;
 
+        if (sem_id >= KS_SEM_MAX_SEMS) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        // Does this proccess even have access `sem_id` though?
+        if (!(plg_shm->sem_vectors[curr_thr->proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
+        if (!sem) {
+            return FOS_E_STATE_MISMATCH; // Very bad.
+        }
+
+        if (sem->passes > 0) {
+            sem->passes--;
+
+            DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+        }
+
+        // Semaphore counter is 0, we must wait :,(
+
+        err = bwq_enqueue(sem->bwq, curr_thr);
+        if (err != FOS_E_SUCCESS) {
+            DUAL_RET(curr_thr, FOS_E_NO_MEM, FOS_E_SUCCESS);
+        }
+
+        thread_detach(curr_thr);
+        curr_thr->state = THREAD_STATE_WAITING;
+        curr_thr->wq = (wait_queue_t *)(sem->bwq);
+
+        return FOS_E_SUCCESS;
     }
 
-    case PLG_SHM_PCID_RELEASE: {
+    /**
+     * Increment a semaphore!
+     *
+     * If the semaphore's current value is zero, then incrementing will wake up one waiting thread!
+     * (If there are any)
+     * 
+     * This is a destructor style call, and thus will return nothing!
+     * Just remember that incrementing will NEVER push the semaphore pass count past it's max value!
+     *
+     * `arg0` - The id of the semaphore to increment.
+     */
+    case PLG_SHM_PCID_SEM_INC: {
+        const sem_id_t sem_id = (sem_id_t)arg0;
 
+        if (sem_id >= KS_SEM_MAX_SEMS) {
+            return FOS_E_SUCCESS;
+        }
+
+        // Does this proccess even have access `sem_id` though?
+        if (!(plg_shm->sem_vectors[curr_thr->proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
+            return FOS_E_SUCCESS;
+        }
+
+        plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
+        if (!sem) {
+            return FOS_E_STATE_MISMATCH; // Very bad.
+        }
+
+        if (sem->passes == sem->max_passes) {
+            return FOS_E_SUCCESS;
+        }
+
+        sem->passes++;
+
+        if (sem->passes == 1) { // If we went from 0 to 1, wake up!
+            err = bwq_notify_next(sem->bwq);
+            if (err != FOS_E_SUCCESS) {
+                return err; // We'll just say a failure to notify is system fatal to make my life
+                            // easier.
+            }
+
+            thread_t *woken_thr;
+            err = bwq_pop(sem->bwq, (void **)&woken_thr);
+            if (err == FOS_E_SUCCESS) {
+                // We successfully popped a waiting thread, it will take the pass just returned!
+                sem->passes--;
+
+                woken_thr->state = THREAD_STATE_DETATCHED;
+                woken_thr->wq = NULL;
+                mem_set(woken_thr->wait_ctx, 0, sizeof(woken_thr->wait_ctx)); // Not really necessary, but whatever.
+                woken_thr->ctx.eax = FOS_E_SUCCESS;
+
+                thread_schedule(woken_thr, &(ks->schedule));
+            }
+
+            if (err != FOS_E_EMPTY) {
+                return err;
+            }
+
+            // NOTE: if `err` was FOS_E_EMPTY, this indicates there were no waiting thread!
+            // This is totally fine, `sem->passes` will retain its new value of 1.
+        }
+
+        return FOS_E_SUCCESS;
     }
 
     case PLG_SHM_PCID_SEM_CLOSE: {

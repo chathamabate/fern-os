@@ -26,6 +26,11 @@ struct _plugin_shm_sem_t {
     const sem_id_t id;
 
     /**
+     * The maximum number of passes which can be lent out by this semaphore!
+     */
+    const uint32_t max_passes;
+
+    /**
      * The number of passes which can still be lent out.
      *
      * When this is 0, threads must wait!
