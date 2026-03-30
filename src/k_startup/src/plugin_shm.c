@@ -75,9 +75,8 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
     plugin_shm_t * const plg_shm = (plugin_shm_t *)plg;
 
     thread_t * const curr_thr = (thread_t *)(ks->schedule.head);
-    process_t * const curr_proc = curr_proc;
+    process_t * const curr_proc = curr_thr->proc;
 
-    (void)arg1;
     (void)arg2;
     (void)arg3;
 
@@ -86,13 +85,13 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
     /**
      * Create a new sempahore!
      *
+     * `arg0` - User pointer to a `sem_id_t`.
+     * `arg1` - Semaphore number of passes.
+     *
      * Returns FOS_E_BAD_ARGS if `arg0` is NULL or if copying to `arg0` fails.
      * Returns FOS_E_BAD_ARGS if `arg1` is 0.
      * Returns FOS_E_NO_SPACE if the sempahore table is already full.
      * Returns FOS_E_NO_MEM if we fail to allocate the sempahore state.
-     *
-     * `arg0` - User pointer to a `sem_id_t`.
-     * `arg1` - Semaphore number of passes.
      */
     case PLG_SHM_PCID_NEW_SEM: {
         err = FOS_E_SUCCESS;
@@ -170,12 +169,14 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
      * If the pass counter is 0, this call blocks the current thread until pass counter becomes
      * non-zero.
      *
+     * `arg0` - The id of the semaphore we are trying to acquire.
+     *
      * Returns FOS_E_BAD_ARGS if the given semaphore id doesn't reference a semaphore available to 
      * the calling process.
+     * Returns FOS_E_STATE_MISMATCH if the calling process closes the semaphore while this thread is 
+     * waiting.
      * Returns FOS_E_SUCCESS when the semaphore has been successfully decremented.
      * Returns FOS_E_NO_MEM if we fail to add our thread to the wait queue in the waiting case.
-     *
-     * `arg0` - The id of the semaphore we are trying to acquire.
      */
     case PLG_SHM_PCID_SEM_DEC: {
         const sem_id_t sem_id = (sem_id_t)arg0;
