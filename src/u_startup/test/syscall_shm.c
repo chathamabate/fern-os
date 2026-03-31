@@ -58,7 +58,11 @@ static bool test_sem_new_and_close(void) {
     TEST_EQUAL_HEX(FOS_E_BAD_ARGS, sc_shm_new_semaphore(&sem, 0));
 
     TEST_SUCCESS(sc_shm_new_semaphore(&sem, 2));
+    TEST_SUCCESS(sc_shm_sem_dec(sem)); // Shouldn't block!
     sc_shm_close_semaphore(sem);
+
+    // Shouldn't be useable after close!
+    TEST_EQUAL_HEX(FOS_E_BAD_ARGS, sc_shm_sem_dec(sem));
 
     TEST_SUCCEED();
 }
@@ -221,6 +225,11 @@ static bool test_sem_cross_process(void) {
     sem_id_t sem;
 
     TEST_SUCCESS(sc_shm_new_semaphore(&sem, 1));
+
+    // This is a little test line which confirms that a semaphore cannot be incremented past its
+    // initialized count. If the semaphore actually does make it to a count of 2, the below
+    // tests will likely yield incorret data!
+    sc_shm_sem_inc(sem);
 
     const tscpw_arg_t arg = {
         .sem = sem,
@@ -418,11 +427,6 @@ static bool test_sem_early_close(void) {
     sc_signal_allow(sv);
 
     TEST_SUCCEED();
-}
-
-static bool test_sem_invalid(void) {
-
-    // What about testing the max count though?
 }
 
 bool test_syscall_shm_sem(void) {
