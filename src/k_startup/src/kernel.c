@@ -27,6 +27,7 @@
 #include "k_startup/plugin_kb.h"
 #include "k_startup/plugin_pipe.h"
 #include "k_startup/plugin_gfx.h"
+#include "k_startup/plugin_shm.h"
 
 #include "k_sys/m2.h"
 
@@ -158,6 +159,12 @@ static void init_kernel_plugins(void) {
         gfx_direct_fatal("Failed to create Pipe plugin");
     }
     try_setup_step(ks_set_plugin(kernel, PLG_PIPE_ID, plg_pipe), "Failed to set Pipe Plugin in the kernel");
+
+    plugin_t *plg_shm = new_plugin_shm(kernel);
+    if (!plg_shm) {
+        gfx_direct_fatal("Failed to create Shared Memory plugin");
+    }
+    try_setup_step(ks_set_plugin(kernel, PLG_SHARED_MEM_ID, plg_shm), "Failed to set Shared Memory Plugin in the kernel");
 
     // Now for graphics plugin!
     window_t *root_window = new_da_window_qgrid(FERNOS_GFX_WIDTH, FERNOS_GFX_HEIGHT);

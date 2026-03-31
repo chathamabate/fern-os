@@ -397,6 +397,9 @@ typedef int32_t futex_t;
  * Shared mem plugin commands.
  */
 
-#define PLG_SHM_PCID_ALLOC   (0U)
-#define PLG_SHM_PCID_RELEASE (1U)
+typedef id_t sem_id_t;
 
+#define PLG_SHM_PCID_NEW_SEM      (0U)
+#define PLG_SHM_PCID_SEM_DEC      (1U)
+#define PLG_SHM_PCID_SEM_INC      (2U)
+#define PLG_SHM_PCID_SEM_CLOSE    (3U)
