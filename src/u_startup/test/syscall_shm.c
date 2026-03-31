@@ -64,10 +64,15 @@ static bool test_sem_new_and_close(void) {
 }
 
 static void *test_sem_simple_lock_worker(void *arg) {
+    fernos_error_t err;
+
     sem_id_t sem = (sem_id_t)arg;
 
     for (size_t i = 0; i < 5; i++) {
-        TEST_SUCCESS(sc_shm_sem_dec(sem));
+        err = sc_shm_sem_dec(sem);
+        if (err != FOS_E_SUCCESS) {
+            return (void *)1;
+        }
 
         // Each iteration, we increment each cell in the buffer by 1.
         // AND confirm the buffer is uniform!
@@ -84,7 +89,7 @@ static void *test_sem_simple_lock_worker(void *arg) {
         sc_shm_sem_inc(sem);
     }
 
-    return NULL;
+    return (void *)0;
 }
 
 static bool test_sem_simple_lock(void) {
@@ -104,8 +109,10 @@ static bool test_sem_simple_lock(void) {
         TEST_SUCCESS(sc_thread_spawn(tids + i, test_sem_simple_lock_worker, (void *)sem));
     }
 
+    void *worker_rv;
     for (size_t i = 0; i < num_workers; i++) {
-        TEST_SUCCESS(sc_thread_join(1U << tids[i], NULL, NULL));
+        TEST_SUCCESS(sc_thread_join(1U << tids[i], NULL, &worker_rv));
+        TEST_FALSE(worker_rv);
     }
 
     for (size_t i = 0; i < TEST_SEM_BUFFER_LEN; i++) {
@@ -134,6 +141,8 @@ typedef struct {
 } tscpw_arg_t;
 
 static void *test_sem_cross_process_worker(void *arg) {
+    fernos_error_t err;
+
     const tscpw_arg_t * const targ = arg;
 
     for (size_t i = 0; i < targ->iters; i++) {
@@ -148,30 +157,37 @@ static void *test_sem_cross_process_worker(void *arg) {
         uint8_t ref_byte;
         uint8_t tmp_byte;
 
-        TEST_SUCCESS(sc_handle_read(targ->rp, &ref_byte, 1, &txed));
-        TEST_EQUAL_UINT(1, txed);
+        err = sc_handle_read(targ->rp, &ref_byte, 1, &txed);
+        if (err != FOS_E_SUCCESS || txed != 1) {
+            return (void *)1;
+        }
 
         for (size_t i = 0; i < targ->pipe_size - 1; i++) {
-            TEST_SUCCESS(sc_handle_read(targ->rp, &tmp_byte, 1, &txed));
-            TEST_EQUAL_UINT(1, txed);
-            TEST_EQUAL_UINT(ref_byte, tmp_byte);
+            err = sc_handle_read(targ->rp, &tmp_byte, 1, &txed);
+            if (err != FOS_E_SUCCESS || 1 != txed || ref_byte != tmp_byte) {
+                return (void *)1;
+            }
         }
 
         // The pipe should not hold excess bytes!
-        TEST_EQUAL_HEX(FOS_E_EMPTY, sc_handle_read(targ->rp, &tmp_byte, 1, &txed));
+        if (FOS_E_EMPTY != sc_handle_read(targ->rp, &tmp_byte, 1, &txed)) {
+            return (void *)1;
+        }
 
         // Now we write back the incremented version.
         ref_byte++;
 
         for (size_t i = 0; i < targ->pipe_size; i++) {
-            TEST_SUCCESS(sc_handle_write(targ->wp, &ref_byte, 1, &txed));
-            TEST_EQUAL_UINT(1, txed);
+            err = sc_handle_write(targ->wp, &ref_byte, 1, &txed);
+            if (err != FOS_E_SUCCESS || 1 != txed) {
+                return (void *)1;
+            }
         }
 
         sc_shm_sem_inc(targ->sem);
     }
 
-    return NULL;
+    return (void *)0;
 }
 
 static bool test_sem_cross_process(void) {
@@ -222,8 +238,10 @@ static bool test_sem_cross_process(void) {
                 TEST_SUCCESS(sc_thread_spawn(tids + j, test_sem_cross_process_worker, (void *)&arg));
             }
 
+            void *worker_rv;
             for (size_t j = 0; j < workers_per_child; j++) {
-                TEST_SUCCESS(sc_thread_join(1 << tids[j], NULL, NULL));
+                TEST_SUCCESS(sc_thread_join(1 << tids[j], NULL, &worker_rv));
+                TEST_FALSE(worker_rv);
             }
 
             sc_proc_exit(PROC_ES_SUCCESS);
@@ -400,6 +418,11 @@ static bool test_sem_early_close(void) {
     sc_signal_allow(sv);
 
     TEST_SUCCEED();
+}
+
+static bool test_sem_invalid(void) {
+
+    // What about testing the max count though?
 }
 
 bool test_syscall_shm_sem(void) {
