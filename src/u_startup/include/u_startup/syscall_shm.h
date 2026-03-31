@@ -59,8 +59,6 @@ void sc_shm_sem_inc(sem_id_t sem);
  *
  * This is a destructor style call, and thus returns nothing.
  *
- * `arg0` - the ID of the semaphore to close.
- *
  * NOTE: The underlying semaphore is only actually deleted if its reference count reaches 0.
  * NOTE: If the calling process has threads which are currently in the given semaphore's 
  * wait queue, said threads are woken up with return code `FOS_E_STATE_MISMATCH`.

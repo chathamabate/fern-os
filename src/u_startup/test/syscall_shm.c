@@ -51,7 +51,6 @@ static fernos_error_t reap_single(proc_id_t rcpid) {
 #define TEST_SEM_BUFFER_LEN 8
 static uint32_t test_sem_buffer[TEST_SEM_BUFFER_LEN];
 
-
 static bool test_sem_new_and_close(void) {
     sem_id_t sem;
 
@@ -265,10 +264,149 @@ static bool test_sem_cross_process(void) {
     TEST_SUCCEED();
 }
 
+typedef struct {
+    sem_id_t sem;
+    bool exp_success;
+} tsecw_arg_t;
+
+static void *test_sem_early_close_worker(void *arg) {
+    const tsecw_arg_t * const targ = (const tsecw_arg_t *)arg;
+
+    fernos_error_t err = sc_shm_sem_dec(targ->sem);
+
+    if (targ->exp_success) {
+        if (err != FOS_E_SUCCESS) {
+            return (void *)1;
+        }
+        sc_thread_sleep(1);
+        sc_shm_sem_inc(targ->sem);
+    } else if (err != FOS_E_STATE_MISMATCH) {
+        return (void *)1;
+    }
+
+    return (void *)0;
+}
+
+static bool test_sem_early_close(void) {
+    // This is testing the behavior where when a process closes a semaphore, all the process's
+    // threads which are still waiting on the semaphore are rescheduled.
+    //
+    // Other waiting threads should not be affected!
+
+    fernos_error_t err;
+
+    sig_vector_t sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    sem_id_t sems[2];
+
+    TEST_SUCCESS(sc_shm_new_semaphore(sems + 0, 1));
+    TEST_SUCCESS(sc_shm_new_semaphore(sems + 1, 1));
+
+    // Ok, before we do anything, let's decrement both semaphores to cause blocking in the 
+    // below threads!
+
+    TEST_SUCCESS(sc_shm_sem_dec(sems[0]));
+    TEST_SUCCESS(sc_shm_sem_dec(sems[1]));
+
+    thread_id_t tids[2]; // two threads per process!
+    tsecw_arg_t wargs[2] = { // expect success in both workers by default!
+        {sems[0], true},
+        {sems[1], true}
+    };
+
+    proc_id_t cpid; 
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    void *worker_rv;
+
+    if (cpid == FOS_MAX_PROCS) { // Child process!
+        TEST_SUCCESS(sc_thread_spawn(tids + 0, test_sem_early_close_worker, wargs + 0));
+
+        wargs[1].exp_success = false; // This guy will be woken up early!
+        TEST_SUCCESS(sc_thread_spawn(tids + 1, test_sem_early_close_worker, wargs + 1));
+
+        // Ok, we want to wait until worker 1 of the child proc is is blocked.
+        // Unfortunately, we actually have no way of confirming this.
+        // So, we'll just wait a little bit.
+        //
+        // Realize, this would fail if we end up closing the semaphore before worker 1 runs,
+        // in this case state mismatch would not be returned, a bad args error would be!
+        sc_thread_sleep(16);
+
+        sc_shm_close_semaphore(sems[1]);
+        TEST_SUCCESS(sc_thread_join(1 << tids[1], NULL, &worker_rv));
+        TEST_FALSE(worker_rv);
+
+        // Finally, we wait for the parent process to increment sem 0 enough times to
+        // gaurantee a wake up of worker 0!
+        
+        TEST_SUCCESS(sc_thread_join(1 << tids[0], NULL, &worker_rv));
+        TEST_FALSE(worker_rv);
+
+        // This will be done autmatically, but whatever!
+        sc_shm_close_semaphore(sems[0]);
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // In the parent process, we'll just expect both workers on both sems to succeed.
+    TEST_SUCCESS(sc_thread_spawn(tids + 0, test_sem_early_close_worker, wargs + 0));
+    TEST_SUCCESS(sc_thread_spawn(tids + 1, test_sem_early_close_worker, wargs + 1));
+
+    // Ok, let's get the child process to exit. It's logic on semaphore 1 is self-contained,
+    // however we will need to manually increment semaphore 0 here before it can exit.
+    // We must be careful though, as our thread 0 is also potentially waiting on semaphore 0.
+    // 
+    // We'll increment the semaphore until the child exits!
+
+    while (true) {
+        sc_shm_sem_inc(sems[0]);
+
+        proc_exit_status_t rces;
+        err = sc_proc_reap(cpid, NULL, &rces);
+        if (err == FOS_E_SUCCESS) {
+            TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
+            break;
+        }
+
+        // We expect that if our reap fails, that the child process is just still executing.
+        // No biggy, just sleep and try again.
+        //
+        // We aren't using signal wait here as we want to be able to continue to increment 
+        // the semaphore to gaurantee the child thread isn't blocked forever!
+        TEST_EQUAL_HEX(FOS_E_EMPTY, err);
+
+        sc_thread_sleep(1);
+    }
+
+    sc_signal_clear(1 << FSIG_CHLD);
+
+    // Our child process has exited and been reaped!
+    // We know it is impossible anyone else is contending for semaphore 0 or 1, increment them just
+    // one more time to be certain our threads must wake up!
+    sc_shm_sem_inc(sems[0]);
+    sc_shm_sem_inc(sems[1]); // This is actually required for semaphore 1 as it gets 
+                                  // incremented no where else!
+
+    TEST_SUCCESS(sc_thread_join(1 << tids[0], NULL, &worker_rv));
+    TEST_FALSE(worker_rv);
+
+    TEST_SUCCESS(sc_thread_join(1 << tids[1], NULL, &worker_rv));
+    TEST_FALSE(worker_rv);
+
+    sc_shm_close_semaphore(sems[1]);
+    sc_shm_close_semaphore(sems[0]);
+
+    sc_signal_allow(sv);
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_shm_sem(void) {
     BEGIN_SUITE("Shared Memory: Semaphores");
     RUN_TEST(test_sem_new_and_close);
     RUN_TEST(test_sem_simple_lock);
     RUN_TEST(test_sem_cross_process);
+    RUN_TEST(test_sem_early_close);
     return END_SUITE();
 }
