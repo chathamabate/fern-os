@@ -429,11 +429,42 @@ static bool test_sem_early_close(void) {
     TEST_SUCCEED();
 }
 
+static bool test_sem_many(void) {
+    // Here we just make sure we can make a bunch of semaphores and access them without error.
+    sem_id_t sems[16]; 
+    const size_t num_sems = sizeof(sems) / sizeof(sems[0]);
+
+    for (size_t i = 0; i < num_sems; i++) {
+        TEST_SUCCESS(sc_shm_new_semaphore(sems + i, 1));
+
+        TEST_SUCCESS(sc_shm_sem_dec(sems[i]));
+        sc_shm_sem_inc(sems[i]);
+    }
+
+    for (size_t i = 0; i < num_sems; i += 3) {
+        sc_shm_close_semaphore(sems[i]);
+    }
+
+    for (size_t i = 0; i < num_sems; i++) {
+        if (i % 3 == 0) {
+            TEST_EQUAL_HEX(FOS_E_BAD_ARGS, sc_shm_sem_dec(sems[i]));
+        } else {
+            TEST_SUCCESS(sc_shm_sem_dec(sems[i]));
+            sc_shm_sem_inc(sems[i]);
+
+            sc_shm_close_semaphore(sems[i]);
+        }
+    }
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_shm_sem(void) {
     BEGIN_SUITE("Shared Memory: Semaphores");
     RUN_TEST(test_sem_new_and_close);
     RUN_TEST(test_sem_simple_lock);
     RUN_TEST(test_sem_cross_process);
     RUN_TEST(test_sem_early_close);
+    RUN_TEST(test_sem_many);
     return END_SUITE();
 }
