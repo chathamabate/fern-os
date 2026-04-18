@@ -403,3 +403,6 @@ typedef id_t sem_id_t;
 #define PLG_SHM_PCID_SEM_DEC      (1U)
 #define PLG_SHM_PCID_SEM_INC      (2U)
 #define PLG_SHM_PCID_SEM_CLOSE    (3U)
+
+#define PLG_SHM_PCID_NEW_SHM      (4U)
+#define PLG_SHM_PCID_CLOSE_SHM    (5U)

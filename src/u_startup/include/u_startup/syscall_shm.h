@@ -64,3 +64,28 @@ void sc_shm_sem_inc(sem_id_t sem);
  * wait queue, said threads are woken up with return code `FOS_E_STATE_MISMATCH`.
  */
 void sc_shm_close_semaphore(sem_id_t sem);
+
+/**
+ * Create a new shared memory area of size at least `bytes`.
+ *
+ * Returns FOS_E_BAD_ARGS if `bytes` is 0 or `shm` is NULL.
+ * Returns FOS_E_NO_MEM if there isn't enough space for the new shared memory area!
+ * Returns FOS_E_SUCCESS on success and writes a pointer to the beginning of the area to `*shm`.
+ */
+fernos_error_t sc_shm_new_shm(size_t bytes, void **shm);
+
+/**
+ * Close a shared memory area!
+ *
+ * This is a destructor style call, and thus returns nothing.
+ *
+ * NOTE: Just like semaphores, the underlying shared memory area is reference counted!
+ * The shared memory area is actually only entirely deallocated once its no longer referenced
+ * by any processes. HOWEVER, this WILL always unmap all of `shm` in the calling process.
+ *
+ * NOTE: `shm` can point to any byte within the shared memory area being unmapped.
+ *
+ * NOTE: This does nothing if `shm` doesn't point to a shared memory area CURRENTLY 
+ * MAPPED IN THIS PROCESS!
+ */
+void sc_shm_close_shm(void *shm);

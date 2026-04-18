@@ -339,6 +339,29 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         return FOS_E_SUCCESS;
     }
 
+    /**
+     * Create a new shared memory area of size at least `bytes`.
+     *
+     * `arg0` - The minimum size of the area to create.
+     * `arg1` - A userspace void **.
+     *
+     * Returns FOS_E_BAD_ARGS if `bytes` is 0 or `shm` is NULL.
+     * Returns FOS_E_NO_MEM if there isn't enough space for the new shared memory area!
+     * Returns FOS_E_SUCCESS on success and writes a pointer to the beginning of the area to `*shm`.
+     */
+    case PLG_SHM_PCID_NEW_SHM: {
+
+    }
+
+    /**
+     * Close a shared memory area!
+     *
+     * `arg0` - the address of a byte within the shared memory region to unmap.
+     */
+    case PLG_SHM_PCID_CLOSE_SHM: {
+
+    }
+
     default: {
         DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
