@@ -86,7 +86,9 @@ static void *test_sem_simple_lock_worker(void *arg) {
         const uint32_t val = test_sem_buffer[0];
         for (size_t i = 0; i < TEST_SEM_BUFFER_LEN; i++) {
             sc_thread_sleep(1);
-            TEST_EQUAL_UINT(val, test_sem_buffer[i]);
+            if (val != test_sem_buffer[i]) {
+                return (void *)1;
+            }
             test_sem_buffer[i] = val + 1;
         }
 

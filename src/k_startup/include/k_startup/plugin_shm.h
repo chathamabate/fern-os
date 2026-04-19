@@ -10,14 +10,22 @@
 
 /**
  * Max number of semaphores allowed globally at once.
- *
- * Must be a multiple of 8.
  */
-#define KS_SEM_MAX_SEMS (64U)
+#define KS_SHM_MAX_SEMS (64U)
+
+/**
+ * Maximum number of shared memory areas allowed globally at once.
+ */
+#define KS_SHM_MAX_SHMS (128U)
 
 typedef struct _plugin_shm_t plugin_shm_t;
 typedef struct _plugin_shm_range_t plugin_shm_range_t;
 typedef struct _plugin_shm_sem_t plugin_shm_sem_t;
+
+/**
+ * ID of a shared memory range.
+ */
+typedef id_t shm_id_t;
 
 struct _plugin_shm_sem_t {
     /**
@@ -43,11 +51,11 @@ struct _plugin_shm_sem_t {
     basic_wait_queue_t * const bwq;
 
     /**
-     * The number of processes which reference this semaphore.
+     * This represents which processes have access to this semaphore!
      *
-     * A process NEVER references a semaphore twice.
+     * If this bit vector is entirely 0, the kernel should dispose of this semaphore!
      */
-    uint32_t references;
+    uint8_t refs[FOS_MAX_PROCS / 8];
 };
 
 /**
@@ -57,6 +65,11 @@ struct _plugin_shm_sem_t {
  * Ranges will always be inside the FOS_SHARED_AREA!
  */
 struct _plugin_shm_range_t {
+    /**
+     * ID of this shared memory area in the global shm table.
+     */
+    const shm_id_t shm_id;
+
     /**
      * Inclusive start of the range.
      *
@@ -77,7 +90,7 @@ struct _plugin_shm_range_t {
      * When this reaches 0, the range will be unmapped in the kernel, and it's underlying pages 
      * returned to the page free list.
      */
-    size_t references;
+    uint32_t references;
 };
 
 struct _plugin_shm_t {
@@ -86,19 +99,11 @@ struct _plugin_shm_t {
     /**
      * A global ID table of all semaphores!
      *
-     * Will have a max cap of `KS_SEM_MAX_SEMS`.
+     * Will have a max cap of `KS_SHM_MAX_SEMS`.
      *
      * This maps sem_id_t -> plugin_shm_sem_t *
      */
     id_table_t * const sem_table;
-
-    /**
-     * This represents which semaphores are referenced by which processes!
-     *
-     * If a sempahore's corresponding bit is not set in a processes's vector,
-     * that process is not allowed to use said semaphore!
-     */
-    uint8_t sem_vectors[FOS_MAX_PROCS][KS_SEM_MAX_SEMS / 8];
 
     /**
      * Each node in this tree will hold a `plugin_shm_range_t` which corresponds to a real

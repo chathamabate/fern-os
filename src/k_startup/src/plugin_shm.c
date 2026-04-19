@@ -4,10 +4,6 @@
 #include "k_startup/page_helpers.h"
 #include "k_startup/process.h"
 
-#if KS_SEM_MAX_SEMS % 8 != 0
-#error "Semaphore limit must be a multiple of 8!"
-#endif
-
 static int32_t cmp_shm_range(const void *k0, const void *k1) {
     const void *s0 = ((plugin_shm_range_t *)k0)->start;
     const void *s1 = ((plugin_shm_range_t *)k1)->start;
@@ -41,7 +37,7 @@ static const plugin_impl_t PLUGIN_SHM_IMPL = {
 
 plugin_t *new_plugin_shm(kernel_state_t *ks) {
     plugin_shm_t *plg_shm = al_malloc(ks->al, sizeof(plugin_shm_t));
-    id_table_t *st = new_id_table(ks->al, KS_SEM_MAX_SEMS);
+    id_table_t *st = new_id_table(ks->al, KS_SHM_MAX_SEMS);
     
     // binary_search_tree_t *rt = new_simple_bst(ks->al, cmp_shm_range, sizeof(plugin_shm_range_t));
 
@@ -56,7 +52,6 @@ plugin_t *new_plugin_shm(kernel_state_t *ks) {
 
     init_base_plugin((plugin_t *)plg_shm, &PLUGIN_SHM_IMPL, ks);
     *(id_table_t **)&(plg_shm->sem_table) = st;
-    mem_set(plg_shm->sem_vectors, 0, sizeof(plg_shm->sem_vectors));
 
     /*
     *(binary_search_tree_t **)&(plg_shm->range_tree) = rt;
@@ -155,10 +150,10 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         *(uint32_t *)&(sem->max_passes) = sem_passes;
         sem->passes = sem_passes;
         *(basic_wait_queue_t **)&(sem->bwq) = bwq;
-        sem->references = 1;
+        mem_set(sem->refs, 0, sizeof(sem->refs));
+        sem->refs[curr_proc->pid / 8] |= 1 << (curr_proc->pid % 8);
 
         idtb_set(plg_shm->sem_table, sem_id, sem);
-        plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] |= 1 << (sem_id % 8);
 
         DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
@@ -181,18 +176,18 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
     case PLG_SHM_PCID_SEM_DEC: {
         const sem_id_t sem_id = (sem_id_t)arg0;
 
-        if (sem_id >= KS_SEM_MAX_SEMS) {
-            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
-        }
-
-        // Does this proccess even have access `sem_id` though?
-        if (!(plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
+        if (sem_id >= KS_SHM_MAX_SEMS) {
             DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 
         plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
         if (!sem) {
-            return FOS_E_STATE_MISMATCH; // Very bad.
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        // Does this proccess even have access `sem` though?
+        if (!(sem->refs[curr_proc->pid / 8] & (1 << (curr_proc->pid % 8)))) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 
         if (sem->passes > 0) {
@@ -229,18 +224,18 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
     case PLG_SHM_PCID_SEM_INC: {
         const sem_id_t sem_id = (sem_id_t)arg0;
 
-        if (sem_id >= KS_SEM_MAX_SEMS) {
-            return FOS_E_SUCCESS;
-        }
-
-        // Does this proccess even have access `sem_id` though?
-        if (!(plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
+        if (sem_id >= KS_SHM_MAX_SEMS) {
             return FOS_E_SUCCESS;
         }
 
         plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
         if (!sem) {
-            return FOS_E_STATE_MISMATCH; // Very bad.
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        // Does this proccess even have access `sem` though?
+        if (!(sem->refs[curr_proc->pid / 8] & (1 << (curr_proc->pid % 8)))) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 
         if (sem->passes == sem->max_passes) {
@@ -295,18 +290,18 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
     case PLG_SHM_PCID_SEM_CLOSE: {
         const sem_id_t sem_id = (sem_id_t)arg0;
 
-        if (sem_id >= KS_SEM_MAX_SEMS) {
+        if (sem_id >= KS_SHM_MAX_SEMS) {
             return FOS_E_SUCCESS;
         }
 
-        // Do we even have access to this semaphore?
-        if (!(plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
-            return FOS_E_SUCCESS;
-        }
-
-        plugin_shm_sem_t *sem = (plugin_shm_sem_t *)(idtb_get(plg_shm->sem_table, sem_id));
+        plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
         if (!sem) {
-            return FOS_E_STATE_MISMATCH;
+            return FOS_E_SUCCESS; // semaphore doesn't even exist.
+        }
+
+        // Does this proccess even have access `sem` though?
+        if (!(sem->refs[curr_proc->pid / 8] & (1 << (curr_proc->pid % 8)))) {
+            return FOS_E_SUCCESS;
         }
 
         // When we close a semaphore, we first detach all of the calling process's current threads
@@ -324,13 +319,12 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
             }
         }
 
-        // Now we remove semaphore from reference vector.
         
-        plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] &= ~(1 << (sem_id % 8));
+        // Now we remove this process from the semaphores reference vector!
+        sem->refs[curr_proc->pid / 8] &= ~(1 << (curr_proc->pid % 8));
 
-        // Finally decrement semaphore counter! (And potentially delete)
-        
-        if (--(sem->references) == 0) {
+        // If the semaphore reference vector is all 0's now, dispose of the semaphore.        
+        if (mem_chk(sem->refs, 0, sizeof(sem->refs))) {
             delete_wait_queue((wait_queue_t *)(sem->bwq));
             al_free(ks->al, sem);
             idtb_push_id(plg_shm->sem_table, sem_id);
@@ -383,23 +377,20 @@ static fernos_error_t plg_shm_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
         return FOS_E_STATE_MISMATCH;
     }
 
-    // Copy the reference vector of the parent, into the child!
-    mem_cpy(plg_shm->sem_vectors[child_proc->pid], plg_shm->sem_vectors[parent_proc->pid], 
-            sizeof(plg_shm->sem_vectors[child_proc->pid]));
-
-    // Here we are looping over every semaphore in the system, increment the reference count
-    // of every semaphore which is reference by the new child process!
+    // We must iterate over every semaphore in the system, if a semaphore is referenced by
+    // the parent process, it will now also become referenced by this new child process.
+    
     idtb_reset_iterator(plg_shm->sem_table);
     const sem_id_t NULL_SEM_ID = idtb_null_id(plg_shm->sem_table);
     for (sem_id_t sem_id = idtb_get_iter(plg_shm->sem_table); sem_id != NULL_SEM_ID;
             sem_id = idtb_next(plg_shm->sem_table)) {
-        if (plg_shm->sem_vectors[child_proc->pid][sem_id / 8] & (1 << (sem_id % 8))) {
-            plugin_shm_sem_t *sem = idtb_get(plg_shm->sem_table, sem_id); 
-            if (!sem) {
-                return FOS_E_STATE_MISMATCH;
-            }
+        plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
+        if (!sem) {
+            return FOS_E_STATE_MISMATCH;
+        }
 
-            sem->references++;
+        if (sem->refs[parent_proc->pid / 8] & (1 << (parent_proc->pid % 8))) {
+            sem->refs[child_proc->pid / 8] |= (1 << (child_proc->pid % 8));
         }
     }
 
@@ -413,25 +404,23 @@ static fernos_error_t plg_shm_on_reset_or_reap_proc(plugin_t *plg, proc_id_t pid
     // Since we will potentially modifying the semaphore table, we will not use
     // the idtb iterator functions!
 
-    for (sem_id_t sem_id = 0; sem_id < KS_SEM_MAX_SEMS; sem_id++) {
-        if (plg_shm->sem_vectors[pid][sem_id / 8] & (1 << (sem_id % 8))) {
-            plugin_shm_sem_t *sem = idtb_get(plg_shm->sem_table, sem_id); 
-            if (!sem) {
-                return FOS_E_STATE_MISMATCH;
-            }
+    for (sem_id_t sem_id = 0; sem_id < KS_SHM_MAX_SEMS; sem_id++) {
+        plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
+        if (!sem) {
+            continue;
+        }
 
-            // Dereference our semaphore once, deleting if needed!
-            // We won't need to worry about threads of the calling process, they will not 
-            // execute again.
-            if (--(sem->references) == 0) {
+        // We only do anything for semaphores which are referenced by the process about to be 
+        // reaped.
+        if (sem->refs[pid / 8] & (1 << (pid % 8))) {
+            sem->refs[pid / 8] &= ~(1 << (pid % 8));
+            if (mem_chk(sem->refs, 0, sizeof(sem->refs))) {
                 delete_wait_queue((wait_queue_t *)(sem->bwq));
                 al_free(ks->al, sem);
                 idtb_push_id(plg_shm->sem_table, sem_id);
             }
         }
     }
-
-    mem_set(plg_shm->sem_vectors[pid], 0, sizeof(plg_shm->sem_vectors[pid]));
 
     return FOS_E_SUCCESS;
 }
