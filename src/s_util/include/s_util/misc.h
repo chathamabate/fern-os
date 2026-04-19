@@ -38,6 +38,11 @@
  */
 #define ALIGN(val, align) ((unsigned int)(val) & ~((align) - 1))
 
+/**
+ * Alignemnet must be a power of 2.
+ */
+#define ALIGN_UP(val, align) ALIGN(val + (align - 1), align)
+
 #define CHECK_ALIGN(val, align) \
     if (!IS_ALIGNED(val, align)) { \
         return FOS_E_ALIGN_ERROR; \

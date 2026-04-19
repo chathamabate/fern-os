@@ -66,11 +66,6 @@ struct _plugin_shm_sem_t {
  */
 struct _plugin_shm_range_t {
     /**
-     * ID of this shared memory area in the global shm table.
-     */
-    const shm_id_t shm_id;
-
-    /**
      * Inclusive start of the range.
      *
      * 4K-Aligned.
@@ -85,12 +80,14 @@ struct _plugin_shm_range_t {
     const void * const end;
 
     /**
-     * How many reference this range has.
+     * In what processes is this range mapped?
      *
-     * When this reaches 0, the range will be unmapped in the kernel, and it's underlying pages 
-     * returned to the page free list.
+     * If this bit vector is all 0, the kernel should dispose of the range.
+     *
+     * Realize, that we could just check a process's page tables to see
+     * if this range is mapped, but that is probably slower and less confusing than this.
      */
-    uint32_t references;
+    uint8_t refs[FOS_MAX_PROCS / 8];
 };
 
 struct _plugin_shm_t {
@@ -109,18 +106,7 @@ struct _plugin_shm_t {
      * Each node in this tree will hold a `plugin_shm_range_t` which corresponds to a real
      * mapped range within the kernel memory space!
      */
-    //binary_search_tree_t * const range_tree;
-
-    /**
-     * This table maps each `pid` to a `map<void *, NULL>`.
-     * Essentially, each map is really just a set holding the starting position of every range
-     * mapped in the corresponding process. This is needed so that when a process exits
-     * or resets, we know what ranges to dereference!
-     *
-     * This will also be lazy initialized. `range_maps[pid]` is NULL until 
-     * a process first requests shared memory. (Or is forked from a process with shared memory)
-     */
-    //map_t *range_sets[FOS_MAX_PROCS];
+    binary_search_tree_t * const range_tree;
 };
 
 plugin_t *new_plugin_shm(kernel_state_t *ks);

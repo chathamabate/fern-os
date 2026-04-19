@@ -5,8 +5,8 @@
 #include "k_startup/process.h"
 
 static int32_t cmp_shm_range(const void *k0, const void *k1) {
-    const void *s0 = ((plugin_shm_range_t *)k0)->start;
-    const void *s1 = ((plugin_shm_range_t *)k1)->start;
+    const void *s0 = ((const plugin_shm_range_t *)k0)->start;
+    const void *s1 = ((const plugin_shm_range_t *)k1)->start;
 
     if (s0 < s1) {
         return -1;
@@ -38,11 +38,10 @@ static const plugin_impl_t PLUGIN_SHM_IMPL = {
 plugin_t *new_plugin_shm(kernel_state_t *ks) {
     plugin_shm_t *plg_shm = al_malloc(ks->al, sizeof(plugin_shm_t));
     id_table_t *st = new_id_table(ks->al, KS_SHM_MAX_SEMS);
-    
-    // binary_search_tree_t *rt = new_simple_bst(ks->al, cmp_shm_range, sizeof(plugin_shm_range_t));
+    binary_search_tree_t *rt = new_simple_bst(ks->al, cmp_shm_range, sizeof(plugin_shm_range_t));
 
-    if (!plg_shm || !st /*|| !rt*/) {
-        //delete_binary_search_tree(rt);
+    if (!plg_shm || !st || !rt) {
+        delete_binary_search_tree(rt);
         delete_id_table(st);
         al_free(ks->al, plg_shm);
         return NULL;
@@ -52,13 +51,7 @@ plugin_t *new_plugin_shm(kernel_state_t *ks) {
 
     init_base_plugin((plugin_t *)plg_shm, &PLUGIN_SHM_IMPL, ks);
     *(id_table_t **)&(plg_shm->sem_table) = st;
-
-    /*
     *(binary_search_tree_t **)&(plg_shm->range_tree) = rt;
-    for (size_t i = 0; i < FOS_MAX_PROCS; i++) {
-        plg_shm->range_sets[i] = NULL;
-    }
-    */
 
     return (plugin_t *)plg_shm;
 }
@@ -344,6 +337,23 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
      * Returns FOS_E_SUCCESS on success and writes a pointer to the beginning of the area to `*shm`.
      */
     case PLG_SHM_PCID_NEW_SHM: {
+        uint32_t len = arg0;
+        if (len == 0) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        if (len > FOS_SHARED_AREA_SIZE) {
+            DUAL_RET(curr_thr, FOS_E_NO_MEM, FOS_E_SUCCESS);
+        }
+
+        // Here we know `len` <= SHARED_AREA_SIZE, it is impossible aligning up causes `len`
+        // to loop back to 0.
+        len = ALIGN_UP(len, M_4K);
+
+        void ** const u_ret_ptr = (void **)arg1;
+        if (!u_ret_ptr) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
 
     }
 
