@@ -13,11 +13,6 @@
  */
 #define KS_SHM_MAX_SEMS (64U)
 
-/**
- * Maximum number of shared memory areas allowed globally at once.
- */
-#define KS_SHM_MAX_SHMS (128U)
-
 typedef struct _plugin_shm_t plugin_shm_t;
 typedef struct _plugin_shm_range_t plugin_shm_range_t;
 typedef struct _plugin_shm_sem_t plugin_shm_sem_t;

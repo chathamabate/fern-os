@@ -49,6 +49,21 @@ static void *find_shm_start(binary_search_tree_t *bst, uint32_t len) {
     };
 }
 
+/**
+ * If `addr` falls within a range in the binary search tree, a pointer to that range is returned!
+ *
+ * Returns NULL if no range is found!
+ */
+static plugin_shm_range_t *find_referenced_shm_range(binary_search_tree_t *bst, void *addr) {
+    for (plugin_shm_range_t *iter = bst_min(bst); iter; iter = bst_next(bst, iter)) {
+        if (iter->start <= addr && addr < iter->end) {
+            return iter;
+        }
+    }
+
+    return NULL;
+}
+
 static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1,
         uint32_t arg2, uint32_t arg3);
 static fernos_error_t plg_shm_on_fork_proc(plugin_t *plg, proc_id_t cpid);
@@ -464,9 +479,33 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
      * Close a shared memory area!
      *
      * `arg0` - the address of a byte within the shared memory region to unmap.
+     *
+     * Remember, this is a destructor style call, and thus needs not return anything to the 
+     * calling thread.
      */
     case PLG_SHM_PCID_CLOSE_SHM: {
+        void *addr = (void *)arg0;
 
+        plugin_shm_range_t *range = find_referenced_shm_range(plg_shm->range_tree, addr);
+        if (!range) {
+            return FOS_E_SUCCESS;
+        }
+
+        // Ok, we found a range! Woo! Only do anything though if the calling process has access!
+        if (range->refs[curr_proc->pid / 8] & (1 << (curr_proc->pid % 8))) {
+            // Always unmap in calling proc and remove caller from bitvector.
+            pd_free_pages(curr_proc->pd, false, range->start, range->end);
+            range->refs[curr_proc->pid / 8] &= ~(1 << (curr_proc->pid % 8));
+
+            // Now, do we entirely delete the shared memory though?
+            if (mem_chk(range->refs, 0, sizeof(range->refs))) {
+                pd_free_pages(ks->root_proc->pd, true, range->start, range->end);
+                bst_remove_node(plg_shm->range_tree, range); // This is ok, as find_ref
+                                                                        // returns a node pointer!
+            }
+        }
+
+        return FOS_E_SUCCESS;
     }
 
     default: {
@@ -507,6 +546,8 @@ static fernos_error_t plg_shm_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
         }
     }
 
+    // On fork, we must 
+
     return FOS_E_SUCCESS;
 }
 
@@ -534,6 +575,7 @@ static fernos_error_t plg_shm_on_reset_or_reap_proc(plugin_t *plg, proc_id_t pid
             }
         }
     }
+
 
     return FOS_E_SUCCESS;
 }
