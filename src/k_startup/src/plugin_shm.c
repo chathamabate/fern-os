@@ -19,6 +19,36 @@ static int32_t cmp_shm_range(const void *k0, const void *k1) {
     return 0;
 }
 
+/**
+ * Find the start of an unmapped region of shared memory with size at least `len`.
+ */
+static void *find_shm_start(binary_search_tree_t *bst, uint32_t len) {
+    const plugin_shm_range_t *prev = NULL;
+    const plugin_shm_range_t *curr = bst_min(bst);
+
+    while (1) {
+        const void *start = prev ? prev->end : (void *)FOS_SHARED_AREA_START;
+        const void *end = curr ? curr->start : (void *)FOS_SHARED_AREA_END;
+        
+        uint32_t area_size = (uint32_t)end - (uint32_t)start;
+
+        if (area_size >= len) {
+            return (void *)start;
+        }
+
+        /**
+         * This'll be here and not in the top level condition as we want at least 1 iteration
+         * to always run. Could've just used a do while, but whatevs.
+         */
+        if (!curr) {
+            return NULL;
+        }
+
+        prev = curr;
+        curr = bst_next(bst, curr);
+    };
+}
+
 static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1,
         uint32_t arg2, uint32_t arg3);
 static fernos_error_t plg_shm_on_fork_proc(plugin_t *plg, proc_id_t cpid);
@@ -333,7 +363,8 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
      * `arg1` - A userspace void **.
      *
      * Returns FOS_E_BAD_ARGS if `bytes` is 0 or `shm` is NULL.
-     * Returns FOS_E_NO_MEM if there isn't enough space for the new shared memory area!
+     * Returns FOS_E_NO_SPACE if the shared memory area doesn't have a large enough unmapped area.
+     * Returns FOS_E_NO_MEM if there aren't enough free pages to complete the allocation.
      * Returns FOS_E_SUCCESS on success and writes a pointer to the beginning of the area to `*shm`.
      */
     case PLG_SHM_PCID_NEW_SHM: {
@@ -355,6 +386,78 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
             DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 
+
+        void *new_start = find_shm_start(plg_shm->range_tree, len);
+        if (!new_start) {
+            DUAL_RET(curr_thr, FOS_E_NO_SPACE, FOS_E_SUCCESS);
+        }
+
+        plugin_shm_range_t range = {
+            .start = new_start,
+            .end = (uint8_t *)new_start + len,
+            .refs = {0}
+        };
+
+        range.refs[curr_proc->pid / 8] |= 1 << (curr_proc->pid % 8);
+
+        err = bst_add(plg_shm->range_tree, &range);
+        if (err != FOS_E_SUCCESS) {
+            if (err == FOS_E_ALREADY_ALLOCATED) {
+                return FOS_E_STATE_MISMATCH;
+            }
+
+            err = FOS_E_UNKNWON_ERROR;
+        }
+
+        if (err == FOS_E_SUCCESS) {
+            // our range is in our tree! Can we map it though?
+            
+            const void *true_e;
+            err = pd_alloc_pages(ks->root_proc->pd, true, true, range.start, range.end, &true_e);
+            if (err != FOS_E_SUCCESS) {
+                if (err != FOS_E_NO_MEM) {
+                    return FOS_E_STATE_MISMATCH; // We should only ever encounter a no memory 
+                                                 // failure!
+                }
+
+                // we ran out of memory, return pages which were allocated.
+                pd_free_pages(ks->root_proc->pd, true, range.start, true_e); 
+            }
+        }
+
+        if (err == FOS_E_SUCCESS) {
+            // Our range is allocated and mapped in kernel space.
+            // Can we map it to the user memory area though?
+            
+            err = pd_copy_range(curr_proc->pd, ks->root_proc->pd, range.start, range.end);
+            if (err != FOS_E_SUCCESS && err != FOS_E_NO_MEM) {
+                return FOS_E_STATE_MISMATCH; // We only ever allow no mem failures.
+            }
+        }
+
+        if (err == FOS_E_SUCCESS) {
+            // Finally, write back start bab!
+
+            err = mem_cpy_to_user(curr_proc->pd, u_ret_ptr, &(range.start), sizeof(void *), NULL);
+            if (err != FOS_E_SUCCESS) {
+                err = FOS_E_UNKNWON_ERROR;
+            }
+        }
+
+        if (err != FOS_E_SUCCESS) {
+            // Cleanup time in error situation!
+
+            // These frees are safe! We know that are allocation errors did not fail due to running
+            // into another mapped area. There is no chance we free something that shouldn't be freed!
+            pd_free_pages(curr_proc->pd, false, range.start, range.end); 
+            pd_free_pages(ks->root_proc->pd, true, range.start, range.end);
+
+            bst_remove(plg_shm->range_tree, &range);
+
+            DUAL_RET(curr_thr, err, FOS_E_SUCCESS);
+        }
+
+        DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
     /**
