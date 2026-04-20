@@ -101,6 +101,26 @@ plugin_t *new_plugin_shm(kernel_state_t *ks) {
     return (plugin_t *)plg_shm;
 }
 
+/**
+ * Static helper! Given a node from the plugin's range tree, unmap it for process `pid`!
+ * If the range is no longer referenced by any processes, it is entirely cleaned up!
+ * If `curr_proc` is not in the range's reference vector, do nothing!
+ */
+static void plg_shm_unmap_shm(plugin_shm_t *plg_shm, plugin_shm_range_t *range_node, process_t *curr_proc) {
+    proc_id_t pid = curr_proc->pid;
+    if (range_node->refs[pid / 8] & (1 << (pid % 8))) {
+        // Always unmap in calling proc and remove caller from bitvector.
+        pd_free_pages(curr_proc->pd, false, range_node->start, range_node->end);
+        range_node->refs[pid / 8] &= ~(1 << (pid % 8));
+
+        // Now, do we entirely delete the shared memory though?
+        if (mem_chk(range_node->refs, 0, sizeof(range_node->refs))) {
+            pd_free_pages(plg_shm->super.ks->root_proc->pd, true, range_node->start, range_node->end);
+            bst_remove_node(plg_shm->range_tree, range_node); 
+        }
+    }
+}
+
 static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     fernos_error_t err;
 
@@ -491,19 +511,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
             return FOS_E_SUCCESS;
         }
 
-        // Ok, we found a range! Woo! Only do anything though if the calling process has access!
-        if (range->refs[curr_proc->pid / 8] & (1 << (curr_proc->pid % 8))) {
-            // Always unmap in calling proc and remove caller from bitvector.
-            pd_free_pages(curr_proc->pd, false, range->start, range->end);
-            range->refs[curr_proc->pid / 8] &= ~(1 << (curr_proc->pid % 8));
-
-            // Now, do we entirely delete the shared memory though?
-            if (mem_chk(range->refs, 0, sizeof(range->refs))) {
-                pd_free_pages(ks->root_proc->pd, true, range->start, range->end);
-                bst_remove_node(plg_shm->range_tree, range); // This is ok, as find_ref
-                                                                        // returns a node pointer!
-            }
-        }
+        plg_shm_unmap_shm(plg_shm, range, curr_proc);
 
         return FOS_E_SUCCESS;
     }
@@ -546,7 +554,20 @@ static fernos_error_t plg_shm_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
         }
     }
 
-    // On fork, we must 
+    // Ok, this may be kinda slow, but for actual shared memory areas, we need to iterate
+    // over all shared memory ranges. A memory range which is referenced by the parent,
+    // must now also become referenced by the child.
+    // 
+    // NOTE: We don't need to do any page directory copying as this will be implicitly done
+    // by the fork.
+
+    for (plugin_shm_range_t *iter = bst_min(plg_shm->range_tree); iter; 
+            iter = bst_next(plg_shm->range_tree, iter)) {
+        
+        if (iter->refs[parent_proc->pid / 8] & (1 << (parent_proc->pid % 8))) {
+            iter->refs[child_proc->pid / 8] |= (1 << (child_proc->pid % 8));
+        }
+    }
 
     return FOS_E_SUCCESS;
 }
@@ -554,6 +575,11 @@ static fernos_error_t plg_shm_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
 static fernos_error_t plg_shm_on_reset_or_reap_proc(plugin_t *plg, proc_id_t pid) {
     kernel_state_t * const ks = plg->ks;
     plugin_shm_t * const plg_shm = (plugin_shm_t *)plg;
+
+    process_t *rproc = idtb_get(ks->proc_table, pid);
+    if (!rproc) {
+        return FOS_E_STATE_MISMATCH;
+    }
 
     // Since we will potentially modifying the semaphore table, we will not use
     // the idtb iterator functions!
@@ -576,6 +602,18 @@ static fernos_error_t plg_shm_on_reset_or_reap_proc(plugin_t *plg, proc_id_t pid
         }
     }
 
+
+    plugin_shm_range_t *iter = bst_min(plg_shm->range_tree);
+    while (iter) {
+        // Gotta do this here, as we may delete `iter` later.
+        // (This is safe because bst nodes are always stable)
+        plugin_shm_range_t *next = bst_next(plg_shm->range_tree, iter);
+
+        // This does nothing if `rproc` does not reference `iter`'s range!
+        plg_shm_unmap_shm(plg_shm, iter, rproc);
+
+        iter = next;
+    }
 
     return FOS_E_SUCCESS;
 }
