@@ -470,3 +470,28 @@ bool test_syscall_shm_sem(void) {
     RUN_TEST(test_sem_many);
     return END_SUITE();
 }
+
+static bool test_new_shm_and_unmap(void) {
+    const size_t shm_size = 5000;
+    uint8_t *shm;
+
+    TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&shm));
+
+    for (size_t i = 0; i < shm_size; i++) {
+        shm[i] = (uint8_t)i;
+    }
+
+    for (size_t i = 0; i < shm_size; i++) {
+        TEST_EQUAL_UINT((uint8_t)i, shm[i]);
+    }
+
+    sc_shm_close_shm(shm);
+
+    TEST_SUCCEED();
+}
+
+bool test_syscall_shm(void) {
+    BEGIN_SUITE("Shared Memory");
+    RUN_TEST(test_new_shm_and_unmap);
+    return END_SUITE();
+}

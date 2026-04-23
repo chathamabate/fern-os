@@ -2,6 +2,7 @@
 #include "k_startup/plugin_shm.h"
 #include "s_util/str.h"
 #include "k_startup/page_helpers.h"
+#include "k_startup/page.h"
 #include "k_startup/process.h"
 
 static int32_t cmp_shm_range(const void *k0, const void *k1) {
@@ -115,7 +116,7 @@ static void plg_shm_unmap_shm(plugin_shm_t *plg_shm, plugin_shm_range_t *range_n
 
         // Now, do we entirely delete the shared memory though?
         if (mem_chk(range_node->refs, 0, sizeof(range_node->refs))) {
-            pd_free_pages(plg_shm->super.ks->root_proc->pd, true, range_node->start, range_node->end);
+            pd_free_pages(get_kernel_pd(), true, range_node->start, range_node->end);
             bst_remove_node(plg_shm->range_tree, range_node); 
         }
     }
@@ -448,7 +449,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
             // our range is in our tree! Can we map it though?
             
             const void *true_e;
-            err = pd_alloc_pages(ks->root_proc->pd, true, true, range.start, range.end, &true_e);
+            err = pd_alloc_pages(get_kernel_pd(), true, true, range.start, range.end, &true_e);
             if (err != FOS_E_SUCCESS) {
                 if (err != FOS_E_NO_MEM) {
                     return FOS_E_STATE_MISMATCH; // We should only ever encounter a no memory 
@@ -456,15 +457,12 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
                 }
 
                 // we ran out of memory, return pages which were allocated.
-                pd_free_pages(ks->root_proc->pd, true, range.start, true_e); 
+                pd_free_pages(get_kernel_pd(), true, range.start, true_e); 
             }
         }
 
         if (err == FOS_E_SUCCESS) {
-            // Our range is allocated and mapped in kernel space.
-            // Can we map it to the user memory area though?
-            
-            err = pd_copy_range(curr_proc->pd, ks->root_proc->pd, range.start, range.end);
+            err = pd_copy_range(curr_proc->pd, get_kernel_pd(), range.start, range.end);
             if (err != FOS_E_SUCCESS && err != FOS_E_NO_MEM) {
                 return FOS_E_STATE_MISMATCH; // We only ever allow no mem failures.
             }
@@ -482,10 +480,11 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         if (err != FOS_E_SUCCESS) {
             // Cleanup time in error situation!
 
+            
             // These frees are safe! We know that are allocation errors did not fail due to running
             // into another mapped area. There is no chance we free something that shouldn't be freed!
             pd_free_pages(curr_proc->pd, false, range.start, range.end); 
-            pd_free_pages(ks->root_proc->pd, true, range.start, range.end);
+            pd_free_pages(get_kernel_pd(), true, range.start, range.end);
 
             bst_remove(plg_shm->range_tree, &range);
 
