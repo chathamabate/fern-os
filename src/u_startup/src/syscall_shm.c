@@ -33,5 +33,5 @@ fernos_error_t sc_shm_new_shm(size_t bytes, void **shm) {
 }
 
 void sc_shm_close_shm(void *shm) {
-    (void)sc_plg_cmd(PLG_SHARED_MEM_ID, PLG_SHM_PCID_NEW_SHM, (uint32_t)shm, 0, 0, 0);
+    (void)sc_plg_cmd(PLG_SHARED_MEM_ID, PLG_SHM_PCID_CLOSE_SHM, (uint32_t)shm, 0, 0, 0);
 }
