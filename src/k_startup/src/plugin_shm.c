@@ -431,7 +431,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         plugin_shm_range_t range = {
             .start = new_start,
             .end = (uint8_t *)new_start + len,
-            .refs = {0}
+            .refs = {0},  
         };
 
         range.refs[curr_proc->pid / 8] |= 1 << (curr_proc->pid % 8);

@@ -3,6 +3,7 @@
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_shm.h"
 #include "u_startup/syscall_pipe.h"
+#include "s_util/rand.h"
 #include "s_util/constraints.h"
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
@@ -490,8 +491,82 @@ static bool test_new_shm_and_unmap(void) {
     TEST_SUCCEED();
 }
 
+static bool test_random_new_shm(void) {
+    // Here we just randomly allocate shared memory areas and make sure nothing
+    // breaks!
+    
+    struct {
+        uint8_t occupied;
+
+        uint8_t *start;
+        uint32_t size;
+    } shm_areas[30] = {0}; // All start as unoccupied.
+
+    const size_t num_shm_areas = sizeof(shm_areas) / sizeof(shm_areas[0]);
+    
+    rand_t r = rand(0);
+
+    for (size_t trial = 0; trial < 200; trial++) {
+        uint32_t i = next_rand_u32(&r) % num_shm_areas;
+
+        if (shm_areas[i].occupied) {
+            sc_shm_close_shm(shm_areas[i].start);
+        }
+        
+        uint32_t size = next_rand_u32(&r) & 0x1FFFF;
+        TEST_SUCCESS(sc_shm_new_shm(size, (void **)&(shm_areas[i].start)));
+
+        mem_set(shm_areas[i].start, (uint8_t)i, size);
+        shm_areas[i].size = size;
+        shm_areas[i].occupied = 1;
+    }
+
+    for (size_t i = 0; i < num_shm_areas; i++) {
+        if (shm_areas[i].occupied) {
+            TEST_TRUE(mem_chk(shm_areas[i].start, i, shm_areas[i].size)); 
+            sc_shm_close_shm(shm_areas[i].start);
+        }
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool test_shm_exhaust(void) {
+    // Now let's try allocating as many shm's as possible!
+
+    fernos_error_t err;
+
+    void *shms[100];
+    const size_t max_shms = sizeof(shms) / sizeof(shms[0]);
+
+    size_t i;
+
+    for (i = 0; i < max_shms; i++) {
+        err = sc_shm_new_shm(0x1000000, shms + i);
+        if (err != FOS_E_SUCCESS) {
+            break;
+        }
+    }
+    
+    TEST_TRUE(err != FOS_E_SUCCESS);
+
+    for (size_t j = 0; j < i; j++) {
+        sc_shm_close_shm(shms[j]);
+    }
+
+    TEST_SUCCEED();
+}
+
+// Ok, does unmap actually unmap??
+// Can two processes really use the same shared memory at once??
+// Can a parent unmap while a child still uses it??
+// There are lots of questions!
+// What if we really use shared memory to its limits?
+
 bool test_syscall_shm(void) {
     BEGIN_SUITE("Shared Memory");
     RUN_TEST(test_new_shm_and_unmap);
+    RUN_TEST(test_random_new_shm);
+    RUN_TEST(test_shm_exhaust);
     return END_SUITE();
 }
