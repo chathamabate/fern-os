@@ -3,6 +3,7 @@
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_shm.h"
 #include "u_startup/syscall_pipe.h"
+#include "s_util/rand.h"
 #include "s_util/constraints.h"
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
@@ -86,7 +87,9 @@ static void *test_sem_simple_lock_worker(void *arg) {
         const uint32_t val = test_sem_buffer[0];
         for (size_t i = 0; i < TEST_SEM_BUFFER_LEN; i++) {
             sc_thread_sleep(1);
-            TEST_EQUAL_UINT(val, test_sem_buffer[i]);
+            if (val != test_sem_buffer[i]) {
+                return (void *)1;
+            }
             test_sem_buffer[i] = val + 1;
         }
 
@@ -466,5 +469,320 @@ bool test_syscall_shm_sem(void) {
     RUN_TEST(test_sem_cross_process);
     RUN_TEST(test_sem_early_close);
     RUN_TEST(test_sem_many);
+    return END_SUITE();
+}
+
+static bool test_new_shm_and_unmap(void) {
+    const size_t shm_size = 5000;
+    uint8_t *shm;
+
+    TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&shm));
+
+    for (size_t i = 0; i < shm_size; i++) {
+        shm[i] = (uint8_t)i;
+    }
+
+    for (size_t i = 0; i < shm_size; i++) {
+        TEST_EQUAL_UINT((uint8_t)i, shm[i]);
+    }
+
+    sc_shm_close_shm(shm);
+
+    TEST_SUCCEED();
+}
+
+static bool test_random_new_shm(void) {
+    // Here we just randomly allocate shared memory areas and make sure nothing
+    // breaks!
+    
+    struct {
+        uint8_t occupied;
+
+        uint8_t *start;
+        uint32_t size;
+    } shm_areas[30] = {0}; // All start as unoccupied.
+
+    const size_t num_shm_areas = sizeof(shm_areas) / sizeof(shm_areas[0]);
+    
+    rand_t r = rand(0);
+
+    for (size_t trial = 0; trial < 200; trial++) {
+        uint32_t i = next_rand_u32(&r) % num_shm_areas;
+
+        if (shm_areas[i].occupied) {
+            sc_shm_close_shm(shm_areas[i].start);
+        }
+        
+        uint32_t size = next_rand_u32(&r) & 0x1FFFF;
+        TEST_SUCCESS(sc_shm_new_shm(size, (void **)&(shm_areas[i].start)));
+
+        mem_set(shm_areas[i].start, (uint8_t)i, size);
+        shm_areas[i].size = size;
+        shm_areas[i].occupied = 1;
+    }
+
+    for (size_t i = 0; i < num_shm_areas; i++) {
+        if (shm_areas[i].occupied) {
+            TEST_TRUE(mem_chk(shm_areas[i].start, i, shm_areas[i].size)); 
+            sc_shm_close_shm(shm_areas[i].start);
+        }
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool test_shm_exhaust(void) {
+    // Now let's try allocating as many shm's as possible!
+    // Pretty slow, but whatever.
+
+    fernos_error_t err;
+
+    void *shms[100];
+    const size_t max_shms = sizeof(shms) / sizeof(shms[0]);
+
+    size_t i;
+
+    for (i = 0; i < max_shms; i++) {
+        err = sc_shm_new_shm(0x1000000, shms + i);
+        if (err != FOS_E_SUCCESS) {
+            break;
+        }
+    }
+    
+    TEST_TRUE(err != FOS_E_SUCCESS);
+
+    for (size_t j = 0; j < i; j++) {
+        sc_shm_close_shm(shms[j]);
+    }
+
+    TEST_SUCCEED();
+}
+
+static bool test_shm_sharing(void) {
+    // Here we test that shared memory is actually shared across parent and child processes!
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    const size_t shm_size = 1000;
+
+    uint8_t *shm;
+    TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&shm));
+
+    for (size_t i = 0; i < shm_size; i++) {
+        shm[i] = (uint8_t)i;
+    }
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) { // Child process!
+        for (size_t i = 0; i < shm_size; i++) {
+            TEST_EQUAL_UINT((uint8_t)i, shm[i]);
+        }
+        
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // Parent process!
+    TEST_SUCCESS(reap_single(cpid));
+
+    sc_shm_close_shm(shm);
+
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
+
+static bool test_shm_unmap_failure(void) {
+    // Here we want to see if unmapping in the child, actually removes access to the area!
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    uint8_t *shm;
+    TEST_SUCCESS(sc_shm_new_shm(1, (void **)&shm));
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) { // Child process!
+        sc_shm_close_shm(shm); // unmap in child!
+        shm[0] = 100; // This should triger a page fault!
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+
+    proc_exit_status_t rces;
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &rces));
+    TEST_EQUAL_HEX(PROC_ES_PF, rces);
+
+    // Make sure that after all this BS, we can still access shm here in the parent process!
+    shm[0] = 10;
+
+    sc_shm_close_shm(shm);
+    
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
+
+static bool test_synced_shm_usage(void) {
+    // Here we will spawn two children who will communicate via a shared shm area and semaphore.
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    const size_t shm_size = M_4K * 10;
+
+    sem_id_t sem;
+    uint8_t *shm;
+
+    TEST_SUCCESS(sc_shm_new_semaphore(&sem, 1));
+    TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&shm));
+
+    mem_set(shm, 1, shm_size); // Set as non-zero to start.
+
+    proc_id_t cpids[2];
+
+    TEST_SUCCESS(sc_proc_fork(cpids + 0));
+    if (cpids[0] == FOS_MAX_PROCS) { // Child proc 0
+        TEST_SUCCESS(sc_shm_sem_dec(sem));
+        for (size_t i = 0; i < shm_size; i++) {
+            shm[i] = (uint8_t)i;
+        }
+        sc_shm_sem_inc(sem);
+
+        // Now we wait for child proc 1 to process our data, we know child proc 1 will increment 
+        // our data so we can use this as a lithmus test.
+
+        while (true) {
+            TEST_SUCCESS(sc_shm_sem_dec(sem));
+            if (shm[0] == 1) {
+                break;
+            }
+            sc_shm_sem_inc(sem);
+        }
+
+        for (size_t i = 0; i < shm_size; i++) {
+            TEST_EQUAL_UINT((uint8_t)(i + 1), shm[i]);
+        }
+
+        sc_shm_sem_inc(sem);
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    TEST_SUCCESS(sc_proc_fork(cpids + 1));
+    if (cpids[1] == FOS_MAX_PROCS) { // Child proc 1
+        while (true) {
+            TEST_SUCCESS(sc_shm_sem_dec(sem));
+            if (shm[0] == 0) { // If set to 0, we know proc 0 has populated the area.
+                break;
+            }
+            sc_shm_sem_inc(sem);
+        }
+
+        for (size_t i = 0; i < shm_size; i++) {
+            shm[i]++;
+        }
+
+        sc_shm_sem_inc(sem);
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // Parent proc can close these immediately as we don't use them!
+    sc_shm_close_shm(shm);
+    sc_shm_close_semaphore(sem);
+
+    TEST_SUCCESS(reap_single(cpids[0])); 
+    TEST_SUCCESS(reap_single(cpids[1])); 
+    
+    sc_signal_allow(old_sv);
+    TEST_SUCCEED();
+}
+
+static bool test_shm_pipeline(void) {
+    // Root Proc <--> shm0 <--> Child Proc <--> shm1 <--> Grandchild Proc
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+    const size_t shm_size = M_4K;
+
+    // We only need 1 semaphore. Technically, we could also do this with just one shared memory
+    // area, but that would be a lame test imo.
+    sem_id_t sem;
+    TEST_SUCCESS(sc_shm_new_semaphore(&sem, 1));
+
+    uint8_t *parent_child_shm;
+    TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&parent_child_shm));
+
+    // Pull semaphore down to 0 before spawnining child.
+    TEST_SUCCESS(sc_shm_sem_dec(sem));
+
+    proc_id_t child_pid;
+    TEST_SUCCESS(sc_proc_fork(&child_pid));
+
+    if (child_pid == FOS_MAX_PROCS) { // Child proc.
+        TEST_SUCCESS(sc_shm_sem_dec(sem));
+
+        sc_signal_allow(1 << FSIG_CHLD); // We know the sv of new processes start as 0.
+
+        uint8_t *child_gchild_shm;
+        TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&child_gchild_shm));
+
+        proc_id_t gchild_pid;
+        TEST_SUCCESS(sc_proc_fork(&gchild_pid));
+        if (gchild_pid == FOS_MAX_PROCS) { // Grand Child proc.
+            sc_shm_close_shm(parent_child_shm); // Not used at all in grandchild.
+
+            TEST_SUCCESS(sc_shm_sem_dec(sem)); // We wait for the child to copy from shm0 to shm1.
+            
+            for (size_t i = 0; i < shm_size; i++) {
+                child_gchild_shm[i]++;
+            }
+
+            sc_proc_exit(PROC_ES_SUCCESS); // We'll let our shm/sems be cleaned up on reap.
+        }
+
+        // Copy from one shm to another!
+        mem_cpy(child_gchild_shm, parent_child_shm, shm_size);
+        sc_shm_sem_inc(sem); // Kick off grandchild.
+        TEST_SUCCESS(reap_single(gchild_pid));
+
+        // Move processed data from shm1 to shm0.
+        mem_cpy(parent_child_shm, child_gchild_shm, shm_size);
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // Parent Proc.
+
+    for (size_t i = 0; i < shm_size; i++) {
+        parent_child_shm[i] = (uint8_t)i;
+    }
+
+    sc_shm_sem_inc(sem); // Kick off pipeline.
+    TEST_SUCCESS(reap_single(child_pid));
+
+    for (size_t i = 0; i < shm_size; i++) {
+        TEST_EQUAL_UINT((uint8_t)(i + 1), parent_child_shm[i]);
+    }
+
+    sc_shm_close_shm(parent_child_shm);
+    sc_shm_close_semaphore(sem);
+
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
+
+bool test_syscall_shm(void) {
+    BEGIN_SUITE("Shared Memory");
+    RUN_TEST(test_new_shm_and_unmap);
+    RUN_TEST(test_random_new_shm);
+    RUN_TEST(test_shm_exhaust);
+    RUN_TEST(test_shm_sharing);
+    RUN_TEST(test_shm_unmap_failure);
+    RUN_TEST(test_synced_shm_usage);
+    RUN_TEST(test_shm_pipeline);
     return END_SUITE();
 }

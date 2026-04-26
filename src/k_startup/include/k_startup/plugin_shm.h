@@ -10,14 +10,17 @@
 
 /**
  * Max number of semaphores allowed globally at once.
- *
- * Must be a multiple of 8.
  */
-#define KS_SEM_MAX_SEMS (64U)
+#define KS_SHM_MAX_SEMS (64U)
 
 typedef struct _plugin_shm_t plugin_shm_t;
 typedef struct _plugin_shm_range_t plugin_shm_range_t;
 typedef struct _plugin_shm_sem_t plugin_shm_sem_t;
+
+/**
+ * ID of a shared memory range.
+ */
+typedef id_t shm_id_t;
 
 struct _plugin_shm_sem_t {
     /**
@@ -43,11 +46,11 @@ struct _plugin_shm_sem_t {
     basic_wait_queue_t * const bwq;
 
     /**
-     * The number of processes which reference this semaphore.
+     * This represents which processes have access to this semaphore!
      *
-     * A process NEVER references a semaphore twice.
+     * If this bit vector is entirely 0, the kernel should dispose of this semaphore!
      */
-    uint32_t references;
+    uint8_t refs[FOS_MAX_PROCS / 8];
 };
 
 /**
@@ -72,12 +75,14 @@ struct _plugin_shm_range_t {
     const void * const end;
 
     /**
-     * How many reference this range has.
+     * In what processes is this range mapped?
      *
-     * When this reaches 0, the range will be unmapped in the kernel, and it's underlying pages 
-     * returned to the page free list.
+     * If this bit vector is all 0, the kernel should dispose of the range.
+     *
+     * Realize, that we could just check a process's page tables to see
+     * if this range is mapped, but that is probably slower and less confusing than this.
      */
-    size_t references;
+    uint8_t refs[FOS_MAX_PROCS / 8];
 };
 
 struct _plugin_shm_t {
@@ -86,36 +91,17 @@ struct _plugin_shm_t {
     /**
      * A global ID table of all semaphores!
      *
-     * Will have a max cap of `KS_SEM_MAX_SEMS`.
+     * Will have a max cap of `KS_SHM_MAX_SEMS`.
      *
      * This maps sem_id_t -> plugin_shm_sem_t *
      */
     id_table_t * const sem_table;
 
     /**
-     * This represents which semaphores are referenced by which processes!
-     *
-     * If a sempahore's corresponding bit is not set in a processes's vector,
-     * that process is not allowed to use said semaphore!
-     */
-    uint8_t sem_vectors[FOS_MAX_PROCS][KS_SEM_MAX_SEMS / 8];
-
-    /**
      * Each node in this tree will hold a `plugin_shm_range_t` which corresponds to a real
      * mapped range within the kernel memory space!
      */
-    //binary_search_tree_t * const range_tree;
-
-    /**
-     * This table maps each `pid` to a `map<void *, NULL>`.
-     * Essentially, each map is really just a set holding the starting position of every range
-     * mapped in the corresponding process. This is needed so that when a process exits
-     * or resets, we know what ranges to dereference!
-     *
-     * This will also be lazy initialized. `range_maps[pid]` is NULL until 
-     * a process first requests shared memory. (Or is forked from a process with shared memory)
-     */
-    //map_t *range_sets[FOS_MAX_PROCS];
+    binary_search_tree_t * const range_tree;
 };
 
 plugin_t *new_plugin_shm(kernel_state_t *ks);

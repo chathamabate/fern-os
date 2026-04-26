@@ -2,15 +2,12 @@
 #include "k_startup/plugin_shm.h"
 #include "s_util/str.h"
 #include "k_startup/page_helpers.h"
+#include "k_startup/page.h"
 #include "k_startup/process.h"
 
-#if KS_SEM_MAX_SEMS % 8 != 0
-#error "Semaphore limit must be a multiple of 8!"
-#endif
-
 static int32_t cmp_shm_range(const void *k0, const void *k1) {
-    const void *s0 = ((plugin_shm_range_t *)k0)->start;
-    const void *s1 = ((plugin_shm_range_t *)k1)->start;
+    const void *s0 = ((const plugin_shm_range_t *)k0)->start;
+    const void *s1 = ((const plugin_shm_range_t *)k1)->start;
 
     if (s0 < s1) {
         return -1;
@@ -21,6 +18,51 @@ static int32_t cmp_shm_range(const void *k0, const void *k1) {
     }
 
     return 0;
+}
+
+/**
+ * Find the start of an unmapped region of shared memory with size at least `len`.
+ */
+static void *find_shm_start(binary_search_tree_t *bst, uint32_t len) {
+    const plugin_shm_range_t *prev = NULL;
+    const plugin_shm_range_t *curr = bst_min(bst);
+
+    while (1) {
+        const void *start = prev ? prev->end : (void *)FOS_SHARED_AREA_START;
+        const void *end = curr ? curr->start : (void *)FOS_SHARED_AREA_END;
+        
+        uint32_t area_size = (uint32_t)end - (uint32_t)start;
+
+        if (area_size >= len) {
+            return (void *)start;
+        }
+
+        /**
+         * This'll be here and not in the top level condition as we want at least 1 iteration
+         * to always run. Could've just used a do while, but whatevs.
+         */
+        if (!curr) {
+            return NULL;
+        }
+
+        prev = curr;
+        curr = bst_next(bst, curr);
+    };
+}
+
+/**
+ * If `addr` falls within a range in the binary search tree, a pointer to that range is returned!
+ *
+ * Returns NULL if no range is found!
+ */
+static plugin_shm_range_t *find_referenced_shm_range(binary_search_tree_t *bst, void *addr) {
+    for (plugin_shm_range_t *iter = bst_min(bst); iter; iter = bst_next(bst, iter)) {
+        if (iter->start <= addr && addr < iter->end) {
+            return iter;
+        }
+    }
+
+    return NULL;
 }
 
 static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1,
@@ -41,12 +83,11 @@ static const plugin_impl_t PLUGIN_SHM_IMPL = {
 
 plugin_t *new_plugin_shm(kernel_state_t *ks) {
     plugin_shm_t *plg_shm = al_malloc(ks->al, sizeof(plugin_shm_t));
-    id_table_t *st = new_id_table(ks->al, KS_SEM_MAX_SEMS);
-    
-    // binary_search_tree_t *rt = new_simple_bst(ks->al, cmp_shm_range, sizeof(plugin_shm_range_t));
+    id_table_t *st = new_id_table(ks->al, KS_SHM_MAX_SEMS);
+    binary_search_tree_t *rt = new_simple_bst(ks->al, cmp_shm_range, sizeof(plugin_shm_range_t));
 
-    if (!plg_shm || !st /*|| !rt*/) {
-        //delete_binary_search_tree(rt);
+    if (!plg_shm || !st || !rt) {
+        delete_binary_search_tree(rt);
         delete_id_table(st);
         al_free(ks->al, plg_shm);
         return NULL;
@@ -56,16 +97,29 @@ plugin_t *new_plugin_shm(kernel_state_t *ks) {
 
     init_base_plugin((plugin_t *)plg_shm, &PLUGIN_SHM_IMPL, ks);
     *(id_table_t **)&(plg_shm->sem_table) = st;
-    mem_set(plg_shm->sem_vectors, 0, sizeof(plg_shm->sem_vectors));
-
-    /*
     *(binary_search_tree_t **)&(plg_shm->range_tree) = rt;
-    for (size_t i = 0; i < FOS_MAX_PROCS; i++) {
-        plg_shm->range_sets[i] = NULL;
-    }
-    */
 
     return (plugin_t *)plg_shm;
+}
+
+/**
+ * Static helper! Given a node from the plugin's range tree, unmap it for process `pid`!
+ * If the range is no longer referenced by any processes, it is entirely cleaned up!
+ * If `curr_proc` is not in the range's reference vector, do nothing!
+ */
+static void plg_shm_unmap_shm(plugin_shm_t *plg_shm, plugin_shm_range_t *range_node, process_t *curr_proc) {
+    proc_id_t pid = curr_proc->pid;
+    if (range_node->refs[pid / 8] & (1 << (pid % 8))) {
+        // Always unmap in calling proc and remove caller from bitvector.
+        pd_free_pages(curr_proc->pd, false, range_node->start, range_node->end);
+        range_node->refs[pid / 8] &= ~(1 << (pid % 8));
+
+        // Now, do we entirely delete the shared memory though?
+        if (mem_chk(range_node->refs, 0, sizeof(range_node->refs))) {
+            pd_free_pages(get_kernel_pd(), true, range_node->start, range_node->end);
+            bst_remove_node(plg_shm->range_tree, range_node); 
+        }
+    }
 }
 
 static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
@@ -155,10 +209,10 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         *(uint32_t *)&(sem->max_passes) = sem_passes;
         sem->passes = sem_passes;
         *(basic_wait_queue_t **)&(sem->bwq) = bwq;
-        sem->references = 1;
+        mem_set(sem->refs, 0, sizeof(sem->refs));
+        sem->refs[curr_proc->pid / 8] |= 1 << (curr_proc->pid % 8);
 
         idtb_set(plg_shm->sem_table, sem_id, sem);
-        plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] |= 1 << (sem_id % 8);
 
         DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
@@ -181,18 +235,18 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
     case PLG_SHM_PCID_SEM_DEC: {
         const sem_id_t sem_id = (sem_id_t)arg0;
 
-        if (sem_id >= KS_SEM_MAX_SEMS) {
-            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
-        }
-
-        // Does this proccess even have access `sem_id` though?
-        if (!(plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
+        if (sem_id >= KS_SHM_MAX_SEMS) {
             DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 
         plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
         if (!sem) {
-            return FOS_E_STATE_MISMATCH; // Very bad.
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        // Does this proccess even have access `sem` though?
+        if (!(sem->refs[curr_proc->pid / 8] & (1 << (curr_proc->pid % 8)))) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 
         if (sem->passes > 0) {
@@ -229,18 +283,18 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
     case PLG_SHM_PCID_SEM_INC: {
         const sem_id_t sem_id = (sem_id_t)arg0;
 
-        if (sem_id >= KS_SEM_MAX_SEMS) {
-            return FOS_E_SUCCESS;
-        }
-
-        // Does this proccess even have access `sem_id` though?
-        if (!(plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
+        if (sem_id >= KS_SHM_MAX_SEMS) {
             return FOS_E_SUCCESS;
         }
 
         plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
         if (!sem) {
-            return FOS_E_STATE_MISMATCH; // Very bad.
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        // Does this proccess even have access `sem` though?
+        if (!(sem->refs[curr_proc->pid / 8] & (1 << (curr_proc->pid % 8)))) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
         }
 
         if (sem->passes == sem->max_passes) {
@@ -295,18 +349,18 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
     case PLG_SHM_PCID_SEM_CLOSE: {
         const sem_id_t sem_id = (sem_id_t)arg0;
 
-        if (sem_id >= KS_SEM_MAX_SEMS) {
+        if (sem_id >= KS_SHM_MAX_SEMS) {
             return FOS_E_SUCCESS;
         }
 
-        // Do we even have access to this semaphore?
-        if (!(plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] & (1 << (sem_id % 8)))) {
-            return FOS_E_SUCCESS;
-        }
-
-        plugin_shm_sem_t *sem = (plugin_shm_sem_t *)(idtb_get(plg_shm->sem_table, sem_id));
+        plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
         if (!sem) {
-            return FOS_E_STATE_MISMATCH;
+            return FOS_E_SUCCESS; // semaphore doesn't even exist.
+        }
+
+        // Does this proccess even have access `sem` though?
+        if (!(sem->refs[curr_proc->pid / 8] & (1 << (curr_proc->pid % 8)))) {
+            return FOS_E_SUCCESS;
         }
 
         // When we close a semaphore, we first detach all of the calling process's current threads
@@ -324,17 +378,139 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
             }
         }
 
-        // Now we remove semaphore from reference vector.
         
-        plg_shm->sem_vectors[curr_proc->pid][sem_id / 8] &= ~(1 << (sem_id % 8));
+        // Now we remove this process from the semaphores reference vector!
+        sem->refs[curr_proc->pid / 8] &= ~(1 << (curr_proc->pid % 8));
 
-        // Finally decrement semaphore counter! (And potentially delete)
-        
-        if (--(sem->references) == 0) {
+        // If the semaphore reference vector is all 0's now, dispose of the semaphore.        
+        if (mem_chk(sem->refs, 0, sizeof(sem->refs))) {
             delete_wait_queue((wait_queue_t *)(sem->bwq));
             al_free(ks->al, sem);
             idtb_push_id(plg_shm->sem_table, sem_id);
         }
+
+        return FOS_E_SUCCESS;
+    }
+
+    /**
+     * Create a new shared memory area of size at least `bytes`.
+     *
+     * `arg0` - The minimum size of the area to create.
+     * `arg1` - A userspace void **.
+     *
+     * Returns FOS_E_BAD_ARGS if `bytes` is 0 or `shm` is NULL.
+     * Returns FOS_E_NO_SPACE if the shared memory area doesn't have a large enough unmapped area.
+     * Returns FOS_E_NO_MEM if there aren't enough free pages to complete the allocation.
+     * Returns FOS_E_SUCCESS on success and writes a pointer to the beginning of the area to `*shm`.
+     */
+    case PLG_SHM_PCID_NEW_SHM: {
+        uint32_t len = arg0;
+        if (len == 0) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+        if (len > FOS_SHARED_AREA_SIZE) {
+            DUAL_RET(curr_thr, FOS_E_NO_MEM, FOS_E_SUCCESS);
+        }
+
+        // Here we know `len` <= SHARED_AREA_SIZE, it is impossible aligning up causes `len`
+        // to loop back to 0.
+        len = ALIGN_UP(len, M_4K);
+
+        void ** const u_ret_ptr = (void **)arg1;
+        if (!u_ret_ptr) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
+
+
+        void *new_start = find_shm_start(plg_shm->range_tree, len);
+        if (!new_start) {
+            DUAL_RET(curr_thr, FOS_E_NO_SPACE, FOS_E_SUCCESS);
+        }
+
+        plugin_shm_range_t range = {
+            .start = new_start,
+            .end = (uint8_t *)new_start + len,
+            .refs = {0},  
+        };
+
+        range.refs[curr_proc->pid / 8] |= 1 << (curr_proc->pid % 8);
+
+        err = bst_add(plg_shm->range_tree, &range);
+        if (err != FOS_E_SUCCESS) {
+            if (err == FOS_E_ALREADY_ALLOCATED) {
+                return FOS_E_STATE_MISMATCH;
+            }
+
+            err = FOS_E_UNKNWON_ERROR;
+        }
+
+        if (err == FOS_E_SUCCESS) {
+            // our range is in our tree! Can we map it though?
+            
+            const void *true_e;
+            err = pd_alloc_pages(get_kernel_pd(), true, true, range.start, range.end, &true_e);
+            if (err != FOS_E_SUCCESS) {
+                if (err != FOS_E_NO_MEM) {
+                    return FOS_E_STATE_MISMATCH; // We should only ever encounter a no memory 
+                                                 // failure!
+                }
+
+                // we ran out of memory, return pages which were allocated.
+                pd_free_pages(get_kernel_pd(), true, range.start, true_e); 
+            }
+        }
+
+        if (err == FOS_E_SUCCESS) {
+            err = pd_copy_range(curr_proc->pd, get_kernel_pd(), range.start, range.end);
+            if (err != FOS_E_SUCCESS && err != FOS_E_NO_MEM) {
+                return FOS_E_STATE_MISMATCH; // We only ever allow no mem failures.
+            }
+        }
+
+        if (err == FOS_E_SUCCESS) {
+            // Finally, write back start bab!
+
+            err = mem_cpy_to_user(curr_proc->pd, u_ret_ptr, &(range.start), sizeof(void *), NULL);
+            if (err != FOS_E_SUCCESS) {
+                err = FOS_E_UNKNWON_ERROR;
+            }
+        }
+
+        if (err != FOS_E_SUCCESS) {
+            // Cleanup time in error situation!
+
+            
+            // These frees are safe! We know that are allocation errors did not fail due to running
+            // into another mapped area. There is no chance we free something that shouldn't be freed!
+            pd_free_pages(curr_proc->pd, false, range.start, range.end); 
+            pd_free_pages(get_kernel_pd(), true, range.start, range.end);
+
+            bst_remove(plg_shm->range_tree, &range);
+
+            DUAL_RET(curr_thr, err, FOS_E_SUCCESS);
+        }
+
+        DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    /**
+     * Close a shared memory area!
+     *
+     * `arg0` - the address of a byte within the shared memory region to unmap.
+     *
+     * Remember, this is a destructor style call, and thus needs not return anything to the 
+     * calling thread.
+     */
+    case PLG_SHM_PCID_CLOSE_SHM: {
+        void *addr = (void *)arg0;
+
+        plugin_shm_range_t *range = find_referenced_shm_range(plg_shm->range_tree, addr);
+        if (!range) {
+            return FOS_E_SUCCESS;
+        }
+
+        plg_shm_unmap_shm(plg_shm, range, curr_proc);
 
         return FOS_E_SUCCESS;
     }
@@ -360,23 +536,35 @@ static fernos_error_t plg_shm_on_fork_proc(plugin_t *plg, proc_id_t cpid) {
         return FOS_E_STATE_MISMATCH;
     }
 
-    // Copy the reference vector of the parent, into the child!
-    mem_cpy(plg_shm->sem_vectors[child_proc->pid], plg_shm->sem_vectors[parent_proc->pid], 
-            sizeof(plg_shm->sem_vectors[child_proc->pid]));
-
-    // Here we are looping over every semaphore in the system, increment the reference count
-    // of every semaphore which is reference by the new child process!
+    // We must iterate over every semaphore in the system, if a semaphore is referenced by
+    // the parent process, it will now also become referenced by this new child process.
+    
     idtb_reset_iterator(plg_shm->sem_table);
     const sem_id_t NULL_SEM_ID = idtb_null_id(plg_shm->sem_table);
     for (sem_id_t sem_id = idtb_get_iter(plg_shm->sem_table); sem_id != NULL_SEM_ID;
             sem_id = idtb_next(plg_shm->sem_table)) {
-        if (plg_shm->sem_vectors[child_proc->pid][sem_id / 8] & (1 << (sem_id % 8))) {
-            plugin_shm_sem_t *sem = idtb_get(plg_shm->sem_table, sem_id); 
-            if (!sem) {
-                return FOS_E_STATE_MISMATCH;
-            }
+        plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
+        if (!sem) {
+            return FOS_E_STATE_MISMATCH;
+        }
 
-            sem->references++;
+        if (sem->refs[parent_proc->pid / 8] & (1 << (parent_proc->pid % 8))) {
+            sem->refs[child_proc->pid / 8] |= (1 << (child_proc->pid % 8));
+        }
+    }
+
+    // Ok, this may be kinda slow, but for actual shared memory areas, we need to iterate
+    // over all shared memory ranges. A memory range which is referenced by the parent,
+    // must now also become referenced by the child.
+    // 
+    // NOTE: We don't need to do any page directory copying as this will be implicitly done
+    // by the fork.
+
+    for (plugin_shm_range_t *iter = bst_min(plg_shm->range_tree); iter; 
+            iter = bst_next(plg_shm->range_tree, iter)) {
+        
+        if (iter->refs[parent_proc->pid / 8] & (1 << (parent_proc->pid % 8))) {
+            iter->refs[child_proc->pid / 8] |= (1 << (child_proc->pid % 8));
         }
     }
 
@@ -387,20 +575,25 @@ static fernos_error_t plg_shm_on_reset_or_reap_proc(plugin_t *plg, proc_id_t pid
     kernel_state_t * const ks = plg->ks;
     plugin_shm_t * const plg_shm = (plugin_shm_t *)plg;
 
+    process_t *rproc = idtb_get(ks->proc_table, pid);
+    if (!rproc) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
     // Since we will potentially modifying the semaphore table, we will not use
     // the idtb iterator functions!
 
-    for (sem_id_t sem_id = 0; sem_id < KS_SEM_MAX_SEMS; sem_id++) {
-        if (plg_shm->sem_vectors[pid][sem_id / 8] & (1 << (sem_id % 8))) {
-            plugin_shm_sem_t *sem = idtb_get(plg_shm->sem_table, sem_id); 
-            if (!sem) {
-                return FOS_E_STATE_MISMATCH;
-            }
+    for (sem_id_t sem_id = 0; sem_id < KS_SHM_MAX_SEMS; sem_id++) {
+        plugin_shm_sem_t * const sem = idtb_get(plg_shm->sem_table, sem_id);
+        if (!sem) {
+            continue;
+        }
 
-            // Dereference our semaphore once, deleting if needed!
-            // We won't need to worry about threads of the calling process, they will not 
-            // execute again.
-            if (--(sem->references) == 0) {
+        // We only do anything for semaphores which are referenced by the process about to be 
+        // reaped.
+        if (sem->refs[pid / 8] & (1 << (pid % 8))) {
+            sem->refs[pid / 8] &= ~(1 << (pid % 8));
+            if (mem_chk(sem->refs, 0, sizeof(sem->refs))) {
                 delete_wait_queue((wait_queue_t *)(sem->bwq));
                 al_free(ks->al, sem);
                 idtb_push_id(plg_shm->sem_table, sem_id);
@@ -408,7 +601,18 @@ static fernos_error_t plg_shm_on_reset_or_reap_proc(plugin_t *plg, proc_id_t pid
         }
     }
 
-    mem_set(plg_shm->sem_vectors[pid], 0, sizeof(plg_shm->sem_vectors[pid]));
+
+    plugin_shm_range_t *iter = bst_min(plg_shm->range_tree);
+    while (iter) {
+        // Gotta do this here, as we may delete `iter` later.
+        // (This is safe because bst nodes are always stable)
+        plugin_shm_range_t *next = bst_next(plg_shm->range_tree, iter);
+
+        // This does nothing if `rproc` does not reference `iter`'s range!
+        plg_shm_unmap_shm(plg_shm, iter, rproc);
+
+        iter = next;
+    }
 
     return FOS_E_SUCCESS;
 }

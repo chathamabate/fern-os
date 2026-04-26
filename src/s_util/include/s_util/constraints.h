@@ -108,7 +108,7 @@
 #define FOS_MAX_THREADS_PER_PROC (16)
 
 /**
- * EDITABLE
+ * EDITABLE, Must be multiple of 8.
  */
 #define FOS_MAX_PROCS (256)
 

@@ -10,3 +10,10 @@
  * sharing data between processes.
  */
 bool test_syscall_shm_sem(void);
+
+/**
+ * This tests actual shared memory now. (with the help of semaphores)
+ *
+ * Make sure `test_syscall_shm_sem` is passing before interpreting the results of this test.
+ */
+bool test_syscall_shm(void);

@@ -74,6 +74,10 @@
 #error "FOS_STACK_AREA_SIZE is too small given constraints!"
 #endif
 
+#if FOS_MAX_PROCS % 8 != 0
+#error "FOS_MAX_PROCS must be a multiple of 8!"
+#endif
+
 // Check for overlaps!!!
 
 #if FOS_KERNEL_AREA_START < FOS_AREA_START
