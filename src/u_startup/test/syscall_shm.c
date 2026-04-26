@@ -626,12 +626,154 @@ static bool test_shm_unmap_failure(void) {
     TEST_SUCCEED();
 }
 
-// Ok, does unmap actually unmap??
-// Can two processes really use the same shared memory at once??
-// Can a parent unmap while a child still uses it??
-// There are lots of questions!
-// What if we really use shared memory to its limits?
-// IDK, imma take a walk tbh, too much computer for one day maybe.
+static bool test_synced_shm_usage(void) {
+    // Here we will spawn two children who will communicate via a shared shm area and semaphore.
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    const size_t shm_size = M_4K * 10;
+
+    sem_id_t sem;
+    uint8_t *shm;
+
+    TEST_SUCCESS(sc_shm_new_semaphore(&sem, 1));
+    TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&shm));
+
+    mem_set(shm, 1, shm_size); // Set as non-zero to start.
+
+    proc_id_t cpids[2];
+
+    TEST_SUCCESS(sc_proc_fork(cpids + 0));
+    if (cpids[0] == FOS_MAX_PROCS) { // Child proc 0
+        TEST_SUCCESS(sc_shm_sem_dec(sem));
+        for (size_t i = 0; i < shm_size; i++) {
+            shm[i] = (uint8_t)i;
+        }
+        sc_shm_sem_inc(sem);
+
+        // Now we wait for child proc 1 to process our data, we know child proc 1 will increment 
+        // our data so we can use this as a lithmus test.
+
+        while (true) {
+            TEST_SUCCESS(sc_shm_sem_dec(sem));
+            if (shm[0] == 1) {
+                break;
+            }
+            sc_shm_sem_inc(sem);
+        }
+
+        for (size_t i = 0; i < shm_size; i++) {
+            TEST_EQUAL_UINT((uint8_t)(i + 1), shm[i]);
+        }
+
+        sc_shm_sem_inc(sem);
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    TEST_SUCCESS(sc_proc_fork(cpids + 1));
+    if (cpids[1] == FOS_MAX_PROCS) { // Child proc 1
+        while (true) {
+            TEST_SUCCESS(sc_shm_sem_dec(sem));
+            if (shm[0] == 0) { // If set to 0, we know proc 0 has populated the area.
+                break;
+            }
+            sc_shm_sem_inc(sem);
+        }
+
+        for (size_t i = 0; i < shm_size; i++) {
+            shm[i]++;
+        }
+
+        sc_shm_sem_inc(sem);
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // Parent proc can close these immediately as we don't use them!
+    sc_shm_close_shm(shm);
+    sc_shm_close_semaphore(sem);
+
+    TEST_SUCCESS(reap_single(cpids[0])); 
+    TEST_SUCCESS(reap_single(cpids[1])); 
+    
+    sc_signal_allow(old_sv);
+    TEST_SUCCEED();
+}
+
+static bool test_shm_pipeline(void) {
+    // Root Proc <--> shm0 <--> Child Proc <--> shm1 <--> Grandchild Proc
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+    const size_t shm_size = M_4K;
+
+    // We only need 1 semaphore. Technically, we could also do this with just one shared memory
+    // area, but that would be a lame test imo.
+    sem_id_t sem;
+    TEST_SUCCESS(sc_shm_new_semaphore(&sem, 1));
+
+    uint8_t *parent_child_shm;
+    TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&parent_child_shm));
+
+    // Pull semaphore down to 0 before spawnining child.
+    TEST_SUCCESS(sc_shm_sem_dec(sem));
+
+    proc_id_t child_pid;
+    TEST_SUCCESS(sc_proc_fork(&child_pid));
+
+    if (child_pid == FOS_MAX_PROCS) { // Child proc.
+        TEST_SUCCESS(sc_shm_sem_dec(sem));
+
+        sc_signal_allow(1 << FSIG_CHLD); // We know the sv of new processes start as 0.
+
+        uint8_t *child_gchild_shm;
+        TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&child_gchild_shm));
+
+        proc_id_t gchild_pid;
+        TEST_SUCCESS(sc_proc_fork(&gchild_pid));
+        if (gchild_pid == FOS_MAX_PROCS) { // Grand Child proc.
+            sc_shm_close_shm(parent_child_shm); // Not used at all in grandchild.
+
+            TEST_SUCCESS(sc_shm_sem_dec(sem)); // We wait for the child to copy from shm0 to shm1.
+            
+            for (size_t i = 0; i < shm_size; i++) {
+                child_gchild_shm[i]++;
+            }
+
+            sc_proc_exit(PROC_ES_SUCCESS); // We'll let our shm/sems be cleaned up on reap.
+        }
+
+        // Copy from one shm to another!
+        mem_cpy(child_gchild_shm, parent_child_shm, shm_size);
+        sc_shm_sem_inc(sem); // Kick off grandchild.
+        TEST_SUCCESS(reap_single(gchild_pid));
+
+        // Move processed data from shm1 to shm0.
+        mem_cpy(parent_child_shm, child_gchild_shm, shm_size);
+
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // Parent Proc.
+
+    for (size_t i = 0; i < shm_size; i++) {
+        parent_child_shm[i] = (uint8_t)i;
+    }
+
+    sc_shm_sem_inc(sem); // Kick off pipeline.
+    TEST_SUCCESS(reap_single(child_pid));
+
+    for (size_t i = 0; i < shm_size; i++) {
+        TEST_EQUAL_UINT((uint8_t)(i + 1), parent_child_shm[i]);
+    }
+
+    sc_shm_close_shm(parent_child_shm);
+    sc_shm_close_semaphore(sem);
+
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
 
 bool test_syscall_shm(void) {
     BEGIN_SUITE("Shared Memory");
@@ -640,5 +782,7 @@ bool test_syscall_shm(void) {
     RUN_TEST(test_shm_exhaust);
     RUN_TEST(test_shm_sharing);
     RUN_TEST(test_shm_unmap_failure);
+    RUN_TEST(test_synced_shm_usage);
+    RUN_TEST(test_shm_pipeline);
     return END_SUITE();
 }
