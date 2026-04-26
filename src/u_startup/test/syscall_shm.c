@@ -533,6 +533,7 @@ static bool test_random_new_shm(void) {
 
 static bool test_shm_exhaust(void) {
     // Now let's try allocating as many shm's as possible!
+    // Pretty slow, but whatever.
 
     fernos_error_t err;
 
@@ -557,16 +558,87 @@ static bool test_shm_exhaust(void) {
     TEST_SUCCEED();
 }
 
+static bool test_shm_sharing(void) {
+    // Here we test that shared memory is actually shared across parent and child processes!
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    const size_t shm_size = 1000;
+
+    uint8_t *shm;
+    TEST_SUCCESS(sc_shm_new_shm(shm_size, (void **)&shm));
+
+    for (size_t i = 0; i < shm_size; i++) {
+        shm[i] = (uint8_t)i;
+    }
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) { // Child process!
+        for (size_t i = 0; i < shm_size; i++) {
+            TEST_EQUAL_UINT((uint8_t)i, shm[i]);
+        }
+        
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    // Parent process!
+    TEST_SUCCESS(reap_single(cpid));
+
+    sc_shm_close_shm(shm);
+
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
+
+static bool test_shm_unmap_failure(void) {
+    // Here we want to see if unmapping in the child, actually removes access to the area!
+
+    sig_vector_t old_sv = sc_signal_allow(1 << FSIG_CHLD);
+
+    uint8_t *shm;
+    TEST_SUCCESS(sc_shm_new_shm(1, (void **)&shm));
+
+    proc_id_t cpid;
+    TEST_SUCCESS(sc_proc_fork(&cpid));
+
+    if (cpid == FOS_MAX_PROCS) { // Child process!
+        sc_shm_close_shm(shm); // unmap in child!
+        shm[0] = 100; // This should triger a page fault!
+        sc_proc_exit(PROC_ES_SUCCESS);
+    }
+
+    TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
+
+    proc_exit_status_t rces;
+    TEST_SUCCESS(sc_proc_reap(cpid, NULL, &rces));
+    TEST_EQUAL_HEX(PROC_ES_PF, rces);
+
+    // Make sure that after all this BS, we can still access shm here in the parent process!
+    shm[0] = 10;
+
+    sc_shm_close_shm(shm);
+    
+    sc_signal_allow(old_sv);
+
+    TEST_SUCCEED();
+}
+
 // Ok, does unmap actually unmap??
 // Can two processes really use the same shared memory at once??
 // Can a parent unmap while a child still uses it??
 // There are lots of questions!
 // What if we really use shared memory to its limits?
+// IDK, imma take a walk tbh, too much computer for one day maybe.
 
 bool test_syscall_shm(void) {
     BEGIN_SUITE("Shared Memory");
     RUN_TEST(test_new_shm_and_unmap);
     RUN_TEST(test_random_new_shm);
     RUN_TEST(test_shm_exhaust);
+    RUN_TEST(test_shm_sharing);
+    RUN_TEST(test_shm_unmap_failure);
     return END_SUITE();
 }
