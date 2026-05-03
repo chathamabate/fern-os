@@ -86,7 +86,23 @@ const m2_info_tag_base_t *m2_next_info_tag(const m2_info_tag_base_t *it);
  */
 const m2_info_tag_base_t *m2_find_info_tag(const m2_info_tag_base_t *it, uint32_t type);
 
+typedef struct _m2_info_tag_vbe_t m2_info_tag_vbe_t;
+typedef struct _m2_info_tag_framebuffer_t m2_info_tag_framebuffer_t;
+
+#define M2_ITT_VBE_INFO (7U)
 #define M2_ITT_FRAMEBUFFER (8U)
+
+struct _m2_info_tag_vbe_t {
+    m2_info_tag_base_t super; 
+
+    uint16_t vbe_mode;
+    uint16_t vbe_interface_seg;
+    uint16_t vbe_interface_offset;
+    uint16_t vbe_interface_len;
+
+    uint8_t vbe_control_info[512];
+    uint8_t vbe_mode_info[256];
+} __attribute__ ((packed));
 
 /* FBT for frame buffer type */
 #define M2_FBT_INDEXED_COLOR (0U)
@@ -132,7 +148,6 @@ struct _m2_info_tag_framebuffer_t {
     // more bytes depending on the type of framebuffer which was installed!
 } __attribute__ ((packed));
 
-typedef struct _m2_info_tag_framebuffer_t m2_info_tag_framebuffer_t;
 
 /**
  * For the DIRECT RGB type, this is what follows the frame buffer tag.

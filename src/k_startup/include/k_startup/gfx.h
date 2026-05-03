@@ -7,6 +7,11 @@
 #include "s_data/term_buffer.h"
 
 /**
+ * The offset of the VBE protected mode interface!
+ */
+extern const uint32_t VBE_ENTRY;
+
+/**
  * This structure is very similar to the generic `gfx_buffer_t` structure.
  * It is meant to reference an area of memory mapped I/O responsible for a graphics display.
  *
@@ -81,6 +86,8 @@ extern term_buffer_t * const DIRECT_TERM;
  * (We assume we have access to the full memory space)
  */
 fernos_error_t init_screen(const m2_info_start_t *m2_info);
+
+uint16_t vbe_current_mode(void);
 
 /**
  * Copy the default back buffer to the default screen!

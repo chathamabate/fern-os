@@ -8,6 +8,8 @@
 #include "s_gfx/mono_fonts.h"
 #include "s_util/str.h"
 
+const uint32_t VBE_ENTRY = 0;
+
 void gfx_to_screen(gfx_screen_t *screen, gfx_buffer_t *frame) {
     // We'll put a memory barrier both before and after cause why not.
     __sync_synchronize();
@@ -81,15 +83,6 @@ static term_buffer_t direct_term = {
 term_buffer_t * const DIRECT_TERM = &direct_term;
 
 fernos_error_t init_screen(const m2_info_start_t *m2_info) {
-    /*
-     * TODO: I think my graphics driver potentially has issues with cacheability.
-     * I may need to make updates to how PTEs for the frame buffer are constructed to confirm
-     * uncacheability and write combining.
-     *
-     * Additionally, some guys on stack overflow have introduced me to various strategies 
-     * useable for speeding up memcpy! I could consider making these changes!
-     */
-
     if (!m2_info) {
         return FOS_E_BAD_ARGS;
     }
@@ -98,8 +91,6 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
         // The screen buffer has already been initialized!
         return FOS_E_STATE_MISMATCH;
     }
-
-    // Otherwise, let's search for the
 
     const m2_info_tag_base_t *tags = m2_info_tag_area(m2_info);
 
@@ -147,6 +138,23 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
     };
 
     tb_default_clear(DIRECT_TERM);
+
+    const m2_info_tag_vbe_t *vbe_info_tag = 
+        (const m2_info_tag_vbe_t *)m2_find_info_tag(tags, M2_ITT_VBE_INFO);
+    if (!vbe_info_tag) {
+        return FOS_E_STATE_MISMATCH;
+    }
+
+    *(uint32_t *)&VBE_ENTRY = vbe_info_tag->vbe_interface_offset;
+
+    gfx_direct_put_fmt_s_rr("Attempting Call!\n");
+    uint16_t r = vbe_current_mode();
+    gfx_direct_put_fmt_s_rr("Current Mode: 0x%X\n", r);
+
+    // We want to be able to call this shit right??
+    // Ok, now what??
+
+    while (1);
 
     return FOS_E_SUCCESS;
 }
