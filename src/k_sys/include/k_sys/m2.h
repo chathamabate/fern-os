@@ -2,6 +2,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "k_sys/vbe.h"
 #include "s_util/misc.h"
 
 /*
@@ -96,11 +97,16 @@ struct _m2_info_tag_vbe_t {
     m2_info_tag_base_t super; 
 
     uint16_t vbe_mode;
+
     uint16_t vbe_interface_seg;
     uint16_t vbe_interface_offset;
     uint16_t vbe_interface_len;
 
-    uint8_t vbe_control_info[512];
+    vbe_info_block_t control_info;
+
+    /**
+     * TODO: Consider actually writing out the struct for this.
+     */
     uint8_t vbe_mode_info[256];
 } __attribute__ ((packed));
 

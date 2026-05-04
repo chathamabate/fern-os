@@ -145,14 +145,11 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
         return FOS_E_STATE_MISMATCH;
     }
 
-    *(uint32_t *)&VBE_ENTRY = vbe_info_tag->vbe_interface_offset;
 
-    gfx_direct_put_fmt_s_rr("Attempting Call!\n");
-    uint16_t r = vbe_current_mode();
-    gfx_direct_put_fmt_s_rr("Current Mode: 0x%X\n", r);
-
-    // We want to be able to call this shit right??
-    // Ok, now what??
+    gfx_direct_put_fmt_s_rr("VBE Int Seg: 0x%X\n", vbe_info_tag->vbe_interface_seg);
+    gfx_direct_put_fmt_s_rr("VBE Int Off: 0x%X\n", vbe_info_tag->vbe_interface_offset);
+    const vbe_info_block_t *vib = &(vbe_info_tag->control_info);
+    dump_vbe_info_block(vib, gfx_direct_put_fmt_s_rr);
 
     while (1);
 
