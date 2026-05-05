@@ -87,7 +87,7 @@ extern term_buffer_t * const DIRECT_TERM;
  */
 fernos_error_t init_screen(const m2_info_start_t *m2_info);
 
-uint16_t vbe_current_mode(void);
+uint16_t vbe_current_mode(uint16_t *mode);
 
 /**
  * Copy the default back buffer to the default screen!

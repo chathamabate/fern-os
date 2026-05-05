@@ -139,17 +139,39 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
 
     tb_default_clear(DIRECT_TERM);
 
+    // Looks like this info tag may not be that helpful!
+    // We need the VBE 3.0 interface, which is not defined here!
+
     const m2_info_tag_vbe_t *vbe_info_tag = 
         (const m2_info_tag_vbe_t *)m2_find_info_tag(tags, M2_ITT_VBE_INFO);
     if (!vbe_info_tag) {
         return FOS_E_STATE_MISMATCH;
     }
 
+    *(uint32_t *)&VBE_ENTRY =  ((uint32_t)(vbe_info_tag->vbe_interface_seg) << 4) + 
+        vbe_info_tag->vbe_interface_offset;
 
+    gfx_direct_put_fmt_s_rr("PMI Seg: 0x%X\n", vbe_info_tag->vbe_interface_seg);
+    gfx_direct_put_fmt_s_rr("PMI Off: 0x%X\n", vbe_info_tag->vbe_interface_offset);
+    gfx_direct_put_fmt_s_rr("PMI Len: 0x%X\n", vbe_info_tag->vbe_interface_len);
+
+    /*
+    for (size_t i = 0; i < 4; i++) {
+        gfx_direct_put_fmt_s_rr("VBE[%u] = 0x%X\n", i, ((uint16_t *)VBE_ENTRY)[i]);
+    }
+    uint16_t status;
+    uint16_t mode;
+    */
+
+    //status = vbe_current_mode(&mode);
+    //gfx_direct_put_fmt_s_rr("Status = 0x%X Mode = 0x%X\n", status, mode);
+
+    /*
     gfx_direct_put_fmt_s_rr("VBE Int Seg: 0x%X\n", vbe_info_tag->vbe_interface_seg);
     gfx_direct_put_fmt_s_rr("VBE Int Off: 0x%X\n", vbe_info_tag->vbe_interface_offset);
     const vbe_info_block_t *vib = &(vbe_info_tag->control_info);
     dump_vbe_info_block(vib, gfx_direct_put_fmt_s_rr);
+    */
 
     while (1);
 
