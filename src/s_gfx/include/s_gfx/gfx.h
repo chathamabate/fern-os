@@ -70,7 +70,7 @@ typedef struct _gfx_buffer_t {
      * The allocator used to allocate this structure and `buffer`.
      *
      * This structure is intentially simple though to allow for 
-     * easily setting up a buffer in static memory.
+     * easily setting up a buffer in static memory. If `al` is NULL, this is a static buffer!
      */
     allocator_t * const al;
 
@@ -80,7 +80,14 @@ typedef struct _gfx_buffer_t {
     uint16_t width, height;
 
     /**
-     * The buffer itself with size `width * height * sizeof(gfx_color_t)`.
+     * The actual number of pixels in the buffer.
+     */
+    uint32_t buffer_len;
+
+    /**
+     * The buffer itself with size `buffer_len * sizeof(gfx_color_t)`.
+     *
+     * `width * height <= buffer_len` must be the case for all valid buffers!
      */
     gfx_color_t *buffer;
 } gfx_buffer_t;
@@ -108,8 +115,10 @@ void delete_gfx_buffer(gfx_buffer_t *buf);
  * If `shrink` is false, then resizing to a smaller cumulative size will do nothing memory wise.
  * If `shrink` is true, resizing to a smaller cumulative size may shrink the buffer in memory.
  *
- * If `buf` has no allocator, this always fails.
- * Otherwise, this fails if there are insufficient resources.
+ * If `buf` has no allocator, this is a static buffer. This call will thus fail if `w * h > buf->buffer_len`.
+ * `shrink` is ignored for static buffers.
+ *
+ * For dynamic buffers, this only fails if there are insufficient resources.
  *
  * On success, the contents of the buffer or undefined.
  * On failure, the buffer is left unmodified.
