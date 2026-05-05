@@ -622,8 +622,6 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
         uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     fernos_error_t err;
 
-    (void)arg0;
-    (void)arg1;
     (void)arg2;
     (void)arg3;
 
@@ -749,6 +747,10 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
         idtb_set(curr_thr->proc->handle_table, h, hs_t);
 
         DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    case  PLG_GFX_PCID_NEW_GFX_WIN: {
+
     }
 
     default: {

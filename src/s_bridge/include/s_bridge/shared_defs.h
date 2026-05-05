@@ -382,6 +382,7 @@ typedef int32_t futex_t;
 
 #define PLG_GFX_PCID_NEW_DUMMY (0U)
 #define PLG_GFX_PCID_NEW_TERM  (1U)
+#define PLG_GFX_PCID_NEW_GFX_WIN (2U)
 
 /*
  * ***** Shared Memory Plugin *****

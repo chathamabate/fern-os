@@ -22,3 +22,8 @@ fernos_error_t sc_gfx_new_dummy(void);
  * (Other errors may be returned)
  */
 fernos_error_t sc_gfx_new_terminal(handle_t *h, const gfx_term_buffer_attrs_t *attrs);
+
+/**
+ * Should we make graphics buffers a little better first?
+ */
+fernos_error_t sc_gfx_new_gfx_window(handle_t *h, gfx_color_t *shm_buf0, gfx_color_t *shm_buf1);
