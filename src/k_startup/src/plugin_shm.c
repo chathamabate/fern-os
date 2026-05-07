@@ -6,14 +6,21 @@
 #include "k_startup/process.h"
 
 static int32_t cmp_shm_range(const void *k0, const void *k1) {
-    const void *s0 = ((const plugin_shm_range_t *)k0)->start;
-    const void *s1 = ((const plugin_shm_range_t *)k1)->start;
+    const plugin_shm_range_t *s0 = k0;
+    const plugin_shm_range_t *s1 = k1;
 
-    if (s0 < s1) {
+    /*
+     * To make looking up a shared memory area easy, we'll say if two ranges overlap
+     * at all, they are equal!
+     *
+     * This will work as shared memory areas are non-empty and never overlap!
+     */
+
+    if (s0->end <= s1->start) {
         return -1;
     }
 
-    if (s0 > s1) {
+    if (s1->end <= s0->start) {
         return 1;
     }
 
@@ -56,13 +63,12 @@ static void *find_shm_start(binary_search_tree_t *bst, uint32_t len) {
  * Returns NULL if no range is found!
  */
 static plugin_shm_range_t *find_referenced_shm_range(binary_search_tree_t *bst, void *addr) {
-    for (plugin_shm_range_t *iter = bst_min(bst); iter; iter = bst_next(bst, iter)) {
-        if (iter->start <= addr && addr < iter->end) {
-            return iter;
-        }
-    }
+    const plugin_shm_range_t temp_range = {
+        .start = addr,
+        .end = (uint8_t *)addr + 1
+    };
 
-    return NULL;
+    return bst_find(bst, &temp_range);
 }
 
 static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1,
