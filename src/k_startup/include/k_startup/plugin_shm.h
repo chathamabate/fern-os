@@ -75,14 +75,24 @@ struct _plugin_shm_range_t {
     const void * const end;
 
     /**
-     * In what processes is this range mapped?
-     *
-     * If this bit vector is all 0, the kernel should dispose of the range.
+     * How many references in the kernel exist for this range.
+     */
+    uint32_t kernel_refs;
+
+    /**
+     * In what USER processes is this range mapped?
      *
      * Realize, that we could just check a process's page tables to see
-     * if this range is mapped, but that is probably slower and less confusing than this.
+     * if this range is mapped, but that is probably slower and more confusing than this.
      */
     uint8_t refs[FOS_MAX_PROCS / 8];
+
+    /*
+     * Realize that if `kernel_refs` is 0 AND `refs` is entirely 0, this range is no
+     * longer used either in kernel or userspace!
+     *
+     * It should be unmapped!
+     */
 };
 
 struct _plugin_shm_t {

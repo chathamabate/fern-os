@@ -393,6 +393,12 @@ typedef int32_t futex_t;
  * Shared mem plugin KERNEL commands.
  */
 
+#define PLG_SHM_KCID_NEW_SHM    (0U)
+#define PLG_SHM_KCID_SHM_INC    (1U)
+#define PLG_SHM_KCID_SHM_DEC    (2U)
+#define PLG_SHM_KCID_SHM_MAP    (3U)
+#define PLG_SHM_KCID_SHM_UNMAP  (4U)
+
 /*
  * Shared mem plugin commands.
  */
