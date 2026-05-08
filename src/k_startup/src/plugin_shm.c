@@ -129,6 +129,17 @@ static void plg_shm_unmap_shm(plugin_shm_t *plg_shm, plugin_shm_range_t *range_n
     }
 }
 
+/**
+ * This checks if the given range node is no longer referenced, if so, it is unmapped in the 
+ * kernel and removed from the range tree!
+ */
+static void plg_shm_check_gc(plugin_shm_t *plg_shm, plugin_shm_range_t *range_node) {
+    if (range_node->kernel_refs == 0 && mem_chk(range_node->refs, 0, sizeof(range_node->refs))) {
+        pd_free_pages(get_kernel_pd(), true, range_node->start, range_node->end); 
+        bst_remove_node(plg_shm->range_tree, range_node);
+    }
+}
+
 static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     fernos_error_t err;
 
@@ -177,7 +188,7 @@ static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t k
         //
         // Can we map?
 
-        plugin_shm_range_t range = {
+        const plugin_shm_range_t range = {
             .start = start,
             .end = (uint8_t *)start + size,
             .kernel_refs = 1,
@@ -225,7 +236,22 @@ static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t k
      * reference counter increased.
      */
     case PLG_SHM_KCID_SHM_INC: {
+        void *ptr = (void *)arg0;
+        
+        const plugin_shm_range_t dummy_range = {
+            .start = ptr,
+            .end = (uint8_t *)ptr + 1
+        };
 
+        plugin_shm_range_t *range_node = bst_find(plg_shm->range_tree, &dummy_range);
+
+        if (!range_node) {
+            return FOS_E_INVALID_INDEX;
+        }
+
+        range_node->kernel_refs++;
+        
+        return FOS_E_SUCCESS; 
     }
 
     /**
@@ -238,9 +264,23 @@ static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t k
      * 
      * Always returns FOS_E_SUCCESS.
      * Does nothing if `arg0` is not inside a shared memory area.
+     * Also does nothing if the kernel reference count is already 0.
      */
     case PLG_SHM_KCID_SHM_DEC: {
+        void *ptr = (void *)arg0;
+        
+        const plugin_shm_range_t dummy_range = {
+            .start = ptr,
+            .end = (uint8_t *)ptr + 1
+        };
 
+        plugin_shm_range_t *range_node = bst_find(plg_shm->range_tree, &dummy_range);
+        if (range_node && range_node->kernel_refs > 0) {
+            range_node->kernel_refs--;
+            plg_shm_check_gc(plg_shm, range_node);
+        }
+
+        return FOS_E_SUCCESS;
     }
 
     /**
@@ -255,7 +295,40 @@ static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t k
      * FOS_E_SUCCESS if the map succeeded!
      */
     case PLG_SHM_KCID_SHM_MAP: {
+        void *ptr = (void *)arg0;
+        proc_id_t pid = (proc_id_t)arg1;
 
+        // Before we do anything, is `pid` even valid?
+        process_t *proc = idtb_get(ks->proc_table, pid);
+        if (!proc) {
+            return FOS_E_INVALID_INDEX;
+        }
+
+        // Does `ptr` point to a real range?
+        const plugin_shm_range_t dummy_range = {
+            .start = ptr,
+            .end = (uint8_t *)ptr + 1
+        };
+
+        plugin_shm_range_t *range_node = bst_find(plg_shm->range_tree, &dummy_range);
+        if (!range_node) {
+            return FOS_E_INVALID_INDEX;
+        }
+
+        // Is it already allocated though?
+        if (range_node->refs[pid / 8] & (1 << (pid % 8))) {
+            return FOS_E_ALREADY_ALLOCATED;
+        }
+
+        // We can map baby!
+        err = pd_copy_range(proc->pd, get_kernel_pd(), range_node->start, range_node->end);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+
+        // Success!
+        range_node->refs[pid / 8] |= (1 << (pid % 8));
+        return FOS_E_SUCCESS;
     }
 
     /**
@@ -269,7 +342,37 @@ static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t k
      * Always returns FOS_E_SUCCESS.
      */
     case PLG_SHM_KCID_SHM_UNMAP: {
-        
+        void *ptr = (void *)arg0;
+        proc_id_t pid = (proc_id_t)arg1;
+
+        // Before we do anything, is `pid` even valid?
+        process_t *proc = idtb_get(ks->proc_table, pid);
+        if (!proc) {
+            return FOS_E_SUCCESS;
+        }
+
+        // Does `ptr` point to a real range?
+        const plugin_shm_range_t dummy_range = {
+            .start = ptr,
+            .end = (uint8_t *)ptr + 1
+        };
+
+        plugin_shm_range_t *range_node = bst_find(plg_shm->range_tree, &dummy_range);
+        if (!range_node) {
+            return FOS_E_SUCCESS;
+        }
+
+        // We have a range node, and a user process, we can only unmap if it's actually mapped
+        // in the user process though.
+
+        if (range_node->refs[pid / 8] & (1 << (pid % 8))) {
+            pd_free_pages(proc->pd, false, range_node->start, range_node->end);
+            range_node->refs[pid / 8] &= ~(1 << (pid % 8));
+
+            plg_shm_check_gc(plg_shm, range_node);
+        }
+
+        return FOS_E_SUCCESS;
     }
 
     default: {
