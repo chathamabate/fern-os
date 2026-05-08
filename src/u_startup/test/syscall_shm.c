@@ -491,6 +491,11 @@ static bool test_new_shm_and_unmap(void) {
     TEST_SUCCEED();
 }
 
+static bool test_new_shm_bad_ref(void) {
+    TEST_EQUAL_HEX(FOS_E_BAD_ARGS, sc_shm_new_shm(100, NULL));
+    TEST_SUCCEED();
+}
+
 static bool test_random_new_shm(void) {
     // Here we just randomly allocate shared memory areas and make sure nothing
     // breaks!
@@ -778,6 +783,7 @@ static bool test_shm_pipeline(void) {
 bool test_syscall_shm(void) {
     BEGIN_SUITE("Shared Memory");
     RUN_TEST(test_new_shm_and_unmap);
+    RUN_TEST(test_new_shm_bad_ref);
     RUN_TEST(test_random_new_shm);
     RUN_TEST(test_shm_exhaust);
     RUN_TEST(test_shm_sharing);
