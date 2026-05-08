@@ -71,6 +71,7 @@ static plugin_shm_range_t *find_referenced_shm_range(binary_search_tree_t *bst, 
     return bst_find(bst, &temp_range);
 }
 
+static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1,
         uint32_t arg2, uint32_t arg3);
 static fernos_error_t plg_shm_on_fork_proc(plugin_t *plg, proc_id_t cpid);
@@ -79,7 +80,7 @@ static fernos_error_t plg_shm_on_reap_proc(plugin_t *plg, proc_id_t rpid);
 
 static const plugin_impl_t PLUGIN_SHM_IMPL = {
     .plg_on_shutdown = NULL,
-    .plg_kernel_cmd = NULL,
+    .plg_kernel_cmd = plg_shm_kernel_cmd,
     .plg_cmd = plg_shm_cmd,
     .plg_tick = NULL,
     .plg_on_fork_proc = plg_shm_on_fork_proc,
@@ -126,6 +127,158 @@ static void plg_shm_unmap_shm(plugin_shm_t *plg_shm, plugin_shm_range_t *range_n
             bst_remove_node(plg_shm->range_tree, range_node); 
         }
     }
+}
+
+static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    fernos_error_t err;
+
+    plugin_shm_t *plg_shm = (plugin_shm_t *)plg;
+    kernel_state_t *ks = plg->ks;
+
+    (void)arg2;
+    (void)arg3;
+
+    switch (kcmd_id) {
+
+    /**
+     * Create a new shared memory area which is ONLY mapped in the kernel at this time.
+     * This area will start with a kernel reference count of 1.
+     *
+     * arg0 - minimum size of the area in bytes.
+     * arg1 - void ** Where to right the start of this new mapped region!
+     *
+     * Returns FOS_E_BAD_ARGS if `arg0` is 0 or `arg1` is NULL.
+     * Returns FOS_E_NO_SPACE if the shared memory area doesn't have a large enough unmapped area.
+     * Returns FOS_E_NO_MEM if there aren't enough free pages to complete the allocation.
+     * Returns FOS_E_SUCCESS on success and writes a pointer to the beginning of the area to `*arg1`.
+     *
+     * Returns FOS_E_STATE_MISMATCH if there is a serious kernel error.
+     */
+    case PLG_SHM_KCID_NEW_SHM: {
+        uint32_t size = arg0;
+        void **out = (void **)arg1;
+
+        if (size == 0 || !out) {
+            return FOS_E_BAD_ARGS;
+        }
+
+        if (size > FOS_SHARED_AREA_SIZE) {
+            return FOS_E_NO_SPACE;
+        }
+
+        size = ALIGN_UP(size, M_4K);
+
+        void *start = find_shm_start(plg_shm->range_tree, size);
+        if (!start) {
+            return FOS_E_NO_SPACE;
+        }
+
+        // We know [start, start + size) is a free 4K align range in the free memory area!
+        //
+        // Can we map?
+
+        plugin_shm_range_t range = {
+            .start = start,
+            .end = (uint8_t *)start + size,
+            .kernel_refs = 1,
+            .refs = {0}, 
+        };
+
+        err = bst_add(plg_shm->range_tree, &range);
+        if (err != FOS_E_SUCCESS) {
+            if (err == FOS_E_ALREADY_ALLOCATED) {
+                return FOS_E_STATE_MISMATCH; // This is very bad!
+            }
+
+            return err;
+        }
+
+        // Alright, now we attempt to map in the kernel space.
+
+        const void *true_e;
+        err = pd_alloc_pages(get_kernel_pd(), true, true, range.start, range.end, &true_e);
+        if (err != FOS_E_SUCCESS) {
+            if (err != FOS_E_NO_MEM) {
+                return FOS_E_STATE_MISMATCH; // We should only ever encounter a no memory 
+                                             // failure!
+            }
+
+            // we ran out of memory, return pages which were allocated.
+            pd_free_pages(get_kernel_pd(), true, range.start, true_e); 
+            bst_remove(plg_shm->range_tree, &range);
+
+            return FOS_E_NO_MEM;
+        }
+
+        *out = start;
+
+        return FOS_E_SUCCESS;
+    }
+
+    /**
+     * Incrememnt the kernel reference count of the shared memory area.
+     *
+     * arg0 - void * to a byte inside a shared memory area.
+     * 
+     * Returns FOS_E_INVALID_INDEX if `arg0` is not within a range.
+     * Otherwise FOS_E_SUCCESS is returned and the referenced range has its kernel
+     * reference counter increased.
+     */
+    case PLG_SHM_KCID_SHM_INC: {
+
+    }
+
+    /**
+     * Decrement the kernel reference count of the shared memory area.
+     * If the kernel reference count of the shared memory area hits 0
+     * AND the shared memory area is not referenced by any user processes, the
+     * area is garbage collected.
+     *
+     * arg0 - void * to a byte inside a shared memory area.
+     * 
+     * Always returns FOS_E_SUCCESS.
+     * Does nothing if `arg0` is not inside a shared memory area.
+     */
+    case PLG_SHM_KCID_SHM_DEC: {
+
+    }
+
+    /**
+     * Map an existing range into a user process.
+     *
+     * arg0 - void * to a byte in a shared memory area.
+     * arg1 - proc_id_t of the process to map into.
+     * 
+     * FOS_E_INVALID_INDEX if `arg0` doesn't point to an existing range OR `arg1` is not a 
+     * valid pid.
+     * FOS_E_ALREADY_ALLOCATED if the given range is already mapped in the process.
+     * FOS_E_SUCCESS if the map succeeded!
+     */
+    case PLG_SHM_KCID_SHM_MAP: {
+
+    }
+
+    /**
+     * Unmap an existing range from a user process.
+     * If the unmapped range is now no longer mapped in any user processes AND its kernel
+     * refernce count is 0, it is garbage collected!
+     * 
+     * arg0 - void * to a byte in a shared memory area.
+     * arg1 - proc_id_t of the process to map into.
+     *
+     * Always returns FOS_E_SUCCESS.
+     */
+    case PLG_SHM_KCID_SHM_UNMAP: {
+        
+    }
+
+    default: {
+        return FOS_E_INVALID_INDEX;
+    }
+
+    }
+
+    return FOS_E_SUCCESS;
 }
 
 static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
