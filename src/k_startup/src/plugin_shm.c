@@ -650,15 +650,15 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         }
 
         void *start = NULL;
-        err = plg_shm_kernel_cmd(plg, PLG_SHM_KCID_NEW_SHM, len, (uint32_t)&start, 0, 0);
+        err = plg_shm_new_shm(plg_shm, len, &start);
         DUAL_RET_SAFE(err, curr_thr);
 
         // Shm is mapped in the kernel! Map into userspace.
-        err = plg_shm_kernel_cmd(plg, PLG_SHM_KCID_SHM_MAP, (uint32_t)start, curr_proc->pid, 0, 0);
+        err = plg_shm_map(plg_shm, start, curr_proc->pid);
 
         // Regardless of successfuly map or not, we'll decrement the kernel reference counter.
         // If we failed to mapped to userspace, this will correctly garbage collect the area.
-        plg_shm_kernel_cmd(plg, PLG_SHM_KCID_SHM_DEC, (uint32_t)start, 0, 0, 0);
+        plg_shm_dec_shm(plg_shm, start);
         DUAL_RET_SAFE(err, curr_thr);
         
         // Shm is mapped in userspace, kernel reference count is 0.
@@ -666,7 +666,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
         if (err != FOS_E_SUCCESS) {
             // As this userprocess is the only one which reference our new shared memory area,
             // This unmap will gc the area. (The whole point of the SHM_DEC above)
-            plg_shm_kernel_cmd(plg, PLG_SHM_KCID_SHM_UNMAP, (uint32_t)start, curr_proc->pid, 0, 0);
+            plg_shm_unmap(plg_shm, start, curr_proc->pid);
             DUAL_RET(curr_thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
         }
 
@@ -683,7 +683,7 @@ static fernos_error_t plg_shm_cmd(plugin_t *plg, plugin_cmd_id_t cmd, uint32_t a
      */
     case PLG_SHM_PCID_CLOSE_SHM: {
         void *ptr = (void *)arg0;
-        plg_shm_kernel_cmd(plg, PLG_SHM_KCID_SHM_UNMAP, (uint32_t)ptr, curr_proc->pid, 0, 0);
+        plg_shm_unmap(plg_shm, ptr, curr_proc->pid);
         return FOS_E_SUCCESS; // Returns nothing explicitly to userspace.
     }
 
