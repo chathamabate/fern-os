@@ -598,31 +598,23 @@ static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks) {
     }
 
     window_gfx_t *gw = al_malloc(al, sizeof(window_gfx_t));
-    fixed_queue_t *eq = new_fixed_queue(al, sizeof(window_event_t), 255);
-    basic_wait_queue_t *wq = new_basic_wait_queue(al);
+    if (init_window_gfx_base((window_gfx_base_t *)gw, &(gw->static_buffer), &GFX_WINDOW_IMPL, al, &(ks->schedule)) != FOS_E_SUCCESS) {
+        al_free(al, gw);
+        return NULL;
+    }
 
     gfx_color_t *banks[2] = { NULL, NULL };
     ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 0), 0, 0);
     ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 1), 0, 0);
 
-    if (!gw || !eq || !wq || !(banks[0]) || !(banks[1])) {
+    if (!(banks[0]) || !(banks[1])) {
         ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[0]), 0, 0, 0);
         ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[1]), 0, 0, 0);
-        delete_wait_queue((wait_queue_t *)wq);
-        delete_fixed_queue(eq);
-        al_free(al, gw);
 
+        delete_window_gfx_base((window_gfx_base_t *)gw);
         return NULL;
     }
 
-    const window_attrs_t win_attrs = (window_attrs_t) {
-        .min_width = 0,
-        .max_width = UINT16_MAX,
-        .min_height = 0,
-        .max_height = UINT16_MAX
-    };
-
-    init_window_base((window_t *)gw, &(gw->static_buffer), &win_attrs, &GFX_WINDOW_IMPL);
     *(kernel_state_t **)&(gw->ks) = ks;
 
     *(allocator_t **)&(gw->static_buffer.al) = NULL;
@@ -634,11 +626,9 @@ static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks) {
     *(gfx_color_t **)&(gw->banks[0]) = banks[0];
     *(gfx_color_t **)&(gw->banks[1]) = banks[1];
 
-    *(allocator_t **)&(gw->al) = al;
-    gw->references = 1;
-    *(fixed_queue_t **)&(gw->event_queue) = eq;
-    *(basic_wait_queue_t **)&(gw->wq) = wq;
-    *(ring_t **)&(gw->schedule) = &(ks->schedule);
+    // 0 out both banks to begin with.
+    mem_set(gw->banks[0], 0, SCREEN->width * SCREEN->height * sizeof(gfx_color_t));
+    mem_set(gw->banks[1], 0, SCREEN->width * SCREEN->height * sizeof(gfx_color_t));
 
     return gw;
 }
@@ -649,16 +639,12 @@ static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks) {
 static void delete_gfx_window(window_t *w) {
     window_gfx_t *wg = (window_gfx_t *)w;
 
-    delete_wait_queue((wait_queue_t *)(wg->wq));
-    delete_fixed_queue(wg->event_queue);
-
     ks_kernel_cmd(wg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC,
             (uint32_t)(wg->banks[0]), 0, 0, 0);
     ks_kernel_cmd(wg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC,
             (uint32_t)(wg->banks[1]), 0, 0, 0);
 
-    deinit_window_base(w);
-    al_free(wg->al, wg);
+    delete_window_gfx_base((window_gfx_base_t *)w);
 }
 
 static void gw_render(window_t *w) {
@@ -673,10 +659,10 @@ static fernos_error_t gw_on_event(window_t *w, window_event_t ev) {
     if (ev.event_code == WINEC_DEREGISTERED) {
         // We'll say that a terminal window is inactive once deregistered.
         // It'll have to wait until all references go down to zero to cleanup though.
-        wg->super.is_active = false;
+        wg->super.super.is_active = false;
 
         // This window will delete itself on deregister ONLY if there are no open handles!
-        if (wg->references == 0) {
+        if (wg->super.references == 0) {
             delete_window((window_t *)wg);
 
             // It's ok to return here because 0 references gaurantees no threads in the wait queue!
@@ -689,11 +675,11 @@ static fernos_error_t gw_on_event(window_t *w, window_event_t ev) {
     }
 
     // If the queue is currently empty, we must wake up all sleeping threads after enqueueing.
-    const bool wake_up = fq_is_empty(wg->event_queue);
-    fq_enqueue(wg->event_queue, &ev, true);
+    const bool wake_up = fq_is_empty(wg->super.eq);
+    fq_enqueue(wg->super.eq, &ev, true);
 
     if (wake_up) {
-        err = bwq_wake_all_threads(wg->wq, wg->schedule, FOS_E_SUCCESS);
+        err = bwq_wake_all_threads(wg->super.bwq, wg->super.schedule, FOS_E_SUCCESS);
         if (err != FOS_E_SUCCESS) {
             return FOS_E_INACTIVE; // failure to wake threads is a catastrophic error for this
                                    // window, unsure why `bwq_wake_all` even throws an error tbh.
@@ -704,7 +690,6 @@ static fernos_error_t gw_on_event(window_t *w, window_event_t ev) {
     return FOS_E_SUCCESS;
 }
 
-/*
 static fernos_error_t copy_handle_gfx_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
 static fernos_error_t delete_handle_gfx_state(handle_state_t *hs);
 static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
@@ -720,7 +705,16 @@ static const handle_state_impl_t HS_GFX_IMPL = {
 
     .hs_cmd = gfx_hs_cmd,
 };
-*/
+
+static fernos_error_t copy_handle_gfx_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+static fernos_error_t delete_handle_gfx_state(handle_state_t *hs) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
+static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    return FOS_E_NOT_IMPLEMENTED;
+}
 
 /*
  * Graphics Plugin Stuff.
@@ -944,8 +938,97 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
         DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
+    /**
+     * Create a new graphics window!
+     *
+     * `arg0` - user pointer to a handle.
+     * `arg1` - user pointer to an array of 2 color_t *'s. (This will be populated with the 2 banks)
+     */
     case  PLG_GFX_PCID_NEW_GFX_WIN: {
+        handle_t *u_handle = (handle_t *)arg0;
+        gfx_color_t *(*u_banks)[2] = (gfx_color_t *(*)[2])arg1;
+        
+        if (!u_handle || !u_banks) {
+            DUAL_RET(curr_thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+        }
 
+        const handle_t NULL_HANDLE = idtb_null_id(curr_thr->proc->handle_table);
+
+        err = FOS_E_SUCCESS;
+        handle_t h = NULL_HANDLE;
+        handle_gfx_state_t *hs_g = NULL;
+        window_gfx_t *win_g = NULL;
+
+        // First let's pop a handle.
+        if (err == FOS_E_SUCCESS) {
+            h = idtb_pop_id(curr_thr->proc->handle_table);
+            if (h == NULL_HANDLE) {
+                err = FOS_E_NO_MEM;
+            }
+        }
+
+        // Next let's leave space for the handle state.
+        if (err == FOS_E_SUCCESS) {
+            hs_g = al_malloc(plg_gfx->super.ks->al, sizeof(handle_gfx_state_t));
+            if (!hs_g) {
+                err = FOS_E_NO_MEM;
+            }
+        }
+
+        // Next let's create the terminal window
+        if (err == FOS_E_SUCCESS) {
+            win_g = new_gfx_window(plg->ks->al, plg->ks); 
+            if (!win_g) {
+                err = FOS_E_NO_MEM;
+            }
+        }
+
+        // Attempt to register the window.
+        if (err == FOS_E_SUCCESS) {
+            err = win_register_child(plg_gfx->root_window, (window_t *)win_g);
+        }
+
+        // Map banks into calling process.
+        if (err == FOS_E_SUCCESS) {
+            err = ks_kernel_cmd(plg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_MAP,
+                    (uint32_t)(win_g->banks[0]), curr_thr->proc->pid, 0, 0);
+        }
+        if (err == FOS_E_SUCCESS) {
+            err = ks_kernel_cmd(plg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_MAP,
+                    (uint32_t)(win_g->banks[1]), curr_thr->proc->pid, 0, 0);
+        }
+
+        // Finally copy out the handle and bank locations to userspace!
+        if (err == FOS_E_SUCCESS) {
+            err = mem_cpy_to_user(curr_thr->proc->pd, u_handle, &h, sizeof(handle_t), NULL);
+        }
+        if (err == FOS_E_SUCCESS) {
+            err = mem_cpy_to_user(curr_thr->proc->pd, u_banks, win_g->banks, sizeof(win_g->banks), NULL);
+        }
+
+        if (err != FOS_E_SUCCESS) {
+            if (win_g) {
+                ks_kernel_cmd(plg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_UNMAP,
+                    (uint32_t)(win_g->banks[1]), curr_thr->proc->pid, 0, 0);
+                ks_kernel_cmd(plg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_UNMAP,
+                    (uint32_t)(win_g->banks[0]), curr_thr->proc->pid, 0, 0);
+            }
+
+            win_deregister((window_t *)win_g);
+            delete_window((window_t *)win_g);
+            al_free(plg_gfx->super.ks->al, hs_g);
+            idtb_push_id(curr_thr->proc->handle_table, h);
+
+            DUAL_RET(curr_thr, err, FOS_E_SUCCESS);
+        }
+
+        // WOOO Success!
+        init_base_handle((handle_state_t *)hs_g, &HS_GFX_IMPL, plg_gfx->super.ks, curr_thr->proc, h, false);
+        *(window_gfx_t **)&(hs_g->win_g) = win_g;
+        // Our window will start with 1 reference on creation!
+        idtb_set(curr_thr->proc->handle_table, h, hs_g);
+
+        DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
     default: {
