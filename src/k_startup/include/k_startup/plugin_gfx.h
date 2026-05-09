@@ -19,6 +19,9 @@ typedef struct _window_gfx_base_t window_gfx_base_t;
 struct _window_gfx_base_t {
     window_t super;
 
+    /**
+     * The window structure as a whole MUST be allocated with this allocator!
+     */
     allocator_t * const al;
 
     /**
@@ -43,11 +46,19 @@ struct _window_gfx_base_t {
 };
 
 /**
- * Remember that 
+ * Remember that if this succeeds, `buf` will now be owned by `win`!
+ * `win` MUST be allocated by `al`.
+ *
+ * References will be set as 1.
  */
 fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_buffer_t *buf, const window_impl_t *impl, allocator_t *al, ring_t *sch);
 
-void deinit_window_gfx_base(window_gfx_base_t *win);
+/**
+ * GFX Base windows are promised to be dynamically allocated.
+ * This will free `win` with its internal allocator.
+ * Make sure subclasses cleanup their private fields before calling this!
+ */
+void delete_window_gfx_base(window_gfx_base_t *win);
 
 typedef struct _window_terminal_t window_terminal_t;
 typedef struct _handle_terminal_state_t handle_terminal_state_t;
@@ -56,17 +67,7 @@ typedef struct _handle_terminal_state_t handle_terminal_state_t;
  * A Terminal Window is a special window accessible via handle which just displays a grid of text.
  */
 struct _window_terminal_t {
-    window_t super;
-
-    /**
-     * Terminal windows will always be allocated dynamically.
-     */
-    allocator_t * const al;
-
-    /**
-     * Number of open handles which reference this Terminal Window.
-     */
-    size_t references;
+    window_gfx_base_t super;
 
     /**
      * How the terminal buffer will be rendered on screen.
