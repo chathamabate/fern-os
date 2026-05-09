@@ -299,8 +299,6 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 void fos_irq1_action(user_ctx_t *ctx) {
     ks_save_ctx(kernel, ctx);
 
-    fernos_error_t err;
-
     // Kinda interesting point here, but during keyboard init
     // the interrupt will be triggered due to the intial PS/2 commands
     // we send through the I8042.
