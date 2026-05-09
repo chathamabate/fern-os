@@ -56,6 +56,28 @@ fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *p
     return FOS_E_SUCCESS;
 }
 
+fernos_error_t ks_kernel_cmd(kernel_state_t *ks, plugin_id_t plg_id, plugin_kernel_cmd_id_t kcmd, uint32_t arg0,
+        uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    fernos_error_t err;
+
+    plugin_t *plg = ks->plugins[plg_id];
+    if (!plg) {
+        return FOS_E_INVALID_INDEX;
+    }
+
+    if (!(plg->impl->plg_kernel_cmd)) {
+        return FOS_E_INVALID_INDEX;
+    }
+
+    err = plg->impl->plg_kernel_cmd(plg, kcmd, arg0, arg1, arg2, arg3);
+    if (err == FOS_E_ABORT_SYSTEM) {
+        gfx_direct_put_fmt_s_rr("[Abort System triggered from Plugin: 0x%X Kcmd: 0x%X]", plg_id, kcmd);
+        ks_shutdown(ks);
+    }
+
+    return err;
+}
+
 void ks_save_ctx(kernel_state_t *ks, user_ctx_t *ctx) {
     if (ks->schedule.head) {
         ((thread_t *)(ks->schedule.head))->ctx = *ctx;

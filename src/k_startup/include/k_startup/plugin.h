@@ -27,6 +27,16 @@ typedef struct _plugin_impl_t {
      */
 
     void (*plg_on_shutdown)(plugin_t *plg);
+
+    /**
+     * There is no kernel command wrapper below. 
+     *
+     * To invoke this behavior from other areas in the kernel always use
+     * `ks_kernel_cmd`. This will shutdown the system in the case of FOS_E_ABORT_SYSTEM.
+     *
+     * The below handlers are all always called in a single place in the kernel and
+     * SHOULD NOT be called in any new locations!
+     */
     fernos_error_t (*plg_kernel_cmd)(plugin_t *plg, plugin_kernel_cmd_id_t kcmd_id, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 
     fernos_error_t (*plg_tick)(plugin_t *plg);
@@ -65,21 +75,6 @@ static inline void plg_on_shutdown(plugin_t *plg) {
     if (plg->impl->plg_on_shutdown) {
         plg->impl->plg_on_shutdown(plg);
     }
-}
-
-/**
- * This function gives a plugin and endpoint which is safe to call from within the kernel.
- * For example, what if one plugin wants to invoke a behavior of another plugin?
- * `plg_cmd` is always relative to a calling thread, it is a system call.
- *
- * This function is NOT! It has no implicitrelation ship with the current thread or userspace.
- */
-static inline fernos_error_t plg_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kcmd, uint32_t arg0,
-        uint32_t arg1, uint32_t arg2, uint32_t arg3) {
-    if (plg->impl->plg_kernel_cmd) {
-        return plg->impl->plg_kernel_cmd(plg, kcmd, arg0, arg1, arg2, arg3);
-    }
-    return FOS_E_SUCCESS;
 }
 
 /**

@@ -552,6 +552,7 @@ static const window_impl_t GFX_WINDOW_IMPL = {
  * These will be used to allocate/deallocate/map the two shared banks.
  */
 static window_terminal_t *new_gfx_window(allocator_t *al, plugin_t *plg_shm, ring_t *sch) {
+    /*
     if (!al || !plg_shm || !sch) {
         return NULL;
     }
@@ -561,10 +562,8 @@ static window_terminal_t *new_gfx_window(allocator_t *al, plugin_t *plg_shm, rin
     basic_wait_queue_t *wq = new_basic_wait_queue(al);
 
     gfx_color_t *banks[2] = { NULL, NULL };
+    */
 
-    if () {
-
-    }
     
     return NULL;
 }

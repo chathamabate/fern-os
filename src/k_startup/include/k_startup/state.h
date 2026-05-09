@@ -146,6 +146,18 @@ static inline kernel_state_t *new_da_kernel_state(void) {
 fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *plg);
 
 /**
+ * This is a wrapper around the plugin kernel command endpoint.
+ *
+ * If the plugin returns FOS_E_ABORT_SYSTEM for the requested kernel command, this function
+ * will print out an error message and lock up the system.
+ *
+ * If `plg_id` is not mapped OR the referenced plugin doesn't have a kernel command handler,
+ * this function return FOS_E_INVALID_INDEX.
+ */
+fernos_error_t ks_kernel_cmd(kernel_state_t *ks, plugin_id_t plg_id, plugin_kernel_cmd_id_t kcmd, uint32_t arg0,
+        uint32_t arg1, uint32_t arg2, uint32_t arg3);
+
+/**
  * This function saves the given context into the current thread.
  *
  * Does nothing if there is no current thread.
