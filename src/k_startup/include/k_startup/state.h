@@ -37,8 +37,8 @@
 
 #define DUAL_RET_SAFE(err, thr) \
     if ((err) != FOS_E_SUCCESS) { \
-        if ((err) == FOS_E_STATE_MISMATCH) { \
-            return FOS_E_STATE_MISMATCH; \
+        if ((err) == FOS_E_ABORT_SYSTEM) { \
+            return FOS_E_ABORT_SYSTEM; \
         } \
         DUAL_RET(thr, err, FOS_E_SUCCESS); \
     }

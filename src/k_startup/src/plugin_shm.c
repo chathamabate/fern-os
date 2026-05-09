@@ -166,7 +166,7 @@ static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t k
         err = bst_add(plg_shm->range_tree, &range);
         if (err != FOS_E_SUCCESS) {
             if (err == FOS_E_ALREADY_ALLOCATED) {
-                return FOS_E_STATE_MISMATCH; // This is very bad!
+                return FOS_E_ABORT_SYSTEM;
             }
 
             return err;
@@ -178,8 +178,7 @@ static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t k
         err = pd_alloc_pages(get_kernel_pd(), true, true, range.start, range.end, &true_e);
         if (err != FOS_E_SUCCESS) {
             if (err != FOS_E_NO_MEM) {
-                return FOS_E_STATE_MISMATCH; // We should only ever encounter a no memory 
-                                             // failure!
+                return FOS_E_ABORT_SYSTEM;
             }
 
             // we ran out of memory, return pages which were allocated.
