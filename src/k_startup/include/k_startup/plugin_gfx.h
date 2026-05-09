@@ -105,10 +105,10 @@ struct _handle_terminal_state_t {
 };
 
 typedef struct _window_gfx_t window_gfx_t;
-typedef struct _handle_terminal_state_t handle_gfx_state_t;
+typedef struct _handle_gfx_state_t handle_gfx_state_t;
 
 struct _window_gfx_t {
-    window_t super;
+    window_gfx_base_t super;
 
     /**
      * This will require a kernel state to map/unmap the graphics banks.
@@ -126,32 +126,12 @@ struct _window_gfx_t {
      * with a size of SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(gfx_color_t).
      */
     gfx_color_t * const banks[2];
-
-    allocator_t * const al;
-
-    /**
-     * Number of open handles which reference this graphics Window.
-     */
-    size_t references;
-
-    /**
-     * Events forwarded to the window will be here.
-     */
-    fixed_queue_t * const event_queue;
-
-    /**
-     * Threads waiting for the event queue to be non-empty.
-     */
-    basic_wait_queue_t * const wq;
-
-    /**
-     * Woken threads are scheduled here.
-     */
-    ring_t * const schedule;
 };
 
 struct _handle_gfx_state_t {
     handle_state_t super;
+
+    window_gfx_t * const win_g;
 };
 
 typedef struct _plugin_gfx_t plugin_gfx_t;
