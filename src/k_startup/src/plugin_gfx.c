@@ -2,6 +2,7 @@
 #include "k_startup/plugin_gfx.h"
 #include "k_startup/plugin_shm.h"
 #include "k_startup/gfx.h"
+#include "s_bridge/shared_defs.h"
 #include "s_gfx/window_dummy.h"
 #include "k_startup/page_helpers.h"
 #include "s_util/ansi.h"
@@ -602,14 +603,65 @@ static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks) {
     return gw;
 }
 
+/**
+ * This does NOT check refernce count, so be careful!
+ */
 static void delete_gfx_window(window_t *w) {
-    // TODO!
-}
-static void gw_render(window_t *w) {
+    window_gfx_t *wg = (window_gfx_t *)w;
 
+    delete_wait_queue((wait_queue_t *)(wg->wq));
+    delete_fixed_queue(wg->event_queue);
+
+    ks_kernel_cmd(wg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC,
+            (uint32_t)(wg->banks[0]), 0, 0, 0);
+    ks_kernel_cmd(wg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC,
+            (uint32_t)(wg->banks[1]), 0, 0, 0);
+
+    deinit_window_base(w);
+    al_free(wg->al, wg);
 }
+
+static void gw_render(window_t *w) {
+    (void)w;
+    // It'll be up to the user to draw to the hidden buffer, then swap!
+}
+
 static fernos_error_t gw_on_event(window_t *w, window_event_t ev) {
-    return FOS_E_NOT_IMPLEMENTED;
+    fernos_error_t err;
+    window_gfx_t *wg = (window_gfx_t *)w;
+
+    if (ev.event_code == WINEC_DEREGISTERED) {
+        // We'll say that a terminal window is inactive once deregistered.
+        // It'll have to wait until all references go down to zero to cleanup though.
+        wg->super.is_active = false;
+
+        // This window will delete itself on deregister ONLY if there are no open handles!
+        if (wg->references == 0) {
+            delete_window((window_t *)wg);
+
+            // It's ok to return here because 0 references gaurantees no threads in the wait queue!
+            // No one to wake up!
+            return FOS_E_SUCCESS;
+        }
+    } else if (ev.event_code == WINEC_TICK) {
+        // Don't need to do anything for ticks.
+        return FOS_E_SUCCESS;
+    }
+
+    // If the queue is currently empty, we must wake up all sleeping threads after enqueueing.
+    const bool wake_up = fq_is_empty(wg->event_queue);
+    fq_enqueue(wg->event_queue, &ev, true);
+
+    if (wake_up) {
+        err = bwq_wake_all_threads(wg->wq, wg->schedule, FOS_E_SUCCESS);
+        if (err != FOS_E_SUCCESS) {
+            return FOS_E_INACTIVE; // failure to wake threads is a catastrophic error for this
+                                   // window, unsure why `bwq_wake_all` even throws an error tbh.
+                                   // I dug into the impl, and this error will never happen.
+        }
+    }
+
+    return FOS_E_SUCCESS;
 }
 
 /*
