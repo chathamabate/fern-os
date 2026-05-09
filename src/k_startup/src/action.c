@@ -330,23 +330,8 @@ void fos_irq1_action(user_ctx_t *ctx) {
         // The keyboard plugin is now for recording ALL KEY EVENTS.
         // Whereas the graphics plugin has the right to filter/interpret events accordingly.
 
-        plugin_t *plg_kb = kernel->plugins[PLG_KEYBOARD_ID];
-        if (plg_kb) {
-            err = plg_kernel_cmd(plg_kb, PLG_KB_KCID_KEY_EVENT, sc, 0, 0, 0);
-            if (err != FOS_E_SUCCESS) {
-                gfx_direct_put_fmt_s_rr("[Keyboard Plugin KeyEvent Error 0x%X]\n", err);
-                ks_shutdown(kernel);
-            }
-        }
-
-        plugin_t *plg_gfx = kernel->plugins[PLG_GRAPHICS_ID];
-        if (plg_gfx) {
-            err = plg_kernel_cmd(plg_gfx, PLG_GFX_KCID_KEY_EVENT, sc, 0, 0, 0);
-            if (err != FOS_E_SUCCESS) {
-                gfx_direct_put_fmt_s_rr("[Graphics Plugin KeyEvent Error 0x%X]\n", err);
-                ks_shutdown(kernel);
-            }
-        }
+        ks_kernel_cmd(kernel, PLG_KEYBOARD_ID, PLG_KB_KCID_KEY_EVENT, sc, 0, 0, 0);
+        ks_kernel_cmd(kernel, PLG_GRAPHICS_ID, PLG_GFX_KCID_KEY_EVENT, sc, 0, 0, 0);
     }
 
     return_to_curr_thread();

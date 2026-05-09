@@ -283,7 +283,7 @@ static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kc
 
         err = bwq_notify_all(bwq);
         if (err != FOS_E_SUCCESS) {
-            return err;
+            return FOS_E_ABORT_SYSTEM;
         }
 
         thread_t *woken_thr;
@@ -307,7 +307,7 @@ static fernos_error_t plg_kb_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t kc
         }
 
         if (err != FOS_E_EMPTY) {
-            return err;
+            return FOS_E_ABORT_SYSTEM;
         }
 
         return FOS_E_SUCCESS;
