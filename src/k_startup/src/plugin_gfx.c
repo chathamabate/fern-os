@@ -532,7 +532,7 @@ static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint3
  * Graphics Window!
  */
 
-static window_terminal_t *new_gfx_window(allocator_t *al, plugin_t *plg_shm, ring_t *sch);
+static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks);
 static void delete_gfx_window(window_t *w);
 static void gw_render(window_t *w);
 static fernos_error_t gw_on_event(window_t *w, window_event_t ev);
@@ -548,12 +548,11 @@ static const window_impl_t GFX_WINDOW_IMPL = {
 };
 
 /**
- * NOTE: This requies a plugin which implements the shared memory kernel commands.
- * These will be used to allocate/deallocate/map the two shared banks.
+ * NOTE: This starts the window off with 1 reference!
+ * Assumes `ks`'s schedule.
  */
-static window_terminal_t *new_gfx_window(allocator_t *al, plugin_t *plg_shm, ring_t *sch) {
-    /*
-    if (!al || !plg_shm || !sch) {
+static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks) {
+    if (!al || !ks) {
         return NULL;
     }
 
@@ -562,13 +561,49 @@ static window_terminal_t *new_gfx_window(allocator_t *al, plugin_t *plg_shm, rin
     basic_wait_queue_t *wq = new_basic_wait_queue(al);
 
     gfx_color_t *banks[2] = { NULL, NULL };
-    */
+    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 0), 0, 0);
+    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 1), 0, 0);
 
-    
-    return NULL;
+    if (!gw || !eq || !wq || !(banks[0]) || !(banks[1])) {
+        ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[0]), 0, 0, 0);
+        ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[1]), 0, 0, 0);
+        delete_wait_queue((wait_queue_t *)wq);
+        delete_fixed_queue(eq);
+        al_free(al, gw);
+
+        return NULL;
+    }
+
+    const window_attrs_t win_attrs = (window_attrs_t) {
+        .min_width = 0,
+        .max_width = UINT16_MAX,
+        .min_height = 0,
+        .max_height = UINT16_MAX
+    };
+
+    init_window_base((window_t *)gw, &(gw->static_buffer), &win_attrs, &GFX_WINDOW_IMPL);
+    *(kernel_state_t **)&(gw->ks) = ks;
+
+    *(allocator_t **)&(gw->static_buffer.al) = NULL;
+    gw->static_buffer.buffer = banks[0];
+    gw->static_buffer.buffer_len = SCREEN->width * SCREEN->height;
+    gw->static_buffer.width = 0;
+    gw->static_buffer.height = 0;
+
+    *(gfx_color_t **)&(gw->banks[0]) = banks[0];
+    *(gfx_color_t **)&(gw->banks[1]) = banks[1];
+
+    *(allocator_t **)&(gw->al) = al;
+    gw->references = 1;
+    *(fixed_queue_t **)&(gw->event_queue) = eq;
+    *(basic_wait_queue_t **)&(gw->wq) = wq;
+    *(ring_t **)&(gw->schedule) = &(ks->schedule);
+
+    return gw;
 }
-static void delete_gfx_window(window_t *w) {
 
+static void delete_gfx_window(window_t *w) {
+    // TODO!
 }
 static void gw_render(window_t *w) {
 

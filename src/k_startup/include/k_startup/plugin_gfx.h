@@ -78,20 +78,20 @@ struct _handle_terminal_state_t {
     window_terminal_t * const win_t;
 };
 
-typedef struct _window_terminal_t window_gfx_t;
+typedef struct _window_gfx_t window_gfx_t;
 typedef struct _handle_terminal_state_t handle_gfx_state_t;
 
 struct _window_gfx_t {
     window_t super;
 
     /**
-     * A graphics window used shared memory to create a front and back buffer.
-     * It thus needs a plugin which implements ths shm kernel commands do this!
+     * This will require a kernel state to map/unmap the graphics banks.
      */
-    plugin_t * const plg_shm;
+    kernel_state_t * const ks;
 
     /**
      * The buffer pointer in the window base class will point here!
+     * The actual buffer in here will swap between banks[0] and banks[1].
      */
     gfx_buffer_t static_buffer;
 
