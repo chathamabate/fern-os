@@ -385,6 +385,15 @@ typedef int32_t futex_t;
 #define PLG_GFX_PCID_NEW_GFX_WIN (2U)
 
 /*
+ * Graphcis window handle commands.
+ */
+
+#define GFX_HCID_GET_DIMS      (NUM_DEFAULT_HCIDS + 0) 
+#define GFX_HCID_WAIT_EVENT    (NUM_DEFAULT_HCIDS + 1) 
+#define GFX_HCID_READ_EVENTS   (NUM_DEFAULT_HCIDS + 2)
+#define GFX_HCID_SWAP          (NUM_DEFAULT_HCIDS + 3)
+
+/*
  * ***** Shared Memory Plugin *****
  */
 

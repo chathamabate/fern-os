@@ -8,6 +8,135 @@
 #include "s_util/ansi.h"
 #include "os_defs.h"
 
+fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_buffer_t *buf, const window_impl_t *impl, allocator_t *al, ring_t *sch) {
+    if (!win || !buf || !impl || !al || !sch) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    fixed_queue_t *eq = new_fixed_queue(al, sizeof(window_event_t), 255);
+    basic_wait_queue_t *bwq = new_basic_wait_queue(al);
+
+    if (!eq || !bwq) {
+        delete_wait_queue((wait_queue_t *)bwq);
+        delete_fixed_queue(eq);
+
+        return FOS_E_NO_MEM;
+    }
+
+    const window_attrs_t attrs = {
+        .min_width = 0,
+        .max_width = SCREEN->width,
+
+        .min_height = 0,
+        .max_height = SCREEN->height
+    };
+    init_window_base((window_t *)win, buf, &attrs, impl);
+    *(allocator_t **)&(win->al) = al;
+    win->references = 1;
+    *(fixed_queue_t **)&(win->eq) = eq;
+    *(basic_wait_queue_t **)&(win->bwq) = bwq;
+    *(ring_t **)&(win->schedule) = sch;
+
+    return FOS_E_SUCCESS;
+}
+
+void deinit_window_gfx_base(window_gfx_base_t *win) {
+    delete_wait_queue((wait_queue_t *)(win->bwq));
+    delete_fixed_queue(win->eq);
+    deinit_window_base((window_t *)win);
+}
+
+/**
+ * The maximum number of events we can read in a single read!
+ */
+#define WIN_HS_MAX_EVS_PER_READ (32U)
+
+static fernos_error_t window_hs_wait_events(window_t *win, thread_t *thr, fixed_queue_t *eq, basic_wait_queue_t *bwq) {
+    fernos_error_t err;
+
+    // Already stuff in the wait queue!
+    if (!fq_is_empty(eq)) {
+        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    // When the terminal window is inactive, we'll allow the user to read
+    // DEREGISTERED Events infinitely.
+    if (!(win->is_active)) {
+        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    // Active with empty event queue!
+    // Wait!
+
+    err = bwq_enqueue(bwq, thr);
+    if (err != FOS_E_SUCCESS) {
+        DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+    }
+
+    // Enqueue succeeded, we are in the clear!
+    thread_detach(thr);
+    thr->wq = (wait_queue_t *)bwq;
+    thr->state = THREAD_STATE_WAITING;
+
+    return FOS_E_SUCCESS;
+}
+
+static fernos_error_t window_hs_read_events(window_t *win, fixed_queue_t *eq, thread_t *thr, window_event_t *u_ev_buf, size_t num_buf_cells, size_t *u_cells_readden) {
+    fernos_error_t err;
+
+    // If we are requesting a non-zero number of requests,
+    // the buffer must be non-null.
+    if (num_buf_cells > 0 && !u_ev_buf) {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    // NOTE: The user is allowed to request 0 events. This is a 
+    // non-blocking way of being able to see if there are pending events or not.
+
+    size_t events_polled = 0; // how many cells we end up filling in the `events` buffer.
+    window_event_t events[WIN_HS_MAX_EVS_PER_READ];
+
+    if (fq_is_empty(eq)) {
+        // If the window is active and the event queue is empty, we just return empty!
+        if (win->is_active) {
+            DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
+        } 
+
+        // If the window is inactive and there are no more events which were explicitly
+        // forwarded to the terminal window, no big deal!
+        // We'll allow the user to inifinitely read deregistered events!
+
+        if (num_buf_cells > 0) {
+            events[events_polled++] = (window_event_t) {
+                .event_code = WINEC_DEREGISTERED
+            };
+        }
+    } else {
+        // If the event queue is populated, we can always read from it!
+        for (events_polled = 0; 
+                !fq_is_empty(eq) && 
+                events_polled < MIN(num_buf_cells, WIN_HS_MAX_EVS_PER_READ);
+                events_polled++) {
+            fq_poll(eq, events + events_polled);
+        }
+    }
+
+    // Ok, finally, now we do the copy!
+    if (events_polled > 0) {
+        err = mem_cpy_to_user(thr->proc->pd, u_ev_buf, events, 
+                sizeof(window_event_t) * events_polled, NULL);
+        DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+    }
+
+    if (u_cells_readden) {
+        err = mem_cpy_to_user(thr->proc->pd, u_cells_readden, &events_polled, sizeof(size_t), NULL);
+        DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
+    }
+    
+    // Success!
+    DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+}
+
 static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, uint16_t cols, 
         const gfx_term_buffer_attrs_t *attrs, ring_t *sch);
 static void delete_terminal_window(window_t *w);
@@ -398,11 +527,6 @@ static fernos_error_t term_hs_write(handle_state_t *hs, const void *u_src, size_
     DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
 }
 
-/**
- * The maximum number of events we can read in a single read!
- */
-#define TERM_WIN_HS_MAX_EVS_PER_READ (32U)
-
 static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     fernos_error_t err;
     handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
@@ -436,32 +560,7 @@ static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint3
     }
 
     case TERM_HCID_WAIT_EVENT: {
-        // Already stuff in the wait queue!
-        if (!fq_is_empty(hs_t->win_t->event_queue)) {
-            DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
-        }
-
-        // When the terminal window is inactive, we'll allow the user to read
-        // DEREGISTERED Events infinitely.
-        if (!(hs_t->win_t->super.is_active)) {
-            DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
-        }
-
-        // Active with empty event queue!
-        // Wait!
-    
-        basic_wait_queue_t *bwq = hs_t->win_t->wq;
-        err = bwq_enqueue(bwq, thr);
-        if (err != FOS_E_SUCCESS) {
-            DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
-        }
-
-        // Enqueue succeeded, we are in the clear!
-        thread_detach(thr);
-        thr->wq = (wait_queue_t *)bwq;
-        thr->state = THREAD_STATE_WAITING;
-
-        return FOS_E_SUCCESS;
+        return window_hs_wait_events(&(hs_t->win_t->super), thr, hs_t->win_t->event_queue, hs_t->win_t->wq);
     }
 
     case TERM_HCID_READ_EVENTS: {
@@ -469,57 +568,7 @@ static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint3
         const size_t num_buf_cells = (size_t)arg1;
         size_t *u_cells_readden = (size_t *)arg2;
 
-        // If we are requesting a non-zero number of requests,
-        // the buffer must be non-null.
-        if (num_buf_cells > 0 && !u_ev_buf) {
-            DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
-        }
-
-        // NOTE: The user is allowed to request 0 events. This is a 
-        // non-blocking way of being able to see if there are pending events or not.
-
-        size_t events_polled = 0; // how many cells we end up filling in the `events` buffer.
-        window_event_t events[TERM_WIN_HS_MAX_EVS_PER_READ];
-
-        if (fq_is_empty(hs_t->win_t->event_queue)) {
-            // If the window is active and the event queue is empty, we just return empty!
-            if (hs_t->win_t->super.is_active) {
-                DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
-            } 
-
-            // If the window is inactive and there are no more events which were explicitly
-            // forwarded to the terminal window, no big deal!
-            // We'll allow the user to inifinitely read deregistered events!
-
-            if (num_buf_cells > 0) {
-                events[events_polled++] = (window_event_t) {
-                    .event_code = WINEC_DEREGISTERED
-                };
-            }
-        } else {
-            // If the event queue is populated, we can always read from it!
-            for (events_polled = 0; 
-                    !fq_is_empty(hs_t->win_t->event_queue) && 
-                    events_polled < MIN(num_buf_cells, TERM_WIN_HS_MAX_EVS_PER_READ);
-                    events_polled++) {
-                fq_poll(hs_t->win_t->event_queue, events + events_polled);
-            }
-        }
-
-        // Ok, finally, now we do the copy!
-        if (events_polled > 0) {
-            err = mem_cpy_to_user(thr->proc->pd, u_ev_buf, events, 
-                    sizeof(window_event_t) * events_polled, NULL);
-            DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
-        }
-
-        if (u_cells_readden) {
-            err = mem_cpy_to_user(thr->proc->pd, u_cells_readden, &events_polled, sizeof(size_t), NULL);
-            DUAL_RET_COND(err != FOS_E_SUCCESS, thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
-        }
-        
-        // Success!
-        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+        return window_hs_read_events(&(hs_t->win_t->super), hs_t->win_t->event_queue, thr, u_ev_buf, num_buf_cells, u_cells_readden);
     }
 
     default: {
@@ -663,6 +712,22 @@ static fernos_error_t gw_on_event(window_t *w, window_event_t ev) {
 
     return FOS_E_SUCCESS;
 }
+
+static fernos_error_t copy_handle_gfx_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
+static fernos_error_t delete_handle_gfx_state(handle_state_t *hs);
+static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+
+static const handle_state_impl_t HS_GFX_IMPL = {
+    .copy_handle_state = copy_handle_gfx_state,
+    .delete_handle_state = delete_handle_gfx_state,
+
+    .hs_wait_write_ready = NULL,
+    .hs_write = NULL,
+    .hs_wait_read_ready = NULL,
+    .hs_read = NULL,
+
+    .hs_cmd = gfx_hs_cmd,
+};
 
 /*
  * Graphics Plugin Stuff.
