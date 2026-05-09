@@ -78,6 +78,56 @@ struct _handle_terminal_state_t {
     window_terminal_t * const win_t;
 };
 
+typedef struct _window_terminal_t window_gfx_t;
+typedef struct _handle_terminal_state_t handle_gfx_state_t;
+
+struct _window_gfx_t {
+    window_t super;
+
+    /**
+     * A graphics window used shared memory to create a front and back buffer.
+     * It thus needs a plugin which implements ths shm kernel commands do this!
+     */
+    plugin_t * const plg_shm;
+
+    /**
+     * The buffer pointer in the window base class will point here!
+     */
+    gfx_buffer_t static_buffer;
+
+    /**
+     * When a gfx window is created, each `bank` will be allocated in the shared memory area
+     * with a size of SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(gfx_color_t).
+     */
+    gfx_color_t * const banks[2];
+
+    allocator_t * const al;
+
+    /**
+     * Number of open handles which reference this graphics Window.
+     */
+    size_t references;
+
+    /**
+     * Events forwarded to the window will be here.
+     */
+    fixed_queue_t * const event_queue;
+
+    /**
+     * Threads waiting for the event queue to be non-empty.
+     */
+    basic_wait_queue_t * const wq;
+
+    /**
+     * Woken threads are scheduled here.
+     */
+    ring_t * const schedule;
+};
+
+struct _handle_gfx_state_t {
+    handle_state_t super;
+};
+
 typedef struct _plugin_gfx_t plugin_gfx_t;
 
 /**

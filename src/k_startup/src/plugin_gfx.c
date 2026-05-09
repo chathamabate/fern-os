@@ -1,5 +1,6 @@
 
 #include "k_startup/plugin_gfx.h"
+#include "k_startup/plugin_shm.h"
 #include "k_startup/gfx.h"
 #include "s_gfx/window_dummy.h"
 #include "k_startup/page_helpers.h"
@@ -525,6 +526,56 @@ static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint3
     }
 
     }
+}
+
+/*
+ * Graphics Window!
+ */
+
+static window_terminal_t *new_gfx_window(allocator_t *al, plugin_t *plg_shm, ring_t *sch);
+static void delete_gfx_window(window_t *w);
+static void gw_render(window_t *w);
+static fernos_error_t gw_on_event(window_t *w, window_event_t ev);
+
+static const window_impl_t GFX_WINDOW_IMPL = {
+    .delete_window = delete_gfx_window,
+    .win_render = gw_render,
+    .win_on_event = gw_on_event,
+
+    // Terminal windows never contain subwindows.
+    .win_register_child = NULL,
+    .win_deregister_child = NULL
+};
+
+/**
+ * NOTE: This requies a plugin which implements the shared memory kernel commands.
+ * These will be used to allocate/deallocate/map the two shared banks.
+ */
+static window_terminal_t *new_gfx_window(allocator_t *al, plugin_t *plg_shm, ring_t *sch) {
+    if (!al || !plg_shm || !sch) {
+        return NULL;
+    }
+
+    window_gfx_t *gw = al_malloc(al, sizeof(window_gfx_t));
+    fixed_queue_t *eq = new_fixed_queue(al, sizeof(window_event_t), 255);
+    basic_wait_queue_t *wq = new_basic_wait_queue(al);
+
+    gfx_color_t *banks[2] = { NULL, NULL };
+
+    if () {
+
+    }
+    
+    return NULL;
+}
+static void delete_gfx_window(window_t *w) {
+
+}
+static void gw_render(window_t *w) {
+
+}
+static fernos_error_t gw_on_event(window_t *w, window_event_t ev) {
+    return FOS_E_NOT_IMPLEMENTED;
 }
 
 /*

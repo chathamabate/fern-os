@@ -219,8 +219,8 @@ struct _window_impl_t {
 
     /*
      * For container windows, the below two functions must both be defined.
-     * Otherwise, both should be NULL. */
-    /*
+     * Otherwise, both should be NULL. 
+     *
      * The below two endpoints have some automatic checking before being called.
      * I usually don't do this type of thing, but I am making an exception.
      */

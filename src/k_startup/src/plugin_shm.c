@@ -129,7 +129,7 @@ static fernos_error_t plg_shm_kernel_cmd(plugin_t *plg, plugin_kernel_cmd_id_t k
      * Returns FOS_E_NO_MEM if there aren't enough free pages to complete the allocation.
      * Returns FOS_E_SUCCESS on success and writes a pointer to the beginning of the area to `*arg1`.
      *
-     * Returns FOS_E_STATE_MISMATCH if there is a serious kernel error.
+     * Returns FOS_E_ABORT_SYSTEM if there is a serious kernel error.
      *
      * THIS ONLY WRITES TO `*out` on success.
      */
