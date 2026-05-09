@@ -40,10 +40,12 @@ fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_buffer_t *buf, c
     return FOS_E_SUCCESS;
 }
 
-void deinit_window_gfx_base(window_gfx_base_t *win) {
+void delete_window_gfx_base(window_gfx_base_t *win) {
     delete_wait_queue((wait_queue_t *)(win->bwq));
     delete_fixed_queue(win->eq);
     deinit_window_base((window_t *)win);
+
+    al_free(win->al, win);
 }
 
 /**
@@ -51,37 +53,37 @@ void deinit_window_gfx_base(window_gfx_base_t *win) {
  */
 #define WIN_HS_MAX_EVS_PER_READ (32U)
 
-static fernos_error_t window_hs_wait_events(window_t *win, thread_t *thr, fixed_queue_t *eq, basic_wait_queue_t *bwq) {
+static fernos_error_t window_gfx_base_wait_events(window_gfx_base_t *win, thread_t *thr) {
     fernos_error_t err;
 
     // Already stuff in the wait queue!
-    if (!fq_is_empty(eq)) {
+    if (!fq_is_empty(win->eq)) {
         DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
     // When the terminal window is inactive, we'll allow the user to read
     // DEREGISTERED Events infinitely.
-    if (!(win->is_active)) {
+    if (!(win->super.is_active)) {
         DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
     // Active with empty event queue!
     // Wait!
 
-    err = bwq_enqueue(bwq, thr);
+    err = bwq_enqueue(win->bwq, thr);
     if (err != FOS_E_SUCCESS) {
         DUAL_RET(thr, FOS_E_UNKNWON_ERROR, FOS_E_SUCCESS);
     }
 
     // Enqueue succeeded, we are in the clear!
     thread_detach(thr);
-    thr->wq = (wait_queue_t *)bwq;
+    thr->wq = (wait_queue_t *)(win->bwq);
     thr->state = THREAD_STATE_WAITING;
 
     return FOS_E_SUCCESS;
 }
 
-static fernos_error_t window_hs_read_events(window_t *win, fixed_queue_t *eq, thread_t *thr, window_event_t *u_ev_buf, size_t num_buf_cells, size_t *u_cells_readden) {
+static fernos_error_t window_gfx_base_read_events(window_gfx_base_t *win, thread_t *thr, window_event_t *u_ev_buf, size_t num_buf_cells, size_t *u_cells_readden) {
     fernos_error_t err;
 
     // If we are requesting a non-zero number of requests,
@@ -96,9 +98,9 @@ static fernos_error_t window_hs_read_events(window_t *win, fixed_queue_t *eq, th
     size_t events_polled = 0; // how many cells we end up filling in the `events` buffer.
     window_event_t events[WIN_HS_MAX_EVS_PER_READ];
 
-    if (fq_is_empty(eq)) {
+    if (fq_is_empty(win->eq)) {
         // If the window is active and the event queue is empty, we just return empty!
-        if (win->is_active) {
+        if (win->super.is_active) {
             DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
         } 
 
@@ -114,10 +116,10 @@ static fernos_error_t window_hs_read_events(window_t *win, fixed_queue_t *eq, th
     } else {
         // If the event queue is populated, we can always read from it!
         for (events_polled = 0; 
-                !fq_is_empty(eq) && 
+                !fq_is_empty(win->eq) && 
                 events_polled < MIN(num_buf_cells, WIN_HS_MAX_EVS_PER_READ);
                 events_polled++) {
-            fq_poll(eq, events + events_polled);
+            fq_poll(win->eq, events + events_polled);
         }
     }
 
@@ -174,6 +176,17 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
 
     window_terminal_t *win_t = al_malloc(al, sizeof(window_terminal_t));
     gfx_buffer_t *buf = new_gfx_buffer(al, width, height);
+
+    if (init_window_gfx_base((window_gfx_base_t *)win_t, buf, &TERMINAL_WINDOW_IMPL, al, sch) != FOS_E_SUCCESS) {
+        delete_gfx_buffer(buf);
+        al_free(al, win_t);
+        return NULL;
+    }
+
+    buf = NULL;
+    // From this point on, `buf` is owned by `win_t`. Calling delete on the base gfx window will
+    // delete `buf`.
+
     term_buffer_t *vis_tb = new_term_buffer(al, (term_cell_t) {
         .c = ' ',
         .style = term_style(TC_WHITE, TC_BLACK)
@@ -182,39 +195,20 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
         .c = ' ',
         .style = term_style(TC_WHITE, TC_BLACK)
     }, rows, cols);
-    fixed_queue_t *event_queue = new_fixed_queue(al, sizeof(window_event_t), 255);
-    basic_wait_queue_t *wq = new_basic_wait_queue(al);
 
-    if (!win_t || !buf || !vis_tb || !true_tb || !event_queue || !wq) {
-        delete_wait_queue((wait_queue_t *)wq);
-        delete_fixed_queue(event_queue);
+    if (!vis_tb || !true_tb) {
         delete_term_buffer(true_tb);
         delete_term_buffer(vis_tb);
-        delete_gfx_buffer(buf);
-        al_free(al, win_t);
+        delete_window_gfx_base(&(win_t->super));
 
         return NULL;
     }
 
     // Success!
-
-    const window_attrs_t win_attrs = (window_attrs_t) {
-        .min_width = 0,
-        .max_width = UINT16_MAX,
-        .min_height = 0,
-        .max_height = UINT16_MAX
-    };
-
-    init_window_base((window_t *)win_t, buf, &win_attrs, &TERMINAL_WINDOW_IMPL);
-    *(allocator_t **)&(win_t->al) = al;
-    win_t->references = 0;
     *(gfx_term_buffer_attrs_t *)&(win_t->tb_attrs) = *attrs;
     *(term_buffer_t **)&(win_t->visible_tb) = vis_tb;
     win_t->dirty_buffer = true;
     *(term_buffer_t **)&(win_t->true_tb) = true_tb;
-    *(fixed_queue_t **)&(win_t->event_queue) = event_queue;
-    *(basic_wait_queue_t **)&(win_t->wq) = wq;
-    *(ring_t **)&(win_t->schedule) = sch;
 
     return win_t;
 }
@@ -226,13 +220,9 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
 static void delete_terminal_window(window_t *w) {
     window_terminal_t *win_t = (window_terminal_t *)w;
 
-    delete_wait_queue((wait_queue_t *)(win_t->wq));
-    delete_fixed_queue(win_t->event_queue);
     delete_term_buffer(win_t->true_tb);
     delete_term_buffer(win_t->visible_tb);
-    deinit_window_base(w);
-
-    al_free(win_t->al, win_t);
+    delete_window_gfx_base((window_gfx_base_t *)&(win_t->super));
 }
 
 /**
@@ -247,6 +237,7 @@ static void delete_terminal_window(window_t *w) {
 
 static void tw_render(window_t *w) {
     window_terminal_t *win_t = (window_terminal_t *)w;
+    gfx_buffer_t *buf = w->buf;
 
     const ascii_mono_font_t * const font = ASCII_MONO_FONT_MAP[win_t->tb_attrs.fmi];
 
@@ -258,8 +249,8 @@ static void tw_render(window_t *w) {
     const uint32_t tb_height = cell_height * win_t->visible_tb->rows;
 
     // The actual character grid will always be centered!
-    const uint32_t tb_x = tb_width < win_t->super.buf->width ? (win_t->super.buf->width - tb_width) / 2 : 0;
-    const uint32_t tb_y = tb_height < win_t->super.buf->height ? (win_t->super.buf->height - tb_height) / 2 : 0;
+    const uint32_t tb_x = tb_width < buf->width ? (buf->width - tb_width) / 2 : 0;
+    const uint32_t tb_y = tb_height < buf->height ? (buf->height - tb_height) / 2 : 0;
 
     const uint32_t true_cursor_x = tb_x + (win_t->true_tb->cursor_col * cell_width);
     const uint32_t true_cursor_y = tb_y + (win_t->true_tb->cursor_row * cell_height);
@@ -267,15 +258,15 @@ static void tw_render(window_t *w) {
     if (win_t->dirty_buffer) {
         // In case of a dirty buffer, we have to redraw everything!
 
-        gfx_clear(win_t->super.buf, win_t->tb_attrs.palette.colors[TC_LIGHT_GREY]);
-        gfx_draw_term_buffer_wa(win_t->super.buf, NULL, NULL, win_t->true_tb, tb_x, tb_y, 
+        gfx_clear(buf, win_t->tb_attrs.palette.colors[TC_LIGHT_GREY]);
+        gfx_draw_term_buffer_wa(buf, NULL, NULL, win_t->true_tb, tb_x, tb_y, 
                 &(win_t->tb_attrs));
 
         win_t->dirty_buffer = false;
     } else {
         // Here we just redraw cells which have changed! 
         // (This redraws the visible cursor cell everytime!)
-        gfx_draw_term_buffer_wa(win_t->super.buf, NULL, win_t->visible_tb, win_t->true_tb, 
+        gfx_draw_term_buffer_wa(buf, NULL, win_t->visible_tb, win_t->true_tb, 
                 tb_x, tb_y, &(win_t->tb_attrs));
     }
 
@@ -283,8 +274,8 @@ static void tw_render(window_t *w) {
 
     gfx_color_t cursor_color;
 
-    if (win_t->super.focused) {
-        cursor_color = (win_t->super.tick / TW_CURSOR_FLASH_RATE) & 1 
+    if (win_t->super.super.focused) {
+        cursor_color = (win_t->super.super.tick / TW_CURSOR_FLASH_RATE) & 1 
             ? win_t->tb_attrs.palette.colors[TC_WHITE] 
             : win_t->tb_attrs.palette.colors[TC_BRIGHT_BROWN];
     } else {
@@ -292,7 +283,7 @@ static void tw_render(window_t *w) {
         cursor_color = win_t->tb_attrs.palette.colors[TC_LIGHT_GREY];
     }
 
-    gfx_fill_rect(win_t->super.buf, NULL, true_cursor_x, true_cursor_y + (cell_height - cursor_height),
+    gfx_fill_rect(buf, NULL, true_cursor_x, true_cursor_y + (cell_height - cursor_height),
             cell_width, cursor_height, cursor_color);
 
     tb_copy(win_t->visible_tb, win_t->true_tb);
@@ -366,10 +357,10 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
     case WINEC_DEREGISTERED: {
         // We'll say that a terminal window is inactive once deregistered.
         // It'll have to wait until all references go down to zero to cleanup though.
-        win_t->super.is_active = false;
+        win_t->super.super.is_active = false;
 
         // This window will delete itself on deregister ONLY if there are no open handles!
-        if (win_t->references == 0) {
+        if (win_t->super.references == 0) {
             delete_window((window_t *)win_t);
 
             // It's ok to return here because 0 references gaurantees no threads in the wait queue!
@@ -394,11 +385,11 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
     // Regardless of event type, we always place on the queue!
 
     // If the queue is currently empty, we must wake up all sleeping threads after enqueueing.
-    const bool wake_up = fq_is_empty(win_t->event_queue);
-    fq_enqueue(win_t->event_queue, &ev, true);
+    const bool wake_up = fq_is_empty(win_t->super.eq);
+    fq_enqueue(win_t->super.eq, &ev, true);
 
     if (wake_up) {
-        err = bwq_wake_all_threads(win_t->wq, win_t->schedule, FOS_E_SUCCESS);
+        err = bwq_wake_all_threads(win_t->super.bwq, win_t->super.schedule, FOS_E_SUCCESS);
         if (err != FOS_E_SUCCESS) {
             return FOS_E_INACTIVE; // failure to wake threads is a catastrophic error for this
                                    // window, unsure why `bwq_wake_all` even throws an error tbh.
@@ -439,7 +430,7 @@ static fernos_error_t copy_handle_terminal_state(handle_state_t *hs, process_t *
     init_base_handle((handle_state_t *)hs_t_copy, &HS_TERM_IMPL, hs_t->super.ks, proc, hs_t->super.handle, true);
     *(window_terminal_t **)&(hs_t_copy->win_t) = hs_t->win_t;
 
-    hs_t_copy->win_t->references++;
+    hs_t_copy->win_t->super.references++;
 
     *out = (handle_state_t *)hs_t_copy;
 
@@ -449,8 +440,8 @@ static fernos_error_t copy_handle_terminal_state(handle_state_t *hs, process_t *
 static fernos_error_t delete_handle_terminal_state(handle_state_t *hs) {
     handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
 
-    hs_t->win_t->references--;
-    if (hs_t->win_t->references == 0 && !(hs_t->win_t->super.is_active)) {
+    hs_t->win_t->super.references--;
+    if (hs_t->win_t->super.references == 0 && !(hs_t->win_t->super.super.is_active)) {
         // If the underlying terminal window no longer has any references AND is inactive,
         // we can delete the window here too!
         delete_window((window_t *)(hs_t->win_t));
@@ -468,7 +459,7 @@ static fernos_error_t term_hs_wait_write_ready(handle_state_t *hs) {
     thread_t *thr = (thread_t *)(hs_t->super.ks->schedule.head);
 
     // Inactive terminal windows never accept more data!
-    if (!(hs_t->win_t->super.is_active)) {
+    if (!(hs_t->win_t->super.super.is_active)) {
         DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
     }
 
@@ -485,7 +476,7 @@ static fernos_error_t term_hs_write(handle_state_t *hs, const void *u_src, size_
     handle_terminal_state_t *hs_t = (handle_terminal_state_t *)hs;
     thread_t *thr = (thread_t *)(hs_t->super.ks->schedule.head);
 
-    if (!(hs_t->win_t->super.is_active)) {
+    if (!(hs_t->win_t->super.super.is_active)) {
         DUAL_RET(thr, FOS_E_EMPTY, FOS_E_SUCCESS);
     }
 
@@ -560,7 +551,7 @@ static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint3
     }
 
     case TERM_HCID_WAIT_EVENT: {
-        return window_hs_wait_events(&(hs_t->win_t->super), thr, hs_t->win_t->event_queue, hs_t->win_t->wq);
+        return window_gfx_base_wait_events(&(hs_t->win_t->super), thr);
     }
 
     case TERM_HCID_READ_EVENTS: {
@@ -568,7 +559,7 @@ static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint3
         const size_t num_buf_cells = (size_t)arg1;
         size_t *u_cells_readden = (size_t *)arg2;
 
-        return window_hs_read_events(&(hs_t->win_t->super), hs_t->win_t->event_queue, thr, u_ev_buf, num_buf_cells, u_cells_readden);
+        return window_gfx_base_read_events(&(hs_t->win_t->super), thr, u_ev_buf, num_buf_cells, u_cells_readden);
     }
 
     default: {
@@ -713,6 +704,7 @@ static fernos_error_t gw_on_event(window_t *w, window_event_t ev) {
     return FOS_E_SUCCESS;
 }
 
+/*
 static fernos_error_t copy_handle_gfx_state(handle_state_t *hs, process_t *proc, handle_state_t **out);
 static fernos_error_t delete_handle_gfx_state(handle_state_t *hs);
 static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
@@ -728,6 +720,7 @@ static const handle_state_impl_t HS_GFX_IMPL = {
 
     .hs_cmd = gfx_hs_cmd,
 };
+*/
 
 /*
  * Graphics Plugin Stuff.
@@ -945,7 +938,7 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
         // Success!
         init_base_handle((handle_state_t *)hs_t, &HS_TERM_IMPL, plg_gfx->super.ks, curr_thr->proc, h, true);
         *(window_terminal_t **)&(hs_t->win_t) = win_t;
-        win_t->references = 1; // Reference by just this handle we have returned!
+        // Our window will start with 1 reference on creation!
         idtb_set(curr_thr->proc->handle_table, h, hs_t);
 
         DUAL_RET(curr_thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
