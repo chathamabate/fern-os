@@ -9,6 +9,46 @@
 #include "s_gfx/window.h"
 #include "s_gfx/mono_fonts.h"
 
+/**
+ * I realized that there will be overlap for terminal windows and simple
+ * graphics buffer windows in terms of how events are handled.
+ *
+ * So here is a nice superclass to help with this!
+ */
+typedef struct _window_gfx_base_t window_gfx_base_t;
+struct _window_gfx_base_t {
+    window_t super;
+
+    allocator_t * const al;
+
+    /**
+     * Number of open handles which reference this window.
+     */
+    size_t references;
+
+    /**
+     * Events forwarded to the terminal window will be here.
+     */
+    fixed_queue_t * const eq;
+
+    /**
+     * Threads waiting for the event queue to be non-empty.
+     */
+    basic_wait_queue_t * const bwq;
+
+    /**
+     * Woken threads are scheduled here.
+     */
+    ring_t * const schedule;
+};
+
+/**
+ * Remember that 
+ */
+fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_buffer_t *buf, const window_impl_t *impl, allocator_t *al, ring_t *sch);
+
+void deinit_window_gfx_base(window_gfx_base_t *win);
+
 typedef struct _window_terminal_t window_terminal_t;
 typedef struct _handle_terminal_state_t handle_terminal_state_t;
 
@@ -48,21 +88,6 @@ struct _window_terminal_t {
      * The true value of the terminal buffer which should be rendered out next frame!
      */
     term_buffer_t * const true_tb;
-
-    /**
-     * Events forwarded to the terminal window will be here.
-     */
-    fixed_queue_t * const event_queue;
-
-    /**
-     * Threads waiting for the event queue to be non-empty.
-     */
-    basic_wait_queue_t * const wq;
-
-    /**
-     * Woken threads are scheduled here.
-     */
-    ring_t * const schedule;
 };
 
 /**
