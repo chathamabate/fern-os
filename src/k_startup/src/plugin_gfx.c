@@ -707,14 +707,96 @@ static const handle_state_impl_t HS_GFX_IMPL = {
 };
 
 static fernos_error_t copy_handle_gfx_state(handle_state_t *hs, process_t *proc, handle_state_t **out) {
-    return FOS_E_NOT_IMPLEMENTED;
+    handle_gfx_state_t *hs_t = (handle_gfx_state_t *)hs;
+    handle_gfx_state_t *hs_t_copy = al_malloc(hs_t->super.ks->al, sizeof(handle_gfx_state_t));
+
+    if (!hs_t_copy) {
+        return FOS_E_NO_MEM;
+    }
+
+    init_base_handle((handle_state_t *)hs_t_copy, &HS_GFX_IMPL, hs_t->super.ks, proc, hs_t->super.handle, false);
+    *(window_gfx_t **)&(hs_t_copy->win_g) = hs_t->win_g;
+
+    hs_t_copy->win_g->super.references++;
+    *out = (handle_state_t *)hs_t_copy;
+
+    return FOS_E_SUCCESS;
 }
+
 static fernos_error_t delete_handle_gfx_state(handle_state_t *hs) {
-    return FOS_E_NOT_IMPLEMENTED;
+    handle_gfx_state_t *hs_t = (handle_gfx_state_t *)hs;
+
+    hs_t->win_g->super.references--;
+    if (hs_t->win_g->super.references == 0 && !(hs_t->win_g->super.super.is_active)) {
+        // If the underlying gfx window no longer has any references AND is inactive,
+        // we can delete the window here too!
+        delete_window((window_t *)(hs_t->win_g));
+    }
+
+    // Always delete the handle state itself.
+    al_free(hs_t->super.ks->al, hs_t);
+
+    return FOS_E_SUCCESS;
 }
+
 static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
-    return FOS_E_NOT_IMPLEMENTED;
+    fernos_error_t err;
+    handle_gfx_state_t *hs_g = (handle_gfx_state_t *)hs;
+    window_gfx_t *win_g = hs_g->win_g;
+    thread_t *thr = (thread_t *)(hs_g->super.ks->schedule.head);
+
+    (void)arg3;
+
+    switch (cmd) {
+
+    case GFX_HCID_GET_DIMS: {
+        size_t *u_wid = (size_t *)arg0;
+        size_t *u_hei = (size_t *)arg1;
+
+        if (u_wid) {
+            err = mem_cpy_to_user(thr->proc->pd, u_wid, &(win_g->super.super.buf->width), sizeof(size_t), NULL);
+            if (err != FOS_E_SUCCESS) {
+                DUAL_RET(thr, err, FOS_E_SUCCESS);
+            }
+        }
+
+        if (u_hei) {
+            err = mem_cpy_to_user(thr->proc->pd, u_hei, &(win_g->super.super.buf->height), sizeof(size_t), NULL);
+            if (err != FOS_E_SUCCESS) {
+                DUAL_RET(thr, err, FOS_E_SUCCESS);
+            }
+        }
+
+        DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
+    }
+
+    case GFX_HCID_WAIT_EVENT: {
+        return window_gfx_base_wait_events(&(win_g->super), thr);
+    }
+
+    case GFX_HCID_READ_EVENTS: {
+        window_event_t *u_ev_buf = (window_event_t *)arg0;
+        const size_t num_buf_cells = (size_t)arg1;
+        size_t *u_cells_readden = (size_t *)arg2;
+
+        return window_gfx_base_read_events(&(win_g->super), thr, u_ev_buf, num_buf_cells, u_cells_readden);
+    }
+
+    case GFX_HCID_SWAP: {
+        gfx_buffer_t *buf = win_g->super.super.buf;
+        const uint32_t next_bi = buf->buffer == win_g->banks[0] ? 1 : 0;
+        buf->buffer = win_g->banks[next_bi];
+
+        return FOS_E_SUCCESS;
+    }
+
+    default: {
+        DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
+    }
+
+    }
 }
+
 
 /*
  * Graphics Plugin Stuff.
