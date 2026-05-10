@@ -749,7 +749,7 @@ static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32
 
     switch (cmd) {
 
-    case GFX_HCID_GET_DIMS: {
+    case PLG_GFX_HCID_GET_DIMS: {
         size_t *u_wid = (size_t *)arg0;
         size_t *u_hei = (size_t *)arg1;
 
@@ -770,11 +770,11 @@ static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32
         DUAL_RET(thr, FOS_E_SUCCESS, FOS_E_SUCCESS);
     }
 
-    case GFX_HCID_WAIT_EVENT: {
+    case PLG_GFX_HCID_WAIT_EVENT: {
         return window_gfx_base_wait_events(&(win_g->super), thr);
     }
 
-    case GFX_HCID_READ_EVENTS: {
+    case PLG_GFX_HCID_READ_EVENTS: {
         window_event_t *u_ev_buf = (window_event_t *)arg0;
         const size_t num_buf_cells = (size_t)arg1;
         size_t *u_cells_readden = (size_t *)arg2;
@@ -782,7 +782,7 @@ static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32
         return window_gfx_base_read_events(&(win_g->super), thr, u_ev_buf, num_buf_cells, u_cells_readden);
     }
 
-    case GFX_HCID_SWAP: {
+    case PLG_GFX_HCID_SWAP: {
         gfx_buffer_t *buf = win_g->super.super.buf;
         const uint32_t next_bi = buf->buffer == win_g->banks[0] ? 1 : 0;
         buf->buffer = win_g->banks[next_bi];
