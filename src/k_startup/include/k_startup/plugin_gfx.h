@@ -9,12 +9,27 @@
 #include "s_gfx/window.h"
 #include "s_gfx/mono_fonts.h"
 
-/**
- * I realized that there will be overlap for terminal windows and simple
- * graphics buffer windows in terms of how events are handled.
+/*
+ * NOTE:
+ * 
+ * The graphics plugin allows for the creation of 3 different windows.
+ * (One is a dummy window just for debugging purposes though, so we won't count that one)
  *
- * So here is a nice superclass to help with this!
+ * The 2 significant window types are:
+ *      1) A terminal window - this receives text input via the handle write handler! Its handle
+ *      conforms to the terminal handle interface!
+ *
+ *      2) A graphics window - this window just maps two shared buffers into userspaces. The
+ *      user can swap the buffers, and draw to each one as they wish!
+ * 
+ * The reality is that there is lots of overlap between the implementation of the two types of 
+ * windows. I tried to factor out as much shared code as possible, hence the `window_gfx_base_t`
+ * struct below.
+ *
+ * However, honestly, the implementation is a little confusing/verbose no matter what.
+ * In `plg_gfx.c`, you'll likely see certain blocks of code appear twice with just small differneces.
  */
+
 typedef struct _window_gfx_base_t window_gfx_base_t;
 struct _window_gfx_base_t {
     window_t super;
