@@ -36,19 +36,15 @@ struct _gfx_manager_impl_t {
     void (*gm_swap)(gfx_manager_t *gm);
 
     /**
-     * This handle will always receive non-NULL pointers for `width` and `height`.
-     * When called `*width` and `*height` will equal the requested new dimmensions of 
-     * manager.
+     * This should only return FOS_E_SUCCESS if the managed buffers will successfully resized to
+     * `width X height`.
      *
-     * On both ERROR and SUCCESS, this handler should write the NEW dimmensions to `*width`
-     * and `*height`.
-     * This handler should NOT edit `super.width` or `super.height` this will be done
-     * automatically by the wrapper!
+     * On error, the managed buffers should retain the dimmensions they had BEFORE this call.
      *
-     * This should only return FOS_E_SUCCESS if the buffers were resized corectly
-     * to sizes `*width` and `*height.
+     * This endpoint should NEVER modify `super.width` or `super.height`.
+     * This is done automatically!
      */
-    fernos_error_t (*gm_resize)(gfx_manager_t *gm, uint16_t *width, uint16_t *height);
+    fernos_error_t (*gm_resize)(gfx_manager_t *gm, uint16_t width, uint16_t height);
 };
 
 /**
@@ -145,10 +141,21 @@ typedef struct _dynamic_gfx_manager_t {
     size_t front_i;
 
     /**
-     * Both buffers in `bufs` will have size at least `sizeof(gfx_color_t) * buf_len`.
+     * The 'full_buf' will actually just be one large allocated block which holds both
+     * the front and back buffer. (I'm doing this to make the resize function a little
+     * easier to implement)
+     *
+     * `full_buf` will have size at least `full_buf_len * sizeof(gfx_color_t)`
      */
-    size_t buf_len;
-    gfx_color_t *bufs[2]; 
+    size_t full_buf_len;
+    gfx_color_t *full_buf;
+
+    /**
+     * These will both be pointers into the `full_buf` below.
+     * They will never be realloc'd or free'd. Just here for convenience.
+     */
+    gfx_color_t *bufs[2];
+
 } dynamic_gfx_manager_t;
 
 /**

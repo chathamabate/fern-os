@@ -122,12 +122,12 @@ typedef struct _window_qgrid_t {
  */
 
 static inline uint16_t win_qg_tile_width(window_qgrid_t *win_qg) {
-    return (gm_get_front(win_qg->super.gm).width - (WIN_QGRID_BORDER_WIDTH * 3)) / 2;
+    return (gm_get_width(win_qg->super.gm) - (WIN_QGRID_BORDER_WIDTH * 3)) / 2;
 }
 
 static inline uint16_t win_qg_tile_height(window_qgrid_t *win_qg) {
     // BORDER WIDTH AND HEIGHT ARE THE SANE! THIS IS CORRECT!
-    return (gm_get_front(win_qg->super.gm).height - (WIN_QGRID_BORDER_WIDTH * 3)) / 2;
+    return (gm_get_height(win_qg->super.gm) - (WIN_QGRID_BORDER_WIDTH * 3)) / 2;
 }
 
 static inline uint16_t win_qg_large_tile_width(window_qgrid_t *win_qg) {
@@ -143,9 +143,11 @@ static inline uint16_t win_qg_large_tile_height(window_qgrid_t *win_qg) {
  *
  * NOTE: `gm` is GIVEN to the created window.
  * If window creation fails, NULL is returned, in this case `gm` IS DELETED!
+ *
+ * Assumes the width and height of the `gm`.
  */
-window_t *new_window_qgrid(allocator_t *al, gfx_manager_t *gm, uint16_t width, uint16_t height);
+window_t *new_window_qgrid(allocator_t *al, gfx_manager_t *gm);
 
-static inline window_t *new_da_window_qgrid(gfx_manager_t *gm, uint16_t width, uint16_t height) {
-    return new_window_qgrid(get_default_allocator(), gm, width, height);
+static inline window_t *new_da_window_qgrid(gfx_manager_t *gm) {
+    return new_window_qgrid(get_default_allocator(), gm);
 }
