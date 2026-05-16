@@ -13,28 +13,57 @@ typedef struct _gfx_manager_impl_t gfx_manager_impl_t;
  */
 struct _gfx_manager_t {
     const gfx_manager_impl_t * const impl;
+
+    /*
+     * Every buffer managed by one manager MUST have the same abstract width and height!
+     */
+
+    uint16_t width;
+    uint16_t height;
 };
 
 struct _gfx_manager_impl_t {
     /**
      * REQUIRED
      */
-    gfx_buffer_t (*gm_get_front)(gfx_manager_t *gm);
+    gfx_color_t *(*gm_get_front)(gfx_manager_t *gm);
 
     /**
      * OPTIONAL
      */
     void (*delete_gfx_manager)(gfx_manager_t *gm);
-    gfx_buffer_t (*gm_get_back)(gfx_manager_t *gm);
+    gfx_color_t *(*gm_get_back)(gfx_manager_t *gm);
     void (*gm_swap)(gfx_manager_t *gm);
-    fernos_error_t (*gm_resize)(gfx_manager_t *gm, uint16_t width, uint16_t height);
+
+    /**
+     * This handle will always receive non-NULL pointers for `width` and `height`.
+     * When called `*width` and `*height` will equal the requested new dimmensions of 
+     * manager.
+     *
+     * On both ERROR and SUCCESS, this handler should write the NEW dimmensions to `*width`
+     * and `*height`.
+     * This handler should NOT edit `super.width` or `super.height` this will be done
+     * automatically by the wrapper!
+     *
+     * This should only return FOS_E_SUCCESS if the buffers were resized corectly
+     * to sizes `*width` and `*height.
+     */
+    fernos_error_t (*gm_resize)(gfx_manager_t *gm, uint16_t *width, uint16_t *height);
 };
 
 /**
  * Initialize the gfx manager base structure.
  * As always `impl` has its POINTER copied into `gm`... so make sure `*impl` is a global const!
  */
-void init_gfx_manager_base(gfx_manager_t *gm, const gfx_manager_impl_t *impl);
+void init_gfx_manager_base(gfx_manager_t *gm, const gfx_manager_impl_t *impl, uint16_t width, uint16_t height);
+
+static inline uint16_t gm_get_width(gfx_manager_t *gm) {
+    return gm->width;
+}
+
+static inline uint16_t gm_get_height(gfx_manager_t *gm) {
+    return gm->height;
+}
 
 /**
  * Delete a graphics manager, does nothing if the manager has no destructor!
@@ -46,10 +75,26 @@ static inline void delete_gfx_manager(gfx_manager_t *gm) {
 }
 
 /**
+ * A graphics manager may manage two buffers (a back and front), but it may also just have 1 
+ * buffer. In most cases this should really cause any differences in code. Just understand
+ * a single buffer may result in screen tearing depending on how it's used.
+ *
+ * HOWEVER, If your rendering actually tries to remember the state of each buffer to reduce
+ * redundant rendering, you should always check if the graphics manager actually has a back buffer!
+ * If it does not, your strategy may not work as expected!
+ */
+static inline bool gm_has_back(gfx_manager_t *gm) {
+    return gm->impl->gm_get_back != NULL;
+}
+
+/**
  * Get the front buffer!
  */
 static inline gfx_buffer_t gm_get_front(gfx_manager_t *gm) {
-    return gm->impl->gm_get_front(gm);
+    return (gfx_buffer_t) {
+        .buffer = gm->impl->gm_get_front(gm),
+        .width = gm->width, .height = gm->height
+    };
 }
 
 /**
@@ -59,9 +104,12 @@ static inline gfx_buffer_t gm_get_front(gfx_manager_t *gm) {
  */
 static inline gfx_buffer_t gm_get_back(gfx_manager_t *gm) {
     if (gm->impl->gm_get_back) {
-        return gm->impl->gm_get_back(gm);
+        return (gfx_buffer_t) {
+            .buffer = gm->impl->gm_get_back(gm),
+            .width = gm->width, .height = gm->height
+        };
     }
-    return gm->impl->gm_get_front(gm);
+    return gm_get_front(gm);
 }
 
 
@@ -78,15 +126,11 @@ static inline void gm_swap(gfx_manager_t *gm) {
 /**
  * Resize ALL managed buffers to have dimmensions `width * height`.
  *
- * Your manager may be entirely static, and thus have no ability to resize anything!
- * This is totally ok, just don't provide a `resize` endpoint!
+ * On FOS_E_SUCCESS, all managed buffers will have dimmensions `width * height`.
+ * On any other error value, make sure to check `gm_get_width` and `gm_get_height`,
+ * to determine the buffer dimmensions after this call.
  */
-static inline fernos_error_t gm_resize(gfx_manager_t *gm, uint16_t width, uint16_t height) {
-    if (gm->impl->gm_resize) {
-        return gm->impl->gm_resize(gm, width, height);
-    }
-    return FOS_E_NOT_IMPLEMENTED;
-}
+fernos_error_t gm_resize(gfx_manager_t *gm, uint16_t width, uint16_t height);
 
 /**
  * A graphics manager which manages two resizeable buffers which are dynamically allocated.
@@ -105,28 +149,11 @@ typedef struct _dynamic_gfx_manager_t {
      */
     size_t buf_len;
     gfx_color_t *bufs[2]; 
-
-    /**
-     * The current width and height of both of the `bufs`.
-     * It is promised that `width * height <= buf_len`.
-     */
-    uint16_t width, height;
 } dynamic_gfx_manager_t;
 
 /**
  * Create a new dynamic graphics manager.
+ *
+ * On success, the two dynamic buffers will have sizes `width` by `height.
  */
-gfx_manager_t *new_dynamic_gfx_manager(allocator_t *al);
-
-static inline gfx_manager_t *new_dynamic_gfx_manager_sized(allocator_t *al, uint16_t width, uint16_t height) {
-    fernos_error_t err;
-    gfx_manager_t *gm = new_dynamic_gfx_manager(al);
-    if (gm) {
-        err = gm_resize(gm, width, height);
-        if (err == FOS_E_SUCCESS) {
-            return gm;
-        }
-    }
-    delete_gfx_manager(gm);
-    return NULL;
-}
+gfx_manager_t *new_dynamic_gfx_manager(allocator_t *al, uint16_t width, uint16_t height);
