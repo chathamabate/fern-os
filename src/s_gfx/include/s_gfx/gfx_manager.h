@@ -164,3 +164,7 @@ typedef struct _dynamic_gfx_manager_t {
  * On success, the two dynamic buffers will have sizes `width` by `height.
  */
 gfx_manager_t *new_dynamic_gfx_manager(allocator_t *al, uint16_t width, uint16_t height);
+
+static inline gfx_manager_t *new_da_dynamic_gfx_manager(uint16_t width, uint16_t height) {
+    return new_dynamic_gfx_manager(get_default_allocator(), width, height);
+}

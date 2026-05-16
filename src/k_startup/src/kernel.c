@@ -167,7 +167,7 @@ static void init_kernel_plugins(void) {
     try_setup_step(ks_set_plugin(kernel, PLG_SHARED_MEM_ID, plg_shm), "Failed to set Shared Memory Plugin in the kernel");
 
     // Now for graphics plugin!
-    window_t *root_window = new_da_window_qgrid(FERNOS_GFX_WIDTH, FERNOS_GFX_HEIGHT);
+    window_t *root_window = new_da_window_qgrid(new_da_dynamic_gfx_manager(FERNOS_GFX_WIDTH, FERNOS_GFX_HEIGHT));
     if (!root_window) {
         gfx_direct_fatal("Failed to allocate root window");
     }
