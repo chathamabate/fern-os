@@ -13,22 +13,19 @@ typedef struct _gfx_manager_impl_t gfx_manager_impl_t;
  */
 struct _gfx_manager_t {
     const gfx_manager_impl_t * const impl;
-
-    /**
-     * A manager will manage 1 or more buffers!
-     */
-    const size_t num_buffers;
 };
 
 struct _gfx_manager_impl_t {
     /**
      * REQUIRED
      */
-    gfx_buffer_t (*gm_get_buffer)(gfx_manager_t *gm, size_t i);
+    gfx_buffer_t (*gm_get_front)(gfx_manager_t *gm);
 
     /**
      * OPTIONAL
      */
+    void (*delete_gfx_manager)(gfx_manager_t *gm);
+    gfx_buffer_t (*gm_get_back)(gfx_manager_t *gm);
     void (*gm_swap)(gfx_manager_t *gm);
     fernos_error_t (*gm_resize)(gfx_manager_t *gm, uint16_t width, uint16_t height);
 };
@@ -37,34 +34,41 @@ struct _gfx_manager_impl_t {
  * Initialize the gfx manager base structure.
  * As always `impl` has its POINTER copied into `gm`... so make sure `*impl` is a global const!
  */
-void init_gfx_manager_base(gfx_manager_t *gm, gfx_manager_impl_t *impl, size_t num_buffers);
+void init_gfx_manager_base(gfx_manager_t *gm, const gfx_manager_impl_t *impl);
 
 /**
- * Get buffer `i`.
- *
- * VERY IMPORTANT: The point of this structure is that `gfx_buffer_t`'s should now be short lived
- * and quickly forgotten. It should be gauranteed that when calling this function, a valid buffer for 
- * immediate rendering is returned!
- * However, after a `gm_swap` or a `gm_resize` the previously returned `gfx_buffer_t` may be enitrely
- * unusable!
- * NEVER store the returned `gfx_buffer_t` in some structure for later use. Only call this function
- * if you are interested in rendering NOW!
+ * Delete a graphics manager, does nothing if the manager has no destructor!
  */
-static inline gfx_buffer_t gm_get_buffer(gfx_manager_t *gm, size_t i) {
-    if (i >= gm->num_buffers) {
-        return (gfx_buffer_t){0};
+static inline void delete_gfx_manager(gfx_manager_t *gm) {
+    if (gm && gm->impl->delete_gfx_manager) {
+        gm->impl->delete_gfx_manager(gm);
     }
-
-    return gm->impl->gm_get_buffer(gm, i); 
 }
 
 /**
- * This function should abstractly rotate/swap the buffers managed.
+ * Get the front buffer!
+ */
+static inline gfx_buffer_t gm_get_front(gfx_manager_t *gm) {
+    return gm->impl->gm_get_front(gm);
+}
+
+/**
+ * Get the back buffer!
  *
- * Buffer 0 -> Buffer `num_buffers - 1`
- * Buffer 1 -> Buffer 0
- * Buffer 2 -> Buffer 1
- * ....
+ * If `gm_get_front` is not implemented, this just returns a gfx_buffer whose
+ * buffer is NULL.
+ */
+static inline gfx_buffer_t gm_get_back(gfx_manager_t *gm) {
+    if (gm->impl->gm_get_back) {
+        return gm->impl->gm_get_back(gm);
+    }
+    return (gfx_buffer_t) {.buffer = NULL};
+}
+
+
+/**
+ * This function should abstractly rotate/swap the buffers managed.
+ * Front goes to back, and back goes to front.
  */
 static inline void gm_swap(gfx_manager_t *gm) {
     if (gm->impl->gm_swap) {
@@ -84,3 +88,33 @@ static inline fernos_error_t gm_resize(gfx_manager_t *gm, uint16_t width, uint16
     }
     return FOS_E_NOT_IMPLEMENTED;
 }
+
+/**
+ * A graphics manager which manages two resizeable buffers which are dynamically allocated.
+ */
+typedef struct _dynamic_gfx_manager_t {
+    gfx_manager_t base;
+    allocator_t * const al;
+
+    /**
+     * Index of the front buffer.
+     */
+    size_t front_i;
+
+    /**
+     * Both buffers in `bufs` will have size at least `sizeof(gfx_color_t) * buf_len`.
+     */
+    size_t buf_len;
+    gfx_color_t *bufs[2]; 
+
+    /**
+     * The current width and height of both of the `bufs`.
+     * It is promised that `width * height <= buf_len`.
+     */
+    uint16_t width, height;
+} dynamic_gfx_manager_t;
+
+/**
+ * Create a new dynamic graphics manager.
+ */
+gfx_manager_t *new_dynamic_gfx_manager(allocator_t *al);
