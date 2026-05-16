@@ -73,17 +73,21 @@ static void delete_window_dummy(window_t *w) {
 static void win_d_render(window_t *w) {
     window_dummy_t *win_d = (window_dummy_t *)w;
     
-    gfx_buffer_t buf = gm_get_back(win_d->super.gm);
-    // I don't think a back/front works that well here... we may want to put edits in in general
-    // just saying!
-    // Alright, but how does this even work now though?
+    // NOTE: I wrote this window as a small test really before I had the graphics manager class.
+    // I had assumed this would only ever be used in the kernel.
+    // 
+    // Anyway, I'm just going to use the front buffer here. WHICH WILL cause tearing if using
+    // this implementation from userspace. Oh well.
+
+    gfx_buffer_t buf = gm_get_front(win_d->super.gm);
+    gfx_buffer_t *buf_p = &buf;
 
     if (win_d->dirty_buffer) {
-        gfx_clear(w->buf, gfx_color(0, 0, 0));
+        gfx_clear(buf_p, gfx_color(0, 0, 0));
     }
 
     gfx_draw_term_buffer(
-        w->buf, 
+        buf_p, 
         NULL, 
         win_d->dirty_buffer ? NULL : win_d->visible_tb, win_d->real_tb, 
         WINDOW_DUMMY_FONT, WINDOW_DUMMY_PALETTE, 
@@ -94,7 +98,7 @@ static void win_d_render(window_t *w) {
     const uint16_t cursor_y = WINDOW_DUMMY_FONT->char_height * win_d->real_tb->cursor_row;
 
     gfx_fill_rect(
-        w->buf, NULL, cursor_x, cursor_y, 
+        buf_p, NULL, cursor_x, cursor_y, 
         WINDOW_DUMMY_FONT->char_width, WINDOW_DUMMY_FONT->char_height, 
         WINDOW_DUMMY_PALETTE->colors[w->focused ? TC_WHITE : TC_LIGHT_GREY]
     );

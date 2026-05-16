@@ -19,8 +19,8 @@ static const window_impl_t QGRID_IMPL = {
     .win_deregister_child = win_qg_deregister_child
 };
 
-window_t *new_window_qgrid(allocator_t *al, uint16_t width, uint16_t height) {
-    if (!al) {
+window_t *new_window_qgrid(allocator_t *al, gfx_manager_t *gm, uint16_t width, uint16_t height) {
+    if (!al || !gm) {
         return NULL;
     }
 
@@ -29,10 +29,9 @@ window_t *new_window_qgrid(allocator_t *al, uint16_t width, uint16_t height) {
     }
     
     window_qgrid_t *win_qg = al_malloc(al, sizeof(window_qgrid_t));
-    gfx_buffer_t *buf = new_gfx_buffer(al, width, height);
 
-    if (!win_qg || !buf) {
-        delete_gfx_buffer(buf);
+    if (!win_qg) {
+        delete_gfx_manager(gm);
         al_free(al, win_qg);
 
         return NULL;
@@ -48,7 +47,7 @@ window_t *new_window_qgrid(allocator_t *al, uint16_t width, uint16_t height) {
         .max_height = UINT16_MAX,
     };
 
-    init_window_base((window_t *)win_qg, buf, &qg_attrs,
+    init_window_base((window_t *)win_qg, gm, &qg_attrs,
             &QGRID_IMPL);
     *(allocator_t **)&(win_qg->al) = al;
 
@@ -92,10 +91,18 @@ static void delete_window_qgrid(window_t *w) {
 /**
  * Render a single tile given it's (x, y, w, h)
  * (A focus border will be drawn around/outside this tile if focused)
+ *
+ * This renders to the back buffer.
  */
 static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x, uint16_t y, 
         uint16_t w, uint16_t h, bool focused) {
     const gfx_color_t gap_fill_color = WIN_QGRID_BG_COLOR;
+
+    gfx_buffer_t bbuf = gm_get_back(win_qg->super.gm);
+    gfx_buffer_t *bbuf_p = &bbuf;
+
+    gfx_buffer_t sw_fbuf = gm_get_front(sw->gm);
+    gfx_buffer_t *sw_fbuf_p = &sw_fbuf;
 
     if (sw) {
         // With the new render virtual function design, it is the container's responsibility to call
@@ -105,36 +112,36 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
         gfx_box_t clip = {
             .x = x, .y = y, .width = w, .height = h
         };
-        gfx_paste_buffer(win_qg->super.buf, &clip, sw->buf, x, y);
+        gfx_paste_buffer(bbuf_p, &clip, sw_fbuf_p, x, y);
 
         // I kinda go heavily out the way to not need to paint twice over the same pixel.
 
-        if (sw->buf->width < w) {
-            gfx_fill_rect(win_qg->super.buf, NULL,
-                x + sw->buf->width, y, 
-                w - sw->buf->width, sw->buf->height, 
+        if (sw_fbuf_p->width < w) {
+            gfx_fill_rect(bbuf_p, NULL,
+                x + sw_fbuf_p->width, y, 
+                w - sw_fbuf_p->width, sw_fbuf_p->height, 
                 gap_fill_color
             ); 
         }
 
-        if (sw->buf->height < h) {
-            gfx_fill_rect(win_qg->super.buf, NULL,
-                x, y + sw->buf->height,
-                sw->buf->width, h - sw->buf->height,
+        if (sw_fbuf_p->height < h) {
+            gfx_fill_rect(bbuf_p, NULL,
+                x, y + sw_fbuf_p->height,
+                sw_fbuf_p->width, h - sw_fbuf_p->height,
                 gap_fill_color
             );
         }
 
-        if (sw->buf->width < w && sw->buf->height < h) {
-            gfx_fill_rect(win_qg->super.buf, NULL,
-                x + sw->buf->width, y + sw->buf->height,
-                w - sw->buf->width, h - sw->buf->height, 
+        if (sw_fbuf_p->width < w && sw_fbuf_p->height < h) {
+            gfx_fill_rect(bbuf_p, NULL,
+                x + sw_fbuf_p->width, y + sw_fbuf_p->height,
+                w - sw_fbuf_p->width, h - sw_fbuf_p->height, 
                 gap_fill_color
             );
         }
     } else {
         // Now window to render, just fill a nice big ol' rectangle.
-        gfx_fill_rect(win_qg->super.buf, NULL, x, y, w, h, gap_fill_color);
+        gfx_fill_rect(bbuf_p, NULL, x, y, w, h, gap_fill_color);
     }
 
     // Draw focus border regardless of whether `sw` exists.
@@ -152,7 +159,7 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
         }
  
         gfx_draw_rect(
-           win_qg->super.buf, NULL,
+           bbuf_p, NULL,
            x - WIN_QGRID_FOCUS_BORDER_WIDTH,
            y - WIN_QGRID_FOCUS_BORDER_WIDTH, 
            w + (2 * WIN_QGRID_FOCUS_BORDER_WIDTH),
@@ -165,14 +172,15 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
 
 static void win_qg_render(window_t *w) {
     window_qgrid_t * const win_qg = (window_qgrid_t *)w;
-    gfx_buffer_t * const buf = win_qg->super.buf;
+    gfx_buffer_t bbuf = gm_get_back(win_qg->super.gm);
+    gfx_buffer_t *const bbuf_p = &bbuf;
 
     const gfx_color_t border_color = WIN_QGRID_BORDER_COLOR;
 
     // We are going to draw the exterior border 1 pixel thicker, this way, when we are in grid 
     // mode, there is no possibility of issues with divison by 2 round off.
     // (This only really works because we are rendering a 2x2 grid.)
-    gfx_draw_rect(buf, NULL, 0, 0, buf->width, buf->height, 
+    gfx_draw_rect(bbuf_p, NULL, 0, 0, bbuf_p->width, bbuf_p->height, 
             WIN_QGRID_BORDER_WIDTH + 1, border_color);
 
     if (win_qg->single_pane_mode) { // single pane mode is simplest.
@@ -188,15 +196,15 @@ static void win_qg_render(window_t *w) {
         const uint16_t tile_height = win_qg_tile_height(win_qg);
 
         // Here we draw a cross with center overlap.
-        gfx_fill_rect(buf, NULL, 
+        gfx_fill_rect(bbuf_p, NULL, 
             WIN_QGRID_BORDER_WIDTH + tile_width, WIN_QGRID_BORDER_WIDTH, 
-            WIN_QGRID_BORDER_WIDTH, buf->height - (2 * WIN_QGRID_BORDER_WIDTH), 
+            WIN_QGRID_BORDER_WIDTH, bbuf_p->height - (2 * WIN_QGRID_BORDER_WIDTH), 
             border_color
         );
 
-        gfx_fill_rect(buf, NULL,
+        gfx_fill_rect(bbuf_p, NULL,
             WIN_QGRID_BORDER_WIDTH,WIN_QGRID_BORDER_WIDTH + tile_height,
-            buf->width - (2 * WIN_QGRID_BORDER_WIDTH), WIN_QGRID_BORDER_WIDTH,
+            bbuf_p->width - (2 * WIN_QGRID_BORDER_WIDTH), WIN_QGRID_BORDER_WIDTH,
             border_color
         );
 
@@ -212,6 +220,8 @@ static void win_qg_render(window_t *w) {
             }
         }
     }
+
+    gm_swap(win_qg->super.gm);
 }
 
 /**
