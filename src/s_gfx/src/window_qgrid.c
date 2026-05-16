@@ -102,13 +102,13 @@ static void win_qg_render_tile(window_qgrid_t *win_qg, window_t *sw, uint16_t x,
     gfx_buffer_t bbuf = gm_get_back(win_qg->super.gm);
     gfx_buffer_t *bbuf_p = &bbuf;
 
-    gfx_buffer_t sw_fbuf = gm_get_front(sw->gm);
-    gfx_buffer_t *sw_fbuf_p = &sw_fbuf;
-
     if (sw) {
         // With the new render virtual function design, it is the container's responsibility to call
         // the render function of subwindows!
         win_render(sw); // must do this before pasting into container buffer.
+                           
+        gfx_buffer_t sw_fbuf = gm_get_front(sw->gm);
+        gfx_buffer_t *sw_fbuf_p = &sw_fbuf;
 
         gfx_box_t clip = {
             .x = x, .y = y, .width = w, .height = h

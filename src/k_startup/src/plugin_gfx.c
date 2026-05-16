@@ -42,7 +42,7 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
     const uint16_t height = rows * font->char_height * attrs->h_scale;
 
     window_terminal_t *win_t = al_malloc(al, sizeof(window_terminal_t));
-    gfx_buffer_t *buf = new_gfx_buffer(al, width, height);
+    gfx_manager_t *gm = new_dynamic_gfx_manager(al, width, height);
     term_buffer_t *vis_tb = new_term_buffer(al, (term_cell_t) {
         .c = ' ',
         .style = term_style(TC_WHITE, TC_BLACK)
@@ -54,12 +54,12 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
     fixed_queue_t *event_queue = new_fixed_queue(al, sizeof(window_event_t), 255);
     basic_wait_queue_t *wq = new_basic_wait_queue(al);
 
-    if (!win_t || !buf || !vis_tb || !true_tb || !event_queue || !wq) {
+    if (!win_t || !gm || !vis_tb || !true_tb || !event_queue || !wq) {
         delete_wait_queue((wait_queue_t *)wq);
         delete_fixed_queue(event_queue);
         delete_term_buffer(true_tb);
         delete_term_buffer(vis_tb);
-        delete_gfx_buffer(buf);
+        delete_gfx_manager(gm);
         al_free(al, win_t);
 
         return NULL;
@@ -74,7 +74,7 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
         .max_height = UINT16_MAX
     };
 
-    init_window_base((window_t *)win_t, buf, &win_attrs, &TERMINAL_WINDOW_IMPL);
+    init_window_base((window_t *)win_t, gm, &win_attrs, &TERMINAL_WINDOW_IMPL);
     *(allocator_t **)&(win_t->al) = al;
     win_t->references = 0;
     *(gfx_term_buffer_attrs_t *)&(win_t->tb_attrs) = *attrs;
@@ -117,6 +117,8 @@ static void delete_terminal_window(window_t *w) {
 static void tw_render(window_t *w) {
     window_terminal_t *win_t = (window_terminal_t *)w;
 
+    gfx_buffer_t buf = gm_get_front(win_t->super.gm);
+
     const ascii_mono_font_t * const font = ASCII_MONO_FONT_MAP[win_t->tb_attrs.fmi];
 
     const uint32_t cell_width = win_t->tb_attrs.w_scale * font->char_width;
@@ -127,8 +129,8 @@ static void tw_render(window_t *w) {
     const uint32_t tb_height = cell_height * win_t->visible_tb->rows;
 
     // The actual character grid will always be centered!
-    const uint32_t tb_x = tb_width < win_t->super.buf->width ? (win_t->super.buf->width - tb_width) / 2 : 0;
-    const uint32_t tb_y = tb_height < win_t->super.buf->height ? (win_t->super.buf->height - tb_height) / 2 : 0;
+    const uint32_t tb_x = tb_width < buf.width ? (buf.width - tb_width) / 2 : 0;
+    const uint32_t tb_y = tb_height < buf.height ? (buf.height - tb_height) / 2 : 0;
 
     const uint32_t true_cursor_x = tb_x + (win_t->true_tb->cursor_col * cell_width);
     const uint32_t true_cursor_y = tb_y + (win_t->true_tb->cursor_row * cell_height);
@@ -136,15 +138,15 @@ static void tw_render(window_t *w) {
     if (win_t->dirty_buffer) {
         // In case of a dirty buffer, we have to redraw everything!
 
-        gfx_clear(win_t->super.buf, win_t->tb_attrs.palette.colors[TC_LIGHT_GREY]);
-        gfx_draw_term_buffer_wa(win_t->super.buf, NULL, NULL, win_t->true_tb, tb_x, tb_y, 
+        gfx_clear(&buf, win_t->tb_attrs.palette.colors[TC_LIGHT_GREY]);
+        gfx_draw_term_buffer_wa(&buf, NULL, NULL, win_t->true_tb, tb_x, tb_y, 
                 &(win_t->tb_attrs));
 
         win_t->dirty_buffer = false;
     } else {
         // Here we just redraw cells which have changed! 
         // (This redraws the visible cursor cell everytime!)
-        gfx_draw_term_buffer_wa(win_t->super.buf, NULL, win_t->visible_tb, win_t->true_tb, 
+        gfx_draw_term_buffer_wa(&buf, NULL, win_t->visible_tb, win_t->true_tb, 
                 tb_x, tb_y, &(win_t->tb_attrs));
     }
 
@@ -161,7 +163,7 @@ static void tw_render(window_t *w) {
         cursor_color = win_t->tb_attrs.palette.colors[TC_LIGHT_GREY];
     }
 
-    gfx_fill_rect(win_t->super.buf, NULL, true_cursor_x, true_cursor_y + (cell_height - cursor_height),
+    gfx_fill_rect(&buf, NULL, true_cursor_x, true_cursor_y + (cell_height - cursor_height),
             cell_width, cursor_height, cursor_color);
 
     tb_copy(win_t->visible_tb, win_t->true_tb);
@@ -640,7 +642,7 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
      * Really meant for debug of the root window.
      */
     case PLG_GFX_PCID_NEW_DUMMY: {
-        window_t *dummy = new_window_dummy(ks->al);    
+        window_t *dummy = new_window_dummy(ks->al, new_dynamic_gfx_manager(ks->al, 0, 0));    
         if (!dummy) {
             DUAL_RET(curr_thr, FOS_E_NO_MEM, FOS_E_SUCCESS);
         }
@@ -774,7 +776,9 @@ static fernos_error_t plg_gfx_tick(plugin_t *plg) {
     }
 
     win_render(plg_gfx->root_window);
-    gfx_to_screen(SCREEN, plg_gfx->root_window->buf);
+
+    gfx_buffer_t front_buffer = gm_get_front(plg_gfx->root_window->gm);
+    gfx_to_screen(SCREEN, &front_buffer);
 
     return FOS_E_SUCCESS;
 }
