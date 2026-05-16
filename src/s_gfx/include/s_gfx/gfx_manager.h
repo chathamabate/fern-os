@@ -55,14 +55,13 @@ static inline gfx_buffer_t gm_get_front(gfx_manager_t *gm) {
 /**
  * Get the back buffer!
  *
- * If `gm_get_front` is not implemented, this just returns a gfx_buffer whose
- * buffer is NULL.
+ * If `gm_get_back` is not implemented, this just defers to `gm_get_front`.
  */
 static inline gfx_buffer_t gm_get_back(gfx_manager_t *gm) {
     if (gm->impl->gm_get_back) {
         return gm->impl->gm_get_back(gm);
     }
-    return (gfx_buffer_t) {.buffer = NULL};
+    return gm->impl->gm_get_front(gm);
 }
 
 
@@ -118,3 +117,16 @@ typedef struct _dynamic_gfx_manager_t {
  * Create a new dynamic graphics manager.
  */
 gfx_manager_t *new_dynamic_gfx_manager(allocator_t *al);
+
+static inline gfx_manager_t *new_dynamic_gfx_manager_sized(allocator_t *al, uint16_t width, uint16_t height) {
+    fernos_error_t err;
+    gfx_manager_t *gm = new_dynamic_gfx_manager(al);
+    if (gm) {
+        err = gm_resize(gm, width, height);
+        if (err == FOS_E_SUCCESS) {
+            return gm;
+        }
+    }
+    delete_gfx_manager(gm);
+    return NULL;
+}

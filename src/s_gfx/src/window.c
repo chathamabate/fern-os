@@ -57,10 +57,10 @@ size_t win_ev_to_str(char *buf, window_event_t ev, bool with_ansi) {
     return written;
 }
 
-void init_window_base(window_t *w, gfx_buffer_t *buf, const window_attrs_t *attrs, const window_impl_t *impl) {
+void init_window_base(window_t *w, gfx_manager_t *gm, const window_attrs_t *attrs, const window_impl_t *impl) {
     *(const window_impl_t **)&(w->impl) = impl;
     *(window_attrs_t *)&(w->attrs) = *attrs;
-    *(gfx_buffer_t **)&(w->buf) = buf;
+    *(gfx_manager_t **)&(w->gm) = gm;
     w->is_active = true;
     w->container = NULL;
 
@@ -70,7 +70,7 @@ void init_window_base(window_t *w, gfx_buffer_t *buf, const window_attrs_t *attr
 }
 
 void deinit_window_base(window_t *w) {
-    delete_gfx_buffer(w->buf);
+    delete_gfx_manager(w->gm);
 }
 
 fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height) {
@@ -88,7 +88,7 @@ fernos_error_t win_resize(window_t *w, uint16_t width, uint16_t height) {
         return FOS_E_NOT_PERMITTED;
     }
 
-    err = gfx_resize_buffer(w->buf, width, height, false);
+    err = gm_resize(w->gm, width, height);
     if (err != FOS_E_SUCCESS) {
         return FOS_E_NO_MEM; // regardless of error, return no mem.
     }

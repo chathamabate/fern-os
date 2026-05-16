@@ -16,8 +16,8 @@ static const window_impl_t D_IMPL = {
     .win_deregister_child = NULL 
 };
 
-window_t *new_window_dummy(allocator_t *al) {
-    if (!al) {
+window_t *new_window_dummy(allocator_t *al, gfx_manager_t *gm) {
+    if (!al || !gm) {
         return NULL;
     }
 
@@ -25,7 +25,6 @@ window_t *new_window_dummy(allocator_t *al) {
     const uint16_t init_cols = 50;
 
     window_dummy_t *win_d = al_malloc(al, sizeof(window_dummy_t));
-    gfx_buffer_t *buf = new_gfx_buffer(al, init_cols * WINDOW_DUMMY_FONT->char_width, init_rows * WINDOW_DUMMY_FONT->char_height);
     term_buffer_t *vtb = new_term_buffer(al, 
             (term_cell_t) {.c = ' ', .style = term_style(TC_WHITE, TC_BLACK)},
             init_rows, init_cols);
@@ -33,10 +32,10 @@ window_t *new_window_dummy(allocator_t *al) {
             (term_cell_t) {.c = ' ', .style = term_style(TC_WHITE, TC_BLACK)},
             init_rows, init_cols);
 
-    if (!win_d || !buf || !vtb || !rtb) {
+    if (!win_d || !gm || !vtb || !rtb) {
         delete_term_buffer(rtb);
         delete_term_buffer(vtb);
-        delete_gfx_buffer(buf);
+        delete_gfx_manager(gm); // THIS IS IMPORTANT TO NOTICE!
         al_free(al, win_d);
 
         return NULL;
@@ -52,7 +51,7 @@ window_t *new_window_dummy(allocator_t *al) {
         .max_height = UINT16_MAX,
     };
 
-    init_window_base((window_t *)win_d, buf, &d_attrs, &D_IMPL);
+    init_window_base((window_t *)win_d, gm, &d_attrs, &D_IMPL);
 
     *(allocator_t **)&(win_d->al) = al;
     *(term_buffer_t **)&(win_d->visible_tb) = vtb;
@@ -73,6 +72,11 @@ static void delete_window_dummy(window_t *w) {
 
 static void win_d_render(window_t *w) {
     window_dummy_t *win_d = (window_dummy_t *)w;
+    
+    gfx_buffer_t buf = gm_get_back(win_d->super.gm);
+    // I don't think a back/front works that well here... we may want to put edits in in general
+    // just saying!
+    // Alright, but how does this even work now though?
 
     if (win_d->dirty_buffer) {
         gfx_clear(w->buf, gfx_color(0, 0, 0));
