@@ -18,6 +18,7 @@ static const window_impl_t D_IMPL = {
 
 window_t *new_window_dummy(allocator_t *al, gfx_manager_t *gm) {
     if (!al || !gm) {
+        delete_gfx_manager(gm);
         return NULL;
     }
 

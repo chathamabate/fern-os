@@ -20,11 +20,7 @@ static const window_impl_t QGRID_IMPL = {
 };
 
 window_t *new_window_qgrid(allocator_t *al, gfx_manager_t *gm) {
-    if (!al || !gm) {
-        return NULL;
-    }
-
-    if (gm_get_width(gm) < WIN_QGRID_MIN_DIM || gm_get_height(gm) < WIN_QGRID_MIN_DIM) {
+    if (!al || !gm || gm_get_width(gm) < WIN_QGRID_MIN_DIM || gm_get_height(gm) < WIN_QGRID_MIN_DIM) {
         delete_gfx_manager(gm);
         return NULL;
     }
