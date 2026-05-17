@@ -383,7 +383,6 @@ void gfx_test_gradient_buffer_paste(gfx_buffer_t *buffer, const gfx_box_t *clip,
     }
 
     gfx_buffer_t buf = {
-        .al = NULL,
         .buffer = (gfx_color_t *)image,
         .width = image_cols,
         .height = image_rows 

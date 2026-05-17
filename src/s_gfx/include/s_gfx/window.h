@@ -3,6 +3,7 @@
 
 #include "s_mem/allocator.h"
 #include "s_gfx/gfx.h"
+#include "s_gfx/gfx_manager.h"
 #include "s_util/ps2_scancodes.h"
 #include <stdbool.h>
 
@@ -115,13 +116,11 @@ struct _window_t {
     const window_impl_t * const impl;
 
     /**
-     * All windows require a graphics buffer.
+     * All windows require a graphics manager.
      *
-     * This buffer is free to be written to directly by whomever, whenever.
-     * Just be careful, as it's also free to be read from whenever.
-     * Screen tearing may occur depending on how this window is managed and output to the screen.
+     * The front buffer is what is rendered.
      */
-    gfx_buffer_t * const buf;
+    gfx_manager_t * const gm;
 
     /**
      * Core attributes of this window.
@@ -259,15 +258,15 @@ struct _window_impl_t {
  * Initialize the window base fields.
  *
  * NOTE: Window starts in an active state.
- * Undefined behavior if `buf` has dimmensions outside min/maxx bounds described in `attrs`.
+ * Undefined behavior if `buf` has dimmensions outside min/max bounds described in `attrs`.
  *
- * `buf` becomes OWNED by `w`!
+ * `gm` becomes OWNED by `w`!
  * The pointer for `impl` is stored within `w`.
  * The value pointed to by `attrs` is copied into `w`.
  *
  * `w` starts as hidden and unfocused!
  */
-void init_window_base(window_t *w, gfx_buffer_t *buf, const window_attrs_t *attrs, const window_impl_t *impl);
+void init_window_base(window_t *w, gfx_manager_t *gm, const window_attrs_t *attrs, const window_impl_t *impl);
 
 /**
  * This deletes the dynamic parts of the window base fields.

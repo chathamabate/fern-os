@@ -16,8 +16,9 @@ static const window_impl_t D_IMPL = {
     .win_deregister_child = NULL 
 };
 
-window_t *new_window_dummy(allocator_t *al) {
-    if (!al) {
+window_t *new_window_dummy(allocator_t *al, gfx_manager_t *gm) {
+    if (!al || !gm) {
+        delete_gfx_manager(gm);
         return NULL;
     }
 
@@ -25,7 +26,6 @@ window_t *new_window_dummy(allocator_t *al) {
     const uint16_t init_cols = 50;
 
     window_dummy_t *win_d = al_malloc(al, sizeof(window_dummy_t));
-    gfx_buffer_t *buf = new_gfx_buffer(al, init_cols * WINDOW_DUMMY_FONT->char_width, init_rows * WINDOW_DUMMY_FONT->char_height);
     term_buffer_t *vtb = new_term_buffer(al, 
             (term_cell_t) {.c = ' ', .style = term_style(TC_WHITE, TC_BLACK)},
             init_rows, init_cols);
@@ -33,10 +33,10 @@ window_t *new_window_dummy(allocator_t *al) {
             (term_cell_t) {.c = ' ', .style = term_style(TC_WHITE, TC_BLACK)},
             init_rows, init_cols);
 
-    if (!win_d || !buf || !vtb || !rtb) {
+    if (!win_d || !gm || !vtb || !rtb) {
         delete_term_buffer(rtb);
         delete_term_buffer(vtb);
-        delete_gfx_buffer(buf);
+        delete_gfx_manager(gm); // THIS IS IMPORTANT TO NOTICE!
         al_free(al, win_d);
 
         return NULL;
@@ -52,7 +52,7 @@ window_t *new_window_dummy(allocator_t *al) {
         .max_height = UINT16_MAX,
     };
 
-    init_window_base((window_t *)win_d, buf, &d_attrs, &D_IMPL);
+    init_window_base((window_t *)win_d, gm, &d_attrs, &D_IMPL);
 
     *(allocator_t **)&(win_d->al) = al;
     *(term_buffer_t **)&(win_d->visible_tb) = vtb;
@@ -73,13 +73,22 @@ static void delete_window_dummy(window_t *w) {
 
 static void win_d_render(window_t *w) {
     window_dummy_t *win_d = (window_dummy_t *)w;
+    
+    // NOTE: I wrote this window as a small test really before I had the graphics manager class.
+    // I had assumed this would only ever be used in the kernel.
+    // 
+    // Anyway, I'm just going to use the front buffer here. WHICH WILL cause tearing if using
+    // this implementation from userspace. Oh well.
+
+    gfx_buffer_t buf = gm_get_front(win_d->super.gm);
+    gfx_buffer_t *buf_p = &buf;
 
     if (win_d->dirty_buffer) {
-        gfx_clear(w->buf, gfx_color(0, 0, 0));
+        gfx_clear(buf_p, gfx_color(0, 0, 0));
     }
 
     gfx_draw_term_buffer(
-        w->buf, 
+        buf_p, 
         NULL, 
         win_d->dirty_buffer ? NULL : win_d->visible_tb, win_d->real_tb, 
         WINDOW_DUMMY_FONT, WINDOW_DUMMY_PALETTE, 
@@ -90,7 +99,7 @@ static void win_d_render(window_t *w) {
     const uint16_t cursor_y = WINDOW_DUMMY_FONT->char_height * win_d->real_tb->cursor_row;
 
     gfx_fill_rect(
-        w->buf, NULL, cursor_x, cursor_y, 
+        buf_p, NULL, cursor_x, cursor_y, 
         WINDOW_DUMMY_FONT->char_width, WINDOW_DUMMY_FONT->char_height, 
         WINDOW_DUMMY_PALETTE->colors[w->focused ? TC_WHITE : TC_LIGHT_GREY]
     );

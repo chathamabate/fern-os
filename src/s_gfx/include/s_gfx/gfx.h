@@ -64,66 +64,24 @@ static inline bool gfx_color_is_clear(gfx_color_t color) {
  * A gfx buffer is meant to be an intermediate target for graphics.
  * We expect the kernel to be able to take this type of structure and render it onto 
  * the visible screen somehow.
+ *
+ * IMPLEMENTATION NOTE: (5/13/26)
+ * the `gfx_buffer_t` structure used to also have an allocator field. This field would be left
+ * NULL in the case of static buffers. This ultimately became confusing though!
+ * The hope now is that future structures can give a buffer when needed!
+ * SEE `gfx_manager_t`.
  */
 typedef struct _gfx_buffer_t {
     /**
-     * The allocator used to allocate this structure and `buffer`.
-     *
-     * This structure is intentially simple though to allow for 
-     * easily setting up a buffer in static memory. If `al` is NULL, this is a static buffer!
-     */
-    allocator_t * const al;
-
-    /**
      * Dimmensions of the buffer in pixels.
      */
-    uint16_t width, height;
+    const uint16_t width, height;
 
     /**
-     * The actual number of pixels in the buffer.
+     * The buffer itself with size at least `width * height * sizeof(gfx_color_t)`.
      */
-    uint32_t buffer_len;
-
-    /**
-     * The buffer itself with size `buffer_len * sizeof(gfx_color_t)`.
-     *
-     * `width * height <= buffer_len` must be the case for all valid buffers!
-     */
-    gfx_color_t *buffer;
+    gfx_color_t * const buffer;
 } gfx_buffer_t;
-
-/**
- * Create a new dynamically allocated gfx buffer with dimmensions w x h.
- *
- * Returns NULL on error.
- */
-gfx_buffer_t *new_gfx_buffer(allocator_t *al, uint16_t w, uint16_t h);
-
-static inline gfx_buffer_t *new_da_gfx_buffer(uint16_t w, uint16_t h) {
-    return new_gfx_buffer(get_default_allocator(), w, h);
-}
-
-/**
- * Delete a gfx buffer. 
- * (This does nothing if the allocator of `buf` is NULL)
- */
-void delete_gfx_buffer(gfx_buffer_t *buf);
-
-/**
- * Attempt to resize `buf`.
- * 
- * If `shrink` is false, then resizing to a smaller cumulative size will do nothing memory wise.
- * If `shrink` is true, resizing to a smaller cumulative size may shrink the buffer in memory.
- *
- * If `buf` has no allocator, this is a static buffer. This call will thus fail if `w * h > buf->buffer_len`.
- * `shrink` is ignored for static buffers.
- *
- * For dynamic buffers, this only fails if there are insufficient resources.
- *
- * On success, the contents of the buffer or undefined.
- * On failure, the buffer is left unmodified.
- */
-fernos_error_t gfx_resize_buffer(gfx_buffer_t *buf, uint16_t w, uint16_t h, bool shrink);
 
 /**
  * Set all pixels in the given buffer to `color`.

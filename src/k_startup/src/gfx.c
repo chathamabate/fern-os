@@ -39,12 +39,8 @@ gfx_screen_t * const SCREEN = &screen;
 static gfx_color_t back_buffer_arr[FERNOS_GFX_HEIGHT][FERNOS_GFX_WIDTH];
 
 static gfx_buffer_t back_buffer = {
-    .al = NULL, // Statically allocated.
-    
     .width = FERNOS_GFX_WIDTH,
     .height = FERNOS_GFX_HEIGHT,
-
-    .buffer_len = FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT,
     .buffer = (gfx_color_t *)back_buffer_arr
 };
 

@@ -37,9 +37,14 @@ typedef struct _window_dummy_t {
 
 /**
  * Create a new dummy window!
+ *
+ * Returns NULL on failure.
+ *
+ * NOTE: This GIVES `gm` to the created window. when the window is deleted, `gm` will be too!
+ * If this constructor fails for some reason, `gm` WILL BE DELETED!
  */
-window_t *new_window_dummy(allocator_t *al);
+window_t *new_window_dummy(allocator_t *al, gfx_manager_t *gm);
 
-static inline window_t *new_da_window_dummy(void) {
-    return new_window_dummy(get_default_allocator());
+static inline window_t *new_da_window_dummy(gfx_manager_t *gm) {
+    return new_window_dummy(get_default_allocator(), gm);
 }
