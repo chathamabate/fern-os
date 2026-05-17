@@ -42,7 +42,7 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
     const uint16_t height = rows * font->char_height * attrs->h_scale;
 
     window_terminal_t *win_t = al_malloc(al, sizeof(window_terminal_t));
-    gfx_manager_t *gm = new_dynamic_gfx_manager(al, width, height);
+    gfx_manager_t *gm = new_dynamic_gfx_manager_single(al, width, height);
     term_buffer_t *vis_tb = new_term_buffer(al, (term_cell_t) {
         .c = ' ',
         .style = term_style(TC_WHITE, TC_BLACK)
@@ -117,6 +117,8 @@ static void delete_terminal_window(window_t *w) {
 static void tw_render(window_t *w) {
     window_terminal_t *win_t = (window_terminal_t *)w;
 
+    // These system terminal windows ALWAYS use just a front buffer.
+    // As render function can never be interrupted this is not a problem!
     gfx_buffer_t buf = gm_get_front(win_t->super.gm);
 
     const ascii_mono_font_t * const font = ASCII_MONO_FONT_MAP[win_t->tb_attrs.fmi];
@@ -642,7 +644,7 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
      * Really meant for debug of the root window.
      */
     case PLG_GFX_PCID_NEW_DUMMY: {
-        window_t *dummy = new_window_dummy(ks->al, new_dynamic_gfx_manager(ks->al, 0, 0));    
+        window_t *dummy = new_window_dummy(ks->al, new_dynamic_gfx_manager_single(ks->al, 0, 0));    
         if (!dummy) {
             DUAL_RET(curr_thr, FOS_E_NO_MEM, FOS_E_SUCCESS);
         }

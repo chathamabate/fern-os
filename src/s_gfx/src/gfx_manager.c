@@ -116,3 +116,66 @@ static fernos_error_t dgm_resize(gfx_manager_t *gm, uint16_t width, uint16_t hei
 
     return FOS_E_SUCCESS;
 }
+
+static void delete_dynamic_gfx_manager_single(gfx_manager_t *gm);
+static gfx_color_t *dgms_get_front(gfx_manager_t *gm);
+static fernos_error_t dgms_resize(gfx_manager_t *gm, uint16_t width, uint16_t height);
+
+static const gfx_manager_impl_t DGMS_IMPL = {
+    .delete_gfx_manager = delete_dynamic_gfx_manager_single,
+    .gm_get_front = dgms_get_front,
+    .gm_resize = dgms_resize
+};
+
+gfx_manager_t *new_dynamic_gfx_manager_single(allocator_t *al, uint16_t width, uint16_t height) {
+    if (!al) {
+        return NULL;
+    }
+
+    size_t init_buf_len = (size_t)width * (size_t)height;
+    
+    dynamic_gfx_manager_single_t *dgms = al_malloc(al, sizeof(dynamic_gfx_manager_single_t));
+    gfx_color_t *buf = al_malloc(al, init_buf_len * sizeof(gfx_color_t));
+
+    if (!dgms || (init_buf_len > 0 && !buf)) {
+        al_free(al, dgms);
+        al_free(al, buf);
+        return NULL;
+    }
+
+    init_gfx_manager_base((gfx_manager_t *)dgms, &DGMS_IMPL, width, height);  
+    *(allocator_t **)&(dgms->al) = al;
+    dgms->buf_len = init_buf_len;
+    dgms->buf = buf;
+
+    return (gfx_manager_t *)dgms;
+}
+
+static void delete_dynamic_gfx_manager_single(gfx_manager_t *gm) {
+    dynamic_gfx_manager_single_t *dgms = (dynamic_gfx_manager_single_t *)gm;
+    al_free(dgms->al, dgms->buf);
+    al_free(dgms->al, dgms);
+
+}
+
+static gfx_color_t *dgms_get_front(gfx_manager_t *gm) {
+    dynamic_gfx_manager_single_t *dgms = (dynamic_gfx_manager_single_t *)gm;
+    return dgms->buf;
+}
+
+static fernos_error_t dgms_resize(gfx_manager_t *gm, uint16_t width, uint16_t height) {
+    dynamic_gfx_manager_single_t *dgms = (dynamic_gfx_manager_single_t *)gm;
+    size_t new_buf_len = (size_t)width * (size_t)height;
+
+    if (new_buf_len > dgms->buf_len) {
+        gfx_color_t *new_buf = al_realloc(dgms->al, dgms->buf, new_buf_len * sizeof(gfx_color_t));
+        if (!new_buf) {
+            return FOS_E_NO_MEM;
+        }
+
+        dgms->buf = new_buf;
+        dgms->buf_len = new_buf_len;
+    }
+
+    return FOS_E_SUCCESS;
+}

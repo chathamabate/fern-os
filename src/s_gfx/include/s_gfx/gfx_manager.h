@@ -155,7 +155,6 @@ typedef struct _dynamic_gfx_manager_t {
      * They will never be realloc'd or free'd. Just here for convenience.
      */
     gfx_color_t *bufs[2];
-
 } dynamic_gfx_manager_t;
 
 /**
@@ -168,3 +167,29 @@ gfx_manager_t *new_dynamic_gfx_manager(allocator_t *al, uint16_t width, uint16_t
 static inline gfx_manager_t *new_da_dynamic_gfx_manager(uint16_t width, uint16_t height) {
     return new_dynamic_gfx_manager(get_default_allocator(), width, height);
 }
+
+/**
+ * Same as `dynamic_gfx_manager_t`, but with only one buffer.
+ */
+typedef struct _dynamic_gfx_manager_single_t {
+    gfx_manager_t base;
+    allocator_t * const al;
+
+    /**
+     * `buf` will have size at least `buf_len * sizeof(gfx_color_t)`.
+     */
+    size_t buf_len;
+    gfx_color_t *buf;
+} dynamic_gfx_manager_single_t;
+
+/**
+ * Create a new dynamic graphics manager (single)
+ *
+ * On success, the single dynamic buffer will have dimmensions `width X height`
+ */
+gfx_manager_t *new_dynamic_gfx_manager_single(allocator_t *al, uint16_t width, uint16_t height);
+
+static inline gfx_manager_t *new_da_dynamic_gfx_manager_single(uint16_t width, uint16_t height) {
+    return new_dynamic_gfx_manager_single(get_default_allocator(), width, height);
+}
+
