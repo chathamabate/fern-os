@@ -577,6 +577,64 @@ static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint3
  * ************************** Graphics Window **************************
  */
 
+static window_gfx_gm_t *new_window_gfx_gm(kernel_state_t *ks);
+static void delete_window_gfx_gm(gfx_manager_t *gm);
+static gfx_color_t *wggm_get_front(gfx_manager_t *gm);
+static gfx_color_t *wggm_get_back(gfx_manager_t *gm);
+static void wggm_swap(gfx_manager_t *gm);
+static fernos_error_t wggm_resize(gfx_manager_t *gm, uint16_t width, uint16_t height);
+
+static const gfx_manager_impl_t WINDOW_GFX_GM_IMPL = {
+    .delete_gfx_manager = delete_window_gfx_gm,
+    .gm_get_front = wggm_get_front,
+    .gm_get_back = wggm_get_back,
+    .gm_swap = wggm_swap,
+    .gm_resize = wggm_resize
+};
+
+static window_gfx_gm_t *new_window_gfx_gm(kernel_state_t *ks) {
+    window_gfx_gm_t *wggm = al_malloc(ks->al, sizeof(window_gfx_gm_t));
+
+    gfx_color_t *banks[2];
+    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 0), 0, 0);
+    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 1), 0, 0);
+
+    if (!wggm || !banks[0] || !banks[1]) {
+        ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[1]), 0, 0, 0);
+        ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[0]), 0, 0, 0);
+        al_free(ks->al, wggm);
+        return NULL;
+    }
+
+    init_gfx_manager_base((gfx_manager_t *)wggm, &WINDOW_GFX_GM_IMPL, 0, 0);
+    *(kernel_state_t **)&(wggm->ks) = ks;
+    *(gfx_color_t **)(wggm->banks + 0) = banks[0];
+    *(gfx_color_t **)(wggm->banks + 1) = banks[1];
+    wggm->front_i = 0;
+
+    return wggm;
+}
+
+static void delete_window_gfx_gm(gfx_manager_t *gm) {
+    
+}
+
+static gfx_color_t *wggm_get_front(gfx_manager_t *gm) {
+
+}
+
+static gfx_color_t *wggm_get_back(gfx_manager_t *gm) {
+
+}
+
+static void wggm_swap(gfx_manager_t *gm) {
+
+}
+
+static fernos_error_t wggm_resize(gfx_manager_t *gm, uint16_t width, uint16_t height) {
+
+}
+
 static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks);
 static void delete_gfx_window(window_t *w);
 static void gw_render(window_t *w);

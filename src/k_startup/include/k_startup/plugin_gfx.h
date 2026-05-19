@@ -130,12 +130,6 @@ struct _window_gfx_gm_t {
     kernel_state_t * const ks;
 
     /**
-     * Each bank buffer will have size at least `bank_len * sizeof(gfx_color_t)`
-     * This NEVER changes thorughout the lifetime of this structure.
-     */
-    const size_t bank_len;
-
-    /**
      * The two kernel mapped banks.
      */
     gfx_color_t * const banks[2];
