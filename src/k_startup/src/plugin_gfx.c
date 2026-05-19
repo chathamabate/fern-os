@@ -3,13 +3,14 @@
 #include "k_startup/plugin_shm.h"
 #include "k_startup/gfx.h"
 #include "s_bridge/shared_defs.h"
+#include "s_gfx/gfx_manager.h"
 #include "s_gfx/window_dummy.h"
 #include "k_startup/page_helpers.h"
 #include "s_util/ansi.h"
 #include "os_defs.h"
 
-fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_buffer_t *buf, const window_impl_t *impl, allocator_t *al, ring_t *sch) {
-    if (!win || !buf || !impl || !al || !sch) {
+fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_manager_t *gm, const window_impl_t *impl, allocator_t *al, ring_t *sch) {
+    if (!win || !gm || !impl || !al || !sch) {
         return FOS_E_BAD_ARGS;
     }
 
@@ -30,7 +31,7 @@ fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_buffer_t *buf, c
         .min_height = 0,
         .max_height = SCREEN->height
     };
-    init_window_base((window_t *)win, buf, &attrs, impl);
+    init_window_base((window_t *)win, gm, &attrs, impl);
     *(allocator_t **)&(win->al) = al;
     win->references = 1;
     *(fixed_queue_t **)&(win->eq) = eq;
@@ -43,7 +44,7 @@ fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_buffer_t *buf, c
 void delete_window_gfx_base(window_gfx_base_t *win) {
     delete_wait_queue((wait_queue_t *)(win->bwq));
     delete_fixed_queue(win->eq);
-    deinit_window_base((window_t *)win);
+    deinit_window_base((window_t *)win); // Remember, this deletes our gm.
 
     al_free(win->al, win);
 }
@@ -175,17 +176,17 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
     const uint16_t height = rows * font->char_height * attrs->h_scale;
 
     window_terminal_t *win_t = al_malloc(al, sizeof(window_terminal_t));
-    gfx_buffer_t *buf = new_gfx_buffer(al, width, height);
+    gfx_manager_t *gm = new_dynamic_gfx_manager_single(al, width, height);
 
-    if (init_window_gfx_base((window_gfx_base_t *)win_t, buf, &TERMINAL_WINDOW_IMPL, al, sch) != FOS_E_SUCCESS) {
-        delete_gfx_buffer(buf);
+    if (init_window_gfx_base((window_gfx_base_t *)win_t, gm, &TERMINAL_WINDOW_IMPL, al, sch) != FOS_E_SUCCESS) {
+        delete_gfx_manager(gm);
         al_free(al, win_t);
         return NULL;
     }
 
-    buf = NULL;
-    // From this point on, `buf` is owned by `win_t`. Calling delete on the base gfx window will
-    // delete `buf`.
+    gm = NULL;
+    // From this point on, `gm` is owned by `win_t`. Calling delete on the base gfx window will
+    // delete `gm`.
 
     term_buffer_t *vis_tb = new_term_buffer(al, (term_cell_t) {
         .c = ' ',
@@ -237,11 +238,10 @@ static void delete_terminal_window(window_t *w) {
 
 static void tw_render(window_t *w) {
     window_terminal_t *win_t = (window_terminal_t *)w;
-    gfx_buffer_t *buf = w->buf;
 
     // These system terminal windows ALWAYS use just a front buffer.
     // As render function can never be interrupted this is not a problem!
-    gfx_buffer_t buf = gm_get_front(win_t->super.gm);
+    gfx_buffer_t buf = gm_get_front(win_t->super.super.gm);
 
     const ascii_mono_font_t * const font = ASCII_MONO_FONT_MAP[win_t->tb_attrs.fmi];
 
@@ -253,8 +253,8 @@ static void tw_render(window_t *w) {
     const uint32_t tb_height = cell_height * win_t->visible_tb->rows;
 
     // The actual character grid will always be centered!
-    const uint32_t tb_x = tb_width < buf->width ? (buf->width - tb_width) / 2 : 0;
-    const uint32_t tb_y = tb_height < buf->height ? (buf->height - tb_height) / 2 : 0;
+    const uint32_t tb_x = tb_width < buf.width ? (buf.width - tb_width) / 2 : 0;
+    const uint32_t tb_y = tb_height < buf.height ? (buf.height - tb_height) / 2 : 0;
 
     const uint32_t true_cursor_x = tb_x + (win_t->true_tb->cursor_col * cell_width);
     const uint32_t true_cursor_y = tb_y + (win_t->true_tb->cursor_row * cell_height);
@@ -262,15 +262,15 @@ static void tw_render(window_t *w) {
     if (win_t->dirty_buffer) {
         // In case of a dirty buffer, we have to redraw everything!
 
-        gfx_clear(buf, win_t->tb_attrs.palette.colors[TC_LIGHT_GREY]);
-        gfx_draw_term_buffer_wa(buf, NULL, NULL, win_t->true_tb, tb_x, tb_y, 
+        gfx_clear(&buf, win_t->tb_attrs.palette.colors[TC_LIGHT_GREY]);
+        gfx_draw_term_buffer_wa(&buf, NULL, NULL, win_t->true_tb, tb_x, tb_y, 
                 &(win_t->tb_attrs));
 
         win_t->dirty_buffer = false;
     } else {
         // Here we just redraw cells which have changed! 
         // (This redraws the visible cursor cell everytime!)
-        gfx_draw_term_buffer_wa(buf, NULL, win_t->visible_tb, win_t->true_tb, 
+        gfx_draw_term_buffer_wa(&buf, NULL, win_t->visible_tb, win_t->true_tb, 
                 tb_x, tb_y, &(win_t->tb_attrs));
     }
 
@@ -287,7 +287,7 @@ static void tw_render(window_t *w) {
         cursor_color = win_t->tb_attrs.palette.colors[TC_LIGHT_GREY];
     }
 
-    gfx_fill_rect(buf, NULL, true_cursor_x, true_cursor_y + (cell_height - cursor_height),
+    gfx_fill_rect(&buf, NULL, true_cursor_x, true_cursor_y + (cell_height - cursor_height),
             cell_width, cursor_height, cursor_color);
 
     tb_copy(win_t->visible_tb, win_t->true_tb);
@@ -574,7 +574,7 @@ static fernos_error_t term_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint3
 }
 
 /*
- * Graphics Window!
+ * ************************** Graphics Window **************************
  */
 
 static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks);

@@ -66,7 +66,7 @@ struct _window_gfx_base_t {
  *
  * References will be set as 1.
  */
-fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_buffer_t *buf, const window_impl_t *impl, allocator_t *al, ring_t *sch);
+fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_manager_t *gm, const window_impl_t *impl, allocator_t *al, ring_t *sch);
 
 /**
  * GFX Base windows are promised to be dynamically allocated.
@@ -119,6 +119,33 @@ struct _handle_terminal_state_t {
     window_terminal_t * const win_t;
 };
 
+typedef struct _window_gfx_gm_t window_gfx_gm_t;
+struct _window_gfx_gm_t {
+    gfx_manager_t super;
+
+    /**
+     * This kernel state is needed for creating and deleting the banks!
+     * Also, its allocator is used for creating this structure!
+     */
+    kernel_state_t * const ks;
+
+    /**
+     * Each bank buffer will have size at least `bank_len * sizeof(gfx_color_t)`
+     * This NEVER changes thorughout the lifetime of this structure.
+     */
+    const size_t bank_len;
+
+    /**
+     * The two kernel mapped banks.
+     */
+    gfx_color_t * const banks[2];
+
+    /**
+     * The index of the front bank.
+     */
+    uint8_t front_i;
+};
+
 typedef struct _window_gfx_t window_gfx_t;
 typedef struct _handle_gfx_state_t handle_gfx_state_t;
 
@@ -130,11 +157,16 @@ struct _window_gfx_t {
      */
     kernel_state_t * const ks;
 
-    /**
-     * The buffer pointer in the window base class will point here!
-     * The actual buffer in here will swap between banks[0] and banks[1].
-     */
-    gfx_buffer_t static_buffer;
+    // What should this guys graphics manager look like?
+    // A double? A single??
+    // I mean, what exactly??
+    // What should a "static manager" even look like though?
+    // Maybe some sort of fixed graphics manager?
+    // Which doesn't do anything though??
+    // Where you provide a destructor for each of the buffers?
+    // And what about other state though?? I mean maybe we can just make an implementation right
+    // here for the graphics window we need exactly??
+    // It'll need a lot of state ultimately??
 
     /**
      * When a gfx window is created, each `bank` will be allocated in the shared memory area
