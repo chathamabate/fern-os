@@ -608,31 +608,48 @@ static window_gfx_gm_t *new_window_gfx_gm(kernel_state_t *ks) {
 
     init_gfx_manager_base((gfx_manager_t *)wggm, &WINDOW_GFX_GM_IMPL, 0, 0);
     *(kernel_state_t **)&(wggm->ks) = ks;
-    *(gfx_color_t **)(wggm->banks + 0) = banks[0];
-    *(gfx_color_t **)(wggm->banks + 1) = banks[1];
+    *(gfx_color_t **)&(wggm->banks[0]) = banks[0];
+    *(gfx_color_t **)&(wggm->banks[1]) = banks[1];
     wggm->front_i = 0;
 
     return wggm;
 }
 
 static void delete_window_gfx_gm(gfx_manager_t *gm) {
-    
+    window_gfx_gm_t *wggm = (window_gfx_gm_t *)gm; 
+
+    /*
+     * Remember how'd shared memory gc works!
+     * The below decrements will actually only delete the shared memory areas if they are not
+     * currently mapped in any user processes!
+     */
+
+    ks_kernel_cmd(wggm->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(wggm->banks[1]), 0, 0, 0);
+    ks_kernel_cmd(wggm->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(wggm->banks[0]), 0, 0, 0);
+    al_free(wggm->ks->al, wggm);  
 }
 
 static gfx_color_t *wggm_get_front(gfx_manager_t *gm) {
-
+    window_gfx_gm_t *wggm = (window_gfx_gm_t *)gm; 
+    return wggm->banks[wggm->front_i];
 }
 
 static gfx_color_t *wggm_get_back(gfx_manager_t *gm) {
-
+    window_gfx_gm_t *wggm = (window_gfx_gm_t *)gm; 
+    return wggm->banks[wggm->front_i ^ 1];
 }
 
 static void wggm_swap(gfx_manager_t *gm) {
-
+    window_gfx_gm_t *wggm = (window_gfx_gm_t *)gm; 
+    wggm->front_i ^= 1;
 }
 
 static fernos_error_t wggm_resize(gfx_manager_t *gm, uint16_t width, uint16_t height) {
-
+    (void)gm;
+    if ((int32_t)width * (int32_t)height > SCREEN->width * SCREEN->height) {
+        return FOS_E_NO_SPACE;
+    }
+    return FOS_E_SUCCESS;
 }
 
 static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks);
