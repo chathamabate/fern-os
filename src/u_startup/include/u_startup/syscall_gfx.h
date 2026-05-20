@@ -3,6 +3,7 @@
 #include "s_bridge/shared_defs.h"
 #include "s_gfx/mono_fonts.h"
 #include "s_gfx/window.h"
+#include "s_gfx/gfx_manager.h"
 
 /**
  * Create a self managed dummy window.
