@@ -146,27 +146,10 @@ typedef struct _handle_gfx_state_t handle_gfx_state_t;
 struct _window_gfx_t {
     window_gfx_base_t super;
 
-    /**
-     * This will require a kernel state to map/unmap the graphics banks.
+    /*
+     * NOTE: This use to require other fields, but they've been factored out thanks
+     * to window_gfx_base_t and window_gfx_gm_t.
      */
-    kernel_state_t * const ks;
-
-    // What should this guys graphics manager look like?
-    // A double? A single??
-    // I mean, what exactly??
-    // What should a "static manager" even look like though?
-    // Maybe some sort of fixed graphics manager?
-    // Which doesn't do anything though??
-    // Where you provide a destructor for each of the buffers?
-    // And what about other state though?? I mean maybe we can just make an implementation right
-    // here for the graphics window we need exactly??
-    // It'll need a lot of state ultimately??
-
-    /**
-     * When a gfx window is created, each `bank` will be allocated in the shared memory area
-     * with a size of SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(gfx_color_t).
-     */
-    gfx_color_t * const banks[2];
 };
 
 struct _handle_gfx_state_t {

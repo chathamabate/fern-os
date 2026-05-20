@@ -677,37 +677,12 @@ static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks) {
     }
 
     window_gfx_t *gw = al_malloc(al, sizeof(window_gfx_t));
-    if (init_window_gfx_base((window_gfx_base_t *)gw, &(gw->static_buffer), &GFX_WINDOW_IMPL, al, &(ks->schedule)) != FOS_E_SUCCESS) {
+    window_gfx_gm_t *wggm = new_window_gfx_gm(ks);
+    if (init_window_gfx_base((window_gfx_base_t *)gw, (gfx_manager_t *)wggm, &GFX_WINDOW_IMPL, al, &(ks->schedule)) != FOS_E_SUCCESS) {
+        delete_gfx_manager((gfx_manager_t *)wggm);
         al_free(al, gw);
         return NULL;
     }
-
-    gfx_color_t *banks[2] = { NULL, NULL };
-    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 0), 0, 0);
-    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 1), 0, 0);
-
-    if (!(banks[0]) || !(banks[1])) {
-        ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[0]), 0, 0, 0);
-        ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[1]), 0, 0, 0);
-
-        delete_window_gfx_base((window_gfx_base_t *)gw);
-        return NULL;
-    }
-
-    *(kernel_state_t **)&(gw->ks) = ks;
-
-    *(allocator_t **)&(gw->static_buffer.al) = NULL;
-    gw->static_buffer.buffer = banks[0];
-    gw->static_buffer.buffer_len = SCREEN->width * SCREEN->height;
-    gw->static_buffer.width = 0;
-    gw->static_buffer.height = 0;
-
-    *(gfx_color_t **)&(gw->banks[0]) = banks[0];
-    *(gfx_color_t **)&(gw->banks[1]) = banks[1];
-
-    // 0 out both banks to begin with.
-    mem_set(gw->banks[0], 0, SCREEN->width * SCREEN->height * sizeof(gfx_color_t));
-    mem_set(gw->banks[1], 0, SCREEN->width * SCREEN->height * sizeof(gfx_color_t));
 
     return gw;
 }
@@ -716,12 +691,8 @@ static window_gfx_t *new_gfx_window(allocator_t *al, kernel_state_t *ks) {
  * This does NOT check refernce count, so be careful!
  */
 static void delete_gfx_window(window_t *w) {
-    window_gfx_t *wg = (window_gfx_t *)w;
-
-    ks_kernel_cmd(wg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC,
-            (uint32_t)(wg->banks[0]), 0, 0, 0);
-    ks_kernel_cmd(wg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC,
-            (uint32_t)(wg->banks[1]), 0, 0, 0);
+    // Keeping this function here just in case in the future gfx_window specific
+    // clean up is needed.
 
     delete_window_gfx_base((window_gfx_base_t *)w);
 }
@@ -736,7 +707,7 @@ static fernos_error_t gw_on_event(window_t *w, window_event_t ev) {
     window_gfx_t *wg = (window_gfx_t *)w;
 
     if (ev.event_code == WINEC_DEREGISTERED) {
-        // We'll say that a terminal window is inactive once deregistered.
+        // We'll say that a gfx window is inactive once deregistered.
         // It'll have to wait until all references go down to zero to cleanup though.
         wg->super.super.is_active = false;
 
@@ -832,15 +803,18 @@ static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32
         size_t *u_wid = (size_t *)arg0;
         size_t *u_hei = (size_t *)arg1;
 
+        const size_t width = gm_get_width(win_g->super.super.gm);
+        const size_t height = gm_get_height(win_g->super.super.gm);
+
         if (u_wid) {
-            err = mem_cpy_to_user(thr->proc->pd, u_wid, &(win_g->super.super.buf->width), sizeof(size_t), NULL);
+            err = mem_cpy_to_user(thr->proc->pd, u_wid, &width, sizeof(size_t), NULL);
             if (err != FOS_E_SUCCESS) {
                 DUAL_RET(thr, err, FOS_E_SUCCESS);
             }
         }
 
         if (u_hei) {
-            err = mem_cpy_to_user(thr->proc->pd, u_hei, &(win_g->super.super.buf->height), sizeof(size_t), NULL);
+            err = mem_cpy_to_user(thr->proc->pd, u_hei, &height, sizeof(size_t), NULL);
             if (err != FOS_E_SUCCESS) {
                 DUAL_RET(thr, err, FOS_E_SUCCESS);
             }
@@ -862,10 +836,7 @@ static fernos_error_t gfx_hs_cmd(handle_state_t *hs, handle_cmd_id_t cmd, uint32
     }
 
     case PLG_GFX_HCID_SWAP: {
-        gfx_buffer_t *buf = win_g->super.super.buf;
-        const uint32_t next_bi = buf->buffer == win_g->banks[0] ? 1 : 0;
-        buf->buffer = win_g->banks[next_bi];
-
+        gm_swap(win_g->super.super.gm);
         return FOS_E_SUCCESS;
     }
 
@@ -1149,14 +1120,18 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
             err = win_register_child(plg_gfx->root_window, (window_t *)win_g);
         }
 
+        // This is not amazing design, but we know for a fact that the user graphics window
+        // always uses a user window graphics manager.
+        window_gfx_gm_t *wggm = (window_gfx_gm_t *)(win_g->super.super.gm);
+
         // Map banks into calling process.
         if (err == FOS_E_SUCCESS) {
             err = ks_kernel_cmd(plg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_MAP,
-                    (uint32_t)(win_g->banks[0]), curr_thr->proc->pid, 0, 0);
+                    (uint32_t)(wggm->banks[0]), curr_thr->proc->pid, 0, 0);
         }
         if (err == FOS_E_SUCCESS) {
             err = ks_kernel_cmd(plg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_MAP,
-                    (uint32_t)(win_g->banks[1]), curr_thr->proc->pid, 0, 0);
+                    (uint32_t)(wggm->banks[1]), curr_thr->proc->pid, 0, 0);
         }
 
         // Finally copy out the handle and bank locations to userspace!
@@ -1164,15 +1139,15 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
             err = mem_cpy_to_user(curr_thr->proc->pd, u_handle, &h, sizeof(handle_t), NULL);
         }
         if (err == FOS_E_SUCCESS) {
-            err = mem_cpy_to_user(curr_thr->proc->pd, u_banks, win_g->banks, sizeof(win_g->banks), NULL);
+            err = mem_cpy_to_user(curr_thr->proc->pd, u_banks, wggm->banks, sizeof(wggm->banks), NULL);
         }
 
         if (err != FOS_E_SUCCESS) {
-            if (win_g) {
+            if (win_g) { 
                 ks_kernel_cmd(plg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_UNMAP,
-                    (uint32_t)(win_g->banks[1]), curr_thr->proc->pid, 0, 0);
+                    (uint32_t)(wggm->banks[1]), curr_thr->proc->pid, 0, 0);
                 ks_kernel_cmd(plg->ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_UNMAP,
-                    (uint32_t)(win_g->banks[0]), curr_thr->proc->pid, 0, 0);
+                    (uint32_t)(wggm->banks[0]), curr_thr->proc->pid, 0, 0);
             }
 
             win_deregister((window_t *)win_g);
