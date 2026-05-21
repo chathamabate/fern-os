@@ -95,10 +95,10 @@ struct _window_terminal_t {
     term_buffer_t * const visible_tb;
 
     /**
-     * When a terminal window is resized, it's buffer pixels are in an unknown state.
-     * When this is true, assume none of `visible_tb` is actually rendered yet.
+     * After a resize, the graphics buffer for this window is unuseable, and must be entirely
+     * reset. `visible_tb` and `true_tb` will both be resized, which clear their contents!
      */
-    bool dirty_buffer;
+    bool just_resized;
 
     /**
      * The true value of the terminal buffer which should be rendered out next frame!

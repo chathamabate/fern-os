@@ -208,7 +208,7 @@ static window_terminal_t *new_window_terminal(allocator_t *al, uint16_t rows, ui
     // Success!
     *(gfx_term_buffer_attrs_t *)&(win_t->tb_attrs) = *attrs;
     *(term_buffer_t **)&(win_t->visible_tb) = vis_tb;
-    win_t->dirty_buffer = true;
+    win_t->just_resized = true;
     *(term_buffer_t **)&(win_t->true_tb) = true_tb;
 
     return win_t;
@@ -259,20 +259,31 @@ static void tw_render(window_t *w) {
     const uint32_t true_cursor_x = tb_x + (win_t->true_tb->cursor_col * cell_width);
     const uint32_t true_cursor_y = tb_y + (win_t->true_tb->cursor_row * cell_height);
 
-    if (win_t->dirty_buffer) {
-        // In case of a dirty buffer, we have to redraw everything!
+    // On a resize (Or the first time we render), we will need to rerender the starting background
+    // and borders. NOTE: by drawing the background with a `gfx_clear`, we make this much much
+    // faster than redrawing EVERY empty cell in the terminal buffer. 
+    if (win_t->just_resized) {
+        const term_color_t default_term_bg = ts_bg_color(win_t->visible_tb->default_cell.style);
+        const gfx_color_t default_term_bg_color = win_t->tb_attrs.palette.colors[default_term_bg];
 
-        gfx_clear(&buf, win_t->tb_attrs.palette.colors[TC_LIGHT_GREY]);
-        gfx_draw_term_buffer_wa(&buf, NULL, NULL, win_t->true_tb, tb_x, tb_y, 
-                &(win_t->tb_attrs));
+        gfx_clear(&buf, default_term_bg_color);
 
-        win_t->dirty_buffer = false;
-    } else {
-        // Here we just redraw cells which have changed! 
-        // (This redraws the visible cursor cell everytime!)
-        gfx_draw_term_buffer_wa(&buf, NULL, win_t->visible_tb, win_t->true_tb, 
-                tb_x, tb_y, &(win_t->tb_attrs));
+        const gfx_color_t term_border_color = win_t->tb_attrs.palette.colors[TC_LIGHT_GREY];
+
+        // Draw borders!
+        gfx_fill_rect(&buf, NULL, 0, 0, buf.width, tb_y, term_border_color); 
+        gfx_fill_rect(&buf, NULL, 0,  buf.height - tb_y, buf.width, tb_y, term_border_color); 
+
+        gfx_fill_rect(&buf, NULL, 0, tb_y, tb_x, tb_height, term_border_color);
+        gfx_fill_rect(&buf, NULL, buf.width - tb_x, tb_y, tb_x, tb_height, term_border_color);
+        
+        win_t->just_resized = false;
     }
+
+    // Here we just redraw cells which have changed! 
+    // (This redraws the visible cursor cell everytime!)
+    gfx_draw_term_buffer_wa(&buf, NULL, win_t->visible_tb, win_t->true_tb, 
+            tb_x, tb_y, &(win_t->tb_attrs));
 
     // Now actual cursor drawing logic!
 
@@ -345,10 +356,7 @@ static fernos_error_t tw_on_event(window_t *w, window_event_t ev) {
             return err;
         }
 
-        // After a resize, it is important to note the the frame buffer of this
-        // window is in an undefined state!
-
-        win_t->dirty_buffer = true;
+        win_t->just_resized = true;
 
         // Finally, overwrite the original event dimmensions.
 

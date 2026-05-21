@@ -117,6 +117,8 @@ void delete_term_buffer(term_buffer_t *tb) {
 void tb_copy(term_buffer_t *dest_tb, term_buffer_t *src_tb) {
     mem_cpy(dest_tb->buf, src_tb->buf, 
             dest_tb->rows * dest_tb->cols * sizeof(term_cell_t));
+    dest_tb->cursor_col = src_tb->cursor_col;
+    dest_tb->cursor_row = src_tb->cursor_row;
 }
 
 void tb_clear(term_buffer_t *tb, term_cell_t cell_val) {
