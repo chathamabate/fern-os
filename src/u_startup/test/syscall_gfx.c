@@ -133,7 +133,6 @@ static bool test_gfx_fork(void) {
     TEST_SUCCEED();
 }
 
-
 bool test_syscall_gfx(void) {
     BEGIN_SUITE("GFX Unit");
     RUN_TEST(test_create_and_swap);
