@@ -30,30 +30,6 @@ static bool posttest(void) {
     TEST_SUCCEED();
 }
 
-static fernos_error_t reap_single(proc_id_t *rcpid, proc_exit_status_t *rces) {
-    fernos_error_t err;
-    while (1) {
-        err = sc_proc_reap(FOS_MAX_PROCS, rcpid, rces);
-        if (err == FOS_E_SUCCESS) {
-            // We clear just in case we were able to reap without waiting on the signal!
-            // If we didn't clear, the FSIG_CHLD bit may still be set after returning from this
-            // function. Although, in reality, I don't think that would be such a problem.
-            sc_signal_clear(1 << FSIG_CHLD);
-
-            return FOS_E_SUCCESS;
-        }
-
-        if (err != FOS_E_EMPTY) {
-            return err;
-        }
-
-        err = sc_signal_wait((1 << FSIG_CHLD), NULL);
-        if (err != FOS_E_SUCCESS) {
-            return err;
-        }
-    }
-}
-
 static bool test_simple_fork(void) {
     fernos_error_t err;
 
@@ -135,7 +111,7 @@ static bool test_simple_signal0(void) {
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     proc_exit_status_t rces;
-    err = reap_single(NULL, &rces);
+    err = sc_proc_reap_single(cpid, NULL, &rces);
     TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
 
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
@@ -187,7 +163,7 @@ static bool test_simple_signal1(void) {
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_UINT(5, final_rsid);
 
-    err = reap_single(NULL, NULL);
+    err = sc_proc_reap_single(cpid, NULL, NULL);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
     TEST_SUCCEED();
@@ -234,7 +210,7 @@ static bool test_signal_allow_exit(void) {
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     
     proc_exit_status_t rces;
-    err = reap_single(NULL, &rces);
+    err = sc_proc_reap_single(cpid, NULL, &rces);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_HEX(PROC_ES_SIGNAL, rces);
     
@@ -302,7 +278,7 @@ static bool test_complex_fork0(void) {
     proc_id_t rcpid;
     proc_exit_status_t rces;
     for (int i = 0; i < 3; i++) {
-        err = reap_single(&rcpid, &rces);
+        err = sc_proc_reap_single(FOS_MAX_PROCS, &rcpid, &rces);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         if (rcpid == cpids[0]) {
@@ -349,7 +325,7 @@ static bool test_complex_fork1(void) {
         while (1);
     } else if (i == 0) {
         for (int i = 0; i < 3; i++) {
-            err = reap_single(NULL, NULL);
+            err = sc_proc_reap_single(FOS_MAX_PROCS, NULL, NULL);
             TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         }
 
@@ -396,7 +372,7 @@ static bool test_complex_fork2(void) {
             sc_signal_allow(1 << FSIG_CHLD);
 
             proc_id_t rcpid;
-            err = reap_single(&rcpid, NULL);
+            err = sc_proc_reap_single(FOS_MAX_PROCS, &rcpid, NULL);
             TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             TEST_EQUAL_HEX(cpids[0], rcpid);
 
@@ -430,7 +406,7 @@ static bool test_complex_fork2(void) {
 
     for (int i = 0; i < 3; i++) {
         // reap proc, proc1, and proc2
-        err = reap_single(NULL, NULL);
+        err = sc_proc_reap_single(FOS_MAX_PROCS, NULL, NULL);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
@@ -454,7 +430,7 @@ static bool test_premature_reap(void) {
     // Now, let's forcefully exit the child!
 
     TEST_SUCCESS(sc_signal(cpid, 2));
-    TEST_SUCCESS(reap_single(NULL, NULL));
+    TEST_SUCCESS(sc_proc_reap_single(cpid, NULL, NULL));
 
     TEST_SUCCEED();
 }
@@ -738,7 +714,7 @@ static bool test_fork_and_thread(void) {
     }
 
     proc_exit_status_t rces;
-    err = reap_single(NULL, &rces);
+    err = sc_proc_reap_single(cpid, NULL, &rces);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
 
@@ -805,7 +781,7 @@ static bool test_fatal_stack_pressure(void) {
     }
 
     proc_exit_status_t rces;
-    err = reap_single(NULL, &rces);
+    err = sc_proc_reap_single(cpid, NULL, &rces);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     TEST_EQUAL_HEX(PROC_ES_PF, rces);
 

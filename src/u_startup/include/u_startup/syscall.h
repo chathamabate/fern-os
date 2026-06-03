@@ -94,6 +94,18 @@ void sc_proc_exit(proc_exit_status_t status);
 fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t *rces);
 
 /**
+ * Wrapper around `sc_proc_reap`.
+ *
+ * This blocks until a single process is reaped.
+ *
+ * NOTE: after successfully reaping the single process, this will CLEAR the FSIG_CHLD flag.
+ * It is entirely possible that another zombie child process still exists and must be reaped!
+ *
+ * `cpid`, `rcpid`, and `rces` all follow the exact same rules as `sc_proc_reap`.
+ */
+fernos_error_t sc_proc_reap_single(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t *rces);
+
+/**
  * Execute a user application. 
  *
  * This call overwrites the calling process by loading a binary dynamically!
