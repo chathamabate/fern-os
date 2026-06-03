@@ -17,6 +17,30 @@ fernos_error_t sc_proc_reap(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t
             (uint32_t)rces, 0);
 }
 
+fernos_error_t sc_proc_reap_single(proc_id_t cpid, proc_id_t *rcpid, proc_exit_status_t *rces) {
+    fernos_error_t err;
+    while (1) {
+        err = sc_proc_reap(cpid, rcpid, rces);
+        if (err == FOS_E_SUCCESS) {
+            // We clear just in case we were able to reap without waiting on the signal!
+            // If we didn't clear, the FSIG_CHLD bit may still be set after returning from this
+            // function. Although, in reality, I don't think that would be such a problem.
+            sc_signal_clear(1 << FSIG_CHLD);
+
+            return FOS_E_SUCCESS;
+        }
+
+        if (err != FOS_E_EMPTY) {
+            return err;
+        }
+
+        err = sc_signal_wait((1 << FSIG_CHLD), NULL);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+    }
+}
+
 fernos_error_t sc_proc_exec(user_app_t *ua, const void *args_block, size_t args_block_size) {
     return (fernos_error_t)trigger_syscall(SCID_PROC_EXEC, (uint32_t)ua, (uint32_t)args_block, 
             (uint32_t)args_block_size, 0);
