@@ -26,10 +26,10 @@ fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_manager_t *gm, c
 
     const window_attrs_t attrs = {
         .min_width = 0,
-        .max_width = SCREEN->width,
+        .max_width = FERNOS_GFX_WIDTH,
 
         .min_height = 0,
-        .max_height = SCREEN->height
+        .max_height = FERNOS_GFX_HEIGHT
     };
     init_window_base((window_t *)win, gm, &attrs, impl);
     *(allocator_t **)&(win->al) = al;
@@ -604,8 +604,8 @@ static window_gfx_gm_t *new_window_gfx_gm(kernel_state_t *ks) {
     window_gfx_gm_t *wggm = al_malloc(ks->al, sizeof(window_gfx_gm_t));
 
     gfx_color_t *banks[2];
-    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 0), 0, 0);
-    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * SCREEN->width * SCREEN->height, (uint32_t)(banks + 1), 0, 0);
+    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT, (uint32_t)(banks + 0), 0, 0);
+    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT, (uint32_t)(banks + 1), 0, 0);
 
     if (!wggm || !banks[0] || !banks[1]) {
         ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[1]), 0, 0, 0);
@@ -613,6 +613,10 @@ static window_gfx_gm_t *new_window_gfx_gm(kernel_state_t *ks) {
         al_free(ks->al, wggm);
         return NULL;
     }
+
+    // Start both banks a black!
+    mem_set(banks[0], 0, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT);
+    mem_set(banks[1], 0, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT);
 
     init_gfx_manager_base((gfx_manager_t *)wggm, &WINDOW_GFX_GM_IMPL, 0, 0);
     *(kernel_state_t **)&(wggm->ks) = ks;
@@ -654,7 +658,7 @@ static void wggm_swap(gfx_manager_t *gm) {
 
 static fernos_error_t wggm_resize(gfx_manager_t *gm, uint16_t width, uint16_t height) {
     (void)gm;
-    if ((int32_t)width * (int32_t)height > SCREEN->width * SCREEN->height) {
+    if ((uint32_t)width * (uint32_t)height > FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT) {
         return FOS_E_NO_SPACE;
     }
     return FOS_E_SUCCESS;
