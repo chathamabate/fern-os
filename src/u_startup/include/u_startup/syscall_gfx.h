@@ -24,7 +24,7 @@ fernos_error_t sc_gfx_new_dummy(void);
  * (Other errors may be returned)
  *
  * VERY IMPORTANT: the handle returned will conform to the terminal handle interface.
- * Use the handle endpoints define in `syscall_term.h`!
+ * Use the handle endpoints defined in `syscall_term.h`!
  * Not the ones below!
  */
 fernos_error_t sc_gfx_new_terminal(handle_t *h, const gfx_term_buffer_attrs_t *attrs);
@@ -65,6 +65,14 @@ fernos_error_t sc_gfx_wait_event(handle_t h);
  * Although, RESIZE events will be in units of pixels! 
  */
 fernos_error_t sc_gfx_read_events(handle_t h, window_event_t *ev_buf, size_t num_buf_cells, size_t *cells_readden);
+
+/**
+ * A blocking wrapper around `sc_gfx_read_events`.
+ *
+ * FOS_E_SUCCESS means a single event was read into `*ev`.
+ * Other errors possible.
+ */
+fernos_error_t sc_gfx_read_event_single(handle_t h, window_event_t *ev);
 
 /**
  * Swap the back and front buffers of `h`'s graphics window!

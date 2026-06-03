@@ -101,19 +101,33 @@ static bool test_gfx_fork(void) {
     gfx_color_t *bufs[2];
     TEST_SUCCESS(sc_gfx_new_gfx_window(&h, &bufs));
 
-    proc_id_t cpids[2];
+    proc_id_t cpids[5];
     for (size_t i = 0; i < sizeof(cpids) / sizeof(cpids[0]); i++) {
         TEST_SUCCESS(sc_proc_fork(cpids + i));
-        if (cpids[i] == FOS_MAX_PROCS) {
 
+        if (cpids[i] == FOS_MAX_PROCS) { // Child process work!
+            window_event_t ev;
+            for (size_t j = 0; j < 5; j++) {
+                TEST_SUCCESS(sc_gfx_read_event_single(h, &ev));
+
+                mem_set(bufs[0] + (6 * FERNOS_GFX_WIDTH * i), 0xF + (j * 16), 6 * FERNOS_GFX_WIDTH * sizeof(gfx_color_t));
+            }
+
+            // By exiting handles and shms should be closed just fine!
+            sc_proc_exit(PROC_ES_SUCCESS);
         }
     }
 
+    LOGF_PREFIXED("Press some keys!\n");
+    LOGF_PREFIXED("You should see lightening bands\n");
 
+    for (size_t i = 0; i < sizeof(cpids) / sizeof(cpids[0]); i++) {
+        proc_exit_status_t rces;
+        TEST_SUCCESS(sc_proc_reap_single(cpids[i], NULL, &rces));
+        TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
+    }
 
-    // And what about reaping these guys??
-
-
+    TEST_TRUE(wait_gfx_win_cleanup(h, &bufs));
     sc_signal_allow(old_sv);
 
     TEST_SUCCEED();

@@ -29,6 +29,30 @@ fernos_error_t sc_gfx_read_events(handle_t h, window_event_t *ev_buf, size_t num
     return sc_handle_cmd(h, PLG_GFX_HCID_READ_EVENTS, (uint32_t)ev_buf, (uint32_t)num_buf_cells, (uint32_t)cells_readden, 0);
 }
 
+fernos_error_t sc_gfx_read_event_single(handle_t h, window_event_t *ev) {
+    fernos_error_t err;
+
+    if (!ev) {
+        return FOS_E_BAD_ARGS;
+    }
+
+    while (true) {
+        err = sc_gfx_read_events(h, ev, 1, NULL);
+        if (err == FOS_E_SUCCESS) {
+            return FOS_E_SUCCESS;
+        }
+
+        if (err != FOS_E_EMPTY) {
+            return err;
+        }
+
+        err = sc_gfx_wait_event(h);
+        if (err != FOS_E_SUCCESS) {
+            return err;
+        }
+    }
+}
+
 void sc_gfx_swap(handle_t h) {
     (void)sc_handle_cmd(h, PLG_GFX_HCID_SWAP, 0, 0, 0, 0);
 }

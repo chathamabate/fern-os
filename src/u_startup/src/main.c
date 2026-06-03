@@ -27,8 +27,8 @@ proc_exit_status_t user_main(void) {
     sc_set_out_handle(out);
 
     test_syscall_gfx();
-
-    while (1);
+    test_syscall_gfx();
+    test_syscall_gfx();
 
     return PROC_ES_SUCCESS;
 }
