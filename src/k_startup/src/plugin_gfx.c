@@ -1119,7 +1119,7 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
             }
         }
 
-        // Next let's create the terminal window
+        // Next let's create the gfx window
         if (err == FOS_E_SUCCESS) {
             win_g = new_gfx_window(plg->ks->al, plg->ks); 
             if (!win_g) {
