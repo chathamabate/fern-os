@@ -223,7 +223,7 @@ static void delete_terminal_window(window_t *w) {
 
     delete_term_buffer(win_t->true_tb);
     delete_term_buffer(win_t->visible_tb);
-    delete_window_gfx_base((window_gfx_base_t *)&(win_t->super));
+    delete_window_gfx_base((window_gfx_base_t *)win_t);
 }
 
 /**

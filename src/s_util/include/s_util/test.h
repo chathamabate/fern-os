@@ -46,17 +46,19 @@ static uint32_t _total_run;
     } while (0)
 
 
-#define TEST_EQUAL_W_FMT(fmt, exp, act) \
+#define TEST_EQUAL_W_FMT(fmt, t, exp, act) \
     do { \
-        if ((exp) != (act)) { \
-            LOGF_PREFIXED("Expected: " fmt " Actual: " fmt "\n", exp, act); \
+        t __exp = (t)(exp); \
+        t __act = (t)(act); \
+        if ((__exp) != (__act)) { \
+            LOGF_PREFIXED("Expected: " fmt " Actual: " fmt "\n", __exp, __act); \
             TEST_FAIL(); \
         } \
     } while (0)
 
-#define TEST_EQUAL_INT(exp, act) TEST_EQUAL_W_FMT("%d", exp, act)
-#define TEST_EQUAL_UINT(exp, act) TEST_EQUAL_W_FMT("%u", exp, act)
-#define TEST_EQUAL_HEX(exp, act) TEST_EQUAL_W_FMT("0x%X", exp, act)
+#define TEST_EQUAL_INT(exp, act) TEST_EQUAL_W_FMT("%d", int, exp, act)
+#define TEST_EQUAL_UINT(exp, act) TEST_EQUAL_W_FMT("%u", unsigned int, exp, act)
+#define TEST_EQUAL_HEX(exp, act) TEST_EQUAL_W_FMT("0x%X", unsigned int, exp, act)
 
 #define TEST_TRUE(cond) \
     do { \

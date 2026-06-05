@@ -61,8 +61,7 @@ struct _window_gfx_base_t {
 };
 
 /**
- * Remember that if this succeeds, `buf` will now be owned by `win`!
- * `win` MUST be allocated by `al`.
+ * Remember that if this succeeds, `gm` will now be owned by `win`!
  *
  * References will be set as 1.
  */

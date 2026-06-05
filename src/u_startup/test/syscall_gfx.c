@@ -133,10 +133,83 @@ static bool test_gfx_fork(void) {
     TEST_SUCCEED();
 }
 
+static bool test_many_deregisters(void) {
+    handle_t h;
+    gfx_color_t *bufs[2];
+    TEST_SUCCESS(sc_gfx_new_gfx_window(&h, &bufs));
+
+    sc_shm_close_shm(bufs[1]);
+    sc_shm_close_shm(bufs[0]);
+
+    LOGF_PREFIXED("Close window with handle 0x%X\n", h);
+    
+    window_event_t ev;
+    do {
+        TEST_SUCCESS(sc_gfx_read_event_single(h, &ev));
+    } while (ev.event_code != WINEC_DEREGISTERED);
+
+    // Once deregistered, a window should return DEREGISTERED events indefinitely!
+
+    window_event_t ev_buf[10];
+    for (size_t i = 0; i < 10; i++) {
+        TEST_SUCCESS(sc_gfx_wait_event(h));
+
+        size_t readden;
+        TEST_SUCCESS(sc_gfx_read_events(h, ev_buf, 10, &readden));
+        TEST_EQUAL_UINT(1, readden);
+        TEST_EQUAL_HEX(WINEC_DEREGISTERED, ev_buf[0].event_code);
+    }
+
+    // This should actually succeed even without an ev buf given!
+    TEST_SUCCESS(sc_gfx_read_events(h, NULL, 0, NULL));  
+
+    sc_handle_close(h);
+
+    TEST_SUCCEED();
+}
+
+static bool test_many_events(void) {
+    fernos_error_t err;
+
+    handle_t h;
+    gfx_color_t *bufs[2];
+    TEST_SUCCESS(sc_gfx_new_gfx_window(&h, &bufs));
+
+    LOGF_PREFIXED("Trigger a bunch of events!\n");
+
+    size_t total_events_received = 0;
+    window_event_t ev_buf[100];
+
+    while (total_events_received < 100) {
+        TEST_SUCCESS(sc_gfx_wait_event(h));
+
+        size_t iter_er; // NOTE: This read may not actually read all pending events! this is ok!
+        err = sc_gfx_read_events(h, ev_buf, sizeof(ev_buf) / sizeof(ev_buf[0]), &iter_er);
+
+        if (err == FOS_E_SUCCESS) {
+            TEST_TRUE(iter_er > 0);
+        } else if (err == FOS_E_EMPTY) {
+            TEST_EQUAL_UINT(0, iter_er);
+        } else {
+            TEST_FAIL();
+        }
+
+        LOGF_METHOD("%u ", iter_er);
+        total_events_received += iter_er;
+    }
+    LOGF_METHOD("\n");
+
+    TEST_TRUE(wait_gfx_win_cleanup(h, &bufs));
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_gfx(void) {
     BEGIN_SUITE("GFX Unit");
     RUN_TEST(test_create_and_swap);
     RUN_TEST(test_lasting_shms);
     RUN_TEST(test_gfx_fork);
+    RUN_TEST(test_many_deregisters);
+    RUN_TEST(test_many_events);
     return END_SUITE();
 }
