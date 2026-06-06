@@ -1132,9 +1132,10 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
             err = win_register_child(plg_gfx->root_window, (window_t *)win_g);
         }
 
-        // This is not amazing design, but we know for a fact that the user graphics window
-        // always uses a user window graphics manager.
-        window_gfx_gm_t *wggm = (window_gfx_gm_t *)(win_g->super.super.gm);
+        window_gfx_gm_t *wggm = NULL;
+        if (err == FOS_E_SUCCESS) {
+            wggm = (window_gfx_gm_t *)(win_g->super.super.gm);
+        }
 
         // Map banks into calling process.
         if (err == FOS_E_SUCCESS) {
@@ -1162,7 +1163,11 @@ static fernos_error_t plg_gfx_cmd(plugin_t *plg, plugin_cmd_id_t cmd,
                     (uint32_t)(wggm->banks[0]), curr_thr->proc->pid, 0, 0);
             }
 
+            // NOTE: The purpose of this call is to remove `win_g` from the root window 
+            // if it was added. IF `win_g` had 0 references here, this would also delete `win_g`.
+            // This will not happen though, gfx_base windows always start with 1 reference!
             win_deregister((window_t *)win_g);
+
             delete_window((window_t *)win_g);
             al_free(plg_gfx->super.ks->al, hs_g);
             idtb_push_id(curr_thr->proc->handle_table, h);
