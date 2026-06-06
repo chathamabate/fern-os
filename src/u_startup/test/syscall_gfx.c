@@ -183,6 +183,10 @@ static bool test_many_events(void) {
     while (total_events_received < 100) {
         TEST_SUCCESS(sc_gfx_wait_event(h));
 
+        // When there are pending events, we should be able to get a non-blocking success here
+        // even when we don't provide a buffer.
+        TEST_SUCCESS(sc_gfx_read_events(h, NULL, 0, NULL));
+
         size_t iter_er; // NOTE: This read may not actually read all pending events! this is ok!
         err = sc_gfx_read_events(h, ev_buf, sizeof(ev_buf) / sizeof(ev_buf[0]), &iter_er);
 
