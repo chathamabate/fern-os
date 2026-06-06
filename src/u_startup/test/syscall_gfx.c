@@ -204,6 +204,30 @@ static bool test_many_events(void) {
     TEST_SUCCEED();
 }
 
+static bool test_resizes(void) {
+    handle_t h;
+    gfx_color_t *bufs[2];
+    TEST_SUCCESS(sc_gfx_new_gfx_window(&h, &bufs));
+
+    LOGF_PREFIXED("Resize the window a few times!\n");
+
+    for (size_t i = 0; i < 4; i++) {
+        window_event_t ev;
+        do {
+            TEST_SUCCESS(sc_gfx_read_event_single(h, &ev));
+        } while (ev.event_code != WINEC_RESIZED);
+
+        size_t wid, hei;
+        sc_gfx_get_dimmensions(h, &wid, &hei);
+        TEST_EQUAL_UINT(ev.d.dims.width, wid);
+        TEST_EQUAL_UINT(ev.d.dims.height, hei);
+    }
+
+    TEST_TRUE(wait_gfx_win_cleanup(h, &bufs));
+
+    TEST_SUCCEED();
+}
+
 bool test_syscall_gfx(void) {
     BEGIN_SUITE("GFX Unit");
     RUN_TEST(test_create_and_swap);
@@ -211,5 +235,6 @@ bool test_syscall_gfx(void) {
     RUN_TEST(test_gfx_fork);
     RUN_TEST(test_many_deregisters);
     RUN_TEST(test_many_events);
+    RUN_TEST(test_resizes);
     return END_SUITE();
 }
