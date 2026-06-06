@@ -9,6 +9,71 @@
 #include "s_gfx/window.h"
 #include "s_gfx/mono_fonts.h"
 
+/*
+ * NOTE:
+ * 
+ * The graphics plugin allows for the creation of 3 different windows.
+ * (One is a dummy window just for debugging purposes though, so we won't count that one)
+ *
+ * The 2 significant window types are:
+ *      1) A terminal window - this receives text input via the handle write handler! Its handle
+ *      conforms to the terminal handle interface!
+ *
+ *      2) A graphics window - this window just maps two shared buffers into userspaces. The
+ *      user can swap the buffers, and draw to each one as they wish!
+ * 
+ * The reality is that there is lots of overlap between the implementation of the two types of 
+ * windows. I tried to factor out as much shared code as possible, hence the `window_gfx_base_t`
+ * struct below.
+ *
+ * However, honestly, the implementation is a little confusing/verbose no matter what.
+ * In `plg_gfx.c`, you'll likely see certain blocks of code appear twice with just small differneces.
+ */
+
+typedef struct _window_gfx_base_t window_gfx_base_t;
+struct _window_gfx_base_t {
+    window_t super;
+
+    /**
+     * The window structure as a whole MUST be allocated with this allocator!
+     */
+    allocator_t * const al;
+
+    /**
+     * Number of open handles which reference this window.
+     */
+    size_t references;
+
+    /**
+     * Events forwarded to the terminal window will be here.
+     */
+    fixed_queue_t * const eq;
+
+    /**
+     * Threads waiting for the event queue to be non-empty.
+     */
+    basic_wait_queue_t * const bwq;
+
+    /**
+     * Woken threads are scheduled here.
+     */
+    ring_t * const schedule;
+};
+
+/**
+ * Remember that if this succeeds, `gm` will now be owned by `win`!
+ *
+ * References will be set as 1.
+ */
+fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_manager_t *gm, const window_impl_t *impl, allocator_t *al, ring_t *sch);
+
+/**
+ * GFX Base windows are promised to be dynamically allocated.
+ * This will free `win` with its internal allocator.
+ * Make sure subclasses cleanup their private fields before calling this!
+ */
+void delete_window_gfx_base(window_gfx_base_t *win);
+
 typedef struct _window_terminal_t window_terminal_t;
 typedef struct _handle_terminal_state_t handle_terminal_state_t;
 
@@ -16,17 +81,7 @@ typedef struct _handle_terminal_state_t handle_terminal_state_t;
  * A Terminal Window is a special window accessible via handle which just displays a grid of text.
  */
 struct _window_terminal_t {
-    window_t super;
-
-    /**
-     * Terminal windows will always be allocated dynamically.
-     */
-    allocator_t * const al;
-
-    /**
-     * Number of open handles which reference this Terminal Window.
-     */
-    size_t references;
+    window_gfx_base_t super;
 
     /**
      * How the terminal buffer will be rendered on screen.
@@ -39,30 +94,15 @@ struct _window_terminal_t {
     term_buffer_t * const visible_tb;
 
     /**
-     * When a terminal window is resized, it's buffer pixels are in an unknown state.
-     * When this is true, assume none of `visible_tb` is actually rendered yet.
+     * After a resize, the graphics buffer for this window is unuseable, and must be entirely
+     * reset. `visible_tb` and `true_tb` will both be resized, which clear their contents!
      */
-    bool dirty_buffer;
+    bool just_resized;
 
     /**
      * The true value of the terminal buffer which should be rendered out next frame!
      */
     term_buffer_t * const true_tb;
-
-    /**
-     * Events forwarded to the terminal window will be here.
-     */
-    fixed_queue_t * const event_queue;
-
-    /**
-     * Threads waiting for the event queue to be non-empty.
-     */
-    basic_wait_queue_t * const wq;
-
-    /**
-     * Woken threads are scheduled here.
-     */
-    ring_t * const schedule;
 };
 
 /**
@@ -76,6 +116,45 @@ struct _handle_terminal_state_t {
     handle_state_t super;
 
     window_terminal_t * const win_t;
+};
+
+typedef struct _window_gfx_gm_t window_gfx_gm_t;
+struct _window_gfx_gm_t {
+    gfx_manager_t super;
+
+    /**
+     * This kernel state is needed for creating and deleting the banks!
+     * Also, its allocator is used for creating this structure!
+     */
+    kernel_state_t * const ks;
+
+    /**
+     * The two kernel mapped banks.
+     */
+    gfx_color_t * const banks[2];
+
+    /**
+     * The index of the front bank.
+     */
+    uint8_t front_i;
+};
+
+typedef struct _window_gfx_t window_gfx_t;
+typedef struct _handle_gfx_state_t handle_gfx_state_t;
+
+struct _window_gfx_t {
+    window_gfx_base_t super;
+
+    /*
+     * NOTE: This use to require other fields, but they've been factored out thanks
+     * to window_gfx_base_t and window_gfx_gm_t.
+     */
+};
+
+struct _handle_gfx_state_t {
+    handle_state_t super;
+
+    window_gfx_t * const win_g;
 };
 
 typedef struct _plugin_gfx_t plugin_gfx_t;
