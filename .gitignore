@@ -4,3 +4,4 @@ install
 *.swp
 *.o
 .clangd
+.mypy_cache

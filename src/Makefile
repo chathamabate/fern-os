@@ -35,6 +35,7 @@ SRC_DIR    := $(GIT_TOP)/src
 BUILD_DIR   := $(GIT_TOP)/src/build
 INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
+VENV_DIR := $(BUILD_DIR)/venv
 
 MY_MAKE := @make --no-print-directory
 DONE_MSG = @echo -e "\x1B[1;97m>> \x1B[1;92m$1 \x1B[1;97m<<\x1b[0m\n"
@@ -57,6 +58,38 @@ MODS := \
 
 $(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 	mkdir -p $@
+
+####################################################################################################
+
+FERNCONF_VERSION := 0.1.3
+VENV_ACTIVATE := $(VENV_DIR)/bin/activate
+
+$(VENV_DIR):
+	mkdir -p $@
+	python3 -m venv $(VENV_DIR)
+	. $(VENV_ACTIVATE) && pip install mypy fernconf==$(FERNCONF_VERSION)
+
+.PHONY: venv
+venv: $(VENV_DIR)
+
+SCHEMA_PY := $(SRC_DIR)/config_schema.py
+MYPY_TOKEN := $(BUILD_DIR)/mypy_token
+
+# The MyPy token confirms that the schema python file has been type checked since its last update!
+$(MYPY_TOKEN): $(SCHEMA_PY) | $(VENV_DIR)
+	. $(VENV_ACTIVATE) && mypy $(SCHEMA_PY)
+	touch $@
+
+CONFIG_JSON := $(SRC_DIR)/config.json
+
+CONFIG_C  := $(INCLUDE_DIR)/c_config.h
+$(CONFIG_C): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
+	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gcc -o $@
+t: $(CONFIG_C)
+
+CONFIG_AS := $(INCLUDE_DIR)/as_config.h
+CONFIG_LD := $(INSTALL_DIR)/ld_config.h
+CONFIG_MK := $(INSTALL_DIR)/mk_config.mk
 
 ####################################################################################################
 
