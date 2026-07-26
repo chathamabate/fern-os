@@ -61,7 +61,7 @@ $(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 
 ####################################################################################################
 
-FERNCONF_VERSION := 0.1.3
+FERNCONF_VERSION := 0.1.4
 VENV_ACTIVATE := $(VENV_DIR)/bin/activate
 
 $(VENV_DIR):
@@ -85,11 +85,21 @@ CONFIG_JSON := $(SRC_DIR)/config.json
 CONFIG_C  := $(INCLUDE_DIR)/c_config.h
 $(CONFIG_C): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gcc -o $@
-t: $(CONFIG_C)
 
 CONFIG_AS := $(INCLUDE_DIR)/as_config.h
+$(CONFIG_AS): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
+	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gas -o $@
+
 CONFIG_LD := $(INSTALL_DIR)/ld_config.h
+$(CONFIG_LD): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
+	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f ld -o $@
+
+# I haven't figured out yet how we are going to fit in a generated make file into the build
+# process!
 CONFIG_MK := $(INSTALL_DIR)/mk_config.mk
+$(CONFIG_MK): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
+	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f make -o $@
+t: $(CONFIG_MK)
 
 ####################################################################################################
 
