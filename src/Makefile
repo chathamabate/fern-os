@@ -61,7 +61,7 @@ $(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 
 ####################################################################################################
 
-FERNCONF_VERSION := 0.1.4
+FERNCONF_VERSION := 0.1.5
 VENV_ACTIVATE := $(VENV_DIR)/bin/activate
 
 $(VENV_DIR):
