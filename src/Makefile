@@ -7,7 +7,7 @@ INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
 
 MY_MAKE := @make --no-print-directory
-DONE_MSG = @echo "\x1B[1;97m>> \x1B[1;92m$1 \x1B[1;97m<<\x1b[0m\n"
+DONE_MSG = @echo -e "\x1B[1;97m>> \x1B[1;92m$1 \x1B[1;97m<<\x1b[0m\n"
 
 THIS_FILE := $(SRC_DIR)/Makefile
 
@@ -296,11 +296,11 @@ $(ISO_DIR) $(BOOT_DIR) $(GRUB_DIR):
 	mkdir -p $@
 
 $(ISO_FILE): $(ELF_FILE) $(GRUB_CFG)
-	i686-elf-grub-file --is-x86-multiboot2 $(ELF_FILE)
+	grub-file --is-x86-multiboot2 $(ELF_FILE)
 	mkdir -p $(ISO_DIR)/boot/grub
 	cp $(ELF_FILE) $(ISO_DIR)/boot/
 	cp $(GRUB_CFG) $(ISO_DIR)/boot/grub/
-	i686-elf-grub-mkrescue -o $@ $(ISO_DIR)
+	grub-mkrescue -o $@ $(ISO_DIR)
 
 .PHONY: _iso iso.shallow iso
 
