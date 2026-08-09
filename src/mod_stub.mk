@@ -67,6 +67,9 @@ TEST_SRCS 	  := $(addprefix $(TEST_DIR)/,$(_TEST_SRCS))
 
 # Stuff to be built
 
+C_DOTDS	:= $(patsubst %.c,$(BUILD_DIR)/c_%.d,$(_SRCS))
+S_DOTDS	:= $(patsubst %.S,$(BUILD_DIR)/S_%.d,$(_ASMS))
+
 C_OBJS	:= $(patsubst %.c,$(BUILD_DIR)/c_%.o,$(_SRCS))
 S_OBJS	:= $(patsubst %.S,$(BUILD_DIR)/S_%.o,$(_ASMS))
 
@@ -75,7 +78,9 @@ BUILD_LIB	:= $(BUILD_DIR)/$(_LIB)
 INSTALL_LIB	:= $(INSTALL_DIR)/$(_LIB)
 
 BUILD_TEST_DIR := $(BUILD_DIR)/test
-TEST_OBJS	   := $(patsubst %.c,$(BUILD_TEST_DIR)/%.o,$(_TEST_SRCS))
+
+TEST_DOTDS 		:= $(patsubst %.c,$(BUILD_TEST_DIR)/%.d,$(_TEST_SRCS))
+TEST_OBJS 		:= $(patsubst %.c,$(BUILD_TEST_DIR)/%.o,$(_TEST_SRCS))
 
 _TEST_LIB		 := lib$(MOD_NAME)_test.a
 BUILD_TEST_LIB 	 := $(BUILD_TEST_DIR)/$(_TEST_LIB)
@@ -91,6 +96,20 @@ INSTALL_TEST_HDRS := $(addprefix $(INSTALL_TEST_HDRS_DIR)/,$(notdir $(TEST_HDRS)
 
 $(BUILD_DIR) $(BUILD_TEST_DIR) $(INSTALL_DIR):
 	mkdir -p $@
+
+.PHONY: lib.dotds test_lib.dotds
+$(C_DOTDS): $(BUILD_DIR)/c_%.d: $(SRC_DIR)/%.c | $(BUILD_DIR)
+	echo "hello"
+
+$(S_DOTDS): $(BUILD_DIR)/S_%.d: $(SRC_DIR)/%.S | $(BUILD_DIR)
+	echo "hello"
+
+lib.dotds: $(C_DOTDS) $(S_DOTDS)
+
+$(TEST_DOTDS): $(BUILD_TEST_DIR)/%.d: $(TEST_DIR)/%.c $(BUILD_TEST_DIR)
+	echo "hello"
+
+test_lib.dotds: $(TEST_DOTDS)
 
 .PHONY: lib.build test_lib.build
 

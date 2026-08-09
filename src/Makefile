@@ -110,6 +110,14 @@ $(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
 # This expects that $* resolves to the name of a module.
 MOD_MAKE = $(MY_MAKE) -C $(SRC_DIR)/$* BUILD_DIR=$(BUILD_DIR)/mods/$* INSTALL_DIR=$(INSTALL_DIR)
 
+DOTDS_TARS := $(addprefix lib.dotds.,$(MODS))
+$(DOTDS_TARS): lib.dotds.%:
+	$(MOD_MAKE) lib.dotds test_lib.dotds
+
+.PHONY: lib.dotds $(DOTDS_TARS)
+lib.dotds: $(DOTDS_TARS)
+	$(call DONE_MSG,.d Files Generated)
+
 # Install Headers
 
 INCLUDE_DIRS := $(addprefix $(INCLUDE_DIR)/,$(MODS))
