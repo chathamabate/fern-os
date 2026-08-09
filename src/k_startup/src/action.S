@@ -1,7 +1,7 @@
 
-.section .text
+#include "s_os_defs.h"
 
-.include "os_defs.s"
+.section .text
 
 .global return_to_halt_context
 return_to_halt_context:
