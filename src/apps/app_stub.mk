@@ -13,7 +13,9 @@
 # REQUIRED
 #
 # The name of this application. MUST be the same as this apps directory name.
-APP_NAME ?=
+ifeq ($(APP_NAME),)
+$(error App specified with no app name)
+endif
 
 # REQUIRED
 #
@@ -28,23 +30,31 @@ _SRCS ?=
 # REQUIRED
 #
 # Where to place intermediary build artifacts
-BUILD_DIR ?=
+ifeq ($(BUILD_DIR),)
+$(error $(APP_NAME) has no build directory specified)
+endif
 
 # REQUIRED
 #
 # Where to place final binary
-OUT_DIR ?=
+ifeq ($(OUT_DIR),)
+$(error $(APP_NAME) has no out directory specified)
+endif
 
 # REQUIRED
 #
 # Where FernOS built libraries and copied headers are placed. (MUST EXIST)
 # NOTE: We expect the INCLUDE_DIR to be at $(INSTALL_DIR)/include
-INSTALL_DIR ?=
+ifeq ($(INSTALL_DIR),)
+$(error $(APP_NAME) has no install directory specified)
+endif
 
 # REQUIRED
 #
 # ELF Symbols file. (MUST EXIST)
-ELF_SYMS ?=
+ifeq ($(ELF_SYMS),)
+$(error $(APP_NAME) has no elf symbols file specified)
+endif
 
 ####################################################################################################
 
@@ -69,7 +79,7 @@ $(OBJS): $(BUILD_DIR)/%.o: $(APP_DIR)/%.c $(ELF_SYMS) | $(BUILD_DIR)
 
 # NOTE: in the below recipe we give -L$(INSTALL_DIR) so we have access to os_defs.ld
 # This recipe DOES NOT use any FernOS libraries directly! (The point of the symbols file)
-$(APP): $(OBJS) | $(BUILD_DIR)
+$(APP): $(OBJS) | $(OUT_DIR)
 	$(C_COMPILER) -T $(APP_LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
 	    -lgcc -Wl,--just-symbols=$(ELF_SYMS) $^
 

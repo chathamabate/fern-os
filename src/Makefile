@@ -25,7 +25,7 @@ MODS := \
 
 # Static memory layout header and linker generation:
 
-$(INCLUDE_DIR) $(INSTALL_DIR):
+$(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 	mkdir -p $@
 
 ####################################################################################################
@@ -197,15 +197,16 @@ LDSCRIPT := $(SRC_DIR)/linker.ld
 ELF_FILE := $(BUILD_DIR)/$(OS_NAME).elf
 ELF_SYMS := $(BUILD_DIR)/$(OS_NAME).syms
 
-$(BUILD_DIR):
-	mkdir -p $@
-
 LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod)_test -l$(mod))
 
 # Remember this will not attempt to rebuild libs if they already exist!
 $(ELF_FILE): $(ALL_LIBS) $(OS_DEFS_LD) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -nostdlib -O2 -L$(INSTALL_DIR) \
 		-Wl,--start-group -lgcc -Wl,--whole-archive $(LIB_FLAGS) -Wl,--end-group 
+
+# The symbols file is useful for compiling user application binaries.  (Depends on SHALLOW kernel rules)
+$(ELF_SYMS): $(ELF_FILE) | $(BUILD_DIR)
+	i686-elf-objcopy --extract-symbol $(ELF_FILE) $@
 
 .PHONY: elf.shallow elf.shallow.dummy
 elf.shallow.dummy: $(ELF_FILE)
@@ -223,40 +224,36 @@ elf: lib.install $(OS_DEFS_LD)
 # User Apps
 
 # NOTE: ADD APPLICATION NAMES HERE!
-APPS := Test \
+_APPS := Test \
 		Shell
 
 APPS_DIR  := $(SRC_DIR)/apps
 
-APPS_BUILD := $(BUILD_DIR)/apps
-APPS_OUT := $(BUILD_DIR)/apps/out
+APPS_BUILD := $(BUILD_DIR)/apps/build
+APPS_OUT := $(BUILD_DIR)/apps/bin
 
-# The symbols file is useful for compiling user application binaries.  (Depends on SHALLOW kernel rules)
-$(ELF_SYMS): $(ELF_FILE) | $(BUILD_DIR)
-	i686-elf-objcopy --extract-symbol $(ELF_FILE) $@
+APPS := $(addprefix $(APPS_OUT)/,$(_APPS))
 
-$(APPS_BUILD) $(APPS_OUT):
-	mkdir -p $@
+# Similar to MOD_MAKE macro, but for apps
+APP_MAKE = $(MY_MAKE) -C $(APPS_DIR)/$* \
+				BUILD_DIR=$(APPS_BUILD)/$* \
+				OUT_DIR=$(APPS_OUT) \
+				INSTALL_DIR=$(INSTALL_DIR) \
+				ELF_SYMS=$(ELF_SYMS) 
 
-APP_BUILDS := $(addprefix $(APPS_BUILD)/,$(APPS))
-
-$(APP_BUILDS): $(APPS_BUILD)/%: $(ELF_SYMS) | $(APPS_BUILD) $(APPS_OUT)
-	$(MY_MAKE) -C $(APPS_DIR)/$* \
-		BUILD_DIR=$@ \
-		OUT_DIR=$(APPS_OUT) \
-		INSTALL_DIR=$(INSTALL_DIR) \
-		ELF_SYMS=$(ELF_SYMS) \
-		bin
+.PHONY: $(APPS)
+$(APPS): $(APPS_OUT)/%: $(ELF_SYMS)
+	$(APP_MAKE) bin
 
 # NOTE: VERY IMPORTANT!
 # Apps specific makefile are always invoked! However, the shallow/unshallow rules below determine
 # whether or not the kernel is rebuilt first!
 
-.PHONY: apps.shallow apps.shallow.dummy $(APP_BUILDS)
-apps.shallow.dummy: $(APP_BUILDS)
+.PHONY: apps.shallow apps.shallow.dummy
+apps.shallow.dummy: $(APPS)
 	@echo > /dev/null
 
-apps.shallow: $(APP_BUILDS)
+apps.shallow: $(APPS)
 	$(call DONE_MSG,Apps Built [shallow kernel])
 
 .PHONY: apps
@@ -266,23 +263,20 @@ apps: elf
 
 # Potentially move this out of here?
 
-APPS_CLANGD_TARS := $(addprefix apps.clangd.,$(APPS))
+APPS_CLANGD_TARS := $(addprefix apps.clangd.,$(_APPS))
 .PHONY: apps.clangd $(APPS_CLANGD_TARS)
 
 $(APPS_CLANGD_TARS): apps.clangd.%: 
-	$(MY_MAKE) -C $(APPS_DIR)/$* \
-		INSTALL_DIR=$(INSTALL_DIR) \
-		clangd
+	$(APP_MAKE) clangd
 
 apps.clangd: $(APPS_CLANGD_TARS)
 	$(call DONE_MSG,App Clangd Installed)
 
-APPS_CLEAN_CLANGD_TARS := $(addprefix apps.clean.clangd.,$(APPS))
+APPS_CLEAN_CLANGD_TARS := $(addprefix apps.clean.clangd.,$(_APPS))
 .PHONY: apps.clean.clangd $(APPS_CLEAN_CLANGD_TARS)
 
 $(APPS_CLEAN_CLANGD_TARS): apps.clean.clangd.%:
-	$(MY_MAKE) -C $(APPS_DIR)/$* \
-		clean.clangd
+	$(APP_MAKE) clean.clangd
 
 apps.clean.clangd: $(APPS_CLEAN_CLANGD_TARS)
 	$(call DONE_MSG,App Clangd Cleaned)
@@ -336,7 +330,7 @@ iso: elf
 
 DISK := $(BUILD_DIR)/hdd.img
 
-$(DISK): $(APP_BUILDS) | $(BUILD_DIR)
+$(DISK): $(APPS) | $(BUILD_DIR)
 	qemu-img create -f raw $@ 256M
 	mkfs.fat -F 32 -s 2 $@
 	mcopy -i $@ $(APPS_OUT) ::/Bin
