@@ -34,7 +34,6 @@ GIT_TOP := $(shell git rev-parse --show-toplevel)
 # I think it's safe to say that for the entirety of this project I'll be using
 # the 386 tools.
 C_COMPILER := i686-elf-gcc
-ASSEMBLER  := i686-elf-as
 AR 		   := i686-elf-ar
 
 CFLAGS := -m32 -std=gnu99 -ffreestanding -Wall -Wextra -Wpedantic $(EXTRA_CFLAGS)
@@ -56,7 +55,6 @@ TEST_HDRS	 := $(wildcard $(INC_DIR)/$(MOD_NAME)/test/*.h)
 SRC_DIR 	 := $(MOD_DIR)/src
 SRC_INC_DIRS := $(SRC_DIR) $(INC_DIR) $(INSTALL_INC_DIR)
 SRC_INC_FLAGS:= $(addprefix -I,$(SRC_INC_DIRS))
-ASM_INC_FLAGS:= $(addprefix -I ,$(SRC_INC_DIRS))
 SRCS 		 := $(addprefix $(SRC_DIR)/,$(_SRCS))
 ASMS		 := $(addprefix $(SRC_DIR)/,$(_ASMS))
 
@@ -99,15 +97,15 @@ $(BUILD_DIR) $(BUILD_TEST_DIR) $(INSTALL_DIR):
 
 .PHONY: lib.dotds test_lib.dotds
 $(C_DOTDS): $(BUILD_DIR)/c_%.d: $(SRC_DIR)/%.c | $(BUILD_DIR)
-	echo "hello"
+	$(C_COMPILER) $(SRC_INC_FLAGS) -E $< -MM -MF $@
 
 $(S_DOTDS): $(BUILD_DIR)/S_%.d: $(SRC_DIR)/%.S | $(BUILD_DIR)
-	echo "hello"
+	$(C_COMPILER) $(SRC_INC_FLAGS) -E $< -MM -MF $@
 
 lib.dotds: $(C_DOTDS) $(S_DOTDS)
 
 $(TEST_DOTDS): $(BUILD_TEST_DIR)/%.d: $(TEST_DIR)/%.c $(BUILD_TEST_DIR)
-	echo "hello"
+	@echo "hello"
 
 test_lib.dotds: $(TEST_DOTDS)
 
@@ -119,7 +117,7 @@ $(C_OBJS): $(BUILD_DIR)/c_%.o: $(SRC_DIR)/%.c $(HDRS) | $(BUILD_DIR)
 	$(C_COMPILER) -c $(CFLAGS) $(SRC_INC_FLAGS) -o $@ $<
 
 $(S_OBJS): $(BUILD_DIR)/S_%.o: $(SRC_DIR)/%.S | $(BUILD_DIR)
-	$(ASSEMBLER) $(ASM_INC_FLAGS) -o $@ $<
+	$(C_COMPILER) -c $(CFLAGS) $(SRC_INC_FLAGS) -o $@ $<
 
 lib.build: $(BUILD_LIB)
 $(BUILD_LIB): $(C_OBJS) $(S_OBJS) | $(BUILD_DIR)
