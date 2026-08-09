@@ -106,11 +106,15 @@ $(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
 
 ####################################################################################################
 
+# A helper macro invoking module specific make targets!
+# This expects that $* resolves to the name of a module.
+MOD_MAKE = $(MY_MAKE) -C $(SRC_DIR)/$* BUILD_DIR=$(BUILD_DIR)/mods/$* INSTALL_DIR=$(INSTALL_DIR)
+
 # Install Headers
 
 INCLUDE_DIRS := $(addprefix $(INCLUDE_DIR)/,$(MODS))
 $(INCLUDE_DIRS): $(INCLUDE_DIR)/%: | $(INCLUDE_DIR)
-	$(MY_MAKE) -C $(SRC_DIR)/$* hdrs.install test_hdrs.install 
+	$(MOD_MAKE) hdrs.install test_hdrs.install 
 
 ALL_INCLUDES := $(INCLUDE_DIRS) $(OS_DEFS_H) $(OS_DEFS_S)
 
@@ -124,7 +128,7 @@ hdrs.install.shallow: $(ALL_INCLUDES)
 # check for modification!
 HDRS_INSTALL_TARS := $(addprefix hdrs.install.,$(MODS))
 $(HDRS_INSTALL_TARS): hdrs.install.%:
-	$(MY_MAKE) -C $(SRC_DIR)/$* hdrs.install test_hdrs.install 
+	$(MOD_MAKE) hdrs.install test_hdrs.install 
 
 .PHONY: hdrs.install $(HDRS_INSTALL_TARS)
 hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
@@ -135,11 +139,11 @@ hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
 # NOTE: The LIBS and TEST_LIBS targets are Shallow since they ONLY CHECK FOR EXISTENCE!!!
 LIBS := $(patsubst %,$(INSTALL_DIR)/lib%.a,$(MODS))
 $(LIBS): $(INSTALL_DIR)/lib%.a: | $(ALL_INCLUDES)
-	$(MY_MAKE) -C $(SRC_DIR)/$* lib.install
+	$(MOD_MAKE) lib.install
 
 TEST_LIBS := $(patsubst %,$(INSTALL_DIR)/lib%_test.a,$(MODS))
-$(TEST_LIBS): $(INSTALL_DIR)/lib%_test.a: | $(INSTALL_DIR) $(ALL_INCLUDES)
-	$(MY_MAKE) -C $(SRC_DIR)/$* test_lib.install
+$(TEST_LIBS): $(INSTALL_DIR)/lib%_test.a: | $(ALL_INCLUDES)
+	$(MOD_MAKE) test_lib.install
 
 ALL_LIBS := $(LIBS) $(TEST_LIBS)
 
@@ -155,7 +159,7 @@ LIB_INSTALL_TARS := $(addprefix lib.install.,$(MODS))
 # This is "unsafe" since there is no gaurantee that the headers have been installed.
 lib.unsafe_install: $(LIB_INSTALL_TARS)
 $(LIB_INSTALL_TARS): lib.install.%:
-	$(MY_MAKE) -C $(SRC_DIR)/$* lib.install test_lib.install
+	$(MOD_MAKE) lib.install test_lib.install
 
 lib.install: hdrs.install
 	$(MY_MAKE) -C $(SRC_DIR) lib.unsafe_install
@@ -167,7 +171,7 @@ CLANGD_TARS := $(addprefix clangd.,$(MODS))
 .PHONY: clangd $(CLANGD_TARS)
 
 $(CLANGD_TARS): clangd.%:
-	$(MY_MAKE) -C $(SRC_DIR)/$* clangd
+	$(MOD_MAKE) clangd
 
 clangd: $(CLANGD_TARS)
 	$(call DONE_MSG,Clangd Installed)
@@ -176,7 +180,7 @@ CLANGD_CLEAN_TARS := $(addprefix clean.clangd.,$(MODS))
 .PHONY: clean.clangd $(CLANGD_CLEAN_TARS)
 
 $(CLANGD_CLEAN_TARS): clean.clangd.%:
-	$(MY_MAKE) -C $(SRC_DIR)/$* clean.clangd
+	$(MOD_MAKE) clean.clangd
 
 clean.clangd: $(CLANGD_CLEAN_TARS)
 	$(call DONE_MSG,Clang Cleaned)
