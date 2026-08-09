@@ -10,7 +10,7 @@ MOD_NAME 	?= s_gfx
 _SRCS 		?= gfx.c gfx_manager.c mono_fonts.c window.c \
 			   window_qgrid.c window_dummy.c
 
-# REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
+# REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder

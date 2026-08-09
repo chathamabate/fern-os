@@ -23,9 +23,9 @@ _SRCS 		?= kernel.c \
 			   page_helpers.c \
 			   ata_block_device.c 
 
-# REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
-_ASMS		?= boot.s \
-			   action.s
+# REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
+_ASMS		?= boot.S \
+			   action.S
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= page.c \

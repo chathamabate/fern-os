@@ -1,5 +1,5 @@
 
-.include "os_defs.s"
+#include "s_os_defs.h"
 
 .section .multiboot
 header_start:

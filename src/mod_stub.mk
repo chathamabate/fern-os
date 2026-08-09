@@ -8,7 +8,7 @@ endif
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
 _SRCS 		?=
 
-# REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
+# REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
 _ASMS		?=
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
@@ -68,7 +68,7 @@ TEST_SRCS 	  := $(addprefix $(TEST_DIR)/,$(_TEST_SRCS))
 # Stuff to be built
 
 C_OBJS	:= $(patsubst %.c,$(BUILD_DIR)/c_%.o,$(_SRCS))
-S_OBJS	:= $(patsubst %.s,$(BUILD_DIR)/s_%.o,$(_ASMS))
+S_OBJS	:= $(patsubst %.S,$(BUILD_DIR)/S_%.o,$(_ASMS))
 
 _LIB 		:= lib$(MOD_NAME).a
 BUILD_LIB	:= $(BUILD_DIR)/$(_LIB)
@@ -99,8 +99,8 @@ $(BUILD_DIR) $(BUILD_TEST_DIR) $(INSTALL_DIR):
 $(C_OBJS): $(BUILD_DIR)/c_%.o: $(SRC_DIR)/%.c $(HDRS) | $(BUILD_DIR)
 	$(C_COMPILER) -c $(CFLAGS) $(SRC_INC_FLAGS) -o $@ $<
 
-$(S_OBJS): $(BUILD_DIR)/s_%.o: $(SRC_DIR)/%.s | $(BUILD_DIR)
-	$(ASSEMBLER) $(SRC_INC_FLAGS) -o $@ $<
+$(S_OBJS): $(BUILD_DIR)/S_%.o: $(SRC_DIR)/%.S | $(BUILD_DIR)
+	$(ASSEMBLER) $(ASM_INC_FLAGS) -o $@ $<
 
 lib.build: $(BUILD_LIB)
 $(BUILD_LIB): $(C_OBJS) $(S_OBJS) | $(BUILD_DIR)

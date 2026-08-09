@@ -1,8 +1,7 @@
 
+#include "s_os_defs.h"
 
 .section .text
-
-.include "os_defs.s"
 
 /*
 This is a Non-C style function. It expects to be called right after 

@@ -87,7 +87,7 @@ OS_DEFS :=   PROLOGUE_START PROLOGUE_END \
 
 C_MACRO_GEN = echo "\#define $1 $($1)UL" >> $@;
 LD_DEF_GEN = echo "$1 = ($($1));" >> $@; 
-S_DEF_GEN = echo ".equ $1, $($1)" >> $@; 
+S_DEF_GEN = echo "\#define $1 $($1)" >> $@; 
 
 OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
 $(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
@@ -99,7 +99,7 @@ $(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
 	rm $@; touch $@;
 	$(foreach def,$(OS_DEFS),$(call LD_DEF_GEN,$(def)))
 
-OS_DEFS_S := $(INCLUDE_DIR)/os_defs.s
+OS_DEFS_S := $(INCLUDE_DIR)/s_os_defs.h
 $(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
 	rm $@; touch $@;
 	$(foreach def,$(OS_DEFS),$(call S_DEF_GEN,$(def)))
