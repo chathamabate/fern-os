@@ -95,6 +95,35 @@ INSTALL_TEST_HDRS := $(addprefix $(INSTALL_TEST_HDRS_DIR)/,$(notdir $(TEST_HDRS)
 $(BUILD_DIR) $(BUILD_TEST_DIR) $(INSTALL_DIR):
 	mkdir -p $@
 
+# The targets in this file are meant to be defined in the very order they should be invoked!
+
+# 1) Header installation
+#
+# This should be done first for all modules! .d file generation must be able to discover ALL
+# referenced headers!
+
+$(INSTALL_HDRS_DIR) $(INSTALL_TEST_HDRS_DIR):
+	mkdir -p $@
+
+.PHONY: hdrs.install test_hdrs.install
+
+$(INSTALL_HDRS): $(INSTALL_HDRS_DIR)/%.h: $(INC_DIR)/$(MOD_NAME)/%.h | $(INSTALL_HDRS_DIR)
+	cp $< $@
+
+hdrs.install: $(INSTALL_HDRS)
+	@echo > /dev/null
+
+$(INSTALL_TEST_HDRS): $(INSTALL_TEST_HDRS_DIR)/%.h: $(INC_DIR)/$(MOD_NAME)/test/%.h | $(INSTALL_TEST_HDRS_DIR)
+	cp $< $@
+
+test_hdrs.install: $(INSTALL_TEST_HDRS)
+	@echo > /dev/null
+
+# 2) .d File generation
+#
+# Again, this will only succeed if ALL referenced headers (even those outside this module)
+# can be found via the include path!
+
 .PHONY: lib.dotds test_lib.dotds
 $(C_DOTDS): $(BUILD_DIR)/c_%.d: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	$(C_COMPILER) $(SRC_INC_FLAGS) -E $< -MM -MF $@
@@ -104,20 +133,32 @@ $(S_DOTDS): $(BUILD_DIR)/S_%.d: $(SRC_DIR)/%.S | $(BUILD_DIR)
 
 lib.dotds: $(C_DOTDS) $(S_DOTDS)
 
-$(TEST_DOTDS): $(BUILD_TEST_DIR)/%.d: $(TEST_DIR)/%.c $(BUILD_TEST_DIR)
-	@echo "hello"
+$(TEST_DOTDS): $(BUILD_TEST_DIR)/%.d: $(TEST_DIR)/%.c | $(BUILD_TEST_DIR)
+	$(C_COMPILER) $(SRC_INC_FLAGS) -E $< -MM -MF $@
 
 test_lib.dotds: $(TEST_DOTDS)
 
+# 3) Object compilation and library creation!
+#
+# We include the .d files conditionally! This way, are not attempted to be generated for targets
+# which don't require them!
+
 .PHONY: lib.build test_lib.build
 
-# NOTE: We only rebuild on modification to headers in this module.
-# We treat installed dependencies in the install dir as unchanging.
-$(C_OBJS): $(BUILD_DIR)/c_%.o: $(SRC_DIR)/%.c $(HDRS) | $(BUILD_DIR)
-	$(C_COMPILER) -c $(CFLAGS) $(SRC_INC_FLAGS) -o $@ $<
+ifneq ($(filter lib.build,$(MAKECMDGOALS)),)
+include $(C_DOTDS) $(S_DOTDS)
+endif
 
-$(S_OBJS): $(BUILD_DIR)/S_%.o: $(SRC_DIR)/%.S | $(BUILD_DIR)
-	$(C_COMPILER) -c $(CFLAGS) $(SRC_INC_FLAGS) -o $@ $<
+ifneq ($(filter test_lib.build,$(MAKECMDGOALS)),)
+include $(TEST_DOTDS)
+endif
+
+# .d files will declare all significant dependencies!
+$(C_OBJS): $(BUILD_DIR)/c_%.o: | $(BUILD_DIR)
+	$(C_COMPILER) -c $(CFLAGS) $(SRC_INC_FLAGS) -o $@ $(SRC_DIR)/$*.c
+
+$(S_OBJS): $(BUILD_DIR)/S_%.o: | $(BUILD_DIR)
+	$(C_COMPILER) -c $(CFLAGS) $(SRC_INC_FLAGS) -o $@ $(SRC_DIR)/$*.S
 
 lib.build: $(BUILD_LIB)
 $(BUILD_LIB): $(C_OBJS) $(S_OBJS) | $(BUILD_DIR)
@@ -135,27 +176,12 @@ $(BUILD_TEST_LIB): $(TEST_OBJS) | $(BUILD_DIR)
 # Install Targets
 
 
-$(INSTALL_HDRS_DIR) $(INSTALL_TEST_HDRS_DIR):
-	mkdir -p $@
-
-.PHONY: hdrs.install lib.install test_hdrs.install test_lib.install
-
-hdrs.install: $(INSTALL_HDRS)
-	@echo > /dev/null
-
-$(INSTALL_HDRS): $(INSTALL_HDRS_DIR)/%.h: $(INC_DIR)/$(MOD_NAME)/%.h | $(INSTALL_HDRS_DIR)
-	cp $< $@
+.PHONY: lib.install test_lib.install
 
 lib.install: $(INSTALL_LIB) 
 	@echo > /dev/null
 
 $(INSTALL_LIB): $(BUILD_LIB) | $(INSTALL_DIR)
-	cp $< $@
-
-test_hdrs.install: $(INSTALL_TEST_HDRS)
-	@echo > /dev/null
-
-$(INSTALL_TEST_HDRS): $(INSTALL_TEST_HDRS_DIR)/%.h: $(INC_DIR)/$(MOD_NAME)/test/%.h | $(INSTALL_TEST_HDRS_DIR)
 	cp $< $@
 
 test_lib.install: $(INSTALL_TEST_LIB)
