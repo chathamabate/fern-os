@@ -7,7 +7,7 @@ MOD_NAME 	?= s_data
 _SRCS 		?= id_table.c map.c list.c wait_queue.c ring.c term_buffer.c \
 			   fixed_queue.c heap.c binary_search_tree.c
 
-# REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
+# REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder

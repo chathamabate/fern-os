@@ -14,8 +14,8 @@ _SRCS 		?= main.c \
 			   syscall_shm.c \
 			   syscall_term.c
 
-# REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
-_ASMS		?= main.s syscall.s
+# REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
+_ASMS		?= main.S syscall.S
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= syscall.c \

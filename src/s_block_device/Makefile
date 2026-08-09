@@ -10,7 +10,7 @@ MOD_NAME 	?= s_block_device
 _SRCS 		?= mem_block_device.c cached_block_device.c \
 			   fat32.c fat32_dir.c file_sys.c fat32_file_sys.c
 
-# REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
+# REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder

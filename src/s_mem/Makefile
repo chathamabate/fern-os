@@ -9,7 +9,7 @@ MOD_NAME 	?= s_mem
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
 _SRCS 		?= allocator.c simple_heap.c
 
-# REQUIRED: Names (NOT PATHS) of all .s files found in the src folder
+# REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
 _ASMS		?= 
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
