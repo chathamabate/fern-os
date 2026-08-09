@@ -1,8 +1,9 @@
 # NOTE: This stub is meant to be included
-GIT_TOP ?= $(shell git rev-parse --show-toplevel)
 
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
-MOD_NAME 	?=
+ifeq ($(MOD_NAME),)
+$(error module name is required)
+endif
 
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
 _SRCS 		?=
@@ -13,16 +14,22 @@ _ASMS		?=
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?=
 
-# OPTIONAL: Where to place build artifacts
-BUILD_DIR   ?= $(GIT_TOP)/src/build/mods/$(MOD_NAME)
+# REQUIRED: Where to place build artifacts
+ifeq ($(BUILD_DIR),)
+$(error $(MOD_NAME) requires build directory to build)
+endif
 
-# OPTIONAL: Where to place .a files and headers
-INSTALL_DIR ?= $(GIT_TOP)/src/build/install
+# REQUIRED: Where to place .a files and headers
+ifeq ($(INSTALL_DIR),)
+$(error $(MOD_NAME) requires install dir to build)
+endif
 
 # OPTIONAL: Extra C flags to use
 EXTRA_CFLAGS ?=
 
 #####################################################################################
+
+GIT_TOP := $(shell git rev-parse --show-toplevel)
 
 # I think it's safe to say that for the entirety of this project I'll be using
 # the 386 tools.
