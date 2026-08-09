@@ -27,29 +27,27 @@ def fern_os_range32_4k_aligned(fcv: FCValue) -> Result[None, str]:
     dv = cast(dict[str, FCValue], fcv)
 
     start = cast(int, dv["START"])
-    end_inc = cast(int, dv["END_INC"])
+    end = cast(int, dv["END"])
 
     if start & (0x1000 - 1) != 0:
         return Err(f"range start is not 4k aligned")
 
-    if (end_inc + 1) & (0x1000 - 1) != 0:
+    if end & (0x1000 - 1) != 0:
         return Err(f"range exclusive end is not 4k aligned")
 
     return Ok(None)
 
-def fern_os_range32_exclusive_end_translate(prefix: str, value: FCValue, translator: FCTranslator) -> list[str]:
-    dv = cast(dict[str, FCValue], value)
-    end = cast(int, dv["END_INC"]) + 1
+FOS_RANGE32 = FCSchemaStruct(
+    [
+        ("START", FOS_UINT32),
+        ("END_INC", FOS_UINT32),
+    ], 
 
-    # It is possible the value of `end` is 0x1_0000_0000
-    return translator.definition(prefix + "_END", end)
-
-FOS_RANGE32 = FCSchemaStruct([
-    ("START", FOS_UINT32),
-    ("END_INC", FOS_UINT32),
-]).with_extra_checks(
-        non_empty=fern_os_range32_not_empty, align_4k=fern_os_range32_4k_aligned
-).with_translates(fern_os_range32_exclusive_end_translate)
+    # Exclusive end as derived field.
+    END=(FOS_UINT32, lambda v: cast(dict[str, int], v)["END_INC"] + 1)
+).with_extra_checks(
+    non_empty=fern_os_range32_not_empty, align_4k=fern_os_range32_4k_aligned
+)
 
 def fern_os_mem_ranges_no_overlap(fcv: FCValue) -> Result[None, str]:
     dv = cast(dict[str, dict[str, int]], fcv)
