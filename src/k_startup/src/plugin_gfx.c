@@ -270,12 +270,11 @@ static void tw_render(window_t *w) {
 
         const gfx_color_t term_border_color = win_t->tb_attrs.palette.colors[TC_LIGHT_GREY];
 
-        // Draw borders!
         gfx_fill_rect(&buf, NULL, 0, 0, buf.width, tb_y, term_border_color); 
-        gfx_fill_rect(&buf, NULL, 0,  buf.height - tb_y, buf.width, tb_y, term_border_color); 
+        gfx_fill_rect(&buf, NULL, 0, tb_y + tb_height, buf.width, buf.height - (tb_y + tb_height), term_border_color); 
 
         gfx_fill_rect(&buf, NULL, 0, tb_y, tb_x, tb_height, term_border_color);
-        gfx_fill_rect(&buf, NULL, buf.width - tb_x, tb_y, tb_x, tb_height, term_border_color);
+        gfx_fill_rect(&buf, NULL, tb_x + tb_width, tb_y, buf.width - (tb_x + tb_width), tb_height, term_border_color);
         
         win_t->just_resized = false;
     }
