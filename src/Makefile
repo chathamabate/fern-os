@@ -1,4 +1,34 @@
 
+# The below diagram outlines the most significant targets of this Makefile and their relationships!
+#
+# Certain targets are actually built entirely in this Makefile. For example the disk, iso, and elf.
+# While others require invoking other Makefiles! For example hdrs.install, lib.install, and apps
+
+####### DEPENDENCY GRAPH OVERVIEW #######
+# 										#
+#                hdrs.install 			#
+# 	                  | 				#
+#                     V 				#
+#                lib.install 			#         
+# 	                  | 				#
+#                     V 				#
+#                    elf 				#
+#                     | 				#
+#            ---------* 				#
+#            |        | 				#
+#            V        | 				#
+#           apps      V 				#
+#            |       iso  				#
+#            V        | 				#
+#           disk      |  				#
+#            |        V 				#
+#            *-----> run  				#
+# 										#
+#########################################
+
+####################################################################################################
+
+
 GIT_TOP ?= $(shell git rev-parse --show-toplevel)
 
 SRC_DIR    := $(GIT_TOP)/src
@@ -100,7 +130,7 @@ $(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
 	$(foreach def,$(OS_DEFS),$(call LD_DEF_GEN,$(def)))
 
 OS_DEFS_S := $(INCLUDE_DIR)/s_os_defs.h
-$(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
+$(OS_DEFS_S): $(THIS_FILE) | $(INCLUDE_DIR)
 	rm $@; touch $@;
 	$(foreach def,$(OS_DEFS),$(call S_DEF_GEN,$(def)))
 
@@ -111,18 +141,6 @@ $(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
 MOD_MAKE = $(MY_MAKE) -C $(SRC_DIR)/$* BUILD_DIR=$(BUILD_DIR)/mods/$* INSTALL_DIR=$(INSTALL_DIR)
 
 # Install Headers
-
-INCLUDE_DIRS := $(addprefix $(INCLUDE_DIR)/,$(MODS))
-$(INCLUDE_DIRS): $(INCLUDE_DIR)/%: | $(INCLUDE_DIR)
-	$(MOD_MAKE) hdrs.install test_hdrs.install 
-
-ALL_INCLUDES := $(INCLUDE_DIRS) $(OS_DEFS_H) $(OS_DEFS_S)
-
-# NOTE: This target is "shallow" because it doesn't check for modifications at all.
-# If the include directories exist, it does NOTHING!
-.PHONY: hdrs.install.shallow
-hdrs.install.shallow: $(ALL_INCLUDES)
-	$(call DONE_MSG,Headers Installed [shallow])
 
 # These targets are NOT "shallow" since they always defer to the module makefile which DOES
 # check for modification!
@@ -136,31 +154,19 @@ hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
 
 # Install Libraries
 
-# NOTE: The LIBS and TEST_LIBS targets are Shallow since they ONLY CHECK FOR EXISTENCE!!!
 LIBS := $(patsubst %,$(INSTALL_DIR)/lib%.a,$(MODS))
-$(LIBS): $(INSTALL_DIR)/lib%.a: | $(ALL_INCLUDES)
-	$(MOD_MAKE) lib.install
-
 TEST_LIBS := $(patsubst %,$(INSTALL_DIR)/lib%_test.a,$(MODS))
-$(TEST_LIBS): $(INSTALL_DIR)/lib%_test.a: | $(ALL_INCLUDES)
-	$(MOD_MAKE) test_lib.install
-
 ALL_LIBS := $(LIBS) $(TEST_LIBS)
 
-.PHONY: lib.install.shallow
-lib.install.shallow: $(ALL_LIBS)
-	$(call DONE_MSG,Libraries Installed [shallow])
-
-# Install Libs (For now we'll just always build the test and normal libs)
-
-LIB_INSTALL_TARS := $(addprefix lib.install.,$(MODS))
+LIB_INSTALL_TARS := $(addprefix lib.unsafe_install.,$(MODS))
 .PHONY: lib.unsafe_install lib.install $(LIB_INSTALL_TARS)
 
 # This is "unsafe" since there is no gaurantee that the headers have been installed.
-lib.unsafe_install: $(LIB_INSTALL_TARS)
-$(LIB_INSTALL_TARS): lib.install.%:
+$(LIB_INSTALL_TARS): lib.unsafe_install.%:
 	$(MOD_MAKE) lib.install test_lib.install
+lib.unsafe_install: $(LIB_INSTALL_TARS)
 
+# This is safe becuase we gaurantee headers are installed first!
 lib.install: hdrs.install
 	$(MY_MAKE) -C $(SRC_DIR) lib.unsafe_install
 	$(call DONE_MSG,Libraries Installed)
@@ -199,7 +205,8 @@ ELF_SYMS := $(BUILD_DIR)/$(OS_NAME).syms
 
 LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod)_test -l$(mod))
 
-# Remember this will not attempt to rebuild libs if they already exist!
+# Realize that ALL_LIBS doesn't actually define a rule for itself. This ELF target should NEVER
+# be invoked without libs already being explicity installed previously!
 $(ELF_FILE): $(ALL_LIBS) $(OS_DEFS_LD) | $(BUILD_DIR)
 	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -nostdlib -O2 -L$(INSTALL_DIR) \
 		-Wl,--start-group -lgcc -Wl,--whole-archive $(LIB_FLAGS) -Wl,--end-group 
@@ -208,15 +215,13 @@ $(ELF_FILE): $(ALL_LIBS) $(OS_DEFS_LD) | $(BUILD_DIR)
 $(ELF_SYMS): $(ELF_FILE) | $(BUILD_DIR)
 	i686-elf-objcopy --extract-symbol $(ELF_FILE) $@
 
-.PHONY: elf.shallow elf.shallow.dummy
-elf.shallow.dummy: $(ELF_FILE)
+.PHONY: elf.unsafe
+elf.unsafe: $(ELF_FILE) $(ELF_SYMS)
 	@echo > /dev/null
-elf.shallow: $(ELF_FILE)
-	$(call DONE_MSG,Kernel ELF Built [shallow])
 
 .PHONY: elf
-elf: lib.install $(OS_DEFS_LD)
-	$(MY_MAKE) -C $(SRC_DIR) elf.shallow.dummy
+elf: lib.install
+	$(MY_MAKE) -C $(SRC_DIR) elf.unsafe
 	$(call DONE_MSG,Kernel ELF Built)
 
 ####################################################################################################
@@ -241,24 +246,17 @@ APP_MAKE = $(MY_MAKE) -C $(APPS_DIR)/$* \
 				INSTALL_DIR=$(INSTALL_DIR) \
 				ELF_SYMS=$(ELF_SYMS) 
 
-.PHONY: $(APPS)
-$(APPS): $(APPS_OUT)/%: $(ELF_SYMS)
+APP_TARS := $(addprefix apps.unsafe.,$(_APPS))
+.PHONY: apps.unsafe $(APP_TARS)
+
+$(APP_TARS): apps.unsafe.%:
 	$(APP_MAKE) bin
 
-# NOTE: VERY IMPORTANT!
-# Apps specific makefile are always invoked! However, the shallow/unshallow rules below determine
-# whether or not the kernel is rebuilt first!
-
-.PHONY: apps.shallow apps.shallow.dummy
-apps.shallow.dummy: $(APPS)
-	@echo > /dev/null
-
-apps.shallow: $(APPS)
-	$(call DONE_MSG,Apps Built [shallow kernel])
+apps.unsafe: $(APP_TARS)
 
 .PHONY: apps
 apps: elf
-	$(MY_MAKE) -C $(SRC_DIR) apps.shallow.dummy
+	$(MY_MAKE) -C $(SRC_DIR) apps.unsafe
 	$(call DONE_MSG,Apps Built)
 
 # Potentially move this out of here?
@@ -285,7 +283,6 @@ apps.clean.clangd: $(APPS_CLEAN_CLANGD_TARS)
 
 # ISO File (Soon disk setup will be swallowed by this section)
 
-
 ISO_DIR  := $(BUILD_DIR)/iso
 GRUB_CFG := $(SRC_DIR)/grub.cfg
 ISO_FILE := $(BUILD_DIR)/$(OS_NAME).iso
@@ -300,16 +297,13 @@ $(ISO_FILE): $(ELF_FILE) $(GRUB_CFG)
 	cp $(GRUB_CFG) $(ISO_DIR)/boot/grub/
 	grub-mkrescue -o $@ $(ISO_DIR)
 
-.PHONY: _iso iso.shallow iso
+.PHONY: iso.unsafe iso
 
-_iso: $(ISO_FILE)
+iso.unsafe: $(ISO_FILE)
 	@echo > /dev/null
 
-iso.shallow: _iso
-	$(call DONE_MSG,ISO Built [shallow kernel])
-
 iso: elf
-	$(MY_MAKE) -C $(SRC_DIR) _iso
+	$(MY_MAKE) -C $(SRC_DIR) iso.unsafe
 	$(call DONE_MSG,ISO Built)
 
 ####################################################################################################
@@ -335,12 +329,12 @@ $(DISK): $(APPS) | $(BUILD_DIR)
 	mkfs.fat -F 32 -s 2 $@
 	mcopy -i $@ $(APPS_OUT) ::/Bin
 
-.PHONY: disk disk.shallow 
-disk.shallow: $(DISK)
-	$(call DONE_MSG,Disk Built [shallow kernel])
+.PHONY: disk disk.unsafe
+disk.unsafe: $(DISK)
+	@echo > /dev/null
 
-disk: elf
-	$(MY_MAKE) -C $(SRC_DIR) $(DISK)
+disk: apps
+	$(MY_MAKE) -C $(SRC_DIR) disk.unsafe
 	$(call DONE_MSG,Disk Built)
 
 ####################################################################################################
@@ -348,15 +342,6 @@ disk: elf
 # Bringing it all together
 
 .PHONY: run run.shallow
-
-run.shallow: iso.shallow disk.shallow
-	qemu-system-x86_64 \
-		-m 4G \
-		-boot d \
-		-cdrom $(ISO_FILE) \
-		-drive file=$(DISK),format=raw,index=0,media=disk \
-		-display gtk \
-		-monitor stdio
 
 run: iso disk
 	qemu-system-x86_64 \
@@ -371,5 +356,4 @@ run: iso disk
 
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -f $(OS_DEFS_LD)
 

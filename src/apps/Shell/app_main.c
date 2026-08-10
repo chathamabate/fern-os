@@ -7,7 +7,6 @@
 #include <stddef.h>
 #include "s_util/ps2_scancodes.h"
 
-
 /*
  * NOTE: Probably going to come back to this after graphics!
  */
