@@ -130,7 +130,7 @@ $(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
 	$(foreach def,$(OS_DEFS),$(call LD_DEF_GEN,$(def)))
 
 OS_DEFS_S := $(INCLUDE_DIR)/s_os_defs.h
-$(OS_DEFS_S): $(THIS_FIE) | $(INCLUDE_DIR)
+$(OS_DEFS_S): $(THIS_FILE) | $(INCLUDE_DIR)
 	rm $@; touch $@;
 	$(foreach def,$(OS_DEFS),$(call S_DEF_GEN,$(def)))
 
