@@ -31,8 +31,6 @@ EXTRA_CFLAGS ?=
 
 GIT_TOP := $(shell git rev-parse --show-toplevel)
 
-# I think it's safe to say that for the entirety of this project I'll be using
-# the 386 tools.
 C_COMPILER := i686-elf-gcc
 AR 		   := i686-elf-ar
 
@@ -48,7 +46,7 @@ INSTALL_INC_DIR := $(INSTALL_DIR)/include
 
 # NOTE: 
 # SRC_INC_DIRS, and TEST_INC_DIRS used to both include $(INC_DIR) before
-# $(INSTALL_INC_DIR). The intention was that during compilation this modules headers in the
+# $(INSTALL_INC_DIR). The intention was that during compilation this module's headers in the
 # source tree would take precedence over its own headers which live in the install tree!
 #
 # When switching over to using .d files though, this file now requires that hdrs.install

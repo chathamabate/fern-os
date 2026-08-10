@@ -63,25 +63,42 @@ SRC_DIR := $(GIT_TOP)/src
 APP_LDSCRIPT  := $(SRC_DIR)/linker_app.ld
 INCLUDE_DIR   := $(INSTALL_DIR)/include
 APP_DIR := $(SRC_DIR)/apps/$(APP_NAME)
+INCLUDE_FLAGS := -I$(APP_DIR) -I$(INCLUDE_DIR)
 APP := $(OUT_DIR)/$(APP_NAME)
 
 C_COMPILER := i686-elf-gcc
 
+SRCS := $(addprefix $(APP_DIR)/,$(_SRCS))
+
+DOTDS 	:= $(patsubst %.c,$(BUILD_DIR)/%.d,$(_SRCS))
+OBJS 	:= $(patsubst %.c,$(BUILD_DIR)/%.o,$(_SRCS))
+
+# This stub is similar to mod_stub.mk (just a little simpler)
+# To generate the .d files, all referenced headers MUST be installed!
+
 $(BUILD_DIR) $(OUT_DIR):
 	mkdir -p $@
 
-SRCS := $(addprefix $(APP_DIR)/,$(_SRCS))
-OBJS := $(patsubst %.c, $(BUILD_DIR)/%.o,$(_SRCS))
+$(DOTDS): $(BUILD_DIR)/%.d: $(APP_DIR)/%.c | $(BUILD_DIR)
+	$(C_COMPILER) $(INCLUDE_FLAGS) -E $< -MM -MT "$(BUILD_DIR)/$*.o" -MF $@
 
+.PHONY: dotds
+dotds: $(DOTDS)
+
+ifneq ($(filter bin,$(MAKECMDGOALS)),)
+include $(DOTDS)
+endif
+
+# We rebuild an object if any of its source file or referenced headers change (using .d files)
 CFLAGS := -m32 -std=gnu99 -ffreestanding -Wall -Wextra -Wpedantic 
-$(OBJS): $(BUILD_DIR)/%.o: $(APP_DIR)/%.c $(ELF_SYMS) | $(BUILD_DIR)
+$(OBJS): $(BUILD_DIR)/%.o: | $(BUILD_DIR)
 	$(C_COMPILER) -c $(CFLAGS) -I$(INCLUDE_DIR) -I$(APP_DIR) -o $@ $<
 
 # NOTE: in the below recipe we give -L$(INSTALL_DIR) so we have access to os_defs.ld
 # This recipe DOES NOT use any FernOS libraries directly! (The point of the symbols file)
-$(APP): $(OBJS) | $(OUT_DIR)
+$(APP): $(OBJS) $(ELF_SYMS) | $(OUT_DIR)
 	$(C_COMPILER) -T $(APP_LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
-	    -lgcc -Wl,--just-symbols=$(ELF_SYMS) $^
+	    -lgcc -Wl,--just-symbols=$(ELF_SYMS) $(OBJS)
 
 .PHONY: bin
 bin: $(APP)
