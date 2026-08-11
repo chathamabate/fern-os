@@ -4,27 +4,27 @@
 # Certain targets are actually built entirely in this Makefile. For example the disk, iso, and elf.
 # While others require invoking other Makefiles! For example hdrs.install, lib.install, and apps
 
-####### DEPENDENCY GRAPH OVERVIEW #######
-# 										#
-#                hdrs.install 			#
-# 	                  | 				#
-#                     V 				#
-#                lib.install 			#         
-# 	                  | 				#
-#                     V 				#
-#                    elf 				#
-#                     | 				#
-#            ---------* 				#
-#            |        | 				#
-#            V        | 				#
-#           apps      V 				#
-#            |       iso  				#
-#            V        | 				#
-#           disk      |  				#
-#            |        V 				#
-#            *-----> run  				#
-# 										#
-#########################################
+						####### DEPENDENCY GRAPH OVERVIEW #######
+						# 										#
+						#                hdrs.install 			#
+						# 	                  | 				#
+						#                     V 				#
+						#                lib.install 			#         
+						# 	                  | 				#
+						#                     V 				#
+						#                    elf 				#
+						#                     | 				#
+						#            ---------* 				#
+						#            |        | 				#
+						#            V        | 				#
+						#           apps      V 				#
+						#            |       iso  				#
+						#            V        | 				#
+						#           disk      |  				#
+						#            |        V 				#
+						#            *-----> run  				#
+						# 										#
+						#########################################
 
 ####################################################################################################
 
@@ -53,8 +53,6 @@ MODS := \
 		s_mem \
 		s_gfx \
 		s_util 
-
-# Static memory layout header and linker generation:
 
 $(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 	mkdir -p $@
@@ -99,7 +97,9 @@ $(CONFIG_LD): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
 CONFIG_MK := $(INSTALL_DIR)/mk_config.mk
 $(CONFIG_MK): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f make -o $@
-t: $(CONFIG_MK)
+
+CONFIGS := $(CONFIG_C) $(CONFIG_AS) $(CONFIG_LD) $(CONFIG_MK)
+t: $(CONFIGS)
 
 ####################################################################################################
 
