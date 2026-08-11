@@ -59,13 +59,15 @@ $(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 
 ####################################################################################################
 
-FERNCONF_VERSION := 0.1.7
+FERNCONF_VERSION := 0.1.8
 VENV_ACTIVATE := $(VENV_DIR)/bin/activate
 
 $(VENV_DIR):
 	mkdir -p $@
 	python3 -m venv $(VENV_DIR)
-	. $(VENV_ACTIVATE) && pip install mypy fernconf==$(FERNCONF_VERSION)
+	. $(VENV_ACTIVATE) && \
+		pip install --upgrade pip && \
+		pip install mypy fernconf==$(FERNCONF_VERSION)
 
 .PHONY: venv
 venv: $(VENV_DIR)
@@ -99,7 +101,9 @@ $(CONFIG_MK): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f make -o $@
 
 CONFIGS := $(CONFIG_C) $(CONFIG_AS) $(CONFIG_LD) $(CONFIG_MK)
-t: $(CONFIGS)
+
+# NOTE: Generated Config files are not integrated into FernOS at this time.
+# The below more primitive generation method is still used at this time.
 
 ####################################################################################################
 

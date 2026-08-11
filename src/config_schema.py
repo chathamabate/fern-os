@@ -31,7 +31,7 @@ def fern_os_uint_align_4k(fcv: FCValue) -> Result[None, str]:
     dv = cast(int, fcv)
 
     if dv & (0x1000 - 1) != 0:
-        return Err(f"unsigned int is not 4k aligned: {dv}")
+        return Err(f"unsigned int is not 4k aligned: 0x{dv:X}")
 
     return Ok(None)
 
@@ -52,15 +52,7 @@ def fern_os_range32_not_empty(fcv: FCValue) -> Result[None, str]:
 FOS_RANGE32 = FCSchemaStruct(
     [
         ("START", FOS_UINT32_4K),
-
-        # This is a little frustrating, "END" will be a derived field thus given the original
-        # fields are valid, "END" must also be valid by its schema.
-        # i.e. This check confirms that "END_INC" ends with 0xFFF, which guarantees "END"
-        # will fit schema `FOS_UINT32_AND_1_4K`
-        ("END_INC", FOS_UINT32.with_extra_checks(
-            valid_range_end=lambda fcv: 
-            Ok(None) if (cast(int, fcv) & 0xFFF) == 0xFFF else Err(f"Invalid incluive end value: 0x{cast(int, fcv):X}")
-        )), # This is a UINT to allow for 0x1_0000_0000.
+        ("END_INC", FOS_UINT32),
     ], 
 
     END=(FOS_UINT32_AND_1_4K, lambda v: cast(dict[str, int], v)["END_INC"] + 1)
