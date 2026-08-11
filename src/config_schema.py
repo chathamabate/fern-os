@@ -4,13 +4,28 @@ from fernconf.FCTranslator import *
 from fernconf.FCSchema import *
 from fernconf.FCTooling import *
 
-FOS_UINT = FCS_INT.with_extra_checks(
-    non_neg=lambda fcv: Ok(None) if cast(int, fcv) >= 0 else Err("value must be non-negative")
-)
+def fos_bound_int(minimum: int, maximum: int) -> FCSchema:
+    """
+    An integer that is within an inclusive range!
+    """
 
-FOS_UINT32 = FOS_UINT.with_extra_checks(
-    u32=lambda fcv: Ok(None) if cast(int, fcv) < 0x1_0000_0000 else Err("value too large for 32-bits")
-)
+    # NOTE: I used to check if minimum and maximum could both be represented as 64-bit integers,
+    # but I realized this was redundant as FCValue's (when integers) are guaranteed to be
+    # representable in 64-bits! 
+    #
+    # If `minimum` were below INT64_MIN it would be still be impossible for a valid FCValue 
+    # to be less than INT64_MIN.
+
+    if maximum < minimum:
+        raise Exception(f"Integer maximum {maximum} is less than minimum {minimum}")
+
+    return FCS_INT.with_extra_checks(
+            lower_bound=lambda fcv: Ok(None) if minimum <= cast(int, fcv) else Err(f"value is below minimum: {fcv}"),
+            upper_bound=lambda fcv: Ok(None) if cast(int, fcv) <= maximum else Err(f"value is above maximum: {fcv}") 
+    )
+
+FOS_UINT32 = fos_bound_int(0, 0xFFFF_FFFF)
+FOS_UINT32_AND_1 = fos_bound_int(0, 0x1_0000_0000)
 
 def fern_os_uint_align_4k(fcv: FCValue) -> Result[None, str]:
     dv = cast(int, fcv)
@@ -20,8 +35,8 @@ def fern_os_uint_align_4k(fcv: FCValue) -> Result[None, str]:
 
     return Ok(None)
 
-FOS_UINT_4K = FOS_UINT.with_extra_checks(align_4k=fern_os_uint_align_4k)
 FOS_UINT32_4K = FOS_UINT32.with_extra_checks(align_4k=fern_os_uint_align_4k)
+FOS_UINT32_AND_1_4K = FOS_UINT32_AND_1.with_extra_checks(align_4k=fern_os_uint_align_4k)
 
 def fern_os_range32_not_empty(fcv: FCValue) -> Result[None, str]:
     dv = cast(dict[str, FCValue], fcv)
@@ -37,16 +52,25 @@ def fern_os_range32_not_empty(fcv: FCValue) -> Result[None, str]:
 FOS_RANGE32 = FCSchemaStruct(
     [
         ("START", FOS_UINT32_4K),
-        ("END_INC", FOS_UINT32),
+
+        # This is a little frustrating, "END" will be a derived field thus given the original
+        # fields are valid, "END" must also be valid by its schema.
+        # i.e. This check confirms that "END_INC" ends with 0xFFF, which guarantees "END"
+        # will fit schema `FOS_UINT32_AND_1_4K`
+        ("END_INC", FOS_UINT32.with_extra_checks(
+            valid_range_end=lambda fcv: 
+            Ok(None) if (cast(int, fcv) & 0xFFF) == 0xFFF else Err(f"Invalid incluive end value: 0x{cast(int, fcv):X}")
+        )), # This is a UINT to allow for 0x1_0000_0000.
     ], 
 
-    # Exclusive end as derived field!
-    #
-    # See that this is not a UINT32, as 0x1_0000_0000 is a valid value for "END".
-    END=(FOS_UINT_4K, lambda v: cast(dict[str, int], v)["END_INC"] + 1)
+    END=(FOS_UINT32_AND_1_4K, lambda v: cast(dict[str, int], v)["END_INC"] + 1)
 ).with_extra_checks(
     non_empty=fern_os_range32_not_empty
 )
+
+####################################################################################################
+
+# FernOS Memory Layout
 
 def fern_os_mem_ranges_no_overlap(fcv: FCValue) -> Result[None, str]:
     dv = cast(dict[str, dict[str, int]], fcv)
@@ -90,7 +114,7 @@ FOS_PMEM_RANGES = FCSchemaStruct([
             "Beginning of physical memory.",
             "It is very possible the bootloader puts things here!"
         ]),
-        lambda fcv: [0, cast(dict[str, dict[str, int]], fcv)["FERN"]["START"] - 1]
+        lambda fcv: [0, cast(dict[str, dict[str, int]], fcv)["BODY"]["START"] - 1]
     ),
 
     EPILOGUE=(
@@ -98,7 +122,7 @@ FOS_PMEM_RANGES = FCSchemaStruct([
             "End of physical memory.",
             "It is very possible the bootloader puts things here!"
         ]),
-        lambda fcv: [cast(dict[str, dict[str, int]], fcv)["FERN"]["END"], 0xFFFF_FFFF]
+        lambda fcv: [cast(dict[str, dict[str, int]], fcv)["BODY"]["END"], 0xFFFF_FFFF]
     )
 ).with_comment([
     "How physical memory is laid out in FernOS."
@@ -154,27 +178,26 @@ def fern_os_mem_v_valid(fcv: FCValue) -> Result[None, str]:
     Confirm all virtual memory ranges are within the FernOS physical memory range.
     """
     dv = cast(dict[str, FCValue], fcv)
+    pmem = cast(dict[str, dict[str, int]], dv["P"])
+    body_start = pmem["BODY"]["START"]
+    body_end = pmem["BODY"]["END"]
 
-    fa_value = cast(dict[str, int], dv["FULL_AREA"])
-    fa_start = fa_value["START"]
-    fa_end_inc = fa_value["END_INC"]
-
-    ranges_value = cast(dict[str, dict[str, int]], dv["RANGES"])
-    for r_name, r_value in ranges_value.items():
-        r_start = r_value["START"]
-        r_end_inc = r_value["END_INC"]
-
-        if not (fa_start <= r_start and r_end_inc <= fa_end_inc):
-            return Err(f"range outside full area: {r_name}")
+    vmem = cast(dict[str, dict[str, int]], dv["V"])
+    for vr_name, vr in vmem.items():
+        vr_start = vr["START"]
+        vr_end = vr["END"]
+        
+        if not (body_start <= vr_start and vr_end <= body_end):
+            return Err(f"V range outside FernOS body: {vr_name}")
 
     return Ok(None)
 
-# I feel like these areas should be derived??
-# Yeah, I think so too tbh?
 FOS_MEM_LAYOUT = FCSchemaStruct([
     ("P", FOS_PMEM_RANGES),
     ("V", FOS_VMEM_RANGES)
-])
+]).with_extra_checks(valid_virtual_ranges=fern_os_mem_v_valid)
+
+####################################################################################################
 
 FOS_SCHEMA = FCSchemaStruct([
     ("MEM", FOS_MEM_LAYOUT)
