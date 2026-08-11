@@ -4,27 +4,27 @@
 # Certain targets are actually built entirely in this Makefile. For example the disk, iso, and elf.
 # While others require invoking other Makefiles! For example hdrs.install, lib.install, and apps
 
-####### DEPENDENCY GRAPH OVERVIEW #######
-# 										#
-#                hdrs.install 			#
-# 	                  | 				#
-#                     V 				#
-#                lib.install 			#         
-# 	                  | 				#
-#                     V 				#
-#                    elf 				#
-#                     | 				#
-#            ---------* 				#
-#            |        | 				#
-#            V        | 				#
-#           apps      V 				#
-#            |       iso  				#
-#            V        | 				#
-#           disk      |  				#
-#            |        V 				#
-#            *-----> run  				#
-# 										#
-#########################################
+						####### DEPENDENCY GRAPH OVERVIEW #######
+						# 										#
+						#                hdrs.install 			#
+						# 	                  | 				#
+						#                     V 				#
+						#                lib.install 			#         
+						# 	                  | 				#
+						#                     V 				#
+						#                    elf 				#
+						#                     | 				#
+						#            ---------* 				#
+						#            |        | 				#
+						#            V        | 				#
+						#           apps      V 				#
+						#            |       iso  				#
+						#            V        | 				#
+						#           disk      |  				#
+						#            |        V 				#
+						#            *-----> run  				#
+						# 										#
+						#########################################
 
 ####################################################################################################
 
@@ -35,6 +35,7 @@ SRC_DIR    := $(GIT_TOP)/src
 BUILD_DIR   := $(GIT_TOP)/src/build
 INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
+VENV_DIR := $(BUILD_DIR)/venv
 
 MY_MAKE := @make --no-print-directory
 DONE_MSG = @echo -e "\x1B[1;97m>> \x1B[1;92m$1 \x1B[1;97m<<\x1b[0m\n"
@@ -53,10 +54,56 @@ MODS := \
 		s_gfx \
 		s_util 
 
-# Static memory layout header and linker generation:
-
 $(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 	mkdir -p $@
+
+####################################################################################################
+
+FERNCONF_VERSION := 0.1.8
+VENV_ACTIVATE := $(VENV_DIR)/bin/activate
+
+$(VENV_DIR):
+	mkdir -p $@
+	python3 -m venv $(VENV_DIR)
+	. $(VENV_ACTIVATE) && \
+		pip install --upgrade pip && \
+		pip install mypy fernconf==$(FERNCONF_VERSION)
+
+.PHONY: venv
+venv: $(VENV_DIR)
+
+SCHEMA_PY := $(SRC_DIR)/config_schema.py
+MYPY_TOKEN := $(BUILD_DIR)/mypy_token
+
+# The MyPy token confirms that the schema python file has been type checked since its last update!
+$(MYPY_TOKEN): $(SCHEMA_PY) | $(VENV_DIR)
+	. $(VENV_ACTIVATE) && mypy $(SCHEMA_PY)
+	touch $@
+
+CONFIG_JSON := $(SRC_DIR)/config.json
+
+CONFIG_C  := $(INCLUDE_DIR)/c_config.h
+$(CONFIG_C): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
+	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gcc -o $@
+
+CONFIG_AS := $(INCLUDE_DIR)/as_config.h
+$(CONFIG_AS): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
+	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gas -o $@
+
+CONFIG_LD := $(INSTALL_DIR)/ld_config.h
+$(CONFIG_LD): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
+	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f ld -o $@
+
+# I haven't figured out yet how we are going to fit in a generated make file into the build
+# process!
+CONFIG_MK := $(INSTALL_DIR)/mk_config.mk
+$(CONFIG_MK): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
+	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f make -o $@
+
+CONFIGS := $(CONFIG_C) $(CONFIG_AS) $(CONFIG_LD) $(CONFIG_MK)
+
+# NOTE: Generated Config files are not integrated into FernOS at this time.
+# The below more primitive generation method is still used at this time.
 
 ####################################################################################################
 
