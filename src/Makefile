@@ -243,20 +243,30 @@ APPS_DIR  := $(SRC_DIR)/apps
 
 APPS_BUILD := $(BUILD_DIR)/apps/build
 APPS_OUT := $(BUILD_DIR)/apps/bin
-
 APPS := $(addprefix $(APPS_OUT)/,$(_APPS))
+
+APP_LDSCRIPT := $(SRC_DIR)/linker_app.ld
+ABS_APP_LDSCRIPT := $(APPS_BUILD)/abs_linker_app.ld
+
+$(APPS_BUILD):
+	mkdir -p $@
+
+$(ABS_APP_LDSCRIPT): $(APP_LDSCRIPT) $(CONFIG_LD) | $(APPS_BUILD)
+	$(C_COMPILER) -I$(INCLUDE_DIR) -xc -P -E $< > $@
 
 # Similar to MOD_MAKE macro, but for apps
 APP_MAKE = $(MY_MAKE) -C $(APPS_DIR)/$* \
 				BUILD_DIR=$(APPS_BUILD)/$* \
 				OUT_DIR=$(APPS_OUT) \
 				INSTALL_DIR=$(INSTALL_DIR) \
-				ELF_SYMS=$(ELF_SYMS) 
+				ELF_SYMS=$(ELF_SYMS) \
+				APP_LDSCRIPT=$(ABS_APP_LDSCRIPT)
+
 
 APP_TARS := $(addprefix apps.unsafe.,$(_APPS))
 .PHONY: apps.unsafe $(APP_TARS)
 
-$(APP_TARS): apps.unsafe.%:
+$(APP_TARS): apps.unsafe.%: $(ABS_APP_LDSCRIPT)
 	$(APP_MAKE) bin
 
 apps.unsafe: $(APP_TARS)

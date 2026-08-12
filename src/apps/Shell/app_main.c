@@ -6,6 +6,7 @@
 #include "s_util/ansi.h"
 #include <stddef.h>
 #include "s_util/ps2_scancodes.h"
+#include "c_config.h"
 
 /*
  * NOTE: Probably going to come back to this after graphics!

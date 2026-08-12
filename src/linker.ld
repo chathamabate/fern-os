@@ -22,10 +22,6 @@ ENTRY(_start)
 
 MEMORY 
 {
-    /* Nothing goes in the preface area! These all will be 4MB aligned to help with paging. */
-
-    prologue       : ORIGIN = FC_CORE_PMEM_PROLOGUE_START, LENGTH = FC_CORE_PMEM_PROLOGUE_END - FC_CORE_PMEM_PROLOGUE_START + 1
-
     /* Likely only the kernel area will be needed below by this linker script */
     fernos_kernel_area : ORIGIN = FC_CORE_VMEM_KERNEL_START, LENGTH = FC_CORE_VMEM_KERNEL_END - FC_CORE_VMEM_KERNEL_START + 1
 
@@ -34,8 +30,6 @@ MEMORY
 
     fernos_free_area : ORIGIN = FC_CORE_VMEM_FREE_START, LENGTH = FC_CORE_VMEM_FREE_END - FC_CORE_VMEM_FREE_START + 1
     fernos_stack_area : ORIGIN = FC_CORE_VMEM_STACK_START, LENGTH = FC_CORE_VMEM_STACK_END - FC_CORE_VMEM_STACK_START + 1
-
-    epilogue       : ORIGIN = FC_CORE_PMEM_EPILOGUE_START, LENGTH = FC_CORE_PMEM_EPILOGUE_END - FC_CORE_PMEM_EPILOGUE_START + 1
 }
 
 /* Tell where the various sections of the object files will be put in the final
