@@ -21,7 +21,7 @@ MEMORY
 {
     /* Nothing goes in the preface area! These all will be 4MB aligned to help with paging. */
 
-    prologue       : ORIGIN = PROLOGUE_START, LENGTH = PROLOGUE_END - PROLOGUE_START + 1
+    prologue       : ORIGIN = FC_CORE_PMEM_PROLOGUE_START, LENGTH = FC_CORE_PMEM_PROLOGUE_END - FC_CORE_PMEM_PROLOGUE_START + 1
 
     /* Likely only the kernel area will be needed below by this linker script */
     fernos_kernel_area : ORIGIN = FERNOS_KERNEL_START, LENGTH = FERNOS_KERNEL_END - FERNOS_KERNEL_START + 1
@@ -32,7 +32,7 @@ MEMORY
     fernos_free_area : ORIGIN = FERNOS_FREE_START, LENGTH = FERNOS_FREE_END - FERNOS_FREE_START + 1
     fernos_stack_area : ORIGIN = FERNOS_STACK_START, LENGTH = FERNOS_STACK_END - FERNOS_STACK_START + 1
 
-    epilogue       : ORIGIN = EPILOGUE_START, LENGTH = EPILOGUE_END - EPILOGUE_START + 1
+    epilogue       : ORIGIN = FC_CORE_PMEM_EPILOGUE_START, LENGTH = FC_CORE_PMEM_EPILOGUE_END - FC_CORE_PMEM_EPILOGUE_START + 1
 }
 
 

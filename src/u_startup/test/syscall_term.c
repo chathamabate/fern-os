@@ -5,7 +5,7 @@
 #include "s_util/ansi.h"
 #include "s_util/misc.h"
 #include "s_gfx/window.h"
-
+#include "c_config.h"
 
 fernos_error_t test_userspace_dummy_term(handle_t h_t) {
     size_t rows;

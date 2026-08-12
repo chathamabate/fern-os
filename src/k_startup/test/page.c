@@ -9,6 +9,7 @@
 #include "s_util/str.h"
 #include <stdint.h>
 #include "k_startup/gfx.h"
+#include "c_config.h"
 
 static bool pretest(void);
 static bool posttest(void);

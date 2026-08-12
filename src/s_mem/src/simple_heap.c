@@ -1,11 +1,11 @@
 
-
 #include "s_mem/simple_heap.h"
 #include "s_mem/allocator.h"
 #include "s_util/err.h"
 #include "s_util/misc.h"
 #include "s_util/str.h"
 #include "s_util/ansi.h"
+#include "c_config.h"
 
 #include <stdarg.h>
 

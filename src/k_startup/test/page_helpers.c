@@ -13,6 +13,8 @@
 #include <stdint.h>
 #include "k_startup/gfx.h"
 
+#include "c_config.h"
+
 static bool pretest(void);
 static bool posttest(void);
 
@@ -781,15 +783,15 @@ static bool test_new_user_app_pd(void) {
     // kernel stack. We'll just loosely require the kernel stack to be pretty large before
     // running this test.
 
-    TEST_TRUE(FOS_KERNEL_STACK_SIZE >= (M_4K * 24));
+    TEST_TRUE(FC_CORE_KSTACK_SIZE >= (M_4K * 24));
 
     user_app_t ua = {
         .al = NULL, // These tests cannot depend on a heap being set up.
-        .entry = (const void *)FOS_APP_AREA_START,
+        .entry = (const void *)FC_CORE_VMEM_APP_START,
         .areas = {
             (user_app_area_entry_t) {
                 .occupied = true,
-                .load_position = (void *)FOS_APP_AREA_START,
+                .load_position = (void *)FC_CORE_VMEM_APP_START,
                 .area_size = M_4K,
                 .given = NULL,
                 .given_size = 0,
@@ -797,7 +799,7 @@ static bool test_new_user_app_pd(void) {
             },
             (user_app_area_entry_t) {
                 .occupied = true,
-                .load_position = (void *)(FOS_APP_AREA_START + M_4K),
+                .load_position = (void *)(FC_CORE_VMEM_APP_START + M_4K),
                 .area_size = 16,
                 .given = "hello",
                 .given_size = 6,
@@ -805,7 +807,7 @@ static bool test_new_user_app_pd(void) {
             },
             (user_app_area_entry_t) {
                 .occupied = true,
-                .load_position = (void *)(FOS_APP_AREA_START + (3 * M_4K)),
+                .load_position = (void *)(FC_CORE_VMEM_APP_START + (3 * M_4K)),
                 .area_size = 8,
                 .given = "goodbye",
                 .given_size = 8,
@@ -813,7 +815,7 @@ static bool test_new_user_app_pd(void) {
             } ,
             (user_app_area_entry_t) {
                 .occupied = true,
-                .load_position = (void *)(FOS_APP_AREA_START + (5 * M_4K)),
+                .load_position = (void *)(FC_CORE_VMEM_APP_START + (5 * M_4K)),
                 .area_size = (2 * M_4K) + 10,
                 .given = NULL,
                 .given_size = 0,
@@ -868,13 +870,13 @@ static bool test_new_user_app_pd(void) {
 
     // Bad entry point.
     const void *og_entry = ua.entry;
-    ua.entry = (const void *)(FOS_APP_AREA_START + (10 * M_4K));  
+    ua.entry = (const void *)(FC_CORE_VMEM_APP_START + (10 * M_4K));  
     TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, mock_args_block_size, &upd));
     ua.entry = og_entry;
 
     // Areas too large.
     uint32_t og_size = ua.areas[0].area_size;
-    ua.areas[0].area_size = FOS_APP_AREA_SIZE + M_4K;
+    ua.areas[0].area_size = FC_CORE_VMEM_APP_SIZE + M_4K;
     TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, mock_args_block_size, &upd));
     ua.areas[0].area_size = og_size;
 

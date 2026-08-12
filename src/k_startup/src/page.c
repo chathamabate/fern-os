@@ -2,11 +2,11 @@
 #include "k_sys/page.h"
 
 #include "k_startup/page.h"
-#include "os_defs.h"
 #include "s_util/misc.h"
 #include "s_util/err.h"
 #include "s_util/str.h"
 #include <stdbool.h>
+#include "k_startup/stacks.h"
 
 // page and page_helpers reference each other.
 #include "k_startup/page_helpers.h"
@@ -260,7 +260,7 @@ static fernos_error_t _init_kernel_pd(void) {
      * (Which must have caching turned off to be safe)
      */
 
-    PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), 
+    PROP_ERR(_place_range(pd, (uint8_t *)(FC_CORE_PMEM_PROLOGUE_START + M_4K), (const uint8_t *)(FC_CORE_PMEM_PROLOGUE_END + 1), 
                 _R_IDENTITY | _R_WRITEABLE | _R_DONT_CACHE));    
 
     PROP_ERR(_place_range(pd, _sys_tables_start, _sys_tables_end, _R_WRITEABLE | _R_IDENTITY));
@@ -283,7 +283,7 @@ static fernos_error_t _init_kernel_pd(void) {
     //
     // The epilogue is being mapped into the kernel space so we have access to the framebuffer
     // and potentially other structures set up by grub.
-    PROP_ERR(_place_range(pd, (uint8_t *)EPILOGUE_START, (const uint8_t *)ALIGN(EPILOGUE_END, M_4K),
+    PROP_ERR(_place_range(pd, (uint8_t *)FC_CORE_PMEM_EPILOGUE_START, (const uint8_t *)ALIGN(FC_CORE_PMEM_EPILOGUE_END, M_4K),
                 _R_WRITEABLE | _R_IDENTITY | _R_DONT_CACHE));
 
     // Now setup up the free kernel pages!
@@ -392,7 +392,7 @@ static fernos_error_t _init_first_user_pd(void) {
 
     /*
     // You get insert the kernel into the user space here for debugging purposes.
-    PROP_ERR(_place_range(pd, (uint8_t *)(PROLOGUE_START + M_4K), (const uint8_t *)(PROLOGUE_END + 1), _R_USER | _R_IDENTITY | _R_WRITEABLE));    
+    PROP_ERR(_place_range(pd, (uint8_t *)(FC_CORE_PMEM_PROLOGUE_START + M_4K), (const uint8_t *)(FC_CORE_PMEM_PROLOGUE_END + 1), _R_USER | _R_IDENTITY | _R_WRITEABLE));    
     PROP_ERR(_place_range(pd, _ro_kernel_start, _ro_kernel_end, _R_USER | _R_IDENTITY));
     PROP_ERR(_place_range(pd, _bss_kernel_start, _bss_kernel_end, _R_USER | _R_WRITEABLE));
     PROP_ERR(_place_range(pd, _data_kernel_start, _data_kernel_end, _R_USER | _R_WRITEABLE));

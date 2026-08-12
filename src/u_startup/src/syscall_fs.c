@@ -6,7 +6,7 @@
 #include "s_util/str.h"
 #include "s_util/misc.h"
 #include "s_util/elf.h"
-
+#include "c_config.h"
 
 #include <stdarg.h>
 

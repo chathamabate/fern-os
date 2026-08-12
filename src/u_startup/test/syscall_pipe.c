@@ -6,6 +6,8 @@
 #include "s_util/misc.h"
 #include "s_util/rand.h"
 
+#include "c_config.h"
+
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
 

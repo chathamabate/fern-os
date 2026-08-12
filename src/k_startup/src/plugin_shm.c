@@ -36,8 +36,8 @@ static void *find_shm_start(binary_search_tree_t *bst, uint32_t len) {
     const plugin_shm_range_t *curr = bst_min(bst);
 
     while (1) {
-        const void *start = prev ? prev->end : (void *)FOS_SHARED_AREA_START;
-        const void *end = curr ? curr->start : (void *)FOS_SHARED_AREA_END;
+        const void *start = prev ? prev->end : (void *)FC_CORE_VMEM_SHARED_START;
+        const void *end = curr ? curr->start : (void *)FC_CORE_VMEM_SHARED_END;
         
         uint32_t area_size = (uint32_t)end - (uint32_t)start;
 
@@ -129,7 +129,7 @@ static fernos_error_t plg_shm_new_shm(plugin_shm_t *plg_shm, uint32_t min_size, 
         return FOS_E_BAD_ARGS;
     }
 
-    if (min_size > FOS_SHARED_AREA_SIZE) {
+    if (min_size > FC_CORE_VMEM_SHARED_SIZE) {
         return FOS_E_NO_SPACE;
     }
 

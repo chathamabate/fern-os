@@ -26,7 +26,7 @@ struct _user_app_area_entry_t {
 
     /**
      * Where to load this section in memory of the user process. This must be within the 
-     * FOS_APP_AREA range.
+     * FC_CORE_VMEM_APP range.
      */
     void *load_position;
 
@@ -61,7 +61,7 @@ struct _user_app_t {
     allocator_t *al; 
 
     /**
-     * Where the entry point of the application is. Must be in the FOS_APP_AREA.
+     * Where the entry point of the application is. Must be in the FC_CORE_VMEM_APP.
      */
     const void *entry;
 

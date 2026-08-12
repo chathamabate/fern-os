@@ -6,7 +6,7 @@
 
 #include "s_bridge/shared_defs.h"
 
-
+#include "c_config.h"
 
 static handle_t results_cd;
 

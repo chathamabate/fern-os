@@ -56,7 +56,7 @@ struct _plugin_shm_sem_t {
  * When a range structure exists like this it corresponds to an allocated area of
  * memory in the kernel memory space.
  *
- * Ranges will always be inside the FOS_SHARED_AREA!
+ * Ranges will always be inside the FC_CORE_VMEM_SHARED!
  */
 struct _plugin_shm_range_t {
     /**

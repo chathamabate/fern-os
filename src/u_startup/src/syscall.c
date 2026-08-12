@@ -2,6 +2,7 @@
 #include "u_startup/syscall.h"
 #include "s_bridge/shared_defs.h"
 #include "s_util/str.h"
+#include "c_config.h"
 
 
 fernos_error_t sc_proc_fork(proc_id_t *cpid) {

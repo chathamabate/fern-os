@@ -1,6 +1,7 @@
 
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_fs.h"
+#include "c_config.h"
 
 #include "s_util/str.h"
 #include "s_util/elf.h"

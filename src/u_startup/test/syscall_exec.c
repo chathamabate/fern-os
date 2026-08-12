@@ -1,10 +1,9 @@
 
-
 #include "u_startup/test/syscall_exec.h"
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_fs.h"
 #include "u_startup/syscall_fut.h"
-
+#include "c_config.h"
 
 /*
  * NOTE: These tests kinda cover the behavior of a few different files/plugins.

@@ -6,6 +6,7 @@
 #include "s_util/str.h"
 #include "s_gfx/mono_fonts.h"
 #include "s_util/str.h"
+#include "c_config.h"
 
 void gfx_to_screen(gfx_screen_t *screen, gfx_buffer_t *frame) {
     // We'll put a memory barrier both before and after cause why not.
@@ -117,7 +118,7 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
 
     // Confirm the screen is setup as expected! 
     // (Remember, the final page of the epilogue will be unmappable in kernel space)
-    if (fb_tag->addr < FOS_AREA_END || end > ALIGN(0xFFFFFFFF, M_4K) ||
+    if (fb_tag->addr < FC_CORE_PMEM_BODY_END || end > ALIGN(0xFFFFFFFF, M_4K) ||
             fb_tag->width != FERNOS_GFX_WIDTH ||
             fb_tag->height != FERNOS_GFX_HEIGHT || fb_tag->bpp != FERNOS_GFX_BPP) {
 
