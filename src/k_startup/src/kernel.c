@@ -11,7 +11,7 @@
 #include "u_startup/main.h"
 #include "s_mem/simple_heap.h"
 #include "s_bridge/ctx.h"
-#include "s_util/constraints.h"
+#include "c_config.h"
 #include "k_startup/ata_block_device.h"
 #include "s_data/id_table.h"
 #include "k_sys/kb.h"
@@ -45,8 +45,8 @@ static inline void try_setup_step(fernos_error_t err, const char *msg) {
 
 static fernos_error_t init_kernel_heap(void) {
     simple_heap_attrs_t shal_attrs = {
-        .start = (void *)FOS_FREE_AREA_START,
-        .end =   (void *)FOS_FREE_AREA_END,
+        .start = (void *)FC_CORE_VMEM_FREE_START,
+        .end =   (void *)FC_CORE_VMEM_FREE_END,
         .mmp = (mem_manage_pair_t) {
             .request_mem = alloc_pages,
             .return_mem = free_pages
@@ -194,8 +194,6 @@ void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
     // Screen is setup, so we can safely call `gfx_direct_fatal` from here on out.
     // (Given we setup paging correctly when enabling virtual memory)
         
-    try_setup_step(validate_constraints(), "Failed to validate memory areas");
-
     try_setup_step(init_gdt(), "Failed to initialize GDT");
     try_setup_step(init_idt(), "Failed to initialize IDT");
     try_setup_step(init_global_tss(), "Failed to initialize TSS");

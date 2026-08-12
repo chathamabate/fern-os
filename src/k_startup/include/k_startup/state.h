@@ -6,6 +6,7 @@
 #include "k_sys/page.h"
 #include "s_mem/allocator.h"
 #include "k_startup/fwd_defs.h"
+#include "c_config.h"
 #include "s_util/constraints.h"
 #include "s_bridge/ctx.h"
 #include "s_data/map.h"
@@ -121,7 +122,7 @@ struct _kernel_state_t {
      * Unused cells will have value NULL. When a plugin errors out and must be deleted, it's cell
      * is also set to NULL after cleanup.
      */
-    plugin_t *plugins[FOS_MAX_PLUGINS];
+    plugin_t *plugins[FC_CORE_MAX_PLUGINS];
 };
 
 /**

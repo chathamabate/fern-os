@@ -70,7 +70,7 @@ struct _plugin_fs_t {
      *
      * If a process exists, it will have a non-null value in this array!
      */
-    fs_node_key_t cwds[FOS_MAX_PROCS];
+    fs_node_key_t cwds[FC_CORE_MAX_PROCS];
 };
 
 /**

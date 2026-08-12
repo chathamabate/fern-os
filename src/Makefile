@@ -32,10 +32,10 @@
 GIT_TOP ?= $(shell git rev-parse --show-toplevel)
 
 SRC_DIR    := $(GIT_TOP)/src
-BUILD_DIR   := $(GIT_TOP)/src/build
+BUILD_DIR   := $(SRC_DIR)/build
 INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
-VENV_DIR := $(BUILD_DIR)/venv
+VENV_DIR := $(SRC_DIR)/venv
 
 MY_MAKE := @make --no-print-directory
 DONE_MSG = @echo -e "\x1B[1;97m>> \x1B[1;92m$1 \x1B[1;97m<<\x1b[0m\n"
@@ -86,8 +86,8 @@ CONFIG_C  := $(INCLUDE_DIR)/c_config.h
 $(CONFIG_C): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gcc -o $@
 
-CONFIG_AS := $(INCLUDE_DIR)/as_config.h
-$(CONFIG_AS): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
+CONFIG_S := $(INCLUDE_DIR)/s_config.h
+$(CONFIG_S): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gas -o $@
 
 CONFIG_LD := $(INSTALL_DIR)/ld_config.h
@@ -100,66 +100,22 @@ CONFIG_MK := $(INSTALL_DIR)/mk_config.mk
 $(CONFIG_MK): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f make -o $@
 
-CONFIGS := $(CONFIG_C) $(CONFIG_AS) $(CONFIG_LD) $(CONFIG_MK)
-
-# NOTE: Generated Config files are not integrated into FernOS at this time.
-# The below more primitive generation method is still used at this time.
+CONFIGS := $(CONFIG_C) $(CONFIG_S) $(CONFIG_LD) $(CONFIG_MK)
 
 ####################################################################################################
 
 # Layout Header and LD script generation.
 # All ranges below are inclusive! (These all must be numeric constants)
 
-PROLOGUE_START  :=       0x0
-PROLOGUE_END    :=  0x3FFFFF
-
-FERNOS_START   :=   	0x00400000
-
-# Where Kernel parts are placed.
-FERNOS_KERNEL_START := 	0x00400000
-FERNOS_KERNEL_END   := 	0x01FFFFFF
-
-# Where User applications will be loaded.
-FERNOS_APP_START      :=  0x02000000
-FERNOS_APP_END        :=  0x02FFFFFF
-
-# Where User application arguments will be loaded.
-FERNOS_APP_ARGS_START := 0x03000000
-FERNOS_APP_ARGS_END   := 0x03003FFF
-
-# Where the dynamic memory area will live for all processes
-FERNOS_FREE_START   :=  0x10000000
-FERNOS_FREE_END     :=  0x3FFFFFFF
-
-# Where shared memory pages will live
-FERNOS_SHARED_START :=  0x60000000
-FERNOS_SHARED_END   :=  0x8FFFFFFF
-
-# Area where stacks will live in fernos.
-FERNOS_STACK_START  := 0xA0000000
-FERNOS_STACK_END    := 0xBFFFFFFF
-
-FERNOS_END     := 0xBFFFFFFF
-
-EPILOGUE_START := 0xC0000000
-EPILOGUE_END   := 0xFFFFFFFF
+# TODO: Add graphics settings into config schema and remove need for these old os defs files 
+# entirely!
 
 FERNOS_GFX_WIDTH  := 1024
 FERNOS_GFX_HEIGHT := 768
 FERNOS_GFX_BPP    := 32
 
 # All Important OS Definitions
-OS_DEFS :=   PROLOGUE_START PROLOGUE_END \
-			 FERNOS_START \
-			 FERNOS_KERNEL_START FERNOS_KERNEL_END \
-			 FERNOS_APP_START FERNOS_APP_END \
-			 FERNOS_APP_ARGS_START FERNOS_APP_ARGS_END \
-			 FERNOS_FREE_START FERNOS_FREE_END \
-			 FERNOS_SHARED_START FERNOS_SHARED_END \
-			 FERNOS_STACK_START FERNOS_STACK_END \
-			 FERNOS_END \
-			 EPILOGUE_START EPILOGUE_END \
-			 FERNOS_GFX_WIDTH FERNOS_GFX_HEIGHT \
+OS_DEFS :=   FERNOS_GFX_WIDTH FERNOS_GFX_HEIGHT \
 			 FERNOS_GFX_BPP
 
 C_MACRO_GEN = echo "\#define $1 $($1)UL" >> $@;
@@ -196,7 +152,7 @@ $(HDRS_INSTALL_TARS): hdrs.install.%:
 	$(MOD_MAKE) hdrs.install test_hdrs.install 
 
 .PHONY: hdrs.install $(HDRS_INSTALL_TARS)
-hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
+hdrs.install: $(HDRS_INSTALL_TARS) $(CONFIG_C) $(CONFIG_S) $(OS_DEFS_H) $(OS_DEFS_S) 
 	$(call DONE_MSG,Headers Installed)
 
 # Install Libraries
@@ -399,8 +355,11 @@ run: iso disk
 		-display gtk \
 		-monitor stdio
 
-.PHONY: clean
+.PHONY: clean clean.deep
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+clean.deep: clean
+	rm -rf $(VENV_DIR)
 

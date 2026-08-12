@@ -50,7 +50,7 @@ struct _plugin_shm_sem_t {
      *
      * If this bit vector is entirely 0, the kernel should dispose of this semaphore!
      */
-    uint8_t refs[FOS_MAX_PROCS / 8];
+    uint8_t refs[FC_CORE_MAX_PROCS / 8];
 };
 
 /**
@@ -85,7 +85,7 @@ struct _plugin_shm_range_t {
      * Realize, that we could just check a process's page tables to see
      * if this range is mapped, but that is probably slower and more confusing than this.
      */
-    uint8_t refs[FOS_MAX_PROCS / 8];
+    uint8_t refs[FC_CORE_MAX_PROCS / 8];
 
     /*
      * Realize that if `kernel_refs` is 0 AND `refs` is entirely 0, this range is no

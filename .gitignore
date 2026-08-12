@@ -5,3 +5,4 @@ install
 *.o
 .clangd
 .mypy_cache
+venv

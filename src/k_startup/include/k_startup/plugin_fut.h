@@ -21,7 +21,7 @@ struct _plugin_fut_t {
      *
      * (futex_t *) -> (basic_wait_queue_t *)
      */
-    map_t *fut_maps[FOS_MAX_PROCS];
+    map_t *fut_maps[FC_CORE_MAX_PROCS];
 };
 
 /**
