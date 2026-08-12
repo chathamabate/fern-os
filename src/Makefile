@@ -76,7 +76,7 @@ SCHEMA_PY := $(SRC_DIR)/config_schema.py
 MYPY_TOKEN := $(BUILD_DIR)/mypy_token
 
 # The MyPy token confirms that the schema python file has been type checked since its last update!
-$(MYPY_TOKEN): $(SCHEMA_PY) | $(VENV_DIR)
+$(MYPY_TOKEN): $(SCHEMA_PY) | $(VENV_DIR) $(BUILD_DIR)
 	. $(VENV_ACTIVATE) && mypy $(SCHEMA_PY)
 	touch $@
 
@@ -90,8 +90,8 @@ CONFIG_S := $(INCLUDE_DIR)/s_config.h
 $(CONFIG_S): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gas -o $@
 
-CONFIG_LD := $(INSTALL_DIR)/ld_config.h
-$(CONFIG_LD): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
+CONFIG_LD := $(INCLUDE_DIR)/ld_config.h
+$(CONFIG_LD): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f ld -o $@
 
 # I haven't figured out yet how we are going to fit in a generated make file into the build
@@ -202,6 +202,10 @@ OS_NAME := fernos
 C_COMPILER := i686-elf-gcc
 
 LDSCRIPT := $(SRC_DIR)/linker.ld
+ABS_LDSCRIPT := $(INSTALL_DIR)/abs_linker.ld
+
+$(ABS_LDSCRIPT): $(LDSCRIPT) $(CONFIG_LD) | $(INSTALL_DIR)
+	$(C_COMPILER) -I$(INCLUDE_DIR) -xc -P -E $< > $@
 
 ELF_FILE := $(BUILD_DIR)/$(OS_NAME).elf
 ELF_SYMS := $(BUILD_DIR)/$(OS_NAME).syms
@@ -210,8 +214,8 @@ LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod)_test -l$(mod))
 
 # Realize that ALL_LIBS doesn't actually define a rule for itself. This ELF target should NEVER
 # be invoked without libs already being explicity installed previously!
-$(ELF_FILE): $(ALL_LIBS) $(OS_DEFS_LD) | $(BUILD_DIR)
-	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -nostdlib -O2 -L$(INSTALL_DIR) \
+$(ELF_FILE): $(ALL_LIBS) $(ABS_LDSCRIPT) | $(BUILD_DIR)
+	$(C_COMPILER) -T $(ABS_LDSCRIPT) -o $@ -ffreestanding -nostdlib -O2 -L$(INSTALL_DIR) \
 		-Wl,--start-group -lgcc -Wl,--whole-archive $(LIB_FLAGS) -Wl,--end-group 
 
 # The symbols file is useful for compiling user application binaries.  (Depends on SHALLOW kernel rules)

@@ -1,10 +1,9 @@
 
+#include "ld_config.h"
 
 /* The bootloader will look at this image and start execution at the symbol
    designated as the entry point. */
 ENTRY(_start)
-
-INCLUDE "os_defs.ld"
 
 /*
  * I'm sick of always doing these calcs.
@@ -28,13 +27,13 @@ MEMORY
     prologue       : ORIGIN = FC_CORE_PMEM_PROLOGUE_START, LENGTH = FC_CORE_PMEM_PROLOGUE_END - FC_CORE_PMEM_PROLOGUE_START + 1
 
     /* Likely only the kernel area will be needed below by this linker script */
-    fernos_kernel_area : ORIGIN = FERNOS_KERNEL_START, LENGTH = FERNOS_KERNEL_END - FERNOS_KERNEL_START + 1
+    fernos_kernel_area : ORIGIN = FC_CORE_VMEM_KERNEL_START, LENGTH = FC_CORE_VMEM_KERNEL_END - FC_CORE_VMEM_KERNEL_START + 1
 
-    fernos_app_area : ORIGIN = FERNOS_APP_START, LENGTH = FERNOS_APP_END - FERNOS_APP_START + 1
-    fernos_app_args_area : ORIGIN = FERNOS_APP_ARGS_START, LENGTH = FERNOS_APP_ARGS_END - FERNOS_APP_ARGS_START + 1
+    fernos_app_area : ORIGIN = FC_CORE_VMEM_APP_START, LENGTH = FC_CORE_VMEM_APP_END - FC_CORE_VMEM_APP_START + 1
+    fernos_app_args_area : ORIGIN = FC_CORE_VMEM_APP_ARGS_START, LENGTH = FC_CORE_VMEM_APP_ARGS_END - FC_CORE_VMEM_APP_ARGS_START + 1
 
-    fernos_free_area : ORIGIN = FERNOS_FREE_START, LENGTH = FERNOS_FREE_END - FERNOS_FREE_START + 1
-    fernos_stack_area : ORIGIN = FERNOS_STACK_START, LENGTH = FERNOS_STACK_END - FERNOS_STACK_START + 1
+    fernos_free_area : ORIGIN = FC_CORE_VMEM_FREE_START, LENGTH = FC_CORE_VMEM_FREE_END - FC_CORE_VMEM_FREE_START + 1
+    fernos_stack_area : ORIGIN = FC_CORE_VMEM_STACK_START, LENGTH = FC_CORE_VMEM_STACK_END - FC_CORE_VMEM_STACK_START + 1
 
     epilogue       : ORIGIN = FC_CORE_PMEM_EPILOGUE_START, LENGTH = FC_CORE_PMEM_EPILOGUE_END - FC_CORE_PMEM_EPILOGUE_START + 1
 }
