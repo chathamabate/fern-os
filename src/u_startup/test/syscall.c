@@ -1,7 +1,7 @@
 
 
 #include "u_startup/syscall.h"
-#include "s_util/constraints.h"
+
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
@@ -38,7 +38,7 @@ static bool test_simple_fork(void) {
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         // We are in the child process!
         sc_proc_exit(PROC_ES_SUCCESS); 
     }
@@ -85,13 +85,13 @@ static bool test_simple_signal0(void) {
 
     sig_id_t sid;
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         // In the child!
         sig_vector_t csv = (1 << 4);
 
         sc_signal_allow(csv);
 
-        err = sc_signal(FOS_MAX_PROCS, 3);
+        err = sc_signal(FC_CORE_MAX_PROCS, 3);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         err = sc_signal_wait(csv, &sid);
@@ -130,16 +130,16 @@ static bool test_simple_signal1(void) {
     err = sc_signal(1234, 1);
     TEST_TRUE(err != FOS_E_SUCCESS);
 
-    err = sc_signal(FOS_MAX_PROCS, 1);
+    err = sc_signal(FC_CORE_MAX_PROCS, 1);
     TEST_TRUE(err != FOS_E_SUCCESS);
 
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         // Send 4,5,6 to the root, then exit.
         for (sig_id_t sid = 4; sid <= 6; sid++) {
-            err = sc_signal(FOS_MAX_PROCS, sid);
+            err = sc_signal(FC_CORE_MAX_PROCS, sid);
             TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         }
 
@@ -182,11 +182,11 @@ static bool test_signal_allow_exit(void) {
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         sc_signal_allow(full_sig_vector()); 
         // Allow all signals in the child!
 
-        err = sc_signal(FOS_MAX_PROCS, 4);
+        err = sc_signal(FC_CORE_MAX_PROCS, 4);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         // Wait for the parent to send a 5.
@@ -225,7 +225,7 @@ static bool test_complex_fork0(void) {
     err = sc_proc_reap(100, NULL, NULL);
     TEST_EQUAL_HEX(FOS_E_STATE_MISMATCH, err);
 
-    err = sc_proc_reap(FOS_MAX_PROCS, NULL, NULL);
+    err = sc_proc_reap(FC_CORE_MAX_PROCS, NULL, NULL);
     TEST_EQUAL_HEX(FOS_E_EMPTY, err);
 
     sc_signal_allow((1 << FSIG_CHLD));
@@ -243,14 +243,14 @@ static bool test_complex_fork0(void) {
     err = sc_proc_fork(&(cpids[0]));
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    if (cpids[0] == FOS_MAX_PROCS) {
+    if (cpids[0] == FC_CORE_MAX_PROCS) {
 
         sc_signal_allow(1 << FSIG_CHLD);
 
         err = sc_proc_fork(&(cpids[1]));
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-        if (cpids[1] == FOS_MAX_PROCS) {
+        if (cpids[1] == FC_CORE_MAX_PROCS) {
             // inside proc1.
 
             sc_proc_exit(PROC_ES_SUCCESS);
@@ -259,7 +259,7 @@ static bool test_complex_fork0(void) {
         err = sc_proc_fork(&(cpids[2]));
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-        if (cpids[2] == FOS_MAX_PROCS) {
+        if (cpids[2] == FC_CORE_MAX_PROCS) {
             // inside proc2
             
             sc_proc_exit(PROC_ES_SUCCESS);
@@ -278,7 +278,7 @@ static bool test_complex_fork0(void) {
     proc_id_t rcpid;
     proc_exit_status_t rces;
     for (int i = 0; i < 3; i++) {
-        err = sc_proc_reap_single(FOS_MAX_PROCS, &rcpid, &rces);
+        err = sc_proc_reap_single(FC_CORE_MAX_PROCS, &rcpid, &rces);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
         if (rcpid == cpids[0]) {
@@ -312,7 +312,7 @@ static bool test_complex_fork1(void) {
         err = sc_proc_fork(&cpid);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-        if (cpid != FOS_MAX_PROCS) {
+        if (cpid != FC_CORE_MAX_PROCS) {
             break;
         }
     }
@@ -325,7 +325,7 @@ static bool test_complex_fork1(void) {
         while (1);
     } else if (i == 0) {
         for (int i = 0; i < 3; i++) {
-            err = sc_proc_reap_single(FOS_MAX_PROCS, NULL, NULL);
+            err = sc_proc_reap_single(FC_CORE_MAX_PROCS, NULL, NULL);
             TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
         }
 
@@ -352,7 +352,7 @@ static bool test_complex_fork2(void) {
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         sc_signal_allow(1 << FSIG_CHLD);
 
         proc_id_t cpids[3];
@@ -362,7 +362,7 @@ static bool test_complex_fork2(void) {
             err = sc_proc_fork(&(cpids[i]));
             TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-            if (cpids[i] == FOS_MAX_PROCS) {
+            if (cpids[i] == FC_CORE_MAX_PROCS) {
                 break;
             }
         }
@@ -372,7 +372,7 @@ static bool test_complex_fork2(void) {
             sc_signal_allow(1 << FSIG_CHLD);
 
             proc_id_t rcpid;
-            err = sc_proc_reap_single(FOS_MAX_PROCS, &rcpid, NULL);
+            err = sc_proc_reap_single(FC_CORE_MAX_PROCS, &rcpid, NULL);
             TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
             TEST_EQUAL_HEX(cpids[0], rcpid);
 
@@ -385,12 +385,12 @@ static bool test_complex_fork2(void) {
             sc_proc_exit(PROC_ES_SUCCESS);
         } 
 
-        if (cpids[0] == FOS_MAX_PROCS) {
+        if (cpids[0] == FC_CORE_MAX_PROCS) {
             // proc0
             while (1);
         }
 
-        if (cpids[1] == FOS_MAX_PROCS) {
+        if (cpids[1] == FC_CORE_MAX_PROCS) {
             // proc1
             err = sc_signal(cpids[0], 4);
             TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
@@ -398,7 +398,7 @@ static bool test_complex_fork2(void) {
             while (1);
         }
 
-        if (cpids[2] == FOS_MAX_PROCS) {
+        if (cpids[2] == FC_CORE_MAX_PROCS) {
             // proc2
             while (1);
         }
@@ -406,7 +406,7 @@ static bool test_complex_fork2(void) {
 
     for (int i = 0; i < 3; i++) {
         // reap proc, proc1, and proc2
-        err = sc_proc_reap_single(FOS_MAX_PROCS, NULL, NULL);
+        err = sc_proc_reap_single(FC_CORE_MAX_PROCS, NULL, NULL);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
@@ -419,7 +419,7 @@ static bool test_premature_reap(void) {
     proc_id_t cpid;
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) { // child.
+    if (cpid == FC_CORE_MAX_PROCS) { // child.
         while (1); // The child will just loop forever.
     }
 
@@ -448,24 +448,24 @@ static bool test_simple_memory(void) {
 
     const void *true_e;
 
-    err = sc_mem_request((void *)(FOS_FREE_AREA_START - M_4K), (const void *)(FOS_FREE_AREA_END), &true_e);
+    err = sc_mem_request((void *)(FC_CORE_VMEM_FREE_START - M_4K), (const void *)(FC_CORE_VMEM_FREE_END), &true_e);
     TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
 
-    err = sc_mem_request((void *)(FOS_FREE_AREA_START), (const void *)(FOS_FREE_AREA_END + M_4K), &true_e);
+    err = sc_mem_request((void *)(FC_CORE_VMEM_FREE_START), (const void *)(FC_CORE_VMEM_FREE_END + M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
 
     // This tests the errors of the wrapped pd alloc function are bubbled up correctly.
-    err = sc_mem_request((void *)(FOS_FREE_AREA_START + (2 * M_4K)), (const void *)(FOS_FREE_AREA_END + M_4K), &true_e);
+    err = sc_mem_request((void *)(FC_CORE_VMEM_FREE_START + (2 * M_4K)), (const void *)(FC_CORE_VMEM_FREE_END + M_4K), &true_e);
     TEST_EQUAL_HEX(FOS_E_INVALID_RANGE, err);
 
     // Going to assume this single page allocation always works!
-    TEST_SUCCESS(sc_mem_request((void *)(FOS_FREE_AREA_START), (const void *)(FOS_FREE_AREA_START + M_4K), &true_e));
-    TEST_EQUAL_HEX((const void *)(FOS_FREE_AREA_START + M_4K), true_e);
+    TEST_SUCCESS(sc_mem_request((void *)(FC_CORE_VMEM_FREE_START), (const void *)(FC_CORE_VMEM_FREE_START + M_4K), &true_e));
+    TEST_EQUAL_HEX((const void *)(FC_CORE_VMEM_FREE_START + M_4K), true_e);
 
     // Make sure this doesn't crash the process.
-    *(int *)(FOS_FREE_AREA_START) = 4;
+    *(int *)(FC_CORE_VMEM_FREE_START) = 4;
 
-    sc_mem_return((void *)(FOS_FREE_AREA_START), (const void *)(FOS_FREE_AREA_START + M_4K));
+    sc_mem_return((void *)(FC_CORE_VMEM_FREE_START), (const void *)(FC_CORE_VMEM_FREE_START + M_4K));
 
     TEST_SUCCEED();
 }
@@ -482,8 +482,8 @@ static bool test_memory_forks(void) {
 
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) {
-        *(int *)(FOS_FREE_AREA_START) = 4; // this shouldn't be allocated yet, and thus
+    if (cpid == FC_CORE_MAX_PROCS) {
+        *(int *)(FC_CORE_VMEM_FREE_START) = 4; // this shouldn't be allocated yet, and thus
                                            // should crash.
         sc_proc_exit(PROC_ES_SUCCESS);
     }
@@ -494,12 +494,12 @@ static bool test_memory_forks(void) {
 
     // Child Proc 2.
 
-    TEST_SUCCESS(sc_mem_request((void *)FOS_FREE_AREA_START, (const void *)(FOS_FREE_AREA_START + M_4K), &true_e));
+    TEST_SUCCESS(sc_mem_request((void *)FC_CORE_VMEM_FREE_START, (const void *)(FC_CORE_VMEM_FREE_START + M_4K), &true_e));
 
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) {
-        *(int *)(FOS_FREE_AREA_START) = 4; // this shouldn't crash, because it IS allocated!
+    if (cpid == FC_CORE_MAX_PROCS) {
+        *(int *)(FC_CORE_VMEM_FREE_START) = 4; // this shouldn't crash, because it IS allocated!
         sc_proc_exit(PROC_ES_SUCCESS);
     }
 
@@ -510,10 +510,10 @@ static bool test_memory_forks(void) {
     // Child Proc 3.
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         // Does returning work?
-        sc_mem_return((void *)FOS_FREE_AREA_START, (const void *)(FOS_FREE_AREA_START + M_4K));
-        *(int *)(FOS_FREE_AREA_START) = 4; // This SHOULD Crash!
+        sc_mem_return((void *)FC_CORE_VMEM_FREE_START, (const void *)(FC_CORE_VMEM_FREE_START + M_4K));
+        *(int *)(FC_CORE_VMEM_FREE_START) = 4; // This SHOULD Crash!
 
         sc_proc_exit(PROC_ES_SUCCESS);
     }
@@ -523,7 +523,7 @@ static bool test_memory_forks(void) {
     TEST_TRUE(rces != PROC_ES_SUCCESS);
 
     // REturn the page we allocated for child proc 2.
-    sc_mem_return((void *)FOS_FREE_AREA_START, (const void *)(FOS_FREE_AREA_START + M_4K));
+    sc_mem_return((void *)FC_CORE_VMEM_FREE_START, (const void *)(FC_CORE_VMEM_FREE_START + M_4K));
 
     TEST_SUCCEED();
 }
@@ -550,7 +550,7 @@ static bool test_thread_join0(void) {
     thread_id_t tids[5];
     for (uint32_t i = 0; i < 5; i++) {
         err = sc_thread_spawn(&(tids[i]), example_worker0, (void *)i);    
-        TEST_TRUE(tids[i] < FOS_MAX_THREADS_PER_PROC);
+        TEST_TRUE(tids[i] < FC_CORE_MAX_THREADS_PER_PROC);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
     }
 
@@ -571,7 +571,7 @@ static bool test_thread_join0(void) {
         for (j = 0; j < 3; j++) {
             if (joined == tids[j]) {
                 TEST_EQUAL_UINT(10 * j, ret_val);
-                tids[j] = FOS_MAX_THREADS_PER_PROC;
+                tids[j] = FC_CORE_MAX_THREADS_PER_PROC;
                 break;
             }
         }
@@ -585,10 +585,10 @@ static bool test_thread_join0(void) {
 
         if (joined == tids[3]) {
             TEST_EQUAL_UINT(10 * 3, ret_val);
-            tids[3] = FOS_MAX_THREADS_PER_PROC;
+            tids[3] = FC_CORE_MAX_THREADS_PER_PROC;
         } else if (joined == tids[4]) {
             TEST_EQUAL_UINT(10 * 4, ret_val);
-            tids[4] = FOS_MAX_THREADS_PER_PROC;
+            tids[4] = FC_CORE_MAX_THREADS_PER_PROC;
         } else {
             TEST_FAIL();
         }
@@ -655,7 +655,7 @@ static bool test_thread_join1(void) {
         for (j = 0; j < workers; j++) {
             if (tids[j] == joined) {
                 TEST_EQUAL_UINT(j * WORKER1_SUB_WORKERS * 10, ret_val);
-                tids[j] = FOS_MAX_THREADS_PER_PROC;
+                tids[j] = FC_CORE_MAX_THREADS_PER_PROC;
                 break;
             }
         }
@@ -699,7 +699,7 @@ static bool test_fork_and_thread(void) {
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         // The point is that in our child process, none of the spawned workers should be duplicated.
         // We should be able to modify the number freely without any race conditions.
         number = 0;
@@ -775,7 +775,7 @@ static bool test_fatal_stack_pressure(void) {
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         // Overflow the stack!
         test_stack_pressure_func(100000000); 
     }

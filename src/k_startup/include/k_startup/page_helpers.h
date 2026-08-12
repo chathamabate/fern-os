@@ -149,7 +149,7 @@ fernos_error_t mem_set_to_user(phys_addr_t user_pd, void *user_dest, uint8_t val
  * NOTE: `*out` is only written to on success.
  *
  * NOTE: VERY IMPORTANT: `abs_ab` is a pointer to an ABSOLUTE args block with offset
- * FOS_APP_ARGS_AREA_START. This is assumed and not checked. (Also, if `abs_ab_len` is 0, `abs_ab`
+ * FC_CORE_VMEM_APP_ARGS_START. This is assumed and not checked. (Also, if `abs_ab_len` is 0, `abs_ab`
  * can be NULL)
  *
  * NOTE: This DOES NOT allocate any thread stacks!! When creating a new process with this memory

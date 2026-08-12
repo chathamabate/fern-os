@@ -6,7 +6,6 @@
 #include "s_data/binary_search_tree.h"
 #include "s_data/wait_queue.h"
 #include "s_data/id_table.h"
-#include "s_util/constraints.h"
 
 /**
  * Max number of semaphores allowed globally at once.

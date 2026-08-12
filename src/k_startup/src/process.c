@@ -4,7 +4,6 @@
 #include "k_startup/thread.h"
 #include "k_sys/page.h"
 #include "s_mem/allocator.h"
-#include "s_util/constraints.h"
 
 #include "k_startup/handle.h"
 #include "s_util/misc.h"
@@ -15,10 +14,10 @@ process_t *new_process(allocator_t *al, proc_id_t pid, phys_addr_t pd, process_t
     process_t *proc = al_malloc(al, sizeof(process_t));
     list_t *children = new_linked_list(al, sizeof(process_t *));
     list_t *zchildren = new_linked_list(al, sizeof(process_t *));
-    id_table_t *thread_table = new_id_table(al, FOS_MAX_THREADS_PER_PROC);
+    id_table_t *thread_table = new_id_table(al, FC_CORE_MAX_THREADS_PER_PROC);
     vector_wait_queue_t *join_queue = new_vector_wait_queue(al);
     vector_wait_queue_t *signal_queue = new_vector_wait_queue(al);
-    id_table_t *handle_table = new_id_table(al, FOS_MAX_HANDLES_PER_PROC);
+    id_table_t *handle_table = new_id_table(al, FC_CORE_MAX_HANDLES_PER_PROC);
 
     if (!proc || !children || !zchildren || !thread_table || !join_queue || 
             !signal_queue || !handle_table) {
@@ -78,11 +77,11 @@ fernos_error_t new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid, 
     }
 
     // Deciding not to use an iterator here because that technically mutates `proc`.
-    for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC;  tid++) {
+    for (thread_id_t tid = 0; tid < FC_CORE_MAX_THREADS_PER_PROC;  tid++) {
         thread_t *parent_thread = idtb_get(proc->thread_table, tid);
         if (parent_thread && tid != thr->tid) {
             void *s = parent_thread->stack_base;
-            const void *e = (const void *)FOS_THREAD_STACK_END(tid);
+            const void *e = (const void *)FC_CORE_TSTACK_END(tid);
 
             // Free all stacks which aren't being used in the new process.
             pd_free_pages(new_pd, false, s, e);
@@ -144,7 +143,7 @@ fernos_error_t new_process_fork(process_t *proc, thread_t *thr, proc_id_t cpid, 
 
     // Ok, now actual handle copying will happen here too!
 
-    for (id_t hid = 0; hid < FOS_MAX_HANDLES_PER_PROC; hid++) {
+    for (id_t hid = 0; hid < FC_CORE_MAX_HANDLES_PER_PROC; hid++) {
         handle_state_t *hs = idtb_get(proc->handle_table, hid);
         if (hs) {
             handle_state_t *hs_copy;
@@ -248,7 +247,7 @@ fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, u
 
     // Now delete all non-main threads!
 
-    for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC; tid++) {
+    for (thread_id_t tid = 0; tid < FC_CORE_MAX_THREADS_PER_PROC; tid++) {
         thread_t *thr = (thread_t *)idtb_get(proc->thread_table, tid);
         if (thr && thr != main_thr) {
             delete_thread(thr); // This will deschedule/unwait as necessary!
@@ -264,7 +263,7 @@ fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, u
     thread_reset(main_thr, entry, arg0, arg1, arg2);
 
     // One point though, we are in a new page directory now, so we must manually reset stack_base.
-    main_thr->stack_base = (void *)FOS_THREAD_STACK_END(main_thr->tid);
+    main_thr->stack_base = (void *)FC_CORE_TSTACK_END(main_thr->tid);
 
     proc->sig_vec = empty_sig_vector(); 
     proc->sig_allow = empty_sig_vector();
@@ -272,7 +271,7 @@ fernos_error_t proc_exec(process_t *proc, phys_addr_t new_pd, uintptr_t entry, u
     // Lucky for us, futexes are no longer stored inside the process structure!
 
     // Now, delete all non-default handles, check for errors of course.
-    for (handle_t h = 0; h < FOS_MAX_HANDLES_PER_PROC; h++) {
+    for (handle_t h = 0; h < FC_CORE_MAX_HANDLES_PER_PROC; h++) {
         handle_state_t *hs = idtb_get(proc->handle_table, h);
         if (hs && h != proc->in_handle && h != proc->out_handle) {
             err = delete_handle_state(hs);
@@ -329,7 +328,7 @@ void proc_delete_thread(process_t *proc, thread_t *thr, bool return_stack) {
 
     if (return_stack) {
         void *tstack_start = thr->stack_base;
-        const void *tstack_end = (void *)FOS_THREAD_STACK_END(tid);
+        const void *tstack_end = (void *)FC_CORE_TSTACK_END(tid);
 
         // Free the whole stack.
         pd_free_pages(proc->pd, false, tstack_start, tstack_end);

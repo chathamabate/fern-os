@@ -2,7 +2,7 @@
 #include "k_startup/thread.h"
 #include "k_startup/process.h"
 #include "k_startup/test/process.h"
-#include "s_util/constraints.h"
+
 
 #include "k_startup/page.h"
 #include "k_startup/handle.h"
@@ -83,7 +83,7 @@ static bool test_many_threads(void) {
     process_t *proc = new_da_process(0, pd, NULL);
     TEST_TRUE(proc != NULL);
 
-    for (size_t i = 0; i < FOS_MAX_THREADS_PER_PROC; i++) {
+    for (size_t i = 0; i < FC_CORE_MAX_THREADS_PER_PROC; i++) {
         thread_t *thr = proc_new_thread(proc, (uintptr_t)fake_entry, 0, 0, 0);
         TEST_TRUE(thr != NULL);
     }
@@ -108,7 +108,7 @@ static bool test_many_threads(void) {
 
     // Try deleting every other thread just to see what happens.
 
-    for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC; tid += 2) {
+    for (thread_id_t tid = 0; tid < FC_CORE_MAX_THREADS_PER_PROC; tid += 2) {
         thread_t *thr = idtb_get(proc->thread_table, tid);
         if (thr) {
             proc_delete_thread(proc, thr, true);
@@ -345,7 +345,7 @@ static bool test_proc_exec(void) {
     TEST_EQUAL_HEX(mt, proc->main_thread);
 
     // Confirm only the main thread still exists!
-    for (thread_id_t tid = 0; tid < FOS_MAX_THREADS_PER_PROC; tid++) {
+    for (thread_id_t tid = 0; tid < FC_CORE_MAX_THREADS_PER_PROC; tid++) {
         if (tid == mt->tid) {
             TEST_EQUAL_HEX(mt, idtb_get(proc->thread_table, tid));
         } else {
@@ -354,7 +354,7 @@ static bool test_proc_exec(void) {
     }
 
     // Now confirm just the out handle exists!
-    for (handle_t h = 0; h < FOS_MAX_HANDLES_PER_PROC; h++) {
+    for (handle_t h = 0; h < FC_CORE_MAX_HANDLES_PER_PROC; h++) {
         if (h == proc->out_handle) {
             TEST_TRUE(idtb_get(proc->handle_table, h) != NULL);
         } else {

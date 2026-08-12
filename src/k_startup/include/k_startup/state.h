@@ -7,7 +7,7 @@
 #include "s_mem/allocator.h"
 #include "k_startup/fwd_defs.h"
 #include "c_config.h"
-#include "s_util/constraints.h"
+#include "stacks.h"
 #include "s_bridge/ctx.h"
 #include "s_data/map.h"
 #include "s_bridge/app.h"
@@ -218,7 +218,7 @@ fernos_error_t ks_tick(kernel_state_t *ks);
  * of the current process.
  *
  * On Success FOS_E_SUCCESS is returned in both processes, in the child process,
- * FOS_MAX_PROCS is written to *u_cpid, in the parent process the new child's pid is written to
+ * FC_CORE_MAX_PROCS is written to *u_cpid, in the parent process the new child's pid is written to
  * *u_cpid.
  *
  * Returns an error in the calling process if insufficient resources or some other misc error.
@@ -245,7 +245,7 @@ KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t st
 /**
  * Reap a zombie child process! 
  *
- * `cpid` is the pid of the process we want to reap. If `cpid` is FOS_MAX_PROCS, this will reap ANY 
+ * `cpid` is the pid of the process we want to reap. If `cpid` is FC_CORE_MAX_PROCS, this will reap ANY 
  * child process!
  * 
  * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
@@ -261,7 +261,7 @@ KS_SYSCALL fernos_error_t ks_exit_proc(kernel_state_t *ks, proc_exit_status_t st
  * If `u_rcpid` is given, the pid of the reaped child is written to *u_rcpid.
  * If `u_rces` is given, the exit status of the reaped child is written to *u_rces.
  *
- * On error, FOS_MAX_PROCS is written to *u_rcpid, and PROC_ES_UNSET is written to *u_rces.
+ * On error, FC_CORE_MAX_PROCS is written to *u_rcpid, and PROC_ES_UNSET is written to *u_rces.
  *
  * NOTE: VERY IMPORTANT: It is intended that the user uses this call in combination with a 
  * wait_signal on FSIG_CHLD. However, based on how the kernel works internally, just because
@@ -277,7 +277,7 @@ KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid, proc_
  * This call overwrites the calling process by loading a binary dynamically!
  *
  * NOTE: `u_abs_ab` must be a pointer to an ABSOLUTE args block! That is all pointers within
- * the block must assume the block begins at FOS_APP_ARGS_AREA_START.
+ * the block must assume the block begins at FC_CORE_VMEM_APP_ARGS_START.
  * SEE: `args_block_make_absolute`.
  *
  * On success, this call does NOT return to the user process, it enters the given app's main function
@@ -299,7 +299,7 @@ KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const vo
 /** 
  * Send a signal to a process with pid `pid`.
  *
- * If `pid` = FOS_MAX_PROCS, the signal is sent to the current process's parent.
+ * If `pid` = FC_CORE_MAX_PROCS, the signal is sent to the current process's parent.
  *
  * An error is returned if the given signal id is invalid, or if the receiving process
  * cannot be found! 

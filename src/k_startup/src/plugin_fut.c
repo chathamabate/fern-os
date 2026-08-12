@@ -38,13 +38,13 @@ plugin_t *new_plugin_fut(kernel_state_t *ks) {
 
     init_base_plugin((plugin_t *)plg_fut, &PLUGIN_FUT_IMPL, ks);
 
-    for (size_t i = 0; i < FOS_MAX_PROCS; i++) {
+    for (size_t i = 0; i < FC_CORE_MAX_PROCS; i++) {
         plg_fut->fut_maps[i] = NULL;  // Set all maps to NULL at start time.
     }
 
     bool alloc_failure = false;
 
-    for (proc_id_t pid = 0; pid < FOS_MAX_PROCS; pid++) {
+    for (proc_id_t pid = 0; pid < FC_CORE_MAX_PROCS; pid++) {
         if (idtb_get(ks->proc_table, pid)) { // Is there a process at `pid`?
             map_t *fut_map = new_chained_hash_map(ks->al, sizeof(futex_t *), sizeof(basic_wait_queue_t *),
                     3, fm_key_eq, fm_key_hash);
@@ -59,7 +59,7 @@ plugin_t *new_plugin_fut(kernel_state_t *ks) {
     }
 
     if (alloc_failure) {
-        for (size_t i = 0; i < FOS_MAX_PROCS; i++) {
+        for (size_t i = 0; i < FC_CORE_MAX_PROCS; i++) {
             delete_map(plg_fut->fut_maps[i]); // NULL pass through.
         }
         al_free(ks->al, plg_fut);

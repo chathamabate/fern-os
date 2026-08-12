@@ -72,7 +72,7 @@ plugin_t *new_plugin_fs(kernel_state_t *ks, file_sys_t *fs) {
     // Ok should be smooth sailing from here.
 
     size_t root_nk_references = 0;
-    for (size_t i = 0; i < FOS_MAX_PROCS; i++) {
+    for (size_t i = 0; i < FC_CORE_MAX_PROCS; i++) {
         if (idtb_get(ks->proc_table, i)) {
             root_nk_references++;
             plg_fs->cwds[i] = root_nk;

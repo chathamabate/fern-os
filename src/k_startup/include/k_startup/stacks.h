@@ -29,7 +29,7 @@
 #define FC_CORE_KSTACK_END      (FC_CORE_VMEM_STACK_END)
 
 /**
- * i is the thread index, (i < FOS_MAX_THREADS_PER_PROC)
+ * i is the thread index, (i < FC_CORE_MAX_THREADS_PER_PROC)
  *
  * The indexes go down. i.e. thread stack 0, will be just below the kernel stack.
  */

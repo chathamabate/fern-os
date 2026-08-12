@@ -2,7 +2,6 @@
 #include "k_startup/gfx.h"
 
 #include "os_defs.h"
-#include "s_util/constraints.h"
 #include "k_sys/debug.h"
 #include "s_util/str.h"
 #include "s_gfx/mono_fonts.h"

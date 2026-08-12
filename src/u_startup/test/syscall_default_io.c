@@ -5,7 +5,7 @@
 #include "u_startup/syscall_fs.h"
 
 #include "s_bridge/shared_defs.h"
-#include "s_util/constraints.h"
+
 
 
 static handle_t results_cd;
@@ -49,9 +49,9 @@ static bool posttest(void) {
 static bool test_null_io_handles(void) {
     fernos_error_t err;
 
-    sc_set_in_handle(FOS_MAX_HANDLES_PER_PROC + 100);
+    sc_set_in_handle(FC_CORE_MAX_HANDLES_PER_PROC + 100);
 
-    TEST_EQUAL_UINT(FOS_MAX_HANDLES_PER_PROC, sc_get_in_handle());
+    TEST_EQUAL_UINT(FC_CORE_MAX_HANDLES_PER_PROC, sc_get_in_handle());
 
     char buf[5];
     err = sc_in_read(buf, sizeof(buf), NULL);
@@ -60,8 +60,8 @@ static bool test_null_io_handles(void) {
     err = sc_in_wait();
     TEST_EQUAL_HEX(FOS_E_EMPTY, err);
 
-    sc_set_out_handle(FOS_MAX_HANDLES_PER_PROC);
-    TEST_EQUAL_UINT(FOS_MAX_HANDLES_PER_PROC, sc_get_out_handle());
+    sc_set_out_handle(FC_CORE_MAX_HANDLES_PER_PROC);
+    TEST_EQUAL_UINT(FC_CORE_MAX_HANDLES_PER_PROC, sc_get_out_handle());
 
     // A NULL out handle should always be ready to accept data!
     err = sc_out_wait();
@@ -114,7 +114,7 @@ static bool test_fork_io_handles(void) {
 
     char buf[128];
 
-    if (cpid == FOS_MAX_PROCS) { // child process!
+    if (cpid == FC_CORE_MAX_PROCS) { // child process!
         TEST_SUCCESS(sc_in_read_full(buf, 5)); // "Hello"
         buf[5] = '\0';
 

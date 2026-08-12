@@ -39,12 +39,12 @@ int32_t trigger_syscall(uint32_t id, uint32_t arg0, uint32_t arg1, uint32_t arg2
  *
  * On Success, FOS_E_SUCCESS is returned in BOTH processes.
  * In the parent process the child's pid is written to *cpid.
- * In the child process FOS_MAX_PROCS is written to *cpid.
+ * In the child process FC_CORE_MAX_PROCS is written to *cpid.
  *
  * The cpid argument is optional.
  * 
  * Returns an error if there are insufficient resources!
- * On error, FOS_MAX_PROCS is written to *cpid.
+ * On error, FC_CORE_MAX_PROCS is written to *cpid.
  */
 fernos_error_t sc_proc_fork(proc_id_t *cpid);
 
@@ -67,7 +67,7 @@ void sc_proc_exit(proc_exit_status_t status);
 /**
  * Reap a zombie child process! 
  *
- * `cpid` is the pid of the process we want to reap. If `cpid` is FOS_MAX_PROCS, this will reap ANY 
+ * `cpid` is the pid of the process we want to reap. If `cpid` is FC_CORE_MAX_PROCS, this will reap ANY 
  * child process!
  * 
  * When attempting to reap a specific process, if `cpid` doesn't correspond to a child of this 
@@ -84,7 +84,7 @@ void sc_proc_exit(proc_exit_status_t status);
  * If `rcpid` is given, the pid of the reaped child is written to *rcpid.
  * If `rces` is given, the exit status of the reaped child is written to *rces.
  *
- * On error, FOS_MAX_PROCS is written to *rcpid, and PROC_ES_UNSET is written to *rces.
+ * On error, FC_CORE_MAX_PROCS is written to *rcpid, and PROC_ES_UNSET is written to *rces.
  *
  * NOTE: VERY IMPORTANT: It is intended that the user uses this call in combination with a 
  * wait_signal on FSIG_CHLD. However, based on how the kernel works internally, just because
@@ -119,7 +119,7 @@ fernos_error_t sc_proc_reap_single(proc_id_t cpid, proc_id_t *rcpid, proc_exit_s
  *
  * NOTE: When this new application is entered, it uses a new memory space which has NO HEAP setup.
  *
- * NOTE: `args_block` is expected to be absolute from FOS_APP_ARGS_AREA_START.
+ * NOTE: `args_block` is expected to be absolute from FC_CORE_VMEM_APP_ARGS_START.
  *
  * On failure, an error is returned, the calling process remains in its original state.
  */
@@ -128,7 +128,7 @@ fernos_error_t sc_proc_exec(user_app_t *ua, const void *args_block, size_t args_
 /**
  * Send a signal to a process with pid `pid`.
  *
- * If `pid` = FOS_MAX_PROCS, the signal is sent to this process's parent.
+ * If `pid` = FC_CORE_MAX_PROCS, the signal is sent to this process's parent.
  *
  * An error is returned if the given signal id is invalid, or if the receiving process
  * cannot be found!
@@ -238,7 +238,7 @@ void sc_thread_sleep(uint32_t ticks);
  * Returns an error otherwise. (The thread is not spawned in this case)
  *
  * If tid is given, the created thread's id is written to tid.
- * On error, the null tid is written, (FOS_MAX_THREADS_PER_PROC)
+ * On error, the null tid is written, (FC_CORE_MAX_THREADS_PER_PROC)
  */
 fernos_error_t sc_thread_spawn(thread_id_t *tid, void *(*entry)(void *arg), void *arg);
 
@@ -277,7 +277,7 @@ void sc_set_in_handle(handle_t in);
 /**
  * Get the default input handle.
  *
- * If this handle is not initialized, FOS_MAX_HANDLES_PER_PROC is returned.
+ * If this handle is not initialized, FC_CORE_MAX_HANDLES_PER_PROC is returned.
  */
 handle_t sc_get_in_handle(void);
 
@@ -304,7 +304,7 @@ void sc_set_out_handle(handle_t out);
 /**
  * Get the default output handle.
  *
- * If this handle is not initialized, FOS_MAX_HANDLES_PER_PROC is returned.
+ * If this handle is not initialized, FC_CORE_MAX_HANDLES_PER_PROC is returned.
  */
 handle_t sc_get_out_handle(void);
 

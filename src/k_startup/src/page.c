@@ -7,7 +7,6 @@
 #include "s_util/err.h"
 #include "s_util/str.h"
 #include <stdbool.h>
-#include "s_util/constraints.h"
 
 // page and page_helpers reference each other.
 #include "k_startup/page_helpers.h"
@@ -59,7 +58,7 @@ static pt_entry_t *free_kernel_page_ptes[NUM_FREE_KERNEL_PAGES];
  * without consequence. (Just be careful)
  */
 #define INITIAL_FREE_AREA_START ((phys_addr_t)_static_area_end) 
-#define INITIAL_FREE_AREA_END  ((phys_addr_t)FOS_KERNEL_STACK_START) // Exclusive end.
+#define INITIAL_FREE_AREA_END  ((phys_addr_t)FC_CORE_KSTACK_START) // Exclusive end.
 
 static phys_addr_t free_list_head = NULL_PHYS_ADDR;
 static uint32_t free_list_len = 0;
@@ -277,7 +276,7 @@ static fernos_error_t _init_kernel_pd(void) {
 
     // The kernel stack will be marked identity because it should only exist once and always in
     // the same place!
-    PROP_ERR(_place_range(pd, (uint8_t *)(FOS_KERNEL_STACK_START + M_4K), (uint8_t *)FOS_KERNEL_STACK_END, _R_WRITEABLE | _R_IDENTITY));
+    PROP_ERR(_place_range(pd, (uint8_t *)(FC_CORE_KSTACK_START + M_4K), (uint8_t *)FC_CORE_KSTACK_END, _R_WRITEABLE | _R_IDENTITY));
 
     // Due to how I wrote `_place_range`, we cannot map the final page of the memory space.
     // Instead of actually solving this problem, I'll just leave that page unmapped.
@@ -333,7 +332,7 @@ static fernos_error_t _init_kernel_pd(void) {
     // Always store the physical address of the kernel page table at the very end
     // of the kernel stack area.
 
-    uint32_t *kpd_entry = (uint32_t *)FOS_KERNEL_STACK_END - 1;
+    uint32_t *kpd_entry = (uint32_t *)FC_CORE_KSTACK_END - 1;
     *kpd_entry = kernel_pd;
     
     return FOS_E_SUCCESS;
@@ -411,8 +410,8 @@ static fernos_error_t _init_first_user_pd(void) {
     PROP_ERR(_place_range(pd, _bss_user_start, _bss_user_end, _R_USER | _R_WRITEABLE));
     PROP_ERR(_place_range(pd, _data_user_start, _data_user_end, _R_USER | _R_WRITEABLE));
 
-    const uint8_t *kstack_end = (uint8_t *)FOS_KERNEL_STACK_END;
-    uint8_t *kstack_start = (uint8_t *)(FOS_KERNEL_STACK_START + M_4K);
+    const uint8_t *kstack_end = (uint8_t *)FC_CORE_KSTACK_END;
+    uint8_t *kstack_start = (uint8_t *)(FC_CORE_KSTACK_START + M_4K);
 
     /*
      * NOTE: The kernel stack MUST MUST MUST be in the page table of all processes!

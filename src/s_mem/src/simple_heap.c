@@ -6,7 +6,7 @@
 #include "s_util/misc.h"
 #include "s_util/str.h"
 #include "s_util/ansi.h"
-#include "s_util/constraints.h"
+
 #include <stdarg.h>
 
 static void *shal_malloc(allocator_t *al, size_t bytes);
@@ -662,8 +662,8 @@ static void delete_simple_heap_allocator(allocator_t *al) {
 fernos_error_t setup_default_simple_heap(mem_manage_pair_t mmp) {
     allocator_t *al = new_simple_heap_allocator(
         (simple_heap_attrs_t) {
-            .start = (void *)FOS_FREE_AREA_START,
-            .end = (const void *)(FOS_FREE_AREA_END),
+            .start = (void *)FC_CORE_VMEM_FREE_START,
+            .end = (const void *)(FC_CORE_VMEM_FREE_END),
 
             .mmp = mmp,
 
