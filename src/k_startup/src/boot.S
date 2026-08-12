@@ -1,5 +1,6 @@
 
 #include "s_os_defs.h"
+#include "s_config.h"
 
 .section .multiboot
 header_start:
@@ -53,12 +54,11 @@ _start:
     */
 
     /*
-    The kernel stack will start at the end of the FERNOS Area.
-    Remeber though that FERNOS_END is inclusive (We must +1)
+    The kernel stack will start at the end of the FernOS Stack Area.
     Also, the last 4 bytes of the stack area will always be reserved for the kernel 
     page directory (We must -4)
     */
-	movl $(FERNOS_STACK_END+1-4), %esp
+	movl $(FC_CORE_VMEM_STACK_END-4), %esp
     movl %esp, %ebp
 
     /*
