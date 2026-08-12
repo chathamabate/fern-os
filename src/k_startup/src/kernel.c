@@ -206,7 +206,7 @@ void start_kernel(uint32_t m2_magic, const m2_info_start_t *m2_info) {
 
     try_setup_step(init_kernel_heap(), "Failed to setup kernel heap");
     try_setup_step(init_kb(), "Failed to init keyboard");
-
+    
     init_kernel_state();
     init_kernel_plugins();
 
