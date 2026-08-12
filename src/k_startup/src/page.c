@@ -258,9 +258,12 @@ static fernos_error_t _init_kernel_pd(void) {
      * Quick note, both the prologue and epilogue area will be marked "don't cache".
      * I think after init time, these areas will only really ever be used for MMIO.
      * (Which must have caching turned off to be safe)
+     *
+     * Remeber that the prologue does NOT contain the very first physical page!
+     * Similarly, the epilogue does NOT contain the very last physical page!
      */
 
-    PROP_ERR(_place_range(pd, (uint8_t *)(FC_CORE_PMEM_PROLOGUE_START + M_4K), (const uint8_t *)(FC_CORE_PMEM_PROLOGUE_END + 1), 
+    PROP_ERR(_place_range(pd, (uint8_t *)(FC_CORE_PMEM_PROLOGUE_START), (const uint8_t *)(FC_CORE_PMEM_PROLOGUE_END), 
                 _R_IDENTITY | _R_WRITEABLE | _R_DONT_CACHE));    
 
     PROP_ERR(_place_range(pd, _sys_tables_start, _sys_tables_end, _R_WRITEABLE | _R_IDENTITY));
@@ -283,7 +286,7 @@ static fernos_error_t _init_kernel_pd(void) {
     //
     // The epilogue is being mapped into the kernel space so we have access to the framebuffer
     // and potentially other structures set up by grub.
-    PROP_ERR(_place_range(pd, (uint8_t *)FC_CORE_PMEM_EPILOGUE_START, (const uint8_t *)ALIGN(FC_CORE_PMEM_EPILOGUE_END, M_4K),
+    PROP_ERR(_place_range(pd, (uint8_t *)FC_CORE_PMEM_EPILOGUE_START, (const uint8_t *)FC_CORE_PMEM_EPILOGUE_END,
                 _R_WRITEABLE | _R_IDENTITY | _R_DONT_CACHE));
 
     // Now setup up the free kernel pages!
