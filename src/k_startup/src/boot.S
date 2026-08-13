@@ -1,5 +1,5 @@
 
-#include "s_os_defs.h"
+
 #include "s_config.h"
 
 .section .multiboot
@@ -23,9 +23,9 @@ gfx_tag:
     .short 0
     .long  20
 
-    .long  FERNOS_GFX_WIDTH
-    .long  FERNOS_GFX_HEIGHT
-    .long  FERNOS_GFX_BPP
+    .long  FC_CORE_GFX_WIDTH
+    .long  FC_CORE_GFX_HEIGHT
+    .long  FC_CORE_GFX_BPP
 
     .long 0  // pad
 

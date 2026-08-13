@@ -7,7 +7,7 @@
 #include "s_gfx/window_dummy.h"
 #include "k_startup/page_helpers.h"
 #include "s_util/ansi.h"
-#include "os_defs.h"
+
 
 fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_manager_t *gm, const window_impl_t *impl, allocator_t *al, ring_t *sch) {
     if (!win || !gm || !impl || !al || !sch) {
@@ -26,10 +26,10 @@ fernos_error_t init_window_gfx_base(window_gfx_base_t *win, gfx_manager_t *gm, c
 
     const window_attrs_t attrs = {
         .min_width = 0,
-        .max_width = FERNOS_GFX_WIDTH,
+        .max_width = FC_CORE_GFX_WIDTH,
 
         .min_height = 0,
-        .max_height = FERNOS_GFX_HEIGHT
+        .max_height = FC_CORE_GFX_HEIGHT
     };
     init_window_base((window_t *)win, gm, &attrs, impl);
     *(allocator_t **)&(win->al) = al;
@@ -603,8 +603,8 @@ static window_gfx_gm_t *new_window_gfx_gm(kernel_state_t *ks) {
     window_gfx_gm_t *wggm = al_malloc(ks->al, sizeof(window_gfx_gm_t));
 
     gfx_color_t *banks[2];
-    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT, (uint32_t)(banks + 0), 0, 0);
-    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT, (uint32_t)(banks + 1), 0, 0);
+    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * FC_CORE_GFX_WIDTH * FC_CORE_GFX_HEIGHT, (uint32_t)(banks + 0), 0, 0);
+    ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_NEW_SHM, sizeof(gfx_color_t) * FC_CORE_GFX_WIDTH * FC_CORE_GFX_HEIGHT, (uint32_t)(banks + 1), 0, 0);
 
     if (!wggm || !banks[0] || !banks[1]) {
         ks_kernel_cmd(ks, PLG_SHARED_MEM_ID, PLG_SHM_KCID_SHM_DEC, (uint32_t)(banks[1]), 0, 0, 0);
@@ -614,8 +614,8 @@ static window_gfx_gm_t *new_window_gfx_gm(kernel_state_t *ks) {
     }
 
     // Start both banks a black!
-    mem_set(banks[0], 0, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT);
-    mem_set(banks[1], 0, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT);
+    mem_set(banks[0], 0, sizeof(gfx_color_t) * FC_CORE_GFX_WIDTH * FC_CORE_GFX_HEIGHT);
+    mem_set(banks[1], 0, sizeof(gfx_color_t) * FC_CORE_GFX_WIDTH * FC_CORE_GFX_HEIGHT);
 
     init_gfx_manager_base((gfx_manager_t *)wggm, &WINDOW_GFX_GM_IMPL, 0, 0);
     *(kernel_state_t **)&(wggm->ks) = ks;
@@ -657,7 +657,7 @@ static void wggm_swap(gfx_manager_t *gm) {
 
 static fernos_error_t wggm_resize(gfx_manager_t *gm, uint16_t width, uint16_t height) {
     (void)gm;
-    if ((uint32_t)width * (uint32_t)height > FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT) {
+    if ((uint32_t)width * (uint32_t)height > FC_CORE_GFX_WIDTH * FC_CORE_GFX_HEIGHT) {
         return FOS_E_NO_SPACE;
     }
     return FOS_E_SUCCESS;
@@ -890,7 +890,7 @@ plugin_t *new_plugin_gfx(kernel_state_t *ks, window_t *root_window) {
 
     // We actually allow the `root_window` resize to fail.
     // As long as the window is still active, we are good!
-    err = win_resize(root_window, FERNOS_GFX_WIDTH, FERNOS_GFX_HEIGHT);
+    err = win_resize(root_window, FC_CORE_GFX_WIDTH, FC_CORE_GFX_HEIGHT);
 
     if (err != FOS_E_INACTIVE) {
         err = win_fwd_event(root_window, (window_event_t) {

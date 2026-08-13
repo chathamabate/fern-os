@@ -2,7 +2,7 @@
 #pragma once
 
 #include "k_sys/page.h"
-#include "os_defs.h"
+
 #include "s_util/misc.h"
 #include "s_util/err.h"
 #include <stdbool.h>
