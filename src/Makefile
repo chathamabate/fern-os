@@ -59,10 +59,10 @@ $(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 
 ####################################################################################################
 
-FERNCONF_VERSION := 0.1.8
+FERNCONF_VERSION := 0.1.9
 VENV_ACTIVATE := $(VENV_DIR)/bin/activate
 
-$(VENV_DIR):
+$(VENV_DIR): $(THIS_FILE)
 	mkdir -p $@
 	python3 -m venv $(VENV_DIR)
 	. $(VENV_ACTIVATE) && \
@@ -104,41 +104,6 @@ CONFIGS := $(CONFIG_C) $(CONFIG_S) $(CONFIG_LD) $(CONFIG_MK)
 
 ####################################################################################################
 
-# Layout Header and LD script generation.
-# All ranges below are inclusive! (These all must be numeric constants)
-
-# TODO: Add graphics settings into config schema and remove need for these old os defs files 
-# entirely!
-
-FERNOS_GFX_WIDTH  := 1024
-FERNOS_GFX_HEIGHT := 768
-FERNOS_GFX_BPP    := 32
-
-# All Important OS Definitions
-OS_DEFS :=   FERNOS_GFX_WIDTH FERNOS_GFX_HEIGHT \
-			 FERNOS_GFX_BPP
-
-C_MACRO_GEN = echo "\#define $1 $($1)UL" >> $@;
-LD_DEF_GEN = echo "$1 = ($($1));" >> $@; 
-S_DEF_GEN = echo "\#define $1 $($1)" >> $@; 
-
-OS_DEFS_H := $(INCLUDE_DIR)/os_defs.h
-$(OS_DEFS_H): $(THIS_FILE) | $(INCLUDE_DIR)
-	echo "#pragma once" > $@
-	$(foreach def,$(OS_DEFS),$(call C_MACRO_GEN,$(def)))
-
-OS_DEFS_LD := $(INSTALL_DIR)/os_defs.ld
-$(OS_DEFS_LD): $(THIS_FILE) | $(INSTALL_DIR)
-	rm $@; touch $@;
-	$(foreach def,$(OS_DEFS),$(call LD_DEF_GEN,$(def)))
-
-OS_DEFS_S := $(INCLUDE_DIR)/s_os_defs.h
-$(OS_DEFS_S): $(THIS_FILE) | $(INCLUDE_DIR)
-	rm $@; touch $@;
-	$(foreach def,$(OS_DEFS),$(call S_DEF_GEN,$(def)))
-
-####################################################################################################
-
 # A helper macro invoking module specific make targets!
 # This expects that $* resolves to the name of a module.
 MOD_MAKE = $(MY_MAKE) -C $(SRC_DIR)/$* BUILD_DIR=$(BUILD_DIR)/mods/$* INSTALL_DIR=$(INSTALL_DIR)
@@ -152,7 +117,7 @@ $(HDRS_INSTALL_TARS): hdrs.install.%:
 	$(MOD_MAKE) hdrs.install test_hdrs.install 
 
 .PHONY: hdrs.install $(HDRS_INSTALL_TARS)
-hdrs.install: $(HDRS_INSTALL_TARS) $(CONFIG_C) $(CONFIG_S) $(OS_DEFS_H) $(OS_DEFS_S) 
+hdrs.install: $(HDRS_INSTALL_TARS) $(CONFIG_C) $(CONFIG_S)
 	$(call DONE_MSG,Headers Installed)
 
 # Install Libraries

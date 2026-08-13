@@ -243,7 +243,13 @@ FOS_CORE = FCSchemaStruct(
         # Similarly, must be able to fit a plugin id into a single byte!
         ("MAX_PLUGINS", fos_bound_int(1, 256).with_default_any(16).with_comment([
             "Guarnateed to be <= 256"
-        ]))
+        ])),
+
+        # TODO: Add Plugin section to schema so that these gfx definitions don't need to
+        # be here in "CORE".
+        ("GFX_WIDTH", FCS_INT.const_any(1024)),
+        ("GFX_HEIGHT", FCS_INT.const_any(768)),
+        ("GFX_BPP", FCS_INT.const_any(32))
     ]
 
     # I had planned to derive the start and end of the kernel stack here.

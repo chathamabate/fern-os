@@ -79,12 +79,12 @@ static bool test_lasting_shms(void) {
     // Here, even though the handle is closed, we should still be able to read/write to 
     // shared buffers!
     
-    mem_set(bufs[0], 0x1F, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT);
-    mem_set(bufs[1], 0x3F, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT);
+    mem_set(bufs[0], 0x1F, sizeof(gfx_color_t) * FC_CORE_GFX_WIDTH * FC_CORE_GFX_HEIGHT);
+    mem_set(bufs[1], 0x3F, sizeof(gfx_color_t) * FC_CORE_GFX_WIDTH * FC_CORE_GFX_HEIGHT);
 
     sc_shm_close_shm(bufs[1]);
 
-    mem_set(bufs[0], 0x0F, sizeof(gfx_color_t) * FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT);
+    mem_set(bufs[0], 0x0F, sizeof(gfx_color_t) * FC_CORE_GFX_WIDTH * FC_CORE_GFX_HEIGHT);
 
     sc_shm_close_shm(bufs[0]);
 
@@ -110,7 +110,7 @@ static bool test_gfx_fork(void) {
             for (size_t j = 0; j < 5; j++) {
                 TEST_SUCCESS(sc_gfx_read_event_single(h, &ev));
 
-                mem_set(bufs[0] + (6 * FERNOS_GFX_WIDTH * i), 0xF + (j * 16), 6 * FERNOS_GFX_WIDTH * sizeof(gfx_color_t));
+                mem_set(bufs[0] + (6 * FC_CORE_GFX_WIDTH * i), 0xF + (j * 16), 6 * FC_CORE_GFX_WIDTH * sizeof(gfx_color_t));
             }
 
             // By exiting handles and shms should be closed just fine!

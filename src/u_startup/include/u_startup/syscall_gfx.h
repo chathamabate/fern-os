@@ -5,7 +5,7 @@
 #include "s_gfx/window.h"
 #include "s_gfx/gfx_manager.h"
 
-#include "os_defs.h"
+
 
 /**
  * Create a self managed dummy window.
@@ -45,7 +45,7 @@ fernos_error_t sc_gfx_new_terminal(handle_t *h, const gfx_term_buffer_attrs_t *a
  * must be closed from the desktop. On window cleanup, the shared memory areas just have their
  * kernel reference count decremented! They will still persist in userspace until being 
  * manually unmapped!
- * 4. The created bufs will each be fixed in size. (FERNOS_GFX_WIDTH * FERNOS_GFX_HEIGHT * sizeof(gfx_color_t))
+ * 4. The created bufs will each be fixed in size. (FC_CORE_GFX_WIDTH * FC_CORE_GFX_HEIGHT * sizeof(gfx_color_t))
  */
 fernos_error_t sc_gfx_new_gfx_window(handle_t *h, gfx_color_t *(*shm_buf)[2]);
 

@@ -1,7 +1,7 @@
 
 #include "k_startup/gfx.h"
 
-#include "os_defs.h"
+
 #include "k_sys/debug.h"
 #include "s_util/str.h"
 #include "s_gfx/mono_fonts.h"
@@ -36,11 +36,11 @@ gfx_screen_t * const SCREEN = &screen;
  * Remember that `init_screen` will fail if the memory mapped buffer doesnt have
  * pixels in these dimmensions.
  */
-static gfx_color_t back_buffer_arr[FERNOS_GFX_HEIGHT][FERNOS_GFX_WIDTH];
+static gfx_color_t back_buffer_arr[FC_CORE_GFX_HEIGHT][FC_CORE_GFX_WIDTH];
 
 static gfx_buffer_t back_buffer = {
-    .width = FERNOS_GFX_WIDTH,
-    .height = FERNOS_GFX_HEIGHT,
+    .width = FC_CORE_GFX_WIDTH,
+    .height = FC_CORE_GFX_HEIGHT,
     .buffer = (gfx_color_t *)back_buffer_arr
 };
 
@@ -119,8 +119,8 @@ fernos_error_t init_screen(const m2_info_start_t *m2_info) {
     // Confirm the screen is setup as expected! 
     // (Remember, the final page of the epilogue will be unmappable in kernel space)
     if (fb_tag->addr < FC_CORE_PMEM_BODY_END || end > ALIGN(0xFFFFFFFF, M_4K) ||
-            fb_tag->width != FERNOS_GFX_WIDTH ||
-            fb_tag->height != FERNOS_GFX_HEIGHT || fb_tag->bpp != FERNOS_GFX_BPP) {
+            fb_tag->width != FC_CORE_GFX_WIDTH ||
+            fb_tag->height != FC_CORE_GFX_HEIGHT || fb_tag->bpp != FC_CORE_GFX_BPP) {
 
         // An error at this point means that a frame buffer was setup, but not in the expected
         // configuration. So, let's just write 0xFF's to the entire buffer area!
@@ -157,8 +157,8 @@ void gfx_direct_term_render(void) {
     const int32_t height = DIRECT_TERM_H_SCALE * (int32_t)(DIRECT_TERM_FONT->char_height) * DIRECT_TERM_ROWS;
 
     // Let's center this bad boy.
-    const int32_t x = (FERNOS_GFX_WIDTH - width) / 2;
-    const int32_t y = (FERNOS_GFX_HEIGHT - height) / 2;
+    const int32_t x = (FC_CORE_GFX_WIDTH - width) / 2;
+    const int32_t y = (FC_CORE_GFX_HEIGHT - height) / 2;
 
     gfx_draw_term_buffer(BACK_BUFFER, NULL, NULL, 
             DIRECT_TERM, DIRECT_TERM_FONT, BASIC_ANSI_PALETTE, 
