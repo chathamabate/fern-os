@@ -44,10 +44,17 @@ SECTIONS
      * Each table gets one full page, which should be more than enough!
      */
     
+    .misc.start : {
+        . = ALIGN(4K);
+        _static_area_start = .;
+    } > fernos_kernel_area
+    
     .multiboot : {
         . = ALIGN(4K);
+        _multiboot_start = .;
 		*(.multiboot)
         . = ALIGN(4K);
+        _multiboot_end = .;
     } > fernos_kernel_area
     
     .sys_tables : {
@@ -153,7 +160,7 @@ SECTIONS
         _data_user_end = .;
     } > fernos_kernel_area
 
-    .misc : {
+    .misc.end : {
         . = ALIGN(4K);
         _static_area_end = .;
     } > fernos_kernel_area

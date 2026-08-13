@@ -12,9 +12,9 @@
  * Here are all the section layouts as defined in the linker script.
  *
  * NOTE: end is EXCLUSIVE!
- *
- * The ends is os_defs are INCLUSIVE!
  */
+
+extern uint8_t _static_area_start[];
 
 extern uint8_t _sys_tables_start[];
 extern uint8_t _sys_tables_end[];
