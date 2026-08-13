@@ -2,10 +2,11 @@
 
 #include "u_startup/syscall.h"
 #include "s_bridge/shared_defs.h"
-#include "s_util/constraints.h"
+
 #include "s_util/ansi.h"
 #include <stddef.h>
 #include "s_util/ps2_scancodes.h"
+#include "c_config.h"
 
 /*
  * NOTE: Probably going to come back to this after graphics!
@@ -35,7 +36,7 @@ proc_exit_status_t app_main(const char * const *args, size_t num_args) {
     // Probably will redo all of this tbh...
     // Maybe not right now though...
     handle_t h = sc_get_out_handle();
-    if (h == FOS_MAX_HANDLES_PER_PROC || !sc_handle_is_terminal(h)) {
+    if (h == FC_CORE_MAX_HANDLES_PER_PROC || !sc_handle_is_terminal(h)) {
         return PROC_ES_FAILURE;
     }
 

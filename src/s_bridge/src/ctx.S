@@ -1,5 +1,5 @@
 
-#include "s_os_defs.h"
+#include "s_config.h"
 
 .section .text
 
@@ -33,7 +33,7 @@ enter_intr_ctx:
     pushl %eax 
 
     // Load kernel page table.
-    movl FERNOS_END + 1 - 4, %eax
+    movl FC_CORE_VMEM_STACK_END - 4, %eax
     movl %eax, %cr3
 
     // Switch to kernel data segments.

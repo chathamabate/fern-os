@@ -190,7 +190,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     case SCID_GET_IN_HANDLE: // Probs easiest to just do inline here.
         thr->ctx.eax = idtb_get(thr->proc->handle_table, thr->proc->in_handle) 
-            ? thr->proc->in_handle : FOS_MAX_HANDLES_PER_PROC;
+            ? thr->proc->in_handle : FC_CORE_MAX_HANDLES_PER_PROC;
         err = FOS_E_SUCCESS;
         break;
 
@@ -208,7 +208,7 @@ void fos_syscall_action(user_ctx_t *ctx, uint32_t id, uint32_t arg0, uint32_t ar
 
     case SCID_GET_OUT_HANDLE: // Probs easiest to just do inline here.
         thr->ctx.eax = idtb_get(thr->proc->handle_table, thr->proc->out_handle) 
-            ? thr->proc->out_handle : FOS_MAX_HANDLES_PER_PROC;
+            ? thr->proc->out_handle : FC_CORE_MAX_HANDLES_PER_PROC;
         err = FOS_E_SUCCESS;
         break;
 

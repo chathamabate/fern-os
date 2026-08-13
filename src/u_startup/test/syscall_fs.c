@@ -1,7 +1,8 @@
 
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_fs.h"
-#include "s_util/constraints.h"
+#include "c_config.h"
+
 #include "s_util/str.h"
 #include "s_util/elf.h"
 #include <stdarg.h>
@@ -309,7 +310,7 @@ static bool test_multiprocess_rw(void) {
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    if (cpid == FOS_MAX_PROCS) { // Child process!
+    if (cpid == FC_CORE_MAX_PROCS) { // Child process!
         for (size_t i = 0; i < 10; i++) {
             err = sc_handle_read_full(fh, buf, sizeof(buf));
             TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
@@ -397,7 +398,7 @@ static bool test_multithread_and_process_rw(void) {
     err = sc_proc_fork(&cpid);
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    if (cpid == FOS_MAX_PROCS) { // Child process
+    if (cpid == FC_CORE_MAX_PROCS) { // Child process
         handle_t b_fh;
 
         err = sc_fs_open("./b.txt", &b_fh);
@@ -538,7 +539,7 @@ static bool test_many_procs(void) {
         err = sc_proc_fork(&cpid);
         TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-        if (cpid != FOS_MAX_PROCS) { // Parent process.
+        if (cpid != FC_CORE_MAX_PROCS) { // Parent process.
             // Write in full.
             err = sc_handle_write_full(h, tx_buf, tx_amt);
             TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
@@ -569,7 +570,7 @@ static bool test_many_procs(void) {
     // Wait for all children to exit.
     size_t reaped = 0;
     while (true) {
-        while ((err = sc_proc_reap(FOS_MAX_PROCS, NULL, NULL)) == FOS_E_SUCCESS) {
+        while ((err = sc_proc_reap(FC_CORE_MAX_PROCS, NULL, NULL)) == FOS_E_SUCCESS) {
             reaped++;
         }
         TEST_EQUAL_HEX(FOS_E_EMPTY, err);
@@ -598,13 +599,13 @@ static bool test_many_handles(void) {
 
     fernos_error_t err;
 
-    handle_t handles[FOS_MAX_HANDLES_PER_PROC];
+    handle_t handles[FC_CORE_MAX_HANDLES_PER_PROC];
     size_t num_handles = 0;
 
     err = sc_fs_touch("./a.txt");
     TEST_EQUAL_HEX(FOS_E_SUCCESS, err);
 
-    for (num_handles = 0; num_handles < FOS_MAX_HANDLES_PER_PROC; num_handles++) {
+    for (num_handles = 0; num_handles < FC_CORE_MAX_HANDLES_PER_PROC; num_handles++) {
         err = sc_fs_open("./a.txt", handles + num_handles);
 
         // This test will expect that the calling process may not have an empty
@@ -624,9 +625,9 @@ static bool test_many_handles(void) {
     err = sc_fs_open("./a.txt", &bad_handle);
     TEST_EQUAL_HEX(FOS_E_EMPTY, err);
 
-    uint8_t buf[FOS_MAX_HANDLES_PER_PROC];
+    uint8_t buf[FC_CORE_MAX_HANDLES_PER_PROC];
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         // Alright this is going to be a bit tricky!
         // Remember, that all handles have their OWN positions!!!
         for (size_t i = 0; i < num_handles; i++) {

@@ -6,7 +6,6 @@
 #include "s_data/binary_search_tree.h"
 #include "s_data/wait_queue.h"
 #include "s_data/id_table.h"
-#include "s_util/constraints.h"
 
 /**
  * Max number of semaphores allowed globally at once.
@@ -50,14 +49,14 @@ struct _plugin_shm_sem_t {
      *
      * If this bit vector is entirely 0, the kernel should dispose of this semaphore!
      */
-    uint8_t refs[FOS_MAX_PROCS / 8];
+    uint8_t refs[FC_CORE_MAX_PROCS / 8];
 };
 
 /**
  * When a range structure exists like this it corresponds to an allocated area of
  * memory in the kernel memory space.
  *
- * Ranges will always be inside the FOS_SHARED_AREA!
+ * Ranges will always be inside the FC_CORE_VMEM_SHARED!
  */
 struct _plugin_shm_range_t {
     /**
@@ -85,7 +84,7 @@ struct _plugin_shm_range_t {
      * Realize, that we could just check a process's page tables to see
      * if this range is mapped, but that is probably slower and more confusing than this.
      */
-    uint8_t refs[FOS_MAX_PROCS / 8];
+    uint8_t refs[FC_CORE_MAX_PROCS / 8];
 
     /*
      * Realize that if `kernel_refs` is 0 AND `refs` is entirely 0, this range is no

@@ -1,10 +1,9 @@
 
-
 #include "u_startup/test/syscall_exec.h"
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_fs.h"
 #include "u_startup/syscall_fut.h"
-#include "s_util/constraints.h"
+#include "c_config.h"
 
 /*
  * NOTE: These tests kinda cover the behavior of a few different files/plugins.
@@ -56,7 +55,7 @@ static bool test_exit_status(void) {
     proc_id_t cpid;
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         TEST_SUCCESS(sc_fs_exec_da_elf32_va(TEST_APP));
 
         // Will never make it here.
@@ -82,14 +81,14 @@ static bool test_adoption(void) {
     proc_id_t cpid;
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         sc_signal_allow(1 << FSIG_CHLD);
 
         proc_id_t gcpid;
 
         // First grand child will immediately exit.
         TEST_SUCCESS(sc_proc_fork(&gcpid));
-        if (gcpid == FOS_MAX_PROCS) {
+        if (gcpid == FC_CORE_MAX_PROCS) {
             sc_proc_exit(PROC_ES_SUCCESS);
         }
 
@@ -99,7 +98,7 @@ static bool test_adoption(void) {
         // Second grand child waits for a single character across the data pipe!
         // Then exits!
         TEST_SUCCESS(sc_proc_fork(&gcpid));
-        if (gcpid == FOS_MAX_PROCS) {
+        if (gcpid == FC_CORE_MAX_PROCS) {
             handle_t gc_dp;
             TEST_SUCCESS(sc_fs_open(data_pipe_path, &gc_dp));
 
@@ -121,7 +120,7 @@ static bool test_adoption(void) {
     
     // First let's reap the only zombie.
     TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
-    TEST_SUCCESS(sc_proc_reap(FOS_MAX_PROCS, NULL, NULL));
+    TEST_SUCCESS(sc_proc_reap(FC_CORE_MAX_PROCS, NULL, NULL));
 
     // Next, let's send a character over the data pipe.
 
@@ -131,7 +130,7 @@ static bool test_adoption(void) {
     sc_handle_close(dp);
 
     TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
-    TEST_SUCCESS(sc_proc_reap(FOS_MAX_PROCS, NULL, NULL));
+    TEST_SUCCESS(sc_proc_reap(FC_CORE_MAX_PROCS, NULL, NULL));
 
     // Finally, Let's signal our original child!
     TEST_SUCCESS(sc_signal(cpid, 1));
@@ -160,7 +159,7 @@ static bool test_big_adoption(void) {
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
     const size_t NUM_GRANDCHILDREN = 5;
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         sc_signal_allow(1 << FSIG_CHLD);
         proc_id_t gcpid;
 
@@ -168,7 +167,7 @@ static bool test_big_adoption(void) {
         // This will signal to the root when adoption has occurred.
 
         TEST_SUCCESS(sc_proc_fork(&gcpid));
-        if (gcpid == FOS_MAX_PROCS) {
+        if (gcpid == FC_CORE_MAX_PROCS) {
             sc_handle_close(dp);
             sc_proc_exit(PROC_ES_SUCCESS);
         }
@@ -176,7 +175,7 @@ static bool test_big_adoption(void) {
 
         for (size_t i = 0; i < NUM_GRANDCHILDREN; i++) {
             TEST_SUCCESS(sc_proc_fork(&gcpid));
-            if (gcpid == FOS_MAX_PROCS) {
+            if (gcpid == FC_CORE_MAX_PROCS) {
                 char c;
                 TEST_SUCCESS(sc_handle_read_full(dp, &c, sizeof(c)));
                 sc_handle_close(dp);
@@ -193,7 +192,7 @@ static bool test_big_adoption(void) {
 
     // Reap first zombie.
     TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
-    TEST_SUCCESS(sc_proc_reap(FOS_MAX_PROCS, NULL, NULL));
+    TEST_SUCCESS(sc_proc_reap(FC_CORE_MAX_PROCS, NULL, NULL));
 
     // Write to data pipe.
     sc_handle_write_full(dp, "a", 1);
@@ -206,7 +205,7 @@ static bool test_big_adoption(void) {
         TEST_SUCCESS(sc_signal_wait(1 << FSIG_CHLD, NULL));
 
         fernos_error_t err;
-        while ((err = sc_proc_reap(FOS_MAX_PROCS, NULL, NULL)) == FOS_E_SUCCESS) {
+        while ((err = sc_proc_reap(FC_CORE_MAX_PROCS, NULL, NULL)) == FOS_E_SUCCESS) {
             reaped++;
         }
 
@@ -261,7 +260,7 @@ static bool test_mutli_threaded(void) {
     proc_id_t cpid;
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         futex_t futs[3] = {0};
         const size_t num_futs = sizeof(futs) / sizeof(futs[0]);
 
@@ -317,7 +316,7 @@ static bool test_default_io(void) {
     proc_id_t cpid;
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         handle_t d_in;
         TEST_SUCCESS(sc_fs_open("h2c", &d_in));
         sc_set_in_handle(d_in);
@@ -381,7 +380,7 @@ static bool test_big_args(void) {
 
     proc_id_t cpid;
     TEST_SUCCESS(sc_proc_fork(&cpid));
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         TEST_SUCCESS(sc_fs_exec_da_elf32(args, num_args));
     }
 

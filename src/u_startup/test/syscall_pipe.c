@@ -2,9 +2,11 @@
 #include "u_startup/syscall.h"
 #include "u_startup/syscall_pipe.h"
 #include "u_startup/test/syscall_pipe.h"
-#include "s_util/constraints.h"
+
 #include "s_util/misc.h"
 #include "s_util/rand.h"
+
+#include "c_config.h"
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
@@ -269,11 +271,11 @@ static bool test_multiproc(void) {
     proc_id_t cpid;
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) { // child proc.
+    if (cpid == FC_CORE_MAX_PROCS) { // child proc.
         TEST_SUCCESS(sc_handle_read_full(rp, buf, 6));
         TEST_TRUE(str_eq("Hello", buf));
 
-        sc_signal(FOS_MAX_PROCS, 5);
+        sc_signal(FC_CORE_MAX_PROCS, 5);
 
         TEST_SUCCESS(sc_handle_write_full(wp, "Heheh", 6));
 
@@ -348,7 +350,7 @@ static bool test_multiproc_complex0(void) {
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         sc_handle_close(wp0);
         sc_handle_close(rp1);
 
@@ -437,7 +439,7 @@ static bool test_many_readers(void) {
         proc_id_t cpid; 
         TEST_SUCCESS(sc_proc_fork(&cpid));
 
-        if (cpid == FOS_MAX_PROCS) { // In the child!
+        if (cpid == FC_CORE_MAX_PROCS) { // In the child!
             sc_handle_close(wp); // Child doesn't need the writing end.
 
             uint8_t b;
@@ -476,7 +478,7 @@ static bool test_many_readers(void) {
 
     while (reaped < NUM_CHILDREN) {
         proc_exit_status_t rces;
-        err = sc_proc_reap(FOS_MAX_PROCS, NULL, &rces);
+        err = sc_proc_reap(FC_CORE_MAX_PROCS, NULL, &rces);
         if (err == FOS_E_SUCCESS) {
             TEST_EQUAL_HEX(PROC_ES_SUCCESS, rces);
             reaped++;

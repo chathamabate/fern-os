@@ -32,10 +32,10 @@
 GIT_TOP ?= $(shell git rev-parse --show-toplevel)
 
 SRC_DIR    := $(GIT_TOP)/src
-BUILD_DIR   := $(GIT_TOP)/src/build
+BUILD_DIR   := $(SRC_DIR)/build
 INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
-VENV_DIR := $(BUILD_DIR)/venv
+VENV_DIR := $(SRC_DIR)/venv
 
 MY_MAKE := @make --no-print-directory
 DONE_MSG = @echo -e "\x1B[1;97m>> \x1B[1;92m$1 \x1B[1;97m<<\x1b[0m\n"
@@ -76,7 +76,7 @@ SCHEMA_PY := $(SRC_DIR)/config_schema.py
 MYPY_TOKEN := $(BUILD_DIR)/mypy_token
 
 # The MyPy token confirms that the schema python file has been type checked since its last update!
-$(MYPY_TOKEN): $(SCHEMA_PY) | $(VENV_DIR)
+$(MYPY_TOKEN): $(SCHEMA_PY) | $(VENV_DIR) $(BUILD_DIR)
 	. $(VENV_ACTIVATE) && mypy $(SCHEMA_PY)
 	touch $@
 
@@ -86,12 +86,12 @@ CONFIG_C  := $(INCLUDE_DIR)/c_config.h
 $(CONFIG_C): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gcc -o $@
 
-CONFIG_AS := $(INCLUDE_DIR)/as_config.h
-$(CONFIG_AS): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
+CONFIG_S := $(INCLUDE_DIR)/s_config.h
+$(CONFIG_S): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f gas -o $@
 
-CONFIG_LD := $(INSTALL_DIR)/ld_config.h
-$(CONFIG_LD): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
+CONFIG_LD := $(INCLUDE_DIR)/ld_config.h
+$(CONFIG_LD): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f ld -o $@
 
 # I haven't figured out yet how we are going to fit in a generated make file into the build
@@ -100,66 +100,22 @@ CONFIG_MK := $(INSTALL_DIR)/mk_config.mk
 $(CONFIG_MK): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f make -o $@
 
-CONFIGS := $(CONFIG_C) $(CONFIG_AS) $(CONFIG_LD) $(CONFIG_MK)
-
-# NOTE: Generated Config files are not integrated into FernOS at this time.
-# The below more primitive generation method is still used at this time.
+CONFIGS := $(CONFIG_C) $(CONFIG_S) $(CONFIG_LD) $(CONFIG_MK)
 
 ####################################################################################################
 
 # Layout Header and LD script generation.
 # All ranges below are inclusive! (These all must be numeric constants)
 
-PROLOGUE_START  :=       0x0
-PROLOGUE_END    :=  0x3FFFFF
-
-FERNOS_START   :=   	0x00400000
-
-# Where Kernel parts are placed.
-FERNOS_KERNEL_START := 	0x00400000
-FERNOS_KERNEL_END   := 	0x01FFFFFF
-
-# Where User applications will be loaded.
-FERNOS_APP_START      :=  0x02000000
-FERNOS_APP_END        :=  0x02FFFFFF
-
-# Where User application arguments will be loaded.
-FERNOS_APP_ARGS_START := 0x03000000
-FERNOS_APP_ARGS_END   := 0x03003FFF
-
-# Where the dynamic memory area will live for all processes
-FERNOS_FREE_START   :=  0x10000000
-FERNOS_FREE_END     :=  0x3FFFFFFF
-
-# Where shared memory pages will live
-FERNOS_SHARED_START :=  0x60000000
-FERNOS_SHARED_END   :=  0x8FFFFFFF
-
-# Area where stacks will live in fernos.
-FERNOS_STACK_START  := 0xA0000000
-FERNOS_STACK_END    := 0xBFFFFFFF
-
-FERNOS_END     := 0xBFFFFFFF
-
-EPILOGUE_START := 0xC0000000
-EPILOGUE_END   := 0xFFFFFFFF
+# TODO: Add graphics settings into config schema and remove need for these old os defs files 
+# entirely!
 
 FERNOS_GFX_WIDTH  := 1024
 FERNOS_GFX_HEIGHT := 768
 FERNOS_GFX_BPP    := 32
 
 # All Important OS Definitions
-OS_DEFS :=   PROLOGUE_START PROLOGUE_END \
-			 FERNOS_START \
-			 FERNOS_KERNEL_START FERNOS_KERNEL_END \
-			 FERNOS_APP_START FERNOS_APP_END \
-			 FERNOS_APP_ARGS_START FERNOS_APP_ARGS_END \
-			 FERNOS_FREE_START FERNOS_FREE_END \
-			 FERNOS_SHARED_START FERNOS_SHARED_END \
-			 FERNOS_STACK_START FERNOS_STACK_END \
-			 FERNOS_END \
-			 EPILOGUE_START EPILOGUE_END \
-			 FERNOS_GFX_WIDTH FERNOS_GFX_HEIGHT \
+OS_DEFS :=   FERNOS_GFX_WIDTH FERNOS_GFX_HEIGHT \
 			 FERNOS_GFX_BPP
 
 C_MACRO_GEN = echo "\#define $1 $($1)UL" >> $@;
@@ -196,7 +152,7 @@ $(HDRS_INSTALL_TARS): hdrs.install.%:
 	$(MOD_MAKE) hdrs.install test_hdrs.install 
 
 .PHONY: hdrs.install $(HDRS_INSTALL_TARS)
-hdrs.install: $(HDRS_INSTALL_TARS) $(OS_DEFS_H) $(OS_DEFS_S)
+hdrs.install: $(HDRS_INSTALL_TARS) $(CONFIG_C) $(CONFIG_S) $(OS_DEFS_H) $(OS_DEFS_S) 
 	$(call DONE_MSG,Headers Installed)
 
 # Install Libraries
@@ -246,6 +202,10 @@ OS_NAME := fernos
 C_COMPILER := i686-elf-gcc
 
 LDSCRIPT := $(SRC_DIR)/linker.ld
+ABS_LDSCRIPT := $(INSTALL_DIR)/abs_linker.ld
+
+$(ABS_LDSCRIPT): $(LDSCRIPT) $(CONFIG_LD) | $(INSTALL_DIR)
+	$(C_COMPILER) -I$(INCLUDE_DIR) -xc -P -E $< > $@
 
 ELF_FILE := $(BUILD_DIR)/$(OS_NAME).elf
 ELF_SYMS := $(BUILD_DIR)/$(OS_NAME).syms
@@ -254,8 +214,8 @@ LIB_FLAGS := $(foreach mod,$(MODS),-l$(mod)_test -l$(mod))
 
 # Realize that ALL_LIBS doesn't actually define a rule for itself. This ELF target should NEVER
 # be invoked without libs already being explicity installed previously!
-$(ELF_FILE): $(ALL_LIBS) $(OS_DEFS_LD) | $(BUILD_DIR)
-	$(C_COMPILER) -T $(LDSCRIPT) -o $@ -ffreestanding -nostdlib -O2 -L$(INSTALL_DIR) \
+$(ELF_FILE): $(ALL_LIBS) $(ABS_LDSCRIPT) | $(BUILD_DIR)
+	$(C_COMPILER) -T $(ABS_LDSCRIPT) -o $@ -ffreestanding -nostdlib -O2 -L$(INSTALL_DIR) \
 		-Wl,--start-group -lgcc -Wl,--whole-archive $(LIB_FLAGS) -Wl,--end-group 
 
 # The symbols file is useful for compiling user application binaries.  (Depends on SHALLOW kernel rules)
@@ -283,20 +243,30 @@ APPS_DIR  := $(SRC_DIR)/apps
 
 APPS_BUILD := $(BUILD_DIR)/apps/build
 APPS_OUT := $(BUILD_DIR)/apps/bin
-
 APPS := $(addprefix $(APPS_OUT)/,$(_APPS))
+
+APP_LDSCRIPT := $(SRC_DIR)/linker_app.ld
+ABS_APP_LDSCRIPT := $(APPS_BUILD)/abs_linker_app.ld
+
+$(APPS_BUILD):
+	mkdir -p $@
+
+$(ABS_APP_LDSCRIPT): $(APP_LDSCRIPT) $(CONFIG_LD) | $(APPS_BUILD)
+	$(C_COMPILER) -I$(INCLUDE_DIR) -xc -P -E $< > $@
 
 # Similar to MOD_MAKE macro, but for apps
 APP_MAKE = $(MY_MAKE) -C $(APPS_DIR)/$* \
 				BUILD_DIR=$(APPS_BUILD)/$* \
 				OUT_DIR=$(APPS_OUT) \
 				INSTALL_DIR=$(INSTALL_DIR) \
-				ELF_SYMS=$(ELF_SYMS) 
+				ELF_SYMS=$(ELF_SYMS) \
+				APP_LDSCRIPT=$(ABS_APP_LDSCRIPT)
+
 
 APP_TARS := $(addprefix apps.unsafe.,$(_APPS))
 .PHONY: apps.unsafe $(APP_TARS)
 
-$(APP_TARS): apps.unsafe.%:
+$(APP_TARS): apps.unsafe.%: $(ABS_APP_LDSCRIPT)
 	$(APP_MAKE) bin
 
 apps.unsafe: $(APP_TARS)
@@ -399,8 +369,11 @@ run: iso disk
 		-display gtk \
 		-monitor stdio
 
-.PHONY: clean
+.PHONY: clean clean.deep
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+clean.deep: clean
+	rm -rf $(VENV_DIR)
 

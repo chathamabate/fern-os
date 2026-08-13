@@ -4,7 +4,7 @@
 #include "u_startup/syscall_shm.h"
 #include "u_startup/syscall_pipe.h"
 #include "s_util/rand.h"
-#include "s_util/constraints.h"
+#include "c_config.h"
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
@@ -228,7 +228,7 @@ static bool test_sem_cross_process(void) {
     for (size_t i = 0; i < num_children; i++) {
         TEST_SUCCESS(sc_proc_fork(cpids + i));
 
-        if (cpids[i] == FOS_MAX_PROCS) { // child process!
+        if (cpids[i] == FC_CORE_MAX_PROCS) { // child process!
             // For each child process we spawn workers! 
             for (size_t j = 0; j < workers_per_child; j++) {
                 TEST_SUCCESS(sc_thread_spawn(tids + j, test_sem_cross_process_worker, (void *)&arg));
@@ -333,7 +333,7 @@ static bool test_sem_early_close(void) {
 
     void *worker_rv;
 
-    if (cpid == FOS_MAX_PROCS) { // Child process!
+    if (cpid == FC_CORE_MAX_PROCS) { // Child process!
         TEST_SUCCESS(sc_thread_spawn(tids + 0, test_sem_early_close_worker, wargs + 0));
 
         wargs[1].exp_success = false; // This guy will be woken up early!
@@ -564,7 +564,7 @@ static bool test_shm_sharing(void) {
     proc_id_t cpid;
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) { // Child process!
+    if (cpid == FC_CORE_MAX_PROCS) { // Child process!
         for (size_t i = 0; i < shm_size; i++) {
             TEST_EQUAL_UINT((uint8_t)i, shm[i]);
         }
@@ -593,7 +593,7 @@ static bool test_shm_unmap_failure(void) {
     proc_id_t cpid;
     TEST_SUCCESS(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) { // Child process!
+    if (cpid == FC_CORE_MAX_PROCS) { // Child process!
         sc_shm_close_shm(shm); // unmap in child!
         shm[0] = 100; // This should triger a page fault!
         sc_proc_exit(PROC_ES_SUCCESS);
@@ -633,7 +633,7 @@ static bool test_synced_shm_usage(void) {
     proc_id_t cpids[2];
 
     TEST_SUCCESS(sc_proc_fork(cpids + 0));
-    if (cpids[0] == FOS_MAX_PROCS) { // Child proc 0
+    if (cpids[0] == FC_CORE_MAX_PROCS) { // Child proc 0
         TEST_SUCCESS(sc_shm_sem_dec(sem));
         for (size_t i = 0; i < shm_size; i++) {
             shm[i] = (uint8_t)i;
@@ -661,7 +661,7 @@ static bool test_synced_shm_usage(void) {
     }
 
     TEST_SUCCESS(sc_proc_fork(cpids + 1));
-    if (cpids[1] == FOS_MAX_PROCS) { // Child proc 1
+    if (cpids[1] == FC_CORE_MAX_PROCS) { // Child proc 1
         while (true) {
             TEST_SUCCESS(sc_shm_sem_dec(sem));
             if (shm[0] == 0) { // If set to 0, we know proc 0 has populated the area.
@@ -710,7 +710,7 @@ static bool test_shm_pipeline(void) {
     proc_id_t child_pid;
     TEST_SUCCESS(sc_proc_fork(&child_pid));
 
-    if (child_pid == FOS_MAX_PROCS) { // Child proc.
+    if (child_pid == FC_CORE_MAX_PROCS) { // Child proc.
         TEST_SUCCESS(sc_shm_sem_dec(sem));
 
         sc_signal_allow(1 << FSIG_CHLD); // We know the sv of new processes start as 0.
@@ -720,7 +720,7 @@ static bool test_shm_pipeline(void) {
 
         proc_id_t gchild_pid;
         TEST_SUCCESS(sc_proc_fork(&gchild_pid));
-        if (gchild_pid == FOS_MAX_PROCS) { // Grand Child proc.
+        if (gchild_pid == FC_CORE_MAX_PROCS) { // Grand Child proc.
             sc_shm_close_shm(parent_child_shm); // Not used at all in grandchild.
 
             TEST_SUCCESS(sc_shm_sem_dec(sem)); // We wait for the child to copy from shm0 to shm1.

@@ -6,12 +6,14 @@
 
 #include "k_sys/debug.h"
 #include "s_util/err.h"
-#include "s_util/constraints.h"
+
 #include "s_util/str.h"
 #include "s_mem/allocator.h"
 #include "s_mem/simple_heap.h"
 #include <stdint.h>
 #include "k_startup/gfx.h"
+
+#include "c_config.h"
 
 static bool pretest(void);
 static bool posttest(void);
@@ -437,7 +439,7 @@ static bool test_pd_copy_range_values(void) {
  * NOTE: This test copies the current page directory!
  */
 #define MEM_TEST_AREA_SIZE  (4 * M_4K)
-#define MEM_TEST_AREA_START ((uint8_t *)FOS_FREE_AREA_START)
+#define MEM_TEST_AREA_START ((uint8_t *)FC_CORE_VMEM_FREE_START)
 #define MEM_TEST_AREA_END   (MEM_TEST_AREA_START + MEM_TEST_AREA_SIZE)
 static bool test_mem_cpy_user(void) {
     const void *true_e;
@@ -781,15 +783,15 @@ static bool test_new_user_app_pd(void) {
     // kernel stack. We'll just loosely require the kernel stack to be pretty large before
     // running this test.
 
-    TEST_TRUE(FOS_KERNEL_STACK_SIZE >= (M_4K * 24));
+    TEST_TRUE(FC_CORE_KSTACK_SIZE >= (M_4K * 24));
 
     user_app_t ua = {
         .al = NULL, // These tests cannot depend on a heap being set up.
-        .entry = (const void *)FOS_APP_AREA_START,
+        .entry = (const void *)FC_CORE_VMEM_APP_START,
         .areas = {
             (user_app_area_entry_t) {
                 .occupied = true,
-                .load_position = (void *)FOS_APP_AREA_START,
+                .load_position = (void *)FC_CORE_VMEM_APP_START,
                 .area_size = M_4K,
                 .given = NULL,
                 .given_size = 0,
@@ -797,7 +799,7 @@ static bool test_new_user_app_pd(void) {
             },
             (user_app_area_entry_t) {
                 .occupied = true,
-                .load_position = (void *)(FOS_APP_AREA_START + M_4K),
+                .load_position = (void *)(FC_CORE_VMEM_APP_START + M_4K),
                 .area_size = 16,
                 .given = "hello",
                 .given_size = 6,
@@ -805,7 +807,7 @@ static bool test_new_user_app_pd(void) {
             },
             (user_app_area_entry_t) {
                 .occupied = true,
-                .load_position = (void *)(FOS_APP_AREA_START + (3 * M_4K)),
+                .load_position = (void *)(FC_CORE_VMEM_APP_START + (3 * M_4K)),
                 .area_size = 8,
                 .given = "goodbye",
                 .given_size = 8,
@@ -813,7 +815,7 @@ static bool test_new_user_app_pd(void) {
             } ,
             (user_app_area_entry_t) {
                 .occupied = true,
-                .load_position = (void *)(FOS_APP_AREA_START + (5 * M_4K)),
+                .load_position = (void *)(FC_CORE_VMEM_APP_START + (5 * M_4K)),
                 .area_size = (2 * M_4K) + 10,
                 .given = NULL,
                 .given_size = 0,
@@ -853,7 +855,7 @@ static bool test_new_user_app_pd(void) {
     }
 
     // Now check args block!
-    TEST_SUCCESS(mem_cpy_from_user(dummy_pages, upd, (const void *)FOS_APP_ARGS_AREA_START, 
+    TEST_SUCCESS(mem_cpy_from_user(dummy_pages, upd, (const void *)FC_CORE_VMEM_APP_ARGS_START, 
                 mock_args_block_size, NULL));
     TEST_TRUE(mem_cmp(mock_args_block, dummy_pages, mock_args_block_size));
 
@@ -868,13 +870,13 @@ static bool test_new_user_app_pd(void) {
 
     // Bad entry point.
     const void *og_entry = ua.entry;
-    ua.entry = (const void *)(FOS_APP_AREA_START + (10 * M_4K));  
+    ua.entry = (const void *)(FC_CORE_VMEM_APP_START + (10 * M_4K));  
     TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, mock_args_block_size, &upd));
     ua.entry = og_entry;
 
     // Areas too large.
     uint32_t og_size = ua.areas[0].area_size;
-    ua.areas[0].area_size = FOS_APP_AREA_SIZE + M_4K;
+    ua.areas[0].area_size = FC_CORE_VMEM_APP_SIZE + M_4K;
     TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, mock_args_block_size, &upd));
     ua.areas[0].area_size = og_size;
 
@@ -885,7 +887,7 @@ static bool test_new_user_app_pd(void) {
     ua.areas[0].area_size = og_size;
 
     // Args block too large!
-    TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, FOS_APP_ARGS_AREA_SIZE + M_4K, &upd));
+    TEST_FAILURE(new_user_app_pd(&ua, mock_args_block, FC_CORE_VMEM_APP_ARGS_SIZE + M_4K, &upd));
 
     TEST_SUCCEED();
 }
@@ -938,8 +940,8 @@ static bool test_ua_copy_from_user(void) {
     TEST_EQUAL_HEX(NULL, get_default_allocator());
 
     const simple_heap_attrs_t small_shal_attrs = { // attributes for a small heap.
-        .start = (void *)FOS_FREE_AREA_START,
-        .end =   (void *)(FOS_FREE_AREA_START + (M_4K)),
+        .start = (void *)FC_CORE_VMEM_FREE_START,
+        .end =   (void *)(FC_CORE_VMEM_FREE_START + (M_4K)),
         .mmp = (mem_manage_pair_t) {
             .request_mem = alloc_pages,
             .return_mem = free_pages

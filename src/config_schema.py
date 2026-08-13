@@ -97,18 +97,18 @@ FOS_PMEM_RANGES = FCSchemaStruct([
 ], 
     PROLOGUE=(
         FOS_RANGE32.with_comment([
-            "Beginning of physical memory.",
+            "Beginning of physical memory. (excluding first physical page)",
             "It is very possible and allowed for the bootloader to puts things here!"
         ]),
-        lambda fcv: [0, cast(dict[str, dict[str, int]], fcv)["BODY"]["START"]]
+        lambda fcv: [0x1000, cast(dict[str, dict[str, int]], fcv)["BODY"]["START"]]
     ),
 
     EPILOGUE=(
         FOS_RANGE32.with_comment([
-            "End of physical memory.",
+            "End of physical memory. (excluding last physical page)",
             "It is very possible and allowed for the bootloader to puts things here!"
         ]),
-        lambda fcv: [cast(dict[str, dict[str, int]], fcv)["BODY"]["END"], 0x1_0000_0000]
+        lambda fcv: [cast(dict[str, dict[str, int]], fcv)["BODY"]["END"], 0x1_0000_0000 - 0x1000]
     )
 ).with_comment([
     "How physical memory is laid out in FernOS."

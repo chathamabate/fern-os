@@ -56,11 +56,21 @@ ifeq ($(ELF_SYMS),)
 $(error $(APP_NAME) has no elf symbols file specified)
 endif
 
+# REQUIRED
+#
+# What linkerscript to use (MUST EXIST)
+# 
+# This should really be the same for all apps. It's just that now linkerscripts in this project
+# are preprocessed. It is the caller's responsibility to create the linkerscript and tell
+# me where it is.
+ifeq ($(APP_LDSCRIPT),)
+$(error $(APP_NAME) has no linkerscript specified)
+endif
+
 ####################################################################################################
 
 GIT_TOP := $(shell git rev-parse --show-toplevel)
 SRC_DIR := $(GIT_TOP)/src
-APP_LDSCRIPT  := $(SRC_DIR)/linker_app.ld
 INCLUDE_DIR   := $(INSTALL_DIR)/include
 APP_DIR := $(SRC_DIR)/apps/$(APP_NAME)
 INCLUDE_FLAGS := -I$(APP_DIR) -I$(INCLUDE_DIR)
@@ -96,7 +106,7 @@ $(OBJS): $(BUILD_DIR)/%.o: | $(BUILD_DIR)
 
 # NOTE: in the below recipe we give -L$(INSTALL_DIR) so we have access to os_defs.ld
 # This recipe DOES NOT use any FernOS libraries directly! (The point of the symbols file)
-$(APP): $(OBJS) $(ELF_SYMS) | $(OUT_DIR)
+$(APP): $(OBJS) $(ELF_SYMS) $(APP_LDSCRIPT) | $(OUT_DIR)
 	$(C_COMPILER) -T $(APP_LDSCRIPT) -o $@ -ffreestanding -O2 -nostdlib -L$(INSTALL_DIR) \
 	    -lgcc -Wl,--just-symbols=$(ELF_SYMS) $(OBJS)
 

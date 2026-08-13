@@ -5,7 +5,7 @@
 #include "s_util/ansi.h"
 #include "s_util/misc.h"
 #include "s_gfx/window.h"
-#include "s_util/constraints.h"
+#include "c_config.h"
 
 fernos_error_t test_userspace_dummy_term(handle_t h_t) {
     size_t rows;
@@ -49,7 +49,7 @@ fernos_error_t test_terminal_fork0(handle_t h_t) {
 
     PROP_ERR(sc_proc_fork(&cpid));
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         // Ok, the child process is going to work a little differently.
         // We are going to use a polling style!
 

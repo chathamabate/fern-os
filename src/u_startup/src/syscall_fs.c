@@ -6,7 +6,7 @@
 #include "s_util/str.h"
 #include "s_util/misc.h"
 #include "s_util/elf.h"
-#include "s_util/constraints.h"
+#include "c_config.h"
 
 #include <stdarg.h>
 
@@ -222,7 +222,7 @@ fernos_error_t sc_fs_exec_da_elf32(const char * const * args, size_t num_args) {
     }
 
     // Make absolute!
-    args_block_make_absolute((void *)args_block, FOS_APP_ARGS_AREA_START);
+    args_block_make_absolute((void *)args_block, FC_CORE_VMEM_APP_ARGS_START);
 
     // Finally, attempt to execute!
     err = sc_proc_exec(ua, args_block, args_block_len);

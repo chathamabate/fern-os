@@ -5,10 +5,11 @@
 
 #include "k_sys/debug.h"
 #include "s_util/err.h"
-#include "s_util/constraints.h"
+
 #include "s_util/str.h"
 #include <stdint.h>
 #include "k_startup/gfx.h"
+#include "c_config.h"
 
 static bool pretest(void);
 static bool posttest(void);
@@ -22,7 +23,7 @@ static bool posttest(void);
 #include "s_util/test.h"
 
 /*
- * NOTE: These tests assume that virtual addresses after FOS_FREE_AREA_START are available.
+ * NOTE: These tests assume that virtual addresses after FC_CORE_VMEM_FREE_START are available.
  * If you have already set up some sort of heap in the FOS Free Area, these tests will fail!
  * 
  * Basically, we are testing just basic paging setup operations.
@@ -456,7 +457,7 @@ static bool test_pd_alloc_entries(void) {
 }
 
 static bool test_kernel_pd_alloc(void) {
-    uint8_t * const S = (uint8_t *)FOS_FREE_AREA_START;
+    uint8_t * const S = (uint8_t *)FC_CORE_VMEM_FREE_START;
     // Here we will test that mapping stuff into the kernel free area actually works!
     // Also, this kinda tests the addressed version of `pd_alloc_p`.
 
@@ -483,7 +484,7 @@ static bool test_kernel_pd_alloc(void) {
 static bool test_pd_free_dangerous(void) {
     LOGF_PREFIXED("Running Dangerous Test\n");
 
-    uint8_t * const S = (uint8_t *)FOS_FREE_AREA_START;
+    uint8_t * const S = (uint8_t *)FC_CORE_VMEM_FREE_START;
     phys_addr_t pd = get_kernel_pd();
 
     fernos_error_t err;

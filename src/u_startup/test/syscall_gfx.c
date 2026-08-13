@@ -3,7 +3,7 @@
 #include "u_startup/syscall_shm.h"
 #include "u_startup/syscall.h"
 #include "s_util/ps2_scancodes.h"
-#include "s_util/constraints.h"
+#include "c_config.h"
 
 #define LOGF_METHOD(...) sc_out_write_fmt_s(__VA_ARGS__)
 #define FAILURE_ACTION() while (1)
@@ -105,7 +105,7 @@ static bool test_gfx_fork(void) {
     for (size_t i = 0; i < sizeof(cpids) / sizeof(cpids[0]); i++) {
         TEST_SUCCESS(sc_proc_fork(cpids + i));
 
-        if (cpids[i] == FOS_MAX_PROCS) { // Child process work!
+        if (cpids[i] == FC_CORE_MAX_PROCS) { // Child process work!
             window_event_t ev;
             for (size_t j = 0; j < 5; j++) {
                 TEST_SUCCESS(sc_gfx_read_event_single(h, &ev));

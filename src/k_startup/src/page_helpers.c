@@ -2,7 +2,7 @@
 #include "k_startup/page_helpers.h"
 
 #include "s_util/str.h"
-#include "s_util/constraints.h"
+#include "c_config.h"
 
 void page_copy(phys_addr_t dest, phys_addr_t src) {
     phys_addr_t old0 = assign_free_page(0, dest);
@@ -396,7 +396,7 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
         return FOS_E_BAD_ARGS;
     }
 
-    if (abs_ab_len > FOS_APP_ARGS_AREA_SIZE) {
+    if (abs_ab_len > FC_CORE_VMEM_APP_ARGS_SIZE) {
         return FOS_E_BAD_ARGS;
     }
     
@@ -423,7 +423,7 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
             }
 
             // NOTE: The end of the loadable area CAN be the end of the app area!
-            if (start < (void *)FOS_APP_AREA_START || (void *)FOS_APP_AREA_END < end) {
+            if (start < (void *)FC_CORE_VMEM_APP_START || (void *)FC_CORE_VMEM_APP_END < end) {
                 return FOS_E_INVALID_RANGE;
             }
 
@@ -469,15 +469,15 @@ fernos_error_t new_user_app_pd(const user_app_t *ua, const void *abs_ab, size_t 
         }
 
         const void *true_e;
-        err = pd_alloc_pages(new_pd, true, false, (void *)FOS_APP_ARGS_AREA_START, 
-                (void *)(FOS_APP_ARGS_AREA_START + abs_ab_alloc_size), &true_e);
+        err = pd_alloc_pages(new_pd, true, false, (void *)FC_CORE_VMEM_APP_ARGS_START, 
+                (void *)(FC_CORE_VMEM_APP_ARGS_START + abs_ab_alloc_size), &true_e);
 
 
         // Ok, now we copy the args block into the app args area!  (This is why the args block must 
         // be absolute when given)
 
         if (err == FOS_E_SUCCESS) {
-            err = mem_cpy_to_user(new_pd, (void *)FOS_APP_ARGS_AREA_START, abs_ab, 
+            err = mem_cpy_to_user(new_pd, (void *)FC_CORE_VMEM_APP_ARGS_START, abs_ab, 
                     abs_ab_len, NULL);
         }
     }

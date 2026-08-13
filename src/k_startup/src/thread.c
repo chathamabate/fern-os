@@ -3,11 +3,11 @@
 #include "k_startup/fwd_defs.h"
 #include "k_startup/gdt.h"
 #include "s_mem/allocator.h"
-#include "s_util/constraints.h"
 #include "k_startup/process.h"
 #include "s_util/str.h"
 #include "u_startup/main.h"
 #include "s_util/str.h"
+#include "k_startup/stacks.h"
 
 /**
  * private version of `thread_reset`, this just requires `thr` to have a parent process
@@ -17,7 +17,7 @@
  */
 static void thread_reset_context(thread_t *thr, uintptr_t entry, uint32_t arg0, 
         uint32_t arg1, uint32_t arg2) {
-    uint8_t *tstack_end = (uint8_t *)FOS_THREAD_STACK_END(thr->tid);
+    uint8_t *tstack_end = (uint8_t *)FC_CORE_TSTACK_END(thr->tid);
     process_t *proc = thr->proc;
 
     thr->ctx = (user_ctx_t) {
@@ -49,7 +49,7 @@ void thread_reset(thread_t *thr, uintptr_t entry, uint32_t arg0,
 
 thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry, 
         uint32_t arg0, uint32_t arg1, uint32_t arg2) {
-    if (tid >= FOS_MAX_THREADS_PER_PROC) {
+    if (tid >= FC_CORE_MAX_THREADS_PER_PROC) {
         return NULL;
     }
     
@@ -65,7 +65,7 @@ thread_t *new_thread(process_t *proc, thread_id_t tid, uintptr_t entry,
         return NULL;
     }
 
-    uint8_t *tstack_end = (uint8_t *)FOS_THREAD_STACK_END(tid);
+    uint8_t *tstack_end = (uint8_t *)FC_CORE_TSTACK_END(tid);
 
     // NOTE: we used to allocate stack pages here... NOT ANYMORE!
 

@@ -1,7 +1,6 @@
 
 
 #include "k_startup/page_helpers.h"
-#include "s_util/constraints.h"
 #include "k_startup/state.h"
 #include "k_startup/thread.h"
 #include "k_startup/process.h"
@@ -17,7 +16,7 @@
  */
 kernel_state_t *new_kernel_state(allocator_t *al) {
     kernel_state_t *ks = al_malloc(al, sizeof(kernel_state_t));
-    id_table_t *pt = new_id_table(al, FOS_MAX_PROCS);
+    id_table_t *pt = new_id_table(al, FC_CORE_MAX_PROCS);
     timed_wait_queue_t *twq = new_timed_wait_queue(al);
 
     if (!ks || !pt || !twq) {
@@ -35,7 +34,7 @@ kernel_state_t *new_kernel_state(allocator_t *al) {
     ks->curr_tick = 0;
     *(timed_wait_queue_t **)&(ks->sleep_q) = twq;
 
-    for (size_t i = 0; i < FOS_MAX_PLUGINS; i++) {
+    for (size_t i = 0; i < FC_CORE_MAX_PLUGINS; i++) {
         ks->plugins[i] = NULL; // No plugins yet!
     }
 
@@ -43,7 +42,7 @@ kernel_state_t *new_kernel_state(allocator_t *al) {
 }
 
 fernos_error_t ks_set_plugin(kernel_state_t *ks, plugin_id_t plg_id, plugin_t *plg) {
-    if (plg_id >= FOS_MAX_PLUGINS) {
+    if (plg_id >= FC_CORE_MAX_PLUGINS) {
         return FOS_E_INVALID_INDEX;
     }
 
@@ -98,9 +97,9 @@ fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base) {
     thread_t *thr = (thread_t *)(ks->schedule.head);
     thread_id_t tid = thr->tid;
 
-    void *stack_start = (void *)FOS_THREAD_STACK_START(tid);
+    void *stack_start = (void *)FC_CORE_TSTACK_START(tid);
     void *true_stack_start = (uint8_t *)stack_start + M_4K;
-    const void *stack_end = (const void *)FOS_THREAD_STACK_END(tid);
+    const void *stack_end = (const void *)FC_CORE_TSTACK_END(tid);
 
     if (new_base < true_stack_start || stack_end <= new_base) {
         return FOS_E_INVALID_INDEX; // Trying to access an address which isn't really on the stack.
@@ -123,7 +122,7 @@ fernos_error_t ks_expand_stack(kernel_state_t *ks, void *new_base) {
 }
 
 void ks_shutdown(kernel_state_t *ks) {
-    for (size_t i = 0; i < FOS_MAX_PLUGINS; i++) {
+    for (size_t i = 0; i < FC_CORE_MAX_PLUGINS; i++) {
         if (ks->plugins[i]) {
             plg_on_shutdown(ks->plugins[i]);
         }
@@ -168,7 +167,7 @@ fernos_error_t ks_tick(kernel_state_t *ks) {
 
     // trigger plugin on tick handlers every 16th tick.
     if ((ks->curr_tick & 0xF) == 0) {
-        err = plgs_tick(ks->plugins, FOS_MAX_PLUGINS);
+        err = plgs_tick(ks->plugins, FC_CORE_MAX_PLUGINS);
         if (err != FOS_E_SUCCESS) {
             return err;
         }
@@ -235,7 +234,7 @@ KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
         }
 
         if (u_cpid) {
-            cpid = FOS_MAX_PROCS;
+            cpid = FC_CORE_MAX_PROCS;
             mem_cpy_to_user(proc->pd, u_cpid, &cpid, 
                     sizeof(proc_id_t), NULL);
         }
@@ -256,7 +255,7 @@ KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
     thread_schedule(child->main_thread, &(ks->schedule));
 
     // Call the on fork handlers!
-    err = plgs_on_fork_proc(ks->plugins, FOS_MAX_PLUGINS, cpid);
+    err = plgs_on_fork_proc(ks->plugins, FC_CORE_MAX_PLUGINS, cpid);
     if (err != FOS_E_SUCCESS) {
         return err;
     }
@@ -270,7 +269,7 @@ KS_SYSCALL fernos_error_t ks_fork_proc(kernel_state_t *ks, proc_id_t *u_cpid) {
         mem_cpy_to_user(proc->pd, u_cpid, &temp_pid, 
                 sizeof(proc_id_t), NULL);
 
-        temp_pid = FOS_MAX_PROCS;
+        temp_pid = FC_CORE_MAX_PROCS;
         mem_cpy_to_user(child->pd, u_cpid, &temp_pid, 
                 sizeof(proc_id_t), NULL);
     }
@@ -442,7 +441,7 @@ KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
     // If we cannot find an applicable zombie child process, user_err will be set to the correct
     // error code.
 
-    if (cpid == FOS_MAX_PROCS) {
+    if (cpid == FC_CORE_MAX_PROCS) {
         // We are reaping any process!
 
         // Default to error case at first.
@@ -484,7 +483,7 @@ KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
         }
     }
 
-    proc_id_t rcpid = FOS_MAX_PROCS;
+    proc_id_t rcpid = FC_CORE_MAX_PROCS;
     proc_exit_status_t rces = PROC_ES_UNSET;
 
     // Ok, at this point, user_err is either FOS_E_SUCCESS, meaning we have a freestanding zombie
@@ -496,7 +495,7 @@ KS_SYSCALL fernos_error_t ks_reap_proc(kernel_state_t *ks, proc_id_t cpid,
         // REAP!
         
         // First off, call the on reap handler!
-        err = plgs_on_reap_proc(ks->plugins, FOS_MAX_PLUGINS, rproc->pid);
+        err = plgs_on_reap_proc(ks->plugins, FC_CORE_MAX_PLUGINS, rproc->pid);
         if (err != FOS_E_SUCCESS) {
             return err;
         }
@@ -603,13 +602,13 @@ KS_SYSCALL fernos_error_t ks_exec(kernel_state_t *ks, user_app_t *u_ua, const vo
     // Errors after this point will crash the system. (may change this later)
 
     // 4) Tell all plugins that a reset is about to occur.
-    PROP_ERR(plgs_on_reset_proc(ks->plugins, FOS_MAX_PLUGINS, proc->pid));
+    PROP_ERR(plgs_on_reset_proc(ks->plugins, FC_CORE_MAX_PLUGINS, proc->pid));
 
     // 5) Give all children to the root process.
     PROP_ERR(ks_abandon_children(ks, proc));
 
     // 6) Exec and schedule!
-    PROP_ERR(proc_exec(proc, new_pd, entry, (uint32_t)FOS_APP_ARGS_AREA_START, num_args, 0));
+    PROP_ERR(proc_exec(proc, new_pd, entry, (uint32_t)FC_CORE_VMEM_APP_ARGS_START, num_args, 0));
 
     thr = NULL; // `proc` has been reset, thus the calling thread may not even exist anymore!
 
@@ -701,7 +700,7 @@ KS_SYSCALL fernos_error_t ks_signal(kernel_state_t *ks, proc_id_t pid, sig_id_t 
 
     process_t *recv_proc;
 
-    if (pid == FOS_MAX_PROCS) {
+    if (pid == FC_CORE_MAX_PROCS) {
         recv_proc = thr->proc->parent;
     } else {
         recv_proc = idtb_get(ks->proc_table, pid);
@@ -837,11 +836,11 @@ KS_SYSCALL fernos_error_t ks_request_mem(kernel_state_t *ks, void *s, const void
         DUAL_RET(thr, FOS_E_BAD_ARGS, FOS_E_SUCCESS);
     }
 
-    if ((uintptr_t)s < FOS_FREE_AREA_START || (uintptr_t)s >= FOS_FREE_AREA_END) {
+    if ((uintptr_t)s < FC_CORE_VMEM_FREE_START || (uintptr_t)s >= FC_CORE_VMEM_FREE_END) {
         DUAL_RET(thr, FOS_E_INVALID_RANGE, FOS_E_SUCCESS);
     }
 
-    if ((uintptr_t)e < FOS_FREE_AREA_START || (uintptr_t)e > FOS_FREE_AREA_END) {
+    if ((uintptr_t)e < FC_CORE_VMEM_FREE_START || (uintptr_t)e > FC_CORE_VMEM_FREE_END) {
         DUAL_RET(thr, FOS_E_INVALID_RANGE, FOS_E_SUCCESS);
     }
     
@@ -865,11 +864,11 @@ KS_SYSCALL fernos_error_t ks_return_mem(kernel_state_t *ks, void *s, const void 
     thread_t *thr = (thread_t *)(ks->schedule.head);
     phys_addr_t pd = thr->proc->pd;
 
-    if ((uintptr_t)s < FOS_FREE_AREA_START || (uintptr_t)s >= FOS_FREE_AREA_END) {
+    if ((uintptr_t)s < FC_CORE_VMEM_FREE_START || (uintptr_t)s >= FC_CORE_VMEM_FREE_END) {
         return FOS_E_SUCCESS;
     }
 
-    if ((uintptr_t)e < FOS_FREE_AREA_START || (uintptr_t)e > FOS_FREE_AREA_END) {
+    if ((uintptr_t)e < FC_CORE_VMEM_FREE_START || (uintptr_t)e > FC_CORE_VMEM_FREE_END) {
         return FOS_E_SUCCESS;
     }
 

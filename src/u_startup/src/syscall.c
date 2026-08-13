@@ -2,7 +2,8 @@
 #include "u_startup/syscall.h"
 #include "s_bridge/shared_defs.h"
 #include "s_util/str.h"
-#include "s_util/constraints.h"
+#include "c_config.h"
+
 
 fernos_error_t sc_proc_fork(proc_id_t *cpid) {
     return (fernos_error_t)trigger_syscall(SCID_PROC_FORK, (uint32_t)cpid, 0, 0, 0);
@@ -197,7 +198,7 @@ fernos_error_t sc_handle_write_full(handle_t h, const void *src, size_t len) {
 
 fernos_error_t sc_out_write_full(const void *src, size_t len) {
     handle_t out = sc_get_out_handle();
-    if (out == FOS_MAX_HANDLES_PER_PROC) {
+    if (out == FC_CORE_MAX_HANDLES_PER_PROC) {
         return FOS_E_SUCCESS; // "everything worked fine"
     }
 
@@ -270,7 +271,7 @@ fernos_error_t sc_handle_read_full(handle_t h, void *dest, size_t len) {
 
 fernos_error_t sc_in_read_full(void *dest, size_t len) {
     handle_t in = sc_get_in_handle();
-    if (in == FOS_MAX_HANDLES_PER_PROC) {
+    if (in == FC_CORE_MAX_HANDLES_PER_PROC) {
         return FOS_E_EMPTY; // Nothing to ever read from the default handle.
     }
 
