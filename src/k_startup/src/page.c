@@ -261,10 +261,20 @@ static fernos_error_t _init_kernel_pd(void) {
      *
      * Remeber that the prologue does NOT contain the very first physical page!
      * Similarly, the epilogue does NOT contain the very last physical page!
+     *
+     * Also, I believe right now, in kernel mode, the writeable bit in ptes has no effect.
+     * However, I think there is a way to change this if I really want one day!
      */
 
     PROP_ERR(_place_range(pd, (uint8_t *)(FC_CORE_PMEM_PROLOGUE_START), (const uint8_t *)(FC_CORE_PMEM_PROLOGUE_END), 
                 _R_IDENTITY | _R_WRITEABLE | _R_DONT_CACHE));    
+
+    /*
+     * This area contains just the headers declared in boot.S.
+     * Grub will give a pointer to the requested multiboot structures at runtime.
+     * These structures will likely live in the prologue.
+     */
+    PROP_ERR(_place_range(pd, _multiboot_start, _multiboot_end, _R_IDENTITY));
 
     PROP_ERR(_place_range(pd, _sys_tables_start, _sys_tables_end, _R_WRITEABLE | _R_IDENTITY));
 

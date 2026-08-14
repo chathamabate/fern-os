@@ -16,6 +16,9 @@
 
 extern uint8_t _static_area_start[];
 
+extern uint8_t _multiboot_start[];
+extern uint8_t _multiboot_end[];
+
 extern uint8_t _sys_tables_start[];
 extern uint8_t _sys_tables_end[];
 
