@@ -51,40 +51,87 @@ uint8_t free_kernel_pages[NUM_FREE_KERNEL_PAGES][M_4K] __attribute__((aligned(NU
 static pt_entry_t free_kernel_page_pt[1024] __attribute__((aligned(M_4K)));
 static pt_entry_t *free_kernel_page_ptes[NUM_FREE_KERNEL_PAGES];
 
-
-/**
- * This is just the range to use to set up the initial free list.
- * After initialization, pages outside this range can be added to the free list
- * without consequence. (Just be careful)
+/*
+ * If you look in c_config.h, you'll see many areas prefixed with "VMEM". These outline
+ * what memory will look like when virtual memory is enabled.
+ *
+ * Only two of those areas (not even entirely) are actually identity mapped though!
+ *
+ * [_static_area_start, _static_area_end) 
+ * A large area of physical memory is reserved for loadable contents of the kernel elf.
+ * Most likely though, the area needed is much smaller than what is reserved.
+ * We use the _static_area pointers (declared in the linker script) to determine what pages
+ * were actually written to.
+ *
+ * [FC_CORE_KSTACK_START, FC_CORE_KSTACK_END)
+ * While probably not 100% required, it made my life much easier for the whole kernel stack area
+ * to be identity mapped in EVERY page table. (marked as supervisor only)
+ *
+ * The pages all live within the range FC_CORE_PMEM_BODY.
+ * So, all physical pages within FC_CORE_PMEM_BODY which are NOT part of the above two ranges,
+ * will be added to the free list!
+ *
+ * NOTE: The logic for this used to be much simpler as the _static_area was always the very 
+ * beginning of the BODY, and the kernel stack was always very end.
+ * Now though with config.json files, these two ranges can appear anywhere within the body!
  */
-#define INITIAL_FREE_AREA_START ((phys_addr_t)_static_area_end) 
-#define INITIAL_FREE_AREA_END  ((phys_addr_t)FC_CORE_KSTACK_START) // Exclusive end.
 
 static phys_addr_t free_list_head = NULL_PHYS_ADDR;
 static uint32_t free_list_len = 0;
 
 static fernos_error_t _init_free_list(void) {
-    CHECK_ALIGN(INITIAL_FREE_AREA_START, M_4K);
-    CHECK_ALIGN(INITIAL_FREE_AREA_END, M_4K);
+    // These checks are redundant, but whatever.
+    CHECK_ALIGN((phys_addr_t)_static_area_start, M_4K);
+    CHECK_ALIGN((phys_addr_t)_static_area_end, M_4K);
+    CHECK_ALIGN(FC_CORE_KSTACK_START, M_4K);
+    CHECK_ALIGN(FC_CORE_KSTACK_END, M_4K);
 
-    if (INITIAL_FREE_AREA_START == INITIAL_FREE_AREA_END) {
-        return FOS_E_SUCCESS;
+    typedef struct {
+        phys_addr_t start;
+        phys_addr_t end;
+    } page_range_t;
+
+    const page_range_t static_area_range = {
+        (phys_addr_t)_static_area_start, 
+        (phys_addr_t)_static_area_end
+    };
+
+    const page_range_t kstack_range = {
+        FC_CORE_KSTACK_START, 
+        FC_CORE_KSTACK_END
+    };
+
+    // how the boys back home sort 2 element lists.
+    const page_range_t iareas[2] = {
+        static_area_range.start < kstack_range.start ? static_area_range : kstack_range,
+        static_area_range.start < kstack_range.start ? kstack_range : static_area_range
+    };
+
+    // realize that it is very possible 1 or 2 of these free areas are actually empty!
+    const page_range_t free_areas[3] = {
+        {FC_CORE_PMEM_BODY_START, iareas[0].start},
+        {iareas[0].end, iareas[1].start},
+        {iareas[1].end, FC_CORE_PMEM_BODY_END}
+    };
+
+    const size_t num_free_areas = sizeof(free_areas) / sizeof(free_areas[0]);
+    for (size_t i = 0; i < num_free_areas; i++) {
+        page_range_t free_area = free_areas[i];
+
+        if (free_area.start == free_area.end) {
+            continue; // skip empty ranges!
+        }
+
+        for (phys_addr_t p = free_area.start; p < free_area.end - M_4K; p += M_4K) {
+            *(phys_addr_t *)p = p + M_4K;
+        }
+        
+        // The final page in the area will point to the current free list head.
+        *(phys_addr_t *)(free_area.end - M_4K) = free_list_head;
+        free_list_head = free_area.start;
+        free_list_len += (free_area.end - free_area.start) / M_4K;
     }
 
-    if (INITIAL_FREE_AREA_END < INITIAL_FREE_AREA_START) {
-        return FOS_E_INVALID_RANGE;
-    }
-
-    for (phys_addr_t iter = INITIAL_FREE_AREA_START; iter < INITIAL_FREE_AREA_END; iter += M_4K) {
-        *(phys_addr_t *)iter = iter + M_4K;
-    }
-
-    // Set final link to NULL.
-    *(phys_addr_t *)(INITIAL_FREE_AREA_END - M_4K) = NULL_PHYS_ADDR;
-    
-    free_list_head = INITIAL_FREE_AREA_START;
-    free_list_len = (INITIAL_FREE_AREA_END - INITIAL_FREE_AREA_START) / M_4K;
-    
     return FOS_E_SUCCESS;
 }
 
