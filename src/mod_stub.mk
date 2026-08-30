@@ -5,11 +5,17 @@ ifeq ($(MOD_NAME),)
 $(error module name is required)
 endif
 
+# REQUIRED: Names (NOT PAHTS) of all non-test .h files found in the include folder
+_HDRS 		?=
+
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
 _SRCS 		?=
 
 # REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
 _ASMS		?=
+
+# REQUIRED: Names (NOT PAHTS) of all test .h files found in the include test folder
+_TEST_HDRS 	?=
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?=
@@ -56,8 +62,8 @@ INSTALL_INC_DIR := $(INSTALL_DIR)/include
 # install are up to date before attempting any compilation!
 
 INC_DIR		 := $(MOD_DIR)/include
-HDRS	 	 := $(wildcard $(INC_DIR)/$(MOD_NAME)/*.h)
-TEST_HDRS	 := $(wildcard $(INC_DIR)/$(MOD_NAME)/test/*.h)
+HDRS 		 := $(addprefix $(INC_DIR)/$(MOD_NAME)/,$(_HDRS))
+TEST_HDRS	 := $(addprefix $(INC_DIR)/$(MOD_NAME)/test/,$(_TEST_HDRS))
 
 SRC_DIR 	 := $(MOD_DIR)/src
 SRC_INC_DIRS := $(SRC_DIR) $(INSTALL_INC_DIR)
@@ -212,42 +218,14 @@ test_lib.install: $(INSTALL_TEST_LIB)
 # 
 # (Can be called out of order just fine)
 
-# Clangd Files
-
-# Expects 
-# $(1): Clangd File
-# $(2): Flags
-define CLANGD_HELPER
-echo "CompileFlags:" > $1
-echo "  Add:" >> $1
-$(foreach fl,$(2),echo "  - $(fl)" >> $1;)
-endef
-
-# Here we include $(INC_DIR) just so we can see our changes while editing without needing
-# to call hdrs.install
-
-INC_CLANGD_INC_DIRS := $(INC_DIR) $(INSTALL_INC_DIR)
-INC_CLANGD_INC_FLAGS:= $(addprefix -I,$(INC_CLANGD_INC_DIRS))
-INC_CLANGD := $(INC_DIR)/.clangd
-$(INC_CLANGD):
-	$(call CLANGD_HELPER,$@,$(CFLAGS) $(INC_CLANGD_INC_FLAGS))
-
-SRC_CLANGD_INC_DIRS := $(SRC_DIR) $(INC_DIR) $(INSTALL_INC_DIR)
-SRC_CLANGD_INC_FLAGS:= $(addprefix -I,$(SRC_CLANGD_INC_DIRS))
-SRC_CLANGD := $(SRC_DIR)/.clangd
-$(SRC_CLANGD):
-	$(call CLANGD_HELPER,$@,$(CFLAGS) $(SRC_CLANGD_INC_FLAGS))
-
-TEST_CLANGD_INC_DIRS := $(TEST_DIR) $(INC_DIR) $(INSTALL_INC_DIR)
-TEST_CLANGD_INC_FLAGS:= $(addprefix -I,$(TEST_CLANGD_INC_DIRS))
-TEST_CLANGD := $(TEST_DIR)/.clangd
-$(TEST_CLANGD):
-	$(call CLANGD_HELPER,$@,$(CFLAGS) $(TEST_CLANGD_INC_FLAGS))
+CLANGD := $(MOD_DIR)/.clangd
+$(CLANGD):
+	echo "CompileFlags:" > $@
+	echo "  Add:" >> $@
+	$(foreach fl,$(CFLAGS) -I$(INSTALL_INC_DIR),echo "  - $(fl)" >> $@;)
 
 .PHONY: clangd
-
-CLANGDS := $(INC_CLANGD) $(SRC_CLANGD) $(TEST_CLANGD)
-clangd: $(CLANGDS) 
+clangd: $(CLANGD) 
 	@echo > /dev/null
 
 # clean targets
@@ -258,7 +236,7 @@ clean:
 	rm -rf $(BUILD_DIR)
 
 clean.clangd:
-	rm -f $(CLANGDS)
+	rm -f $(CLANGD)
 
 uninstall:
 	rm -f $(INSTALL_LIB)

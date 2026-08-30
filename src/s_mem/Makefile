@@ -6,14 +6,20 @@
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
 MOD_NAME 	?= s_mem
 
+# REQUIRED: Names (NOT PAHTS) of all non-test .h files found in the include folder
+_HDRS    	?= allocator.h simple_heap.h
+
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
 _SRCS 		?= allocator.c simple_heap.c
 
 # REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
 _ASMS		?= 
 
+# REQUIRED: Names (NOT PAHTS) of all test .h files found in the include test folder
+_TEST_HDRS 	?= allocator.h simple_heap.h 	
+
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= allocator.c simple_heap.c
 
--include ../mod_stub.mk
+include ../mod_stub.mk
 
