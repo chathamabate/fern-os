@@ -1,4 +1,5 @@
-# NOTE: This stub is meant to be included
+# NOTE: This stub is meant to be included, it assumes `mod_header_stub.mk` has already been
+# included.
 
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
 ifeq ($(MOD_NAME),)

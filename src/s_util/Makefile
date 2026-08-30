@@ -1,4 +1,4 @@
-
+include ../mod_header_stub.mk
 
 # NOTE: This module is freestanding utility code.
 # IT DEPENDS ON NOTHING!!!

@@ -1,4 +1,4 @@
-
+include ../mod_header_stub.mk
 
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
 MOD_NAME 	?= u_startup
@@ -51,6 +51,7 @@ _TEST_SRCS 	?= syscall.c \
 			   syscall_shm.c \
 			   syscall_term.c \
 			   syscall_gfx.c
+
 
 # TODO: Add back testing for terminal/cd.
 

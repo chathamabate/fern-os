@@ -1,6 +1,6 @@
 
 #include "u_startup/main.h"
-#include "u_startup/syscall_fs.h"
+#include "u_startup/syscall_kb.h"
 
 proc_exit_status_t user_main(void) {
     /*

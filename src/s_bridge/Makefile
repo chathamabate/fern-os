@@ -1,3 +1,4 @@
+include ../mod_header_stub.mk
 
 # REQUIRED: Name of the standalone module (MUST BE THE SAME AS IT"S DIRECTORY NAME)
 MOD_NAME 	?= s_bridge

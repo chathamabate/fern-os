@@ -72,6 +72,17 @@ $(MYPY_TOKEN): $(SCHEMA_PY) | $(VENV_DIR) $(BUILD_DIR)
 	. $(VENV_ACTIVATE) && mypy $(SCHEMA_PY)
 	touch $@
 
+# NOTE: At this time, a change to $(CONFIG_JSON) does NOT delete all build artifacts and installed 
+# headers. This means, upon disabling a feature for example, said feature's headers and objs may 
+# still exist in the INSTALL_DIR.
+#
+# Moral of the story, depending on the levity of your change to $(CONFIG_JSON), you may need
+# to do a make clean if you want to guarantee old headers are no longer accessible.
+#
+# I think this is an ok trade off at this time. Config files should be pretty constant.
+# Additionally, changes to the Config file which don't affect which files are included, shouldn't
+# require a full rebuild!
+
 CONFIG_JSON := $(SRC_DIR)/config.json
 
 CONFIG_C  := $(INCLUDE_DIR)/c_config.h
@@ -117,7 +128,10 @@ MODS := \
 
 # A helper macro invoking module specific make targets!
 # This expects that $* resolves to the name of a module.
-MOD_MAKE = $(MY_MAKE) -C $(SRC_DIR)/$* BUILD_DIR=$(BUILD_DIR)/mods/$* INSTALL_DIR=$(INSTALL_DIR)
+MOD_MAKE = $(MY_MAKE) -C $(SRC_DIR)/$* \
+		   CONFIG_MK=$(CONFIG_MK) \
+		   BUILD_DIR=$(BUILD_DIR)/mods/$* \
+		   INSTALL_DIR=$(INSTALL_DIR)
 
 # Install Headers
 
