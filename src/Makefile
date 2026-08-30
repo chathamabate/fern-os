@@ -59,10 +59,11 @@ $(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 
 ####################################################################################################
 
-FERNCONF_VERSION := 0.1.9
+FERNCONF_VERSION := 0.2.0
 VENV_ACTIVATE := $(VENV_DIR)/bin/activate
 
 $(VENV_DIR): $(THIS_FILE)
+	rm -rf $@
 	mkdir -p $@
 	python3 -m venv $(VENV_DIR)
 	. $(VENV_ACTIVATE) && \

@@ -20,18 +20,18 @@ def fos_bound_int(minimum: int, maximum: int) -> FCSchema:
         raise Exception(f"Integer maximum {maximum} is less than minimum {minimum}")
 
     return FCS_INT.with_extra_checks(
-            lower_bound=lambda fcv: Ok(None) if minimum <= cast(int, fcv) else Err(f"value {fcv} is below minimum {minimum}"),
-            upper_bound=lambda fcv: Ok(None) if cast(int, fcv) <= maximum else Err(f"value {fcv} is above maximum: {maximum}") 
+            lower_bound=lambda fcv: Ok(None) if minimum <= cast(int, fcv) else Err([f"value {fcv} is below minimum {minimum}"]),
+            upper_bound=lambda fcv: Ok(None) if cast(int, fcv) <= maximum else Err([f"value {fcv} is above maximum: {maximum}"]) 
     )
 
 FOS_UINT32 = fos_bound_int(0, 0xFFFF_FFFF)
 FOS_UINT32_AND_1 = fos_bound_int(0, 0x1_0000_0000)
 
-def fern_os_uint_align_4k(fcv: FCValue) -> Result[None, str]:
+def fern_os_uint_align_4k(fcv: FCValue) -> Result[None, list[str]]:
     dv = cast(int, fcv)
 
     if dv & (0x1000 - 1) != 0:
-        return Err(f"unsigned int is not 4k aligned: 0x{dv:X}")
+        return Err([f"unsigned int is not 4k aligned: 0x{dv:X}"])
 
     return Ok(None)
 
@@ -58,7 +58,7 @@ FOS_RANGE32 = FCSchemaStruct(
 
 # FernOS Core Properties + Memory Layout
 
-def fern_os_mem_ranges_no_overlap(fcv: FCValue) -> Result[None, str]:
+def fern_os_mem_ranges_no_overlap(fcv: FCValue) -> Result[None, list[str]]:
     dv = cast(dict[str, dict[str, int]], fcv)
 
     ranges = [
@@ -82,7 +82,7 @@ def fern_os_mem_ranges_no_overlap(fcv: FCValue) -> Result[None, str]:
 
         # Remember index 2 is exclusive end.
         if r[2] > next_r[1]:
-            return Err(f"ranges overlap: {r[0]} and {next_r[0]}")
+            return Err([f"ranges overlap: {r[0]} and {next_r[0]}"])
 
     return Ok(None)
 
@@ -159,7 +159,7 @@ FOS_VMEM_RANGES = FCSchemaStruct([
     "NOTE: Some of these ranges may be identity mapped. (for example the kernel area range)"
 ])
 
-def fern_os_mem_v_valid(fcv: FCValue) -> Result[None, str]:
+def fern_os_mem_v_valid(fcv: FCValue) -> Result[None, list[str]]:
     """
     Confirm all virtual memory ranges are within the FernOS physical memory range.
     """
@@ -174,11 +174,11 @@ def fern_os_mem_v_valid(fcv: FCValue) -> Result[None, str]:
         vr_end = vr["END"]
         
         if not (body_start <= vr_start and vr_end <= body_end):
-            return Err(f"V range outside FernOS body: {vr_name}")
+            return Err([f"V range outside FernOS body: {vr_name}"])
 
     return Ok(None)
 
-def fern_os_stack_sizes_valid(fcv: FCValue) -> Result[None, str]:
+def fern_os_stack_sizes_valid(fcv: FCValue) -> Result[None, list[str]]:
     """
     Confirms the defined stack area in VMEM is large enough to fit the kernel stack and thread
     stacks!
@@ -195,7 +195,7 @@ def fern_os_stack_sizes_valid(fcv: FCValue) -> Result[None, str]:
     stack_area_size = vmem["STACK"]["SIZE"]
 
     if min_stack_area_size > stack_area_size:
-        return Err(f"Minimum stack area size 0x{min_stack_area_size:X} is greater than actual stack area size 0x{stack_area_size:X}")
+        return Err([f"Minimum stack area size 0x{min_stack_area_size:X} is greater than actual stack area size 0x{stack_area_size:X}"])
 
     return Ok(None)
 
@@ -208,14 +208,14 @@ FOS_CORE = FCSchemaStruct(
         # Core properties
 
         ("KSTACK_SIZE", FOS_UINT32_4K.with_default_any(256 * 1024).with_extra_checks(
-            two_page_min=lambda v: Ok(None) if cast(int, v) >= 2 * 4 * 1024 else Err("Stacks must be at least 2 pages")
+            two_page_min=lambda v: Ok(None) if cast(int, v) >= 2 * 4 * 1024 else Err(["Stacks must be at least 2 pages"])
         ).with_comment([
             "Kernel stack size (including redzone page)",
             "Guaranteed to be at least 2 pages"
         ])),
 
         ("TSTACK_SIZE", FOS_UINT32_4K.with_default_any(4 * 1024 * 1024).with_extra_checks(
-            two_page_min=lambda v: Ok(None) if cast(int, v) >= 2 * 4 * 1024 else Err("Stacks must be at least 2 pages")
+            two_page_min=lambda v: Ok(None) if cast(int, v) >= 2 * 4 * 1024 else Err(["Stacks must be at least 2 pages"])
         ).with_comment([
             "Size of a single user thread stack (including redzone page)",
             "Guaranteed to be at least 2 pages"
@@ -225,7 +225,7 @@ FOS_CORE = FCSchemaStruct(
         # Also, I decided early on that having max procs be a multiple of 8, makes logic pretty
         # simple in certain areas.
         ("MAX_PROCS", fos_bound_int(1, 512).with_extra_checks(
-            mult_of_8=lambda v: Ok(None) if cast(int, v) % 8 == 0 else Err("Not multple of 8")
+            mult_of_8=lambda v: Ok(None) if cast(int, v) % 8 == 0 else Err(["Not multple of 8"])
         ).with_default_any(256).with_comment([
             "Maximum number of processes (guaranteed to be a multiple of 8)"
         ])),
