@@ -28,7 +28,6 @@
 
 ####################################################################################################
 
-
 GIT_TOP ?= $(shell git rev-parse --show-toplevel)
 
 SRC_DIR    := $(GIT_TOP)/src
@@ -37,27 +36,19 @@ INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
 VENV_DIR := $(SRC_DIR)/venv
 
-MY_MAKE := @make --no-print-directory
-DONE_MSG = @echo -e "\x1B[1;97m>> \x1B[1;92m$1 \x1B[1;97m<<\x1b[0m\n"
-
 THIS_FILE := $(SRC_DIR)/Makefile
 
-MODS := \
-		u_concur \
-		k_startup \
-		u_startup \
-		s_bridge \
-		k_sys \
-		s_block_device \
-		s_data \
-		s_mem \
-		s_gfx \
-		s_util 
+MY_MAKE := @make --no-print-directory
+DONE_MSG = @echo -e "\x1B[1;97m>> \x1B[1;92m$1 \x1B[1;97m<<\x1b[0m\n"
 
 $(BUILD_DIR) $(INCLUDE_DIR) $(INSTALL_DIR):
 	mkdir -p $@
 
 ####################################################################################################
+
+# This Makefile will include a generated make configuration file.
+# This Makefile also contains the rules for said generated configuration files.
+# We have to define the configuration targets here first before anything else!
 
 FERNCONF_VERSION := 0.2.0
 VENV_ACTIVATE := $(VENV_DIR)/bin/activate
@@ -74,12 +65,23 @@ $(VENV_DIR): $(THIS_FILE)
 venv: $(VENV_DIR)
 
 SCHEMA_PY := $(SRC_DIR)/config_schema.py
-MYPY_TOKEN := $(BUILD_DIR)/mypy_token
+MYPY_TOKEN := $(VENV_DIR)/mypy_token
 
 # The MyPy token confirms that the schema python file has been type checked since its last update!
 $(MYPY_TOKEN): $(SCHEMA_PY) | $(VENV_DIR) $(BUILD_DIR)
 	. $(VENV_ACTIVATE) && mypy $(SCHEMA_PY)
 	touch $@
+
+# NOTE: At this time, a change to $(CONFIG_JSON) does NOT delete all build artifacts and installed 
+# headers. This means, upon disabling a feature for example, said feature's headers and objs may 
+# still exist in the INSTALL_DIR.
+#
+# Moral of the story, depending on the levity of your change to $(CONFIG_JSON), you may need
+# to do a make clean if you want to guarantee old headers are no longer accessible.
+#
+# I think this is an ok trade off at this time. Config files should be pretty constant.
+# Additionally, changes to the Config file which don't affect which files are included, shouldn't
+# require a full rebuild!
 
 CONFIG_JSON := $(SRC_DIR)/config.json
 
@@ -95,19 +97,41 @@ CONFIG_LD := $(INCLUDE_DIR)/ld_config.h
 $(CONFIG_LD): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f ld -o $@
 
-# I haven't figured out yet how we are going to fit in a generated make file into the build
-# process!
 CONFIG_MK := $(INSTALL_DIR)/mk_config.mk
 $(CONFIG_MK): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INSTALL_DIR)
 	. $(VENV_ACTIVATE) && python $(SCHEMA_PY) $< -f make -o $@
 
 CONFIGS := $(CONFIG_C) $(CONFIG_S) $(CONFIG_LD) $(CONFIG_MK)
 
+# Generating the config makefile takes some work, and may not be necessary for all targets in this
+# makefile. If a target does not need $(CONFIG_MK) to execute safely, list it here!
+CONFIG_FREE_TARGETS := clean clean.deep
+
+# Kinda confusing condition, include $(CONFIG_MK) if there is at least one non config free target!
+ifneq ($(filter-out $(CONFIG_FREE_TARGETS),$(MAKECMDGOALS)),)
+include $(CONFIG_MK)
+endif
+
 ####################################################################################################
+
+MODS := \
+		u_concur \
+		k_startup \
+		u_startup \
+		s_bridge \
+		k_sys \
+		s_block_device \
+		s_data \
+		s_mem \
+		s_gfx \
+		s_util 
 
 # A helper macro invoking module specific make targets!
 # This expects that $* resolves to the name of a module.
-MOD_MAKE = $(MY_MAKE) -C $(SRC_DIR)/$* BUILD_DIR=$(BUILD_DIR)/mods/$* INSTALL_DIR=$(INSTALL_DIR)
+MOD_MAKE = $(MY_MAKE) -C $(SRC_DIR)/$* \
+		   CONFIG_MK=$(CONFIG_MK) \
+		   BUILD_DIR=$(BUILD_DIR)/mods/$* \
+		   INSTALL_DIR=$(INSTALL_DIR)
 
 # Install Headers
 
@@ -222,6 +246,7 @@ $(ABS_APP_LDSCRIPT): $(APP_LDSCRIPT) $(CONFIG_LD) | $(APPS_BUILD)
 
 # Similar to MOD_MAKE macro, but for apps
 APP_MAKE = $(MY_MAKE) -C $(APPS_DIR)/$* \
+		   		CONFIG_MK=$(CONFIG_MK) \
 				BUILD_DIR=$(APPS_BUILD)/$* \
 				OUT_DIR=$(APPS_OUT) \
 				INSTALL_DIR=$(INSTALL_DIR) \

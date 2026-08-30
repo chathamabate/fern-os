@@ -1,4 +1,4 @@
-
+include ../mod_header_stub.mk
 
 MOD_NAME 	?= k_startup
 

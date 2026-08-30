@@ -1,4 +1,4 @@
-
+include ../mod_header_stub.mk
 
 # NOTE: This module is to help with dynamic memory allocation in
 # both kernel or user space.
