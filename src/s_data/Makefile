@@ -37,5 +37,5 @@ _TEST_HDRS 	?= 	binary_search_tree.h \
 _TEST_SRCS 	?= id_table.c map.c list.c wait_queue.c ring.c term_buffer.c \
 			   fixed_queue.c heap.c binary_search_tree.c
 
--include ../mod_stub.mk
+include ../mod_stub.mk
 

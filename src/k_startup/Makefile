@@ -63,5 +63,5 @@ _TEST_SRCS 	?= page.c \
 			   process.c \
 			   ata_block_device.c
 
--include ../mod_stub.mk
+include ../mod_stub.mk
 

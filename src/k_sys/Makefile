@@ -28,5 +28,5 @@ _TEST_HDRS 	?=
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= test.c
 
--include ../mod_stub.mk
+include ../mod_stub.mk
 

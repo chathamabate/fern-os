@@ -21,5 +21,5 @@ _TEST_HDRS 	?= allocator.h simple_heap.h
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= allocator.c simple_heap.c
 
--include ../mod_stub.mk
+include ../mod_stub.mk
 

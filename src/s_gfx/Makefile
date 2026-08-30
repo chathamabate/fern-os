@@ -29,5 +29,5 @@ _TEST_HDRS 	?= 	gfx.h \
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= gfx.c gfx_manager.c mono_fonts.c
 
--include ../mod_stub.mk
+include ../mod_stub.mk
 

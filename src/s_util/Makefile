@@ -35,5 +35,5 @@ _TEST_SRCS 	?= str.c \
 			   misc.c \
 			   ansi.c
 
--include ../mod_stub.mk
+include ../mod_stub.mk
 

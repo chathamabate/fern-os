@@ -220,39 +220,22 @@ test_lib.install: $(INSTALL_TEST_LIB)
 
 # Clangd Files
 
-# Expects 
-# $(1): Clangd File
-# $(2): Flags
-define CLANGD_HELPER
-echo "CompileFlags:" > $1
-echo "  Add:" >> $1
-$(foreach fl,$(2),echo "  - $(fl)" >> $1;)
-endef
-
-# Here we include $(INC_DIR) just so we can see our changes while editing without needing
-# to call hdrs.install
-
-INC_CLANGD_INC_DIRS := $(INC_DIR) $(INSTALL_INC_DIR)
-INC_CLANGD_INC_FLAGS:= $(addprefix -I,$(INC_CLANGD_INC_DIRS))
 INC_CLANGD := $(INC_DIR)/.clangd
-$(INC_CLANGD):
-	$(call CLANGD_HELPER,$@,$(CFLAGS) $(INC_CLANGD_INC_FLAGS))
-
-SRC_CLANGD_INC_DIRS := $(SRC_DIR) $(INC_DIR) $(INSTALL_INC_DIR)
-SRC_CLANGD_INC_FLAGS:= $(addprefix -I,$(SRC_CLANGD_INC_DIRS))
 SRC_CLANGD := $(SRC_DIR)/.clangd
-$(SRC_CLANGD):
-	$(call CLANGD_HELPER,$@,$(CFLAGS) $(SRC_CLANGD_INC_FLAGS))
-
-TEST_CLANGD_INC_DIRS := $(TEST_DIR) $(INC_DIR) $(INSTALL_INC_DIR)
-TEST_CLANGD_INC_FLAGS:= $(addprefix -I,$(TEST_CLANGD_INC_DIRS))
 TEST_CLANGD := $(TEST_DIR)/.clangd
-$(TEST_CLANGD):
-	$(call CLANGD_HELPER,$@,$(CFLAGS) $(TEST_CLANGD_INC_FLAGS))
 
-.PHONY: clangd
+# NOTE: There was a time where a notion of "private headers" existed.
+# This would be headers defined directly in the src or test directories next to .c files.
+# I have decided that this will no longer be supported! All headers are always installed!
+# To find headers, you only need ever point to $(INSTALL_INC_DIR).
 
 CLANGDS := $(INC_CLANGD) $(SRC_CLANGD) $(TEST_CLANGD)
+$(CLANGDS):
+	echo "CompileFlags:" > $@
+	echo "  Add:" >> $@
+	$(foreach fl,$(CFLAGS) -I$(INSTALL_INC_DIR),echo "  - $(fl)" >> $@;)
+
+.PHONY: clangd
 clangd: $(CLANGDS) 
 	@echo > /dev/null
 

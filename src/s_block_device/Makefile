@@ -37,5 +37,5 @@ _TEST_SRCS 	?= block_device.c mem_block_device.c cached_block_device.c \
 			   fat32.c fat32_dir.c file_sys_helpers.c file_sys.c \
 			   fat32_file_sys.c
 
--include ../mod_stub.mk
+include ../mod_stub.mk
 

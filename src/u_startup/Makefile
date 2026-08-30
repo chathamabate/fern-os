@@ -54,5 +54,5 @@ _TEST_SRCS 	?= syscall.c \
 
 # TODO: Add back testing for terminal/cd.
 
--include ../mod_stub.mk
+include ../mod_stub.mk
 
