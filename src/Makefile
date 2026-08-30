@@ -245,9 +245,8 @@ $(ABS_APP_LDSCRIPT): $(APP_LDSCRIPT) $(CONFIG_LD) | $(APPS_BUILD)
 	$(C_COMPILER) -I$(INCLUDE_DIR) -xc -P -E $< > $@
 
 # Similar to MOD_MAKE macro, but for apps
-# NOTE: At this time, Apps don't get passed $(CONFIG_MK). I may decide to change this in the
-# future.
 APP_MAKE = $(MY_MAKE) -C $(APPS_DIR)/$* \
+		   		CONFIG_MK=$(CONFIG_MK) \
 				BUILD_DIR=$(APPS_BUILD)/$* \
 				OUT_DIR=$(APPS_OUT) \
 				INSTALL_DIR=$(INSTALL_DIR) \

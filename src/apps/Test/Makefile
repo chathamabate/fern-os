@@ -1,3 +1,4 @@
+include ../app_header_stub.mk
 
 # REQUIRED
 #
@@ -9,4 +10,4 @@ APP_NAME ?= Test
 # The names of all .c files within `src/apps/$(APP_NAME)`
 _SRCS ?= app_main.c
 
--include ../app_stub.mk
+include ../app_stub.mk

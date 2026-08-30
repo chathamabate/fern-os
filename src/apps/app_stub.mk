@@ -4,6 +4,9 @@
 # This stub supports .c and .h files defined in the apps subdir directly.
 
 # This Makefile is both meant to be included and invoked with arguments!
+#
+# NOTE: It assumes `app_header_stub.mk` has already be included.
+# This follows a similar pattern to the per module Makefiles and stubs.
 
 ####################################################################################################
 
