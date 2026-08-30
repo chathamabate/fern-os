@@ -23,7 +23,7 @@ _SRCS 		?= tss.c gdt.c idt.c intr.c ata.c kb.c m2.c
 _ASMS		?= tss.S io.S page.S gdt.S idt.S intr.S debug.S
 
 # REQUIRED: Names (NOT PAHTS) of all test .h files found in the include test folder
-_TEST_HDRS 	?= 	
+_TEST_HDRS 	?=
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?= test.c
