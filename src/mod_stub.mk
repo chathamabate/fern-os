@@ -218,25 +218,14 @@ test_lib.install: $(INSTALL_TEST_LIB)
 # 
 # (Can be called out of order just fine)
 
-# Clangd Files
-
-INC_CLANGD := $(INC_DIR)/.clangd
-SRC_CLANGD := $(SRC_DIR)/.clangd
-TEST_CLANGD := $(TEST_DIR)/.clangd
-
-# NOTE: There was a time where a notion of "private headers" existed.
-# This would be headers defined directly in the src or test directories next to .c files.
-# I have decided that this will no longer be supported! All headers are always installed!
-# To find headers, you only need ever point to $(INSTALL_INC_DIR).
-
-CLANGDS := $(INC_CLANGD) $(SRC_CLANGD) $(TEST_CLANGD)
-$(CLANGDS):
+CLANGD := $(MOD_DIR)/.clangd
+$(CLANGD):
 	echo "CompileFlags:" > $@
 	echo "  Add:" >> $@
 	$(foreach fl,$(CFLAGS) -I$(INSTALL_INC_DIR),echo "  - $(fl)" >> $@;)
 
 .PHONY: clangd
-clangd: $(CLANGDS) 
+clangd: $(CLANGD) 
 	@echo > /dev/null
 
 # clean targets
@@ -247,7 +236,7 @@ clean:
 	rm -rf $(BUILD_DIR)
 
 clean.clangd:
-	rm -f $(CLANGDS)
+	rm -f $(CLANGD)
 
 uninstall:
 	rm -f $(INSTALL_LIB)
