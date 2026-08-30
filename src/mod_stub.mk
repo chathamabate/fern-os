@@ -5,11 +5,17 @@ ifeq ($(MOD_NAME),)
 $(error module name is required)
 endif
 
+# REQUIRED: Names (NOT PAHTS) of all non-test .h files found in the include folder
+_HDRS 		?=
+
 # REQUIRED: Names (NOT PATHS) of all .c files found in the src folder
 _SRCS 		?=
 
 # REQUIRED: Names (NOT PATHS) of all .S files found in the src folder
 _ASMS		?=
+
+# REQUIRED: Names (NOT PAHTS) of all test .h files found in the include test folder
+_TEST_HDRS 	?=
 
 # REQUIRED: Names (NOT PATHS) of all .c files in the test folder
 _TEST_SRCS 	?=
@@ -56,8 +62,8 @@ INSTALL_INC_DIR := $(INSTALL_DIR)/include
 # install are up to date before attempting any compilation!
 
 INC_DIR		 := $(MOD_DIR)/include
-HDRS	 	 := $(wildcard $(INC_DIR)/$(MOD_NAME)/*.h)
-TEST_HDRS	 := $(wildcard $(INC_DIR)/$(MOD_NAME)/test/*.h)
+HDRS 		 := $(addprefix $(INC_DIR)/$(MOD_NAME)/,$(_HDRS))
+TEST_HDRS	 := $(addprefix $(INC_DIR)/$(MOD_NAME)/test/,$(_TEST_HDRS))
 
 SRC_DIR 	 := $(MOD_DIR)/src
 SRC_INC_DIRS := $(SRC_DIR) $(INSTALL_INC_DIR)
