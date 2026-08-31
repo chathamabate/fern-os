@@ -28,13 +28,31 @@
 
 ####################################################################################################
 
-GIT_TOP ?= $(shell git rev-parse --show-toplevel)
+# REQUIRED: This is the name of the config which you want to work with. If you do not specify on 
+# the command line, a default config will be selected. (if it exists)
+CFG ?= default
 
+####################################################################################################
+
+GIT_TOP ?= $(shell git rev-parse --show-toplevel)
 SRC_DIR    := $(GIT_TOP)/src
-BUILD_DIR   := $(SRC_DIR)/build
+
+CFGS_DIR := $(SRC_DIR)/configs
+CFGS := $(wildcard $(CFGS_DIR)/*.json)
+CFG_NAMES := $(patsubst $(CFGS_DIR)/%.json,%,$(CFGS))
+
+ifneq ($(filter $(CFG),$(CFG_NAMES)),)
+CFG_NAME := $(CFG)
+else
+$(error Given CFG name "$(CFG)" does not map to an existing config json file)
+endif
+
+TOP_BUILD_DIR := $(SRC_DIR)/build
+
+BUILD_DIR   := $(TOP_BUILD_DIR)/$(CFG_NAME)
 INSTALL_DIR := $(BUILD_DIR)/install
 INCLUDE_DIR := $(INSTALL_DIR)/include
-VENV_DIR := $(SRC_DIR)/venv
+VENV_DIR := $(TOP_BUILD_DIR)/venv
 
 THIS_FILE := $(SRC_DIR)/Makefile
 
@@ -83,7 +101,7 @@ $(MYPY_TOKEN): $(SCHEMA_PY) | $(VENV_DIR) $(BUILD_DIR)
 # Additionally, changes to the Config file which don't affect which files are included, shouldn't
 # require a full rebuild!
 
-CONFIG_JSON := $(SRC_DIR)/config.json
+CONFIG_JSON := $(CFGS_DIR)/$(CFG_NAME).json
 
 CONFIG_C  := $(INCLUDE_DIR)/c_config.h
 $(CONFIG_C): $(CONFIG_JSON) $(MYPY_TOKEN) | $(INCLUDE_DIR)
@@ -105,7 +123,7 @@ CONFIGS := $(CONFIG_C) $(CONFIG_S) $(CONFIG_LD) $(CONFIG_MK)
 
 # Generating the config makefile takes some work, and may not be necessary for all targets in this
 # makefile. If a target does not need $(CONFIG_MK) to execute safely, list it here!
-CONFIG_FREE_TARGETS := clean clean.deep
+CONFIG_FREE_TARGETS := clean clean.deep clean.clangd%
 
 # Kinda confusing condition, include $(CONFIG_MK) if there is at least one non config free target!
 ifneq ($(filter-out $(CONFIG_FREE_TARGETS),$(MAKECMDGOALS)),)
@@ -360,11 +378,10 @@ run: iso disk
 		-display gtk \
 		-monitor stdio
 
-.PHONY: clean clean.deep
+.PHONY: clean clean.all clean.deep
 
 clean:
 	rm -rf $(BUILD_DIR)
 
-clean.deep: clean
-	rm -rf $(VENV_DIR)
-
+clean.deep:
+	rm -rf $(TOP_BUILD_DIR)

@@ -231,18 +231,7 @@ clangd: $(CLANGD)
 
 # clean targets
 
-.PHONY: clean clean.clangd uninstall clean.deep
-
-clean: 
-	rm -rf $(BUILD_DIR)
+.PHONY: clean.clangd
 
 clean.clangd:
 	rm -f $(CLANGD)
-
-uninstall:
-	rm -f $(INSTALL_LIB)
-	rm -f $(INSTALL_TEST_LIB)
-	rm -rf $(INSTALL_HDRS_DIR)
-
-clean.deep: clean clean.clangd uninstall
-
