@@ -117,18 +117,11 @@ $(APP): $(OBJS) $(ELF_SYMS) $(APP_LDSCRIPT) | $(OUT_DIR)
 bin: $(APP)
 	@echo > /dev/null
 
-# Expects 
-# $(1): Clangd File
-# $(2): Flags
-define CLANGD_HELPER
-echo "CompileFlags:" > $1
-echo "  Add:" >> $1
-$(foreach fl,$(2),echo "  - $(fl)" >> $1;)
-endef
-
 CLANGD := $(APP_DIR)/.clangd
 $(CLANGD):
-	$(call CLANGD_HELPER,$@,$(CFLAGS) -I$(INCLUDE_DIR) -I$(APP_DIR))
+	echo "CompileFlags:" > $@
+	echo "  Add:" >> $@
+	$(foreach fl,$(CFLAGS) -I$(INCLUDE_DIR) -I$(APP_DIR),echo "  - $(fl)" >> $@;)
 
 .PHONY: clangd clean.clangd
 
