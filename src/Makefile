@@ -123,7 +123,7 @@ CONFIGS := $(CONFIG_C) $(CONFIG_S) $(CONFIG_LD) $(CONFIG_MK)
 
 # Generating the config makefile takes some work, and may not be necessary for all targets in this
 # makefile. If a target does not need $(CONFIG_MK) to execute safely, list it here!
-CONFIG_FREE_TARGETS := clean clean.deep clean.clangd%
+CONFIG_FREE_TARGETS := clean clean.deep clean.clangd% apps.clean.clangd%
 
 # Kinda confusing condition, include $(CONFIG_MK) if there is at least one non config free target!
 ifneq ($(filter-out $(CONFIG_FREE_TARGETS),$(MAKECMDGOALS)),)
